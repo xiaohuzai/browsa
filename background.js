@@ -96,12 +96,22 @@ async function handle(msg, _sender) {
         try {
           const mode = msg.contextMode || all.contextMode || 'reader';
           if (mode === 'reader') {
-            await ensureReadabilityInjected(tabId).catch(() => {});
+            const inj = await ensureReadabilityInjected(tabId).catch((e) => ({ injected: false, error: e.message }));
+            console.log('browsa[bg]: ensurePageLibrariesInjected →', inj);
           }
           pageContext = await extractActiveTab({
             mode,
             maxTextChars: all.maxTextChars
           });
+          if (pageContext) {
+            console.log('browsa[bg]: pageContext', {
+              mode: pageContext.mode,
+              format: pageContext.format,
+              textLength: pageContext.text?.length,
+              wasCapped: pageContext.truncated?.wasCapped,
+              imageCount: pageContext.imageCount
+            });
+          }
         } catch (e) {
           // If extraction fails, just send without it.
           console.warn('browsa: page extract failed, sending without context', e);
