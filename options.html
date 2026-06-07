@@ -18,20 +18,18 @@
       <h2>Default context mode</h2>
       <p class="hint">How the side panel attaches the current page when you press Send.</p>
       <div class="row">
-        <label><input type="radio" name="ctx" value="full" /> Full page (HTML → text)</label>
+        <label><input type="radio" name="ctx" value="reader" /> Reader (Mozilla Readability — recommended)</label>
+        <label><input type="radio" name="ctx" value="full" /> Full (body innerText, no filtering)</label>
         <label><input type="radio" name="ctx" value="selected" /> Selected text only</label>
         <label><input type="radio" name="ctx" value="screenshot" /> Screenshot</label>
       </div>
 
-      <h2>Page size limits</h2>
+      <h2>Page size limit</h2>
       <p class="hint">
-        How many characters of the page to extract and send. Defaults (500K) cover long articles;
-        most LLMs accept 128K-200K tokens (≈ 500K characters). Lower if your model is small or you want to save cost.
+        Hard cap on extracted text (chars). Readability typically yields 5-30K;
+        this is a safety net for huge pages. Default 1M is fine for any modern LLM.
       </p>
       <div class="row">
-        <label class="small">Max HTML chars (read from page)
-          <input id="maxHtmlChars" type="number" min="1000" step="1000" />
-        </label>
         <label class="small">Max text chars (sent to model)
           <input id="maxTextChars" type="number" min="1000" step="1000" />
         </label>

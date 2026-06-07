@@ -26,7 +26,7 @@ async function init() {
   // Load config
   const cfg = await sendMessage({ type: 'GET_CONFIG' });
   populateProviderSelect(cfg);
-  applyContextMode(cfg.contextMode || 'full');
+  applyContextMode(cfg.contextMode || 'reader');
   autoAttachEl.checked = !!cfg.autoAttachPage;
 
   // Load history
@@ -115,7 +115,7 @@ async function onProviderChange() {
 }
 
 async function onContextModeChange() {
-  const mode = [...ctxRadios].find((r) => r.checked)?.value || 'full';
+  const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
   await sendMessage({ type: 'SET_CONTEXT_MODE', mode });
 }
 
@@ -164,7 +164,7 @@ async function onSend() {
   });
 
   try {
-    const mode = [...ctxRadios].find((r) => r.checked)?.value || 'full';
+    const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,

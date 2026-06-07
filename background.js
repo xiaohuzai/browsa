@@ -7,7 +7,7 @@
 
 import * as storage from './lib/storage.js';
 import { chatStream, chat, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
-import { extractActiveTab, buildMessages } from './lib/page-extractor.js';
+import { extractActiveTab, buildMessages, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
 chrome.sidePanel
@@ -53,9 +53,13 @@ async function handle(msg, _sender) {
 
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
+      const mode = msg.mode || all.contextMode || 'reader';
+      if (mode === 'reader' || mode === 'selected') {
+        // Readability needs to be present in the page world before we can call it.
+        await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
+      }
       const ctx = await extractActiveTab({
-        mode: msg.mode || all.contextMode || 'full',
-        maxHtmlChars: all.maxHtmlChars,
+        mode,
         maxTextChars: all.maxTextChars
       });
       return ctx;
@@ -88,9 +92,12 @@ async function handle(msg, _sender) {
       let pageContext = null;
       if (msg.attachPage) {
         try {
+          const mode = msg.contextMode || all.contextMode || 'reader';
+          if (mode === 'reader' || mode === 'selected') {
+            await ensureReadabilityInjected(tabId).catch(() => {});
+          }
           pageContext = await extractActiveTab({
-            mode: msg.contextMode || all.contextMode || 'full',
-            maxHtmlChars: all.maxHtmlChars,
+            mode,
             maxTextChars: all.maxTextChars
           });
         } catch (e) {
@@ -170,4 +177,12 @@ function safePost(port, payload) {
   } catch {
     // Port closed (user closed panel). Swallow.
   }
+}
+
+// Resolve a tabId from a message context. CHAT messages carry tabId explicitly;
+// GET_PAGE_CONTEXT might not, so we fall back to the sender's tab.
+function tabIdOf(msg, sender) {
+  if (msg?.tabId != null) return msg.tabId;
+  if (sender?.tab?.id != null) return sender.tab.id;
+  return null;
 }

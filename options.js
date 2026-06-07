@@ -13,12 +13,12 @@ init();
 async function init() {
   cachedCfg = await storage.getAll();
   renderProviders();
-  applyContextMode(cachedCfg.contextMode || 'full');
+  applyContextMode(cachedCfg.contextMode || 'reader');
   applyLimits(cachedCfg);
 
   document.querySelectorAll('input[name="ctx"]').forEach((r) => {
     r.addEventListener('change', async () => {
-      const mode = [...document.querySelectorAll('input[name="ctx"]')].find((x) => x.checked)?.value || 'full';
+      const mode = [...document.querySelectorAll('input[name="ctx"]')].find((x) => x.checked)?.value || 'reader';
       await storage.setContextMode(mode);
       flash('ok', `Default context mode: ${mode}`);
     });
@@ -29,25 +29,20 @@ async function init() {
 }
 
 function applyLimits(cfg) {
-  const htmlEl = document.getElementById('maxHtmlChars');
   const textEl = document.getElementById('maxTextChars');
-  if (htmlEl) htmlEl.value = cfg.maxHtmlChars ?? 500_000;
-  if (textEl) textEl.value = cfg.maxTextChars ?? 500_000;
+  if (textEl) textEl.value = cfg.maxTextChars ?? 1_000_000;
 }
 
 async function saveLimits() {
-  const htmlEl = document.getElementById('maxHtmlChars');
   const textEl = document.getElementById('maxTextChars');
-  const html = parseInt(htmlEl?.value, 10);
   const text = parseInt(textEl?.value, 10);
-  if (!Number.isFinite(html) || html < 1000 || !Number.isFinite(text) || text < 1000) {
-    flash('err', 'Both limits must be ≥ 1000 chars.');
+  if (!Number.isFinite(text) || text < 1000) {
+    flash('err', 'Limit must be ≥ 1000 chars.');
     return;
   }
-  cachedCfg.maxHtmlChars = html;
   cachedCfg.maxTextChars = text;
-  await chrome.storage.local.set({ maxHtmlChars: html, maxTextChars: text });
-  flash('ok', `Saved limits: HTML ${html.toLocaleString()} chars, text ${text.toLocaleString()} chars.`);
+  await chrome.storage.local.set({ maxTextChars: text });
+  flash('ok', `Saved: max text ${text.toLocaleString()} chars.`);
 }
 
 function renderProviders() {
