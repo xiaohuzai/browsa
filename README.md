@@ -42,12 +42,12 @@ See [`config.example.json`](./config.example.json) for a starting point.
 
 - `manifest.json` declares `host_permissions: ["http://*/*", "https://*/*"]` so any provider URL works without rebuilding the extension.
 - `lib/openai-client.js` is a ~150-line OpenAI Chat Completions client. It handles both **streaming** (SSE via `fetch` + `ReadableStream`) and **non-streaming** calls, and emits typed errors for config / network / API failures.
-- `lib/page-extractor.js` runs in the page's **MAIN world** via `chrome.scripting.executeScript` so it can read real DOM. It supports three context modes:
-  - `full` — full HTML, stripped to text, capped at 60 KB
+- `lib/page-extractor.js` runs in the page's **MAIN world** via `chrome.scripting.executeScript`. It loads `Readability.js` (Mozilla, MIT) for main-content extraction and `Turndown.js` (HTML→Markdown), then returns one of three context modes:
+  - `full` — full page (Readability → Markdown), capped at 60 KB
   - `selected` — only the user's text selection (falls back to full if empty)
   - `screenshot` — a `data:image/png;...` URL of the visible tab (multimodal)
 - `background.js` is a module service worker. It routes messages from the side panel, extracts page context, builds the messages array, calls the active provider, and streams deltas back via a long-lived `Port`.
-- `sidepanel.js` renders the chat UI, supports per-tab history, and updates page meta when you switch tabs.
+- `sidepanel.js` renders the chat UI with **blinking caret streaming** (60fps textContent during generation), then post-processes the final reply with `marked` (Markdown→HTML) and `DOMPurify` (XSS sanitization) so headings/lists/code blocks/quotes/tables render cleanly.
 
 ## Security
 
@@ -60,12 +60,16 @@ See [`config.example.json`](./config.example.json) for a starting point.
 browsa/
 ├── manifest.json
 ├── background.js               # service worker (module)
-├── sidepanel.html / .css / .js # chat UI
+├── sidepanel.html / .css / .js # chat UI + Markdown rendering
 ├── options.html / .css / .js   # provider config UI
 ├── lib/
 │   ├── openai-client.js        # OpenAI Chat Completions + SSE
-│   ├── page-extractor.js       # tab context extraction
-│   └── storage.js              # chrome.storage wrapper
+│   ├── page-extractor.js       # tab context extraction (MAIN world)
+│   ├── storage.js              # chrome.storage wrapper
+│   ├── Readability.js          # Mozilla main-content extractor (bundled)
+│   ├── Turndown.js             # HTML → Markdown (bundled)
+│   ├── marked.min.js           # Markdown → HTML for LLM replies (bundled)
+│   └── purify.min.js           # XSS sanitizer for LLM replies (bundled)
 ├── icons/                      # 16 / 48 / 128
 ├── config.example.json
 ├── .gitignore
