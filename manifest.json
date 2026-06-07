@@ -44,7 +44,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["lib/Readability.js"],
+      "resources": ["lib/Readability.js", "lib/Turndown.js"],
       "matches": ["<all_urls>"]
     }
   ]

@@ -7,6 +7,9 @@ const messagesEl = $('messages');
 const inputEl = $('input');
 const sendBtn = $('send');
 const providerSel = $('provider');
+const charCountEl = $('charcount');
+const tokCountEl = $('tokcount');
+const composerInfoEl = $('composerinfo');
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const autoAttachEl = $('autoattach');
@@ -40,6 +43,7 @@ async function init() {
     // Persisted on background; also locally
   });
   sendBtn.addEventListener('click', onSend);
+  inputEl.addEventListener('input', updateComposerInfo);
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -108,6 +112,34 @@ function applyContextMode(mode) {
   for (const r of ctxRadios) r.checked = r.value === mode;
 }
 
+// Approximate character / token counter. We avoid bundling gpt-tokenizer
+// (~1MB BPE table) because:
+//   1. The exact count is non-critical — users just need a sense of size.
+//   2. Each LLM tokenizes differently (o200k_base, cl100k_base, etc.) and
+//      we have no way to know which the active provider uses.
+//   3. Token count for a "feel" is good enough: 1 CJK char ≈ 0.5-1.0 token,
+//      1 English word ≈ 1.0-1.3 tokens. We use a simple heuristic:
+//        cjk chars  : 1.0 token each
+//        non-cjk    : ceil(length / 4)  (rough word+punctuation count)
+function estimateTokens(text) {
+  if (!text) return 0;
+  const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+  const rest = text.length - cjk;
+  return Math.round(cjk + rest / 4);
+}
+
+function updateComposerInfo() {
+  if (!charCountEl || !tokCountEl) return;
+  const t = inputEl.value;
+  charCountEl.textContent = t.length.toLocaleString();
+  const est = estimateTokens(t);
+  tokCountEl.textContent = '~' + est.toLocaleString();
+  // Color the line based on size
+  composerInfoEl.classList.remove('warn', 'danger');
+  if (est > 50_000) composerInfoEl.classList.add('danger');
+  else if (est > 10_000) composerInfoEl.classList.add('warn');
+}
+
 async function onProviderChange() {
   const name = providerSel.value;
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
@@ -129,6 +161,20 @@ async function onSend() {
     // Even with empty text, if page is attached, we can still send.
   } else if (!text) {
     return;
+  }
+
+  // Auto-detect: if user has highlighted text on the page, prefer Selection
+  // mode automatically. Otherwise respect the chosen context mode.
+  let mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
+  try {
+    const selRes = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'selected', targetTabId: currentTabId });
+    const selText = (selRes?.text || '').trim();
+    if (selText && selText.length >= 8) {
+      // The user has selected something on the page — use it.
+      mode = 'selected';
+    }
+  } catch (_) {
+    // ignore; fall back to chosen mode
   }
 
   // User bubble
@@ -164,7 +210,6 @@ async function onSend() {
   });
 
   try {
-    const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,

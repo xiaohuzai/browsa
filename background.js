@@ -54,8 +54,10 @@ async function handle(msg, _sender) {
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
       const mode = msg.mode || all.contextMode || 'reader';
-      if (mode === 'reader' || mode === 'selected') {
-        // Readability needs to be present in the page world before we can call it.
+      if (mode === 'reader') {
+        // Readability + Turndown need to be in the page world for reader
+        // mode. Skip injection for 'selected' (only reads window.getSelection)
+        // and 'full' (uses body.innerText).
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
       const ctx = await extractActiveTab({
@@ -93,7 +95,7 @@ async function handle(msg, _sender) {
       if (msg.attachPage) {
         try {
           const mode = msg.contextMode || all.contextMode || 'reader';
-          if (mode === 'reader' || mode === 'selected') {
+          if (mode === 'reader') {
             await ensureReadabilityInjected(tabId).catch(() => {});
           }
           pageContext = await extractActiveTab({

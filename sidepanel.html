@@ -27,12 +27,17 @@
     <main id="messages" class="messages"></main>
 
     <footer class="composer">
-      <textarea
-        id="input"
-        rows="2"
-        placeholder="Type a question for your agent… (Enter to send, Shift+Enter for newline)"
-      ></textarea>
-      <button id="send" class="sendbtn">Send</button>
+      <div class="row">
+        <textarea
+          id="input"
+          rows="2"
+          placeholder="Type a question for your agent… (Enter to send, Shift+Enter for newline)"
+        ></textarea>
+        <button id="send" class="sendbtn">Send</button>
+      </div>
+      <div id="composerinfo" class="composerinfo" title="Approx input size (chars) and estimated tokens">
+        <span id="charcount">0</span> chars · <span id="tokcount">~0</span> tokens
+      </div>
     </footer>
 
     <script type="module" src="sidepanel.js"></script>

@@ -134,10 +134,16 @@ body {
 
 .composer {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 8px;
   border-top: 1px solid var(--border);
   background: var(--bg-2);
+}
+.composer .row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 #input {
   flex: 1;
@@ -152,6 +158,14 @@ body {
   max-height: 200px;
 }
 #input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.composerinfo {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+.composerinfo .warn { color: #d97706; }
+.composerinfo .danger { color: #dc2626; font-weight: 600; }
 .sendbtn {
   padding: 0 14px;
   border: none;
