@@ -176,6 +176,14 @@ async function onSend() {
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);
       assistantEl.remove();
+    } else if (res.data?.pageContext?.truncated?.textLength) {
+      const t = res.data.pageContext.truncated;
+      if (t.rawHtmlLength > t.textLength) {
+        appendSystem(
+          `ℹ Page truncated: sent ${t.textLength.toLocaleString()} of ${t.rawHtmlLength.toLocaleString()} chars ` +
+          `(limit ${t.textCap.toLocaleString()}). Raise limits in ⚙ Settings if you need more.`
+        );
+      }
     }
   } catch (e) {
     appendError(e.message);

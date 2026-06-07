@@ -53,7 +53,11 @@ async function handle(msg, _sender) {
 
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
-      const ctx = await extractActiveTab({ mode: msg.mode || all.contextMode || 'full' });
+      const ctx = await extractActiveTab({
+        mode: msg.mode || all.contextMode || 'full',
+        maxHtmlChars: all.maxHtmlChars,
+        maxTextChars: all.maxTextChars
+      });
       return ctx;
     }
 
@@ -84,7 +88,11 @@ async function handle(msg, _sender) {
       let pageContext = null;
       if (msg.attachPage) {
         try {
-          pageContext = await extractActiveTab({ mode: msg.contextMode || all.contextMode || 'full' });
+          pageContext = await extractActiveTab({
+            mode: msg.contextMode || all.contextMode || 'full',
+            maxHtmlChars: all.maxHtmlChars,
+            maxTextChars: all.maxTextChars
+          });
         } catch (e) {
           // If extraction fails, just send without it.
           console.warn('browsa: page extract failed, sending without context', e);
@@ -138,7 +146,17 @@ async function handle(msg, _sender) {
       await storage.appendToHistory(tabId, { role: 'assistant', content: fullReply });
 
       if (port) safePost(port, { type: 'DONE', full: fullReply });
-      return { full: fullReply, pageContext: pageContext ? { mode: pageContext.mode, url: pageContext.meta.url, title: pageContext.meta.title } : null };
+      return {
+        full: fullReply,
+        pageContext: pageContext
+          ? {
+              mode: pageContext.mode,
+              url: pageContext.meta.url,
+              title: pageContext.meta.title,
+              truncated: pageContext.truncated
+            }
+          : null
+      };
     }
 
     default:
