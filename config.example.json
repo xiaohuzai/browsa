@@ -1,0 +1,24 @@
+{
+  "_comment": "Copy this file content into the extension's Options page (or paste as values). Do NOT commit your real API keys.",
+  "providers": {
+    "hermes": {
+      "baseUrl": "http://101.47.17.208:8642",
+      "apiKey": "your-hermes-api-key",
+      "defaultModel": "hermes-agent",
+      "stream": true
+    },
+    "claude-code": {
+      "baseUrl": "http://localhost:8000",
+      "apiKey": "not-required-for-claude-code-wrapper",
+      "defaultModel": "claude-sonnet-4-6",
+      "stream": true
+    },
+    "openclaw": {
+      "baseUrl": "http://localhost:8080",
+      "apiKey": "your-openclaw-key",
+      "defaultModel": "openai/gpt-5.5",
+      "stream": true
+    }
+  },
+  "activeProvider": "hermes"
+}

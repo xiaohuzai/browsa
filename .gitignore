@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (if user adds build tools later)
+node_modules/
+dist/
+build/
+
+# Local config (do NOT commit real API keys)
+config.local.json
+.env
+.env.local
+
+# Test artifacts
+*.log
+coverage/

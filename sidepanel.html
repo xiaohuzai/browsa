@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>browsa</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">browsa</div>
+      <select id="provider" class="provider" title="选择后端"></select>
+      <button id="settings" class="iconbtn" title="设置 (provider / API key)">⚙</button>
+    </header>
+
+    <div class="contextbar">
+      <span class="ctx-label">Context:</span>
+      <label class="ctx-opt"><input type="radio" name="ctx" value="full" /> Full</label>
+      <label class="ctx-opt"><input type="radio" name="ctx" value="selected" /> Selection</label>
+      <label class="ctx-opt"><input type="radio" name="ctx" value="screenshot" /> Screenshot</label>
+      <label class="ctx-opt">
+        <input type="checkbox" id="autoattach" checked /> Auto-attach
+      </label>
+      <a id="pagemeta" class="pagemeta" target="_blank" title=""></a>
+    </div>
+
+    <main id="messages" class="messages"></main>
+
+    <footer class="composer">
+      <textarea
+        id="input"
+        rows="2"
+        placeholder="Type a question for your agent… (Enter to send, Shift+Enter for newline)"
+      ></textarea>
+      <button id="send" class="sendbtn">Send</button>
+    </footer>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

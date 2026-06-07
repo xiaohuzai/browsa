@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>browsa — settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>browsa settings</h1>
+      <p class="hint">
+        Configure any OpenAI-compatible endpoint as a provider. The active provider is the one the side panel
+        will send to. Use the <b>Ping</b> button to verify connectivity.
+      </p>
+
+      <section id="providers"></section>
+
+      <h2>Default context mode</h2>
+      <p class="hint">How the side panel attaches the current page when you press Send.</p>
+      <div class="row">
+        <label><input type="radio" name="ctx" value="full" /> Full page (HTML → text)</label>
+        <label><input type="radio" name="ctx" value="selected" /> Selected text only</label>
+        <label><input type="radio" name="ctx" value="screenshot" /> Screenshot</label>
+      </div>
+
+      <div id="status" class="status"></div>
+    </main>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
