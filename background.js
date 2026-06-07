@@ -83,6 +83,16 @@ async function handle(msg, _sender) {
       return { contextMode: msg.mode };
     }
 
+    case 'OPEN_OPTIONS_TAB': {
+      // The side panel can't reliably call chrome.runtime.openOptionsPage()
+      // (it sometimes silently no-ops). Open the options page in a new tab
+      // from the service worker, which has the necessary chrome.tabs.create
+      // permission (host_permissions cover all URLs).
+      const url = msg.url || chrome.runtime.getURL('options.html');
+      await chrome.tabs.create({ url });
+      return { opened: true };
+    }
+
     case 'CLEAR_HISTORY': {
       const tabId = msg.tabId;
       if (tabId == null) throw new Error('tabId required');

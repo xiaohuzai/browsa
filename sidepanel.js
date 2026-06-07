@@ -49,7 +49,7 @@ async function init() {
 
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
-  settingsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
+  settingsBtn.addEventListener('click', openSettingsPage);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
   autoAttachEl.addEventListener('change', () => {
     // Persisted on background; also locally
@@ -205,6 +205,24 @@ function updateComposerInfo() {
   composerInfoEl.classList.remove('warn', 'danger');
   if (est > 50_000) composerInfoEl.classList.add('danger');
   else if (est > 10_000) composerInfoEl.classList.add('warn');
+}
+
+async function openSettingsPage() {
+  // chrome.runtime.openOptionsPage() is unreliable when invoked from a side
+  // panel context (Chromium 41294020). Workaround: ask the service worker
+  // to open a new tab pointing at our options.html. The extension URL is
+  // chrome.runtime.getURL('options.html').
+  try {
+    const url = chrome.runtime.getURL('options.html');
+    await sendMessage({ type: 'OPEN_OPTIONS_TAB', url });
+  } catch (e) {
+    // Fallback: try the direct API
+    try {
+      chrome.runtime.openOptionsPage();
+    } catch (e2) {
+      appendError('Cannot open settings: ' + e2.message);
+    }
+  }
 }
 
 async function onProviderChange() {
