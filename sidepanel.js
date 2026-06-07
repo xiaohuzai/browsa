@@ -2,6 +2,18 @@
 // Talks to background.js via chrome.runtime messages. Streaming responses come back
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
+import marked from './lib/marked.min.js';
+import DOMPurify from './lib/purify.min.js';
+
+// Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
+// head features we don't need. Keep it simple; DOMPurify handles XSS later.
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  headerIds: false,
+  mangle: false
+});
+
 const $ = (id) => document.getElementById(id);
 const messagesEl = $('messages');
 const inputEl = $('input');
@@ -112,6 +124,61 @@ function applyContextMode(mode) {
   for (const r of ctxRadios) r.checked = r.value === mode;
 }
 
+// Markdown -> sanitized HTML pipeline. Returns HTML safe for innerHTML.
+function renderSafe(markdown) {
+  try {
+    const rawHtml = marked.parse(markdown || '');
+    return DOMPurify.sanitize(rawHtml, {
+      ADD_ATTR: ['target', 'rel'],
+      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
+    });
+  } catch (e) {
+    return DOMPurify.sanitize(
+      (markdown || '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;',
+        '"': '&quot;', "'": '&#39;'
+      }[c]))
+    );
+  }
+}
+
+// After every innerHTML update, ensure external links open in new tab with
+// rel="noopener noreferrer". Cheap (runs on the bubble subtree only).
+function decorateLinks(el) {
+  for (const a of el.querySelectorAll('a[href]')) {
+    if (a.host && a.host !== location.host) {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+  }
+}
+
+// Build a streaming-render closure for a specific bubble. Streaming path is
+// fast (textContent via rAF throttle); the final DONE render goes through
+// marked + DOMPurify for proper Markdown formatting.
+function makeStreamRenderer(el) {
+  let raf = null;
+  return function renderStream(text, isDone) {
+    if (isDone) {
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      el.innerHTML = renderSafe(text);
+      el.classList.add('done');
+      decorateLinks(el);
+      scrollToBottom();
+      return;
+    }
+    if (raf != null) return; // already scheduled
+    raf = requestAnimationFrame(() => {
+      raf = null;
+      // Plain text during streaming — fast (1 textContent assignment) and
+      // we save the expensive Markdown parse for the final render.
+      el.textContent = text;
+      el.classList.remove('done');
+      scrollToBottom();
+    });
+  };
+}
+
 // Approximate character / token counter. We avoid bundling gpt-tokenizer
 // (~1MB BPE table) because:
 //   1. The exact count is non-critical — users just need a sense of size.
@@ -185,27 +252,53 @@ async function onSend() {
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('▍');
   let acc = '';
+  const renderStream = makeStreamRenderer(assistantEl);
 
-  // Open streaming port
+  // Open streaming port FIRST so the background can push CHUNKs as they
+  // arrive. We pass the port's name to the background via msg.port; the
+  // background matches it to the connected port and pushes deltas back.
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
   activeController = { port, cancelled: false };
 
-  port.onMessage.addListener((m) => {
-    if (m.type === 'CHUNK') {
-      acc += m.delta;
-      assistantEl.textContent = acc + ' ▍';
-      scrollToBottom();
-    } else if (m.type === 'DONE') {
-      assistantEl.textContent = m.full || acc;
-      scrollToBottom();
-    }
+  // Hand the tabId to the background so it knows which port serves which tab.
+  // The background stores the port in a Map keyed by tabId; when the CHAT
+  // handler emits a delta, it looks up the port via this tabId.
+  // We wait for an ACK before sending the CHAT message, to avoid a race
+  // where the first chunk fires before the background has registered us.
+  await new Promise((resolve) => {
+    const ackTimeout = setTimeout(resolve, 500); // safety net
+    port.onMessage.addListener(function once(m) {
+      if (m.type === 'STREAM_HELLO_ACK') {
+        clearTimeout(ackTimeout);
+        port.onMessage.removeListener(once);
+        // Re-attach the chunk listener that we just shadowed.
+        attachChunkListener();
+        resolve();
+      }
+    });
+    port.postMessage({ type: 'STREAM_HELLO', tabId: currentTabId });
   });
+
+  function attachChunkListener() {
+    port.onMessage.addListener((m) => {
+      if (m.type === 'CHUNK') {
+        acc += m.delta;
+        renderStream(acc, false);
+      } else if (m.type === 'DONE') {
+        renderStream(m.full || acc, true);
+      } else if (m.type === 'ERROR') {
+        assistantEl.textContent = `❌ ${m.error}`;
+      }
+    });
+  }
   port.onDisconnect.addListener(() => {
     sendBtn.disabled = false;
     activeController = null;
-    if (acc === '') {
-      // No chunks received — likely an error before streaming. Show hint.
-      assistantEl.textContent = '(no response)';
+    if (acc === '' && assistantEl.textContent === '▍') {
+      // No chunks received AND the assistant bubble still shows the
+      // placeholder. The background reported an error before any delta
+      // was emitted. Show a clear hint.
+      assistantEl.textContent = '(no chunks received — check Service Worker DevTools)';
     }
   });
 
@@ -216,7 +309,8 @@ async function onSend() {
       userText: text,
       attachPage: !!autoAttachEl.checked,
       contextMode: mode,
-      stream: true
+      stream: true,
+      portName: 'browsa-chat' // <- background's onConnect uses port.name to push deltas back
     });
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);

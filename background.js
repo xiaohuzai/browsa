@@ -14,6 +14,45 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((e) => console.error('browsa: setPanelBehavior failed', e));
 
+// Streaming port: the side panel opens a long-lived port named 'browsa-chat'
+// before sending the CHAT message. As soon as the background's CHAT handler
+// has the first delta from the LLM, it pushes it back through this port.
+// We keep a registry keyed by tabId so multiple tabs (each with their own
+// side panel) can stream independently.
+const streamPorts = new Map(); // tabId -> Port
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'browsa-chat') return;
+  // The side panel sends a "hello" with its tabId so we know which tab this
+  // port belongs to. We can't accept a Port over sendMessage, so we handshake.
+  let claimedTabId = null;
+  port.onMessage.addListener((msg) => {
+    if (msg && msg.type === 'STREAM_HELLO' && typeof msg.tabId === 'number') {
+      claimedTabId = msg.tabId;
+      streamPorts.set(msg.tabId, port);
+      console.log('browsa[bg]: stream port registered for tab', msg.tabId);
+      // Acknowledge so the side panel knows it's safe to send CHAT. This
+      // prevents a race where the first LLM chunk arrives before we have
+      // the port in our Map.
+      try { port.postMessage({ type: 'STREAM_HELLO_ACK' }); } catch (_) {}
+    } else if (msg && msg.type === 'STREAM_GOODBYE' && claimedTabId != null) {
+      streamPorts.delete(claimedTabId);
+      console.log('browsa[bg]: stream port released for tab', claimedTabId);
+    }
+  });
+  port.onDisconnect.addListener(() => {
+    if (claimedTabId != null) {
+      streamPorts.delete(claimedTabId);
+      console.log('browsa[bg]: stream port disconnected for tab', claimedTabId);
+    }
+  });
+});
+
+function pushChunk(tabId, payload) {
+  const port = streamPorts.get(tabId);
+  if (port) safePost(port, payload);
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Every handler is async; return true to keep the channel open.
   (async () => {
@@ -137,8 +176,6 @@ async function handle(msg, _sender) {
       let fullReply = '';
       const stream = msg.stream !== false && provider.stream !== false;
 
-      const port = msg.port; // optional: a Port for streaming deltas back
-
       if (stream) {
         fullReply = await chatStream({
           baseUrl: provider.baseUrl,
@@ -146,7 +183,7 @@ async function handle(msg, _sender) {
           model: provider.model || provider.defaultModel,
           messages,
           onDelta: (delta) => {
-            if (port) safePost(port, { type: 'CHUNK', delta });
+            pushChunk(tabId, { type: 'CHUNK', delta });
           },
           signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined // 5 min cap
         });
@@ -158,13 +195,23 @@ async function handle(msg, _sender) {
           messages,
           signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined
         });
-        if (port) safePost(port, { type: 'CHUNK', delta: fullReply });
+        pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
       }
 
       // Persist assistant turn
       await storage.appendToHistory(tabId, { role: 'assistant', content: fullReply });
 
-      if (port) safePost(port, { type: 'DONE', full: fullReply });
+      pushChunk(tabId, { type: 'DONE', full: fullReply });
+      // Disconnect the streaming port so the side panel's onDisconnect fires
+      // and resets the Send button state. A short delay gives the DONE chunk
+      // time to be delivered before the port is torn down.
+      setTimeout(() => {
+        const p = streamPorts.get(tabId);
+        if (p) {
+          try { p.disconnect(); } catch (_) {}
+          streamPorts.delete(tabId);
+        }
+      }, 50);
       return {
         full: fullReply,
         pageContext: pageContext

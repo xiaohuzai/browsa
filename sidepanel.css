@@ -105,18 +105,32 @@ body {
   max-width: 92%;
   padding: 8px 10px;
   border-radius: 10px;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  line-height: 1.5;
   word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .msg.user {
   align-self: flex-end;
   background: var(--user-bubble);
   color: var(--accent-fg);
+  white-space: pre-wrap; /* keep user input as-is */
 }
 .msg.assistant {
   align-self: flex-start;
   background: var(--assistant-bubble);
+  white-space: normal; /* let Markdown handle line breaks */
+}
+.msg.assistant::after {
+  /* Blinking caret while streaming. We hide it on .done. */
+  content: '▍';
+  display: inline-block;
+  margin-left: 2px;
+  animation: blink 1s steps(2, end) infinite;
+  color: var(--muted);
+}
+.msg.assistant.done::after { display: none; }
+@keyframes blink {
+  to { opacity: 0; }
 }
 .msg.system {
   align-self: center;
@@ -130,6 +144,110 @@ body {
   color: var(--error);
   font-size: 12px;
   background: transparent;
+}
+
+/* Markdown element styling inside .msg.assistant. These only take effect
+   after the final render (DONE) when innerHTML is set with marked output. */
+.msg.assistant h1,
+.msg.assistant h2,
+.msg.assistant h3,
+.msg.assistant h4 {
+  margin: 0.4em 0 0.3em;
+  line-height: 1.25;
+  font-weight: 600;
+}
+.msg.assistant h1 { font-size: 1.25em; }
+.msg.assistant h2 { font-size: 1.1em; }
+.msg.assistant h3 { font-size: 1.0em; }
+.msg.assistant h4 { font-size: 0.95em; color: var(--muted); }
+
+.msg.assistant p { margin: 0.3em 0; }
+.msg.assistant p:first-child { margin-top: 0; }
+.msg.assistant p:last-child  { margin-bottom: 0; }
+
+.msg.assistant ul,
+.msg.assistant ol {
+  margin: 0.3em 0;
+  padding-left: 1.4em;
+}
+.msg.assistant li { margin: 0.1em 0; }
+.msg.assistant li > p { margin: 0; }
+
+.msg.assistant a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+@media (prefers-color-scheme: dark) {
+  .msg.assistant a { color: #93c5fd; }
+}
+
+.msg.assistant blockquote {
+  margin: 0.3em 0;
+  padding: 0.2em 0.6em;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+  background: rgba(0,0,0,0.03);
+}
+@media (prefers-color-scheme: dark) {
+  .msg.assistant blockquote { background: rgba(255,255,255,0.04); }
+}
+
+.msg.assistant code {
+  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+  background: rgba(0,0,0,0.07);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+@media (prefers-color-scheme: dark) {
+  .msg.assistant code { background: rgba(255,255,255,0.1); }
+}
+
+.msg.assistant pre {
+  margin: 0.4em 0;
+  padding: 8px 10px;
+  background: #0d1117;
+  color: #c9d1d9;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+@media (prefers-color-scheme: dark) {
+  .msg.assistant pre { background: #161b22; }
+}
+.msg.assistant pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+.msg.assistant table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.9em;
+}
+.msg.assistant th,
+.msg.assistant td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.msg.assistant th { background: var(--bg-2); font-weight: 600; }
+
+.msg.assistant hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.6em 0;
+}
+
+.msg.assistant img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.3em 0;
 }
 
 .composer {
