@@ -199,13 +199,19 @@ function updateOutputTokenCount(delta) {
 
 function addCodeCopyButtons() {
   for (const pre of messagesEl.querySelectorAll('.msg.assistant pre')) {
+    // Add language label (from code[class*="language-xxx"])
+    const code = pre.querySelector('code[class*="language-"]');
+    if (code && !pre.hasAttribute('data-lang')) {
+      const cls = code.className.match(/language-(\w+)/);
+      if (cls) pre.setAttribute('data-lang', cls[1]);
+    }
     if (pre.querySelector('.code-copy-btn')) continue;
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
     btn.textContent = 'Copy';
     btn.addEventListener('click', async () => {
-      const code = pre.querySelector('code')?.textContent || pre.textContent || '';
-      try { await navigator.clipboard.writeText(code); btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); } catch {}
+      const text = code?.textContent || pre.textContent || '';
+      try { await navigator.clipboard.writeText(text); btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); } catch {}
     });
     pre.style.position = 'relative';
     pre.appendChild(btn);
@@ -213,11 +219,14 @@ function addCodeCopyButtons() {
 }
 
 // Markdown -> sanitized HTML pipeline. Returns HTML safe for innerHTML.
+// Also renders math formulas ($...$ and $$...$$) into styled HTML.
 function renderSafe(markdown) {
   try {
-    const rawHtml = marked.parse(markdown || '');
-    return DOMPurify.sanitize(rawHtml, {
+    let html = marked.parse(markdown || '');
+    html = renderMath(html);
+    return DOMPurify.sanitize(html, {
       ADD_ATTR: ['target', 'rel'],
+      ADD_TAGS: ['math-inline', 'math-block'],
       ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
     });
   } catch (e) {
@@ -229,6 +238,26 @@ function renderSafe(markdown) {
     );
   }
 }
+
+/** Render LaTeX math: $inline$ -> <math-inline>, $$block$$ -> <math-block> */
+function renderMath(html) {
+  const blocks = [];
+  let out = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, f) => {
+    blocks.push(f.trim());
+    return '%%MB' + (blocks.length - 1) + '%%';
+  });
+  out = out.replace(/\$([^$\n]+?)\$/g, (_, f) => {
+    blocks.push(f.trim());
+    return '%%MI' + (blocks.length - 1) + '%%';
+  });
+  out = out.replace(/%%MB(\d+)%%/g, (_, i) =>
+    '<div class="math-block">' + escM(blocks[+i]) + '</div>');
+  out = out.replace(/%%MI(\d+)%%/g, (_, i) =>
+    '<math-inline>' + escM(blocks[+i]) + '</math-inline>');
+  return out;
+}
+
+function escM(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // After every innerHTML update, ensure external links open in new tab with
 // rel="noopener noreferrer". Cheap (runs on the bubble subtree only).

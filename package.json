@@ -1,6 +1,6 @@
 {
   "name": "browsa",
-  "version": "0.14.2",
+  "version": "0.14.3",
   "private": true,
   "description": "Hand the current page to your AI agent \u2014 side-panel chat for Hermes / Claude Code / OpenClaw",
   "scripts": {
@@ -12,7 +12,8 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
-    "jsdom": "^29.1.1"
+    "jsdom": "^29.1.1",
+    "katex": "^0.17.0"
   },
   "license": "MIT"
 }

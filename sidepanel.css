@@ -240,6 +240,7 @@ body {
 .msg.assistant pre {
   margin: 0.5em 0;
   padding: 12px 14px;
+  padding-top: 26px;  /* room for lang label */
   background: #0d1117;
   color: #c9d1d9;
   border-radius: var(--radius);
@@ -247,6 +248,17 @@ body {
   font-size: 0.84em;
   line-height: 1.45;
   border: 1px solid var(--border);
+}
+.msg.assistant pre::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
 }
 @media (prefers-color-scheme: light) {
   .msg.assistant pre { background: #f6f8fa; color: #1f2328; }
@@ -283,6 +295,26 @@ body {
   height: auto;
   border-radius: var(--radius);
   margin: 0.3em 0;
+}
+
+/* Math formulas rendered by renderMath() */
+math-inline {
+  font-family: "KaTeX_Main", "Times New Roman", serif;
+  font-style: italic;
+  background: var(--accent-glow);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.math-block {
+  font-family: "KaTeX_Main", "Times New Roman", serif;
+  font-style: italic;
+  text-align: center;
+  margin: 0.6em 0;
+  padding: 0.5em;
+  background: var(--accent-glow);
+  border-radius: var(--radius);
+  overflow-x: auto;
 }
 
 /*** COMPOSER ***/
