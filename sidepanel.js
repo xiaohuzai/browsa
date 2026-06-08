@@ -497,6 +497,10 @@ async function onSend() {
 
   try {
     const imageDataUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
+    // Clear thumbnails immediately — the LLM may take seconds to respond
+    images.length = 0;
+    refreshImageStrip();
+
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,
@@ -507,9 +511,6 @@ async function onSend() {
       portName: 'browsa-chat',  // <- background's onConnect uses port.name to push deltas back
       images: imageDataUrls
     });
-    // Clear images after sending
-    images.length = 0;
-    refreshImageStrip();
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);
       if (res.hint) appendSystem(res.hint);
