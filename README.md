@@ -28,6 +28,20 @@ browsa is a small Chrome / Edge extension (Manifest V3) that opens a side panel 
 6. Click **⚙ Settings** to configure providers (base URL, API key, model).
 7. Use the **Ping** button to verify each provider.
 
+## Browser compatibility
+
+| Browser        | Status     | Notes                                              |
+| -------------- | ---------- | -------------------------------------------------- |
+| **Edge** 114+  | ✅ Primary | Default development target. Side panel works.      |
+| **Chrome** 114+| ✅ Same as Edge | Same Chromium base; identical install steps.   |
+| **Brave** 1.56+| ✅ Should work | Same Chromium API surface as Chrome.              |
+| **Opera** 100+ | ⚠️ Untested | Should work; side panel API is supported since 100. |
+| **Firefox**    | ❌ Not supported | Uses different manifest keys (`browser_specific_settings`, no `side_panel`). Would need a separate build. |
+
+The `manifest.json` declares `minimum_chrome_version: "114"` because the
+`chrome.sidePanel` API shipped in 114. Both Edge and Chrome auto-update to
+versions well past this.
+
 ## Configure a provider
 
 | Provider | Typical base URL | Notes |
