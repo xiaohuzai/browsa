@@ -65,6 +65,22 @@ async function init() {
       e.preventDefault();
       onSend();
     }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      clearChatHistory();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      cycleContextMode();
+    }
+  });
+
+  // Global shortcuts (Esc = cancel stream)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && activeController && !activeController.cancelled) {
+      e.preventDefault();
+      cancelStream();
+    }
   });
 
   // Show current page meta
@@ -143,6 +159,34 @@ function prettyProviderName(name) {
 
 function applyContextMode(mode) {
   for (const r of ctxRadios) r.checked = r.value === mode;
+}
+
+/** Cycle: reader → full → selected → screenshot → reader */
+function cycleContextMode() {
+  const modes = ['reader', 'full', 'selected', 'screenshot'];
+  const cur = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
+  const idx = modes.indexOf(cur);
+  const next = modes[(idx + 1) % modes.length];
+  applyContextMode(next);
+  onContextModeChange(); // persist
+}
+
+async function clearChatHistory() {
+  if (!currentTabId) return;
+  await sendMessage({ type: 'CLEAR_HISTORY', tabId: currentTabId });
+  messagesEl.innerHTML = '';
+  appendSystem('🗑 History cleared');
+}
+
+function cancelStream() {
+  if (!activeController) return;
+  activeController.cancelled = true;
+  if (activeController.port) {
+    activeController.port.disconnect();
+  }
+  activeController = null;
+  sendBtn.disabled = false;
+  appendSystem('⚠ Stream cancelled');
 }
 
 // Markdown -> sanitized HTML pipeline. Returns HTML safe for innerHTML.

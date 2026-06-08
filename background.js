@@ -83,6 +83,12 @@ async function handle(msg, _sender) {
       return { contextMode: msg.mode };
     }
 
+    case 'CLEAR_HISTORY': {
+      await storage.clearHistory(msg.tabId);
+      console.log('browsa[bg]: history cleared for tab', msg.tabId);
+      return {};
+    }
+
     case 'OPEN_OPTIONS_TAB': {
       // The side panel can't reliably call chrome.runtime.openOptionsPage()
       // (it sometimes silently no-ops). Open the options page in a new tab
