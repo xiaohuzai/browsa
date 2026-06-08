@@ -175,7 +175,8 @@ async function handle(msg, _sender) {
         history,
         userText: msg.userText,
         pageContext,
-        withImage: pageContext?.imageDataUrl ? true : false
+        withImage: pageContext?.imageDataUrl ? true : false,
+        userImages: msg.images // pasted / dropped images (base64 data URLs)
       });
 
       // Persist the user turn (text only, no image)

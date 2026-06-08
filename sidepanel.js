@@ -26,10 +26,14 @@ const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const autoAttachEl = $('autoattach');
 const pagemetaEl = $('pagemeta');
+const imagePreviewsEl = $('imagepreviews');
+const imageInfoEl = $('imageinfo');
+const imagePicker = $('imagepicker');
 
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
+const images = [];             // { dataUrl, name } — attached for this turn
 
 init();
 
@@ -97,6 +101,23 @@ async function init() {
       populateProviderSelect(cfg2);
     }
   });
+
+  // Image paste / drop / picker
+  inputEl.addEventListener('paste', onPaste);
+  const composer = document.querySelector('.composer');
+  composer.addEventListener('dragover', (e) => { e.preventDefault(); composer.classList.add('dragover'); });
+  composer.addEventListener('dragleave', () => composer.classList.remove('dragover'));
+  composer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    composer.classList.remove('dragover');
+    handleDroppedFiles(e.dataTransfer.files);
+  });
+  imagePicker.addEventListener('change', () => {
+    if (imagePicker.files) handleDroppedFiles(imagePicker.files);
+    imagePicker.value = ''; // reset so re-pick works
+  });
+
+  refreshImageStrip();
 
   inputEl.focus();
 }
@@ -236,6 +257,64 @@ async function onContextModeChange() {
   await sendMessage({ type: 'SET_CONTEXT_MODE', mode });
 }
 
+// --- Image attachment helpers ---
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleDroppedFiles(fileList) {
+  const maxSize = 20 * 1024 * 1024; // 20 MB
+  for (const f of fileList) {
+    if (!f.type.startsWith('image/')) continue;
+    if (f.size > maxSize) { appendError(`Image too large: ${f.name}`); continue; }
+    const dataUrl = await fileToDataUrl(f);
+    images.push({ dataUrl, name: f.name });
+  }
+  refreshImageStrip();
+}
+
+function removeImage(idx) {
+  images.splice(idx, 1);
+  refreshImageStrip();
+}
+
+function refreshImageStrip() {
+  imagePreviewsEl.innerHTML = '';
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    const div = document.createElement('div');
+    div.className = 'imagepreview';
+    div.innerHTML = `<img src="${img.dataUrl}" alt="${img.name}" /><button class="rm" data-idx="${i}" title="Remove image">&times;</button>`;
+    div.querySelector('.rm').addEventListener('click', () => removeImage(i));
+    imagePreviewsEl.appendChild(div);
+  }
+  imageInfoEl.textContent = images.length ? `+${images.length} image${images.length > 1 ? 's' : ''}` : '';
+  updateComposerInfo();
+}
+
+async function onPaste(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const imageItems = [];
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      imageItems.push(item.getAsFile());
+    }
+  }
+  if (imageItems.length > 0) {
+    e.preventDefault(); // don't paste file name text
+    await handleDroppedFiles(imageItems);
+  }
+}
+
+// --- </Image> ---
+
 async function onSend() {
   if (!currentTabId) {
     appendError('No active tab.');
@@ -321,6 +400,7 @@ async function onSend() {
   });
 
   try {
+    const imageDataUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,
@@ -328,8 +408,12 @@ async function onSend() {
       attachPage: !!autoAttachEl.checked,
       contextMode: mode,
       stream: true,
-      portName: 'browsa-chat' // <- background's onConnect uses port.name to push deltas back
+      portName: 'browsa-chat',  // <- background's onConnect uses port.name to push deltas back
+      images: imageDataUrls
     });
+    // Clear images after sending
+    images.length = 0;
+    refreshImageStrip();
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);
       assistantEl.remove();
