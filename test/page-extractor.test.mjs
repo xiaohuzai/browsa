@@ -239,3 +239,87 @@ test('xhs extractor: collects top comments when present', async () => {
   assert.ok(out.text.includes('1. 第一条评论'));
   assert.ok(out.text.includes('2. 第二条评论'));
 });
+
+// --- XHS anchor poll --------------------------------------------------------
+// Mirrors the polling function injected into the page before the extractor
+// runs. The poll resolves as soon as #detail-desc is present and has
+// non-whitespace text, OR after waitMs, whichever comes first.
+
+function runXhsPollInSandbox(initialHtml, waitMs = 1000, pollMs = 25, mutateAt = null) {
+  const dom = new JSDOM(initialHtml);
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    setTimeout: setTimeout,
+    Date: Date
+  });
+  const src = `
+    (async () => {
+      const start = Date.now();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const t = document.querySelector('#detail-title');
+        const d = document.querySelector('#detail-desc');
+        if (t && d && (d.textContent || '').trim()) {
+          return { ready: true, waited: Date.now() - start };
+        }
+        if (Date.now() - start > ${waitMs}) {
+          return { ready: false, waited: Date.now() - start };
+        }
+        await new Promise((r) => setTimeout(r, ${pollMs}));
+      }
+    })()
+  `;
+  const p = vm.runInContext(src, ctx);
+  // Optionally schedule a DOM mutation that should let the poll resolve.
+  if (mutateAt !== null) {
+    setTimeout(() => {
+      const desc = dom.window.document.querySelector('#detail-desc');
+      if (desc) desc.textContent = 'late XHR injected content';
+    }, mutateAt);
+  }
+  return p;
+}
+
+test('xhs poll: resolves immediately when anchors already present', async () => {
+  const p = runXhsPollInSandbox(
+    `<html><body><div id="detail-title">t</div><div id="detail-desc">d</div></body></html>`,
+    1000, 25
+  );
+  const out = await p;
+  assert.equal(out.ready, true);
+  assert.ok(out.waited < 100, `should be near-instant, got ${out.waited}ms`);
+});
+
+test('xhs poll: waits for late XHR injection', async () => {
+  const p = runXhsPollInSandbox(
+    `<html><body><div id="detail-title">t</div><div id="detail-desc"></div></body></html>`,
+    1000, 25,
+    100  // inject content after 100ms
+  );
+  const out = await p;
+  assert.equal(out.ready, true);
+  assert.ok(out.waited >= 100, `should have waited for injection, got ${out.waited}ms`);
+  assert.ok(out.waited < 500, `should not have waited too long, got ${out.waited}ms`);
+});
+
+test('xhs poll: times out when anchors never appear', async () => {
+  const p = runXhsPollInSandbox(
+    `<html><body><p>no anchors</p></body></html>`,
+    200, 25
+  );
+  const out = await p;
+  assert.equal(out.ready, false);
+  assert.ok(out.waited >= 200, `should have hit timeout, got ${out.waited}ms`);
+});
+
+test('xhs poll: does not treat whitespace-only desc as ready', async () => {
+  const p = runXhsPollInSandbox(
+    `<html><body>
+       <div id="detail-title">t</div>
+       <div id="detail-desc">   \n   </div>
+     </body></html>`,
+    200, 25
+  );
+  const out = await p;
+  assert.equal(out.ready, false, 'whitespace-only desc should not satisfy the poll');
+});
