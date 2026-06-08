@@ -48,7 +48,10 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["lib/Readability.js", "lib/Turndown.js"],
+      "resources": [
+        "lib/vendor/Readability.iife.js",
+        "lib/vendor/Turndown.iife.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

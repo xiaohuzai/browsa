@@ -2,8 +2,8 @@
 // Talks to background.js via chrome.runtime messages. Streaming responses come back
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
-import marked from './lib/marked.min.js';
-import DOMPurify from './lib/purify.min.js';
+import marked from './lib/vendor/marked.bundle.js';
+import DOMPurify from './lib/vendor/purify.bundle.js';
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
 // head features we don't need. Keep it simple; DOMPurify handles XSS later.

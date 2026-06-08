@@ -12,7 +12,14 @@ Thumbs.db
 # Node (if user adds build tools later)
 node_modules/
 dist/
-build/
+# _deps/ holds transient build-time npm packages, never ship
+build/_deps/
+
+# Vendor source cache (rebuilt via `npm run build`)
+lib/_src/
+
+# Distribution artifact (rebuilt via `npm run package`)
+browsa-v*.zip
 
 # Local config (do NOT commit real API keys)
 config.local.json
