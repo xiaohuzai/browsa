@@ -189,6 +189,29 @@ function cancelStream() {
   appendSystem('⚠ Stream cancelled');
 }
 
+let outputTokens = 0;
+function updateOutputTokenCount(delta) {
+  const cjk = (delta.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g) || []).length;
+  const ascii = delta.length - cjk;
+  outputTokens += cjk + Math.ceil(ascii / 4);
+  tokCountEl.textContent = `~${outputTokens}`;
+}
+
+function addCodeCopyButtons() {
+  for (const pre of messagesEl.querySelectorAll('.msg.assistant pre')) {
+    if (pre.querySelector('.code-copy-btn')) continue;
+    const btn = document.createElement('button');
+    btn.className = 'code-copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', async () => {
+      const code = pre.querySelector('code')?.textContent || pre.textContent || '';
+      try { await navigator.clipboard.writeText(code); btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); } catch {}
+    });
+    pre.style.position = 'relative';
+    pre.appendChild(btn);
+  }
+}
+
 // Markdown -> sanitized HTML pipeline. Returns HTML safe for innerHTML.
 function renderSafe(markdown) {
   try {
@@ -451,8 +474,11 @@ async function onSend() {
       if (m.type === 'CHUNK') {
         acc += m.delta;
         renderStream(acc, false);
+        updateOutputTokenCount(m.delta);
       } else if (m.type === 'DONE') {
         renderStream(m.full || acc, true);
+        addCodeCopyButtons();
+        outputTokens = 0;
       } else if (m.type === 'ERROR') {
         assistantEl.textContent = `❌ ${m.error}`;
       }
@@ -486,7 +512,10 @@ async function onSend() {
     refreshImageStrip();
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);
+      if (res.hint) appendSystem(res.hint);
       assistantEl.remove();
+    } else if (res.data?.pageContext?.limitHint) {
+      appendSystem(res.data.pageContext.limitHint);
     } else if (res.data?.pageContext?.truncated?.textLength) {
       const t = res.data.pageContext.truncated;
       if (t.rawHtmlLength > t.textLength) {

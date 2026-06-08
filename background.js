@@ -61,7 +61,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: true, data: result });
     } catch (e) {
       console.error('browsa: handler error', msg?.type, e);
-      sendResponse({ ok: false, error: e?.message || String(e), code: e?.name || 'Error' });
+      const code = e?.name || 'Error';
+      let hint = '';
+      if (code === 'ProviderConfigError') hint = '⚠️ Missing config. Open Settings (⚙) and configure a provider.';
+      else if (code === 'ProviderNetworkError') hint = '🌐 Cannot reach API server. Check base URL in Settings. Is the server running?';
+      else if (code === 'ProviderAPIError') {
+        const errMsg = e?.message || '';
+        if (errMsg.includes('401')) hint = '🔑 Invalid API key. Check Settings → API Key.';
+        else if (errMsg.includes('403')) hint = '🚫 Forbidden. The server may need CORS enabled or a valid API key.';
+        else if (errMsg.includes('404')) hint = '🔗 API endpoint not found. Check base URL → /v1/chat/completions.';
+        else if (errMsg.includes('429')) hint = '⏳ Rate limited. Wait a moment and try again.';
+        else hint = '❌ API error. Check server logs.';
+      }
+      sendResponse({ ok: false, error: e?.message || String(e), code, hint });
     }
   })();
   return true;
@@ -236,7 +248,8 @@ async function handle(msg, _sender) {
               mode: pageContext.mode,
               url: pageContext.meta.url,
               title: pageContext.meta.title,
-              truncated: pageContext.truncated
+              truncated: pageContext.truncated,
+              limitHint: pageContext.limitHint
             }
           : null
       };

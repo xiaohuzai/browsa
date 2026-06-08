@@ -360,6 +360,25 @@ body {
   outline: 2px dashed var(--accent);
   outline-offset: -4px;
 }
+
+/* Code copy button (appears on hover over pre blocks) */
+.code-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+.msg.assistant pre:hover .code-copy-btn { opacity: 1; }
+.code-copy-btn:hover { color: var(--fg); border-color: var(--accent); }
 .sendbtn {
   padding: 0 14px;
   border: none;
