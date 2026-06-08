@@ -1,9 +1,11 @@
-// test/page-extractor.test.mjs — end-to-end test for the Readability +
-// Turndown pipeline that runs in the page's MAIN world.
+// test/page-extractor.test.mjs — end-to-end tests for the page extraction
+// pipeline that runs in the page's MAIN world.
 //
 // We load the IIFE vendor bundles into a vm context, hand them a JSDOM
 // environment, then drive them through the same code path as
-// lib/page-extractor.js's extractInPageWorld() function.
+// lib/page-extractor.js's extractInPageWorld() function. For the
+// Xiaohongshu extractor we just run the function body directly against
+// a synthesized JSDOM document — no Readability needed.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -122,4 +124,118 @@ test('end-to-end: Readability → Turndown pipeline', async () => {
   assert.ok(md.includes('# Pipeline Test'), 'md should have h1');
   assert.ok(md.includes('## Section'), 'md should have h2');
   assert.ok(!md.includes('nav-strip'), 'md should not have nav text');
+});
+
+// --- Xiaohongshu extractor --------------------------------------------------
+// We read the extractor function body straight from lib/page-extractor.js
+// and execute it inside a vm sandbox that mimics the page world (a global
+// `document` + `DOMParser`). This keeps the test in lockstep with the
+// production source — no risk of the two drifting apart. If the function
+// ever stops existing or its signature changes, the tests will fail loudly.
+
+async function runXhsInSandbox(html) {
+  // Extract the function body of `extractXiaohongshuInPageWorld` from the
+  // real source file. We match the `function ...(...)` header and grab
+  // everything up to the matching closing brace. We strip the outer
+  // braces so we can re-emit it as a top-level function declaration in
+  // the sandbox, then invoke it.
+  const src = await readFile(join(ROOT, 'lib/page-extractor.js'), 'utf8');
+  const fnMatch = src.match(/function extractXiaohongshuInPageWorld\(\)\s*\{/);
+  if (!fnMatch) throw new Error('extractXiaohongshuInPageWorld not found in page-extractor.js');
+  const start = fnMatch.index;
+  // Walk forward, counting braces, to find the matching close.
+  let depth = 0;
+  let i = src.indexOf('{', start);
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  if (depth !== 0) throw new Error('unbalanced braces in extractXiaohongshuInPageWorld');
+  const fnBody = src.slice(start, i + 1);
+
+  const dom = new JSDOM(html);
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    DOMParser: dom.window.DOMParser
+  });
+  // Emit as a top-level declaration so `document` resolves from the sandbox
+  // global, exactly as it would in the page world.
+  return vm.runInContext(`${fnBody}\n;extractXiaohongshuInPageWorld();`, ctx);
+}
+
+test('xhs extractor: extracts title and desc from real-looking detail page', async () => {
+  const out = await runXhsInSandbox(`<!doctype html>
+    <html><body>
+      <div id="app">
+        <header>推荐 feed 列表（应该被忽略）</header>
+        <main>
+          <div id="detail-title">自驾转具身，如何克服水土不服</div>
+          <div id="detail-desc">去年从某新势力跳到具身创业公司，说说几点感受。1. 算法栈完全不一样...
+          </div>
+        </main>
+        <aside>相关推荐</aside>
+      </div>
+    </body></html>`);
+  assert.equal(out.error, undefined, 'should not error');
+  assert.equal(out.articleTitle, '自驾转具身，如何克服水土不服');
+  assert.ok(out.text.startsWith('# 自驾转具身，如何克服水土不服'));
+  assert.ok(out.text.includes('算法栈完全不一样'));
+  assert.ok(!out.text.includes('推荐 feed'), 'must not include unrelated feed text');
+  assert.ok(!out.text.includes('相关推荐'), 'must not include sidebar text');
+  assert.equal(out.source, 'xiaohongshu');
+  assert.equal(out.imageCount, 0);
+});
+
+test('xhs extractor: returns error when anchors are missing', async () => {
+  const out = await runXhsInSandbox(`<!doctype html><html><body><div>just a normal page</div></body></html>`);
+  assert.ok(out.error, 'should return error when anchors are missing');
+  assert.match(out.error, /detail-title|detail-desc/);
+});
+
+test('xhs extractor: counts images inside swiper', async () => {
+  const out = await runXhsInSandbox(`<!doctype html>
+    <html><body>
+      <div id="detail-title">多图笔记</div>
+      <div id="detail-desc">正文</div>
+      <div class="swiper">
+        <div class="swiper-slide"><img src="a.jpg"></div>
+        <div class="swiper-slide"><img src="b.jpg"></div>
+        <div class="swiper-slide"><img src="c.jpg"></div>
+      </div>
+    </body></html>`);
+  assert.equal(out.imageCount, 3);
+});
+
+test('xhs extractor: collects tags (auto-prefixes #)', async () => {
+  const out = await runXhsInSandbox(`<!doctype html>
+    <html><body>
+      <div id="detail-title">标题</div>
+      <div id="detail-desc">正文</div>
+      <a class="tag">自驾</a>
+      <a class="tag">具身智能</a>
+      <a class="tag">#跳槽</a>
+    </body></html>`);
+  assert.ok(out.text.includes('#自驾'), `should prefix #, got: ${out.text}`);
+  assert.ok(out.text.includes('#具身智能'));
+  assert.ok(out.text.includes('#跳槽'), 'existing # should be preserved');
+});
+
+test('xhs extractor: collects top comments when present', async () => {
+  const out = await runXhsInSandbox(`<!doctype html>
+    <html><body>
+      <div id="detail-title">标题</div>
+      <div id="detail-desc">正文</div>
+      <div class="comment-item">
+        <div class="content">第一条评论的内容写在这里</div>
+      </div>
+      <div class="comment-item">
+        <div class="content">第二条评论</div>
+      </div>
+    </body></html>`);
+  assert.ok(out.text.includes('## Top comments'));
+  assert.ok(out.text.includes('1. 第一条评论'));
+  assert.ok(out.text.includes('2. 第二条评论'));
 });
