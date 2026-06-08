@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.1.0",
+  "version": "0.12.0",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
@@ -12,7 +12,9 @@
     "tabs",
     "storage"
   ],
-  "optional_permissions": ["scripting"],
+  "optional_permissions": [
+    "scripting"
+  ],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
@@ -52,7 +54,9 @@
         "lib/vendor/Readability.iife.js",
         "lib/vendor/Turndown.iife.js"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_security_policy": {
