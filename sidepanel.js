@@ -315,17 +315,43 @@ async function onPaste(e) {
 
 // --- </Image> ---
 
+const SLASH_COMMANDS = {
+  '/summarize':  'Summarize the page content in 3-5 bullet points. Be concise.',
+  '/translate':  'Translate the page content to 中文 (Chinese).',
+  '/rewrite':    'Rewrite the page content in a more concise and direct style. Keep all key facts.',
+  '/explain':    'Explain the page content as if teaching a beginner. Use simple language.',
+  '/outline':    'List the structure of the page as a nested outline (headings only).',
+  '/keypoints':  'Extract the 5 most important takeaways from the page.',
+};
+
+function expandSlash(text) {
+  if (!text.startsWith('/')) return null;
+  const space = text.indexOf(' ');
+  const cmd = space > 0 ? text.slice(0, space) : text;
+  const rest = space > 0 ? text.slice(space + 1).trim() : '';
+  const template = SLASH_COMMANDS[cmd];
+  if (!template) return null; // unknown command, treat as normal text
+  return rest ? `${template}\n\nAdditional instruction: ${rest}` : template;
+}
+
 async function onSend() {
   if (!currentTabId) {
     appendError('No active tab.');
     return;
   }
-  const text = inputEl.value.trim();
-  if (!text && autoAttachEl.checked) {
+  const rawText = inputEl.value.trim();
+
+  if (!rawText && autoAttachEl.checked) {
     // Even with empty text, if page is attached, we can still send.
-  } else if (!text) {
+  } else if (!rawText) {
     return;
   }
+
+  // Slash commands: expand `/summarize` etc. into full prompts. The original
+  // slash text is shown in the user bubble; the expanded prompt is what the
+  // LLM receives. Unknown commands pass through as-is.
+  const slashExpanded = expandSlash(rawText);
+  const text = slashExpanded || rawText;
 
   // Auto-detect: if user has highlighted text on the page, prefer Selection
   // mode automatically. Otherwise respect the chosen context mode.
@@ -341,8 +367,8 @@ async function onSend() {
     // ignore; fall back to chosen mode
   }
 
-  // User bubble
-  appendUser(text || '(page only)');
+  // User bubble — show the original slash command, not the expanded prompt
+  appendUser(rawText || '(page only)');
   inputEl.value = '';
   sendBtn.disabled = true;
 
