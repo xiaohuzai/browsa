@@ -34,6 +34,7 @@ const imagePicker = $('imagepicker');
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
+let navPort = null;             // long-lived port for SPA navigation pushes
 const images = [];             // { dataUrl, name } — attached for this turn
 
 init();
@@ -101,6 +102,9 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
+    if (navPort) {
+      try { navPort.postMessage({ type: 'NAV_FOLLOW', tabId }); } catch (_) {}
+    }
   });
   chrome.tabs.onUpdated.addListener(async (tabId, _info, t) => {
     if (tabId === currentTabId) {
@@ -108,6 +112,45 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
+  });
+
+  // Long-lived nav port. The background pushes NAVIGATED events for ANY
+  // tab (it's a firehose). We filter to our current tab so SPAs like
+  // 小红书 update the side panel's page-meta UI in real time when the
+  // user clicks from one note to another. Without this, chrome.tabs.onUpdated
+  // never fires (SPA pushState is invisible to it), and the side panel
+  // would keep showing the title of the first note the user opened.
+  navPort = chrome.runtime.connect({ name: 'browsa-nav' });
+  navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
+  navPort.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'NAVIGATED') return;
+    if (msg.tabId !== currentTabId) return; // firehose filter
+    if (msg.closed) {
+      pagemetaEl.textContent = '(tab closed)';
+      pagemetaEl.href = '#';
+      pagemetaEl.title = '';
+      return;
+    }
+    if (msg.url) {
+      pagemetaEl.href = msg.url;
+      pagemetaEl.title = msg.url;
+    }
+    if (msg.title) {
+      pagemetaEl.textContent = msg.title;
+    } else if (msg.url) {
+      // Title comes from webNavigation as empty; show the URL path so the
+      // user at least sees something change.
+      try {
+        const u = new URL(msg.url);
+        pagemetaEl.textContent = u.pathname + u.search;
+      } catch (_) {
+        pagemetaEl.textContent = msg.url;
+      }
+    }
+  });
+  navPort.onDisconnect.addListener(() => {
+    navPort = null;
+    console.log('browsa: nav port disconnected, will reconnect on next send');
   });
 
   // Listen for config changes (from options page)
@@ -448,6 +491,25 @@ async function onSend() {
   // LLM receives. Unknown commands pass through as-is.
   const slashExpanded = expandSlash(rawText);
   const text = slashExpanded || rawText;
+
+  // Re-read the active tab RIGHT before sending. This is the defense-in-depth
+  // for SPA navigation: even if a webNavigation push was missed (background
+  // service worker was sleeping, port was re-establishing, etc.), we still
+  // have the right tab here. The user perceives a small extra delay
+  // (<10ms in practice) but gains correctness.
+  if (typeof currentTabId === 'number') {
+    try {
+      const live = await chrome.tabs.get(currentTabId);
+      if (live) {
+        pagemetaEl.textContent = live.title || live.url || '';
+        pagemetaEl.href = live.url || '#';
+        pagemetaEl.title = live.url || '';
+        lastPageMeta = { url: live.url, title: live.title };
+      }
+    } catch (_) {
+      // tab gone or permission denied — keep going with what we have
+    }
+  }
 
   // Auto-detect: if user has highlighted text on the page, prefer Selection
   // mode automatically. Otherwise respect the chosen context mode.

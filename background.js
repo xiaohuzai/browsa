@@ -21,31 +21,87 @@ chrome.sidePanel
 // side panel) can stream independently.
 const streamPorts = new Map(); // tabId -> Port
 
+// Navigation port: a separate long-lived port ('browsa-nav') the side panel
+// opens on init. The background uses chrome.webNavigation to detect SPA
+// route changes (pushState/popstate/replaceState) inside any tab, and
+// pushes the new {url, title} to every nav-port that has registered for
+// that tab. This is what keeps the side panel's page-meta UI in sync with
+// the user's actual location when they're clicking around inside a SPA
+// like 小红书 — vanilla chrome.tabs.onUpdated does NOT fire for history-API
+// navigation.
+const navPorts = new Map(); // tabId -> Set<Port>
+
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'browsa-chat') return;
-  // The side panel sends a "hello" with its tabId so we know which tab this
-  // port belongs to. We can't accept a Port over sendMessage, so we handshake.
-  let claimedTabId = null;
-  port.onMessage.addListener((msg) => {
-    if (msg && msg.type === 'STREAM_HELLO' && typeof msg.tabId === 'number') {
-      claimedTabId = msg.tabId;
-      streamPorts.set(msg.tabId, port);
-      console.log('browsa[bg]: stream port registered for tab', msg.tabId);
-      // Acknowledge so the side panel knows it's safe to send CHAT. This
-      // prevents a race where the first LLM chunk arrives before we have
-      // the port in our Map.
-      try { port.postMessage({ type: 'STREAM_HELLO_ACK' }); } catch (_) {}
-    } else if (msg && msg.type === 'STREAM_GOODBYE' && claimedTabId != null) {
-      streamPorts.delete(claimedTabId);
-      console.log('browsa[bg]: stream port released for tab', claimedTabId);
-    }
-  });
-  port.onDisconnect.addListener(() => {
-    if (claimedTabId != null) {
-      streamPorts.delete(claimedTabId);
-      console.log('browsa[bg]: stream port disconnected for tab', claimedTabId);
-    }
-  });
+  if (port.name === 'browsa-chat') {
+    // The side panel sends a "hello" with its tabId so we know which tab this
+    // port belongs to. We can't accept a Port over sendMessage, so we handshake.
+    let claimedTabId = null;
+    port.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'STREAM_HELLO' && typeof msg.tabId === 'number') {
+        claimedTabId = msg.tabId;
+        streamPorts.set(msg.tabId, port);
+        console.log('browsa[bg]: stream port registered for tab', msg.tabId);
+        // Acknowledge so the side panel knows it's safe to send CHAT. This
+        // prevents a race where the first LLM chunk arrives before we have
+        // the port in our Map.
+        try { port.postMessage({ type: 'STREAM_HELLO_ACK' }); } catch (_) {}
+      } else if (msg && msg.type === 'STREAM_GOODBYE' && claimedTabId != null) {
+        streamPorts.delete(claimedTabId);
+        console.log('browsa[bg]: stream port released for tab', claimedTabId);
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (claimedTabId != null) {
+        streamPorts.delete(claimedTabId);
+        console.log('browsa[bg]: stream port disconnected for tab', claimedTabId);
+      }
+    });
+    return;
+  }
+
+  if (port.name === 'browsa-nav') {
+    // The nav port is a firehose: the side panel sends a hello with its
+    // current tabId, but the background may push NAVIGATED events for ANY
+    // tab (because webNavigation.onHistoryStateUpdated fires for any tab
+    // we're allowed to see). The side panel filters by tabId on its end.
+    let claimedTabId = null;
+    port.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'NAV_HELLO' && typeof msg.tabId === 'number') {
+        claimedTabId = msg.tabId;
+        if (!navPorts.has(claimedTabId)) navPorts.set(claimedTabId, new Set());
+        navPorts.get(claimedTabId).add(port);
+        console.log('browsa[bg]: nav port registered for tab', claimedTabId);
+        try { port.postMessage({ type: 'NAV_HELLO_ACK' }); } catch (_) {}
+      } else if (msg && msg.type === 'NAV_GOODBYE' && claimedTabId != null) {
+        const set = navPorts.get(claimedTabId);
+        if (set) {
+          set.delete(port);
+          if (set.size === 0) navPorts.delete(claimedTabId);
+        }
+      } else if (msg && msg.type === 'NAV_FOLLOW' && typeof msg.tabId === 'number') {
+        // Side panel can switch which tab it's watching (e.g. user clicked
+        // a different tab in the browser). Re-register.
+        if (claimedTabId != null && claimedTabId !== msg.tabId) {
+          const oldSet = navPorts.get(claimedTabId);
+          if (oldSet) oldSet.delete(port);
+        }
+        claimedTabId = msg.tabId;
+        if (!navPorts.has(claimedTabId)) navPorts.set(claimedTabId, new Set());
+        navPorts.get(claimedTabId).add(port);
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (claimedTabId != null) {
+        const set = navPorts.get(claimedTabId);
+        if (set) {
+          set.delete(port);
+          if (set.size === 0) navPorts.delete(claimedTabId);
+        }
+        console.log('browsa[bg]: nav port disconnected for tab', claimedTabId);
+      }
+    });
+    return;
+  }
 });
 
 function pushChunk(tabId, payload) {
@@ -276,3 +332,84 @@ function tabIdOf(msg, sender) {
   if (sender?.tab?.id != null) return sender.tab.id;
   return null;
 }
+
+// SPA navigation watch.
+//
+// chrome.tabs.onUpdated does NOT fire when a SPA does pushState() to change
+// the URL (e.g. 小红书 switching from one /explore/<noteId> to another).
+// chrome.webNavigation.onHistoryStateUpdated DOES fire — it covers both
+// pushState and replaceState. We also listen to onCommitted/onCompleted for
+// the more common full-reload case (since webNavigation fires earlier than
+// onUpdated in some flows). Each event carries the new tab URL; we forward
+// it to every side panel that has registered a nav-port for that tab.
+//
+// We dedupe: a single SPA navigation can fire multiple webNavigation
+// events (e.g. onHistoryStateUpdated + onCommitted if the SPA also triggers
+// a fetch). Without dedup, the side panel UI flickers. We track the last
+// (tabId, url) we broadcast and skip if unchanged.
+const lastNavBroadcast = new Map(); // tabId -> url
+// (The Map is mutated in place; we never replace the reference.)
+
+// Pure broadcast helper: given the current "last URL" map, the nav-port
+// registry, a tabId, and a new URL, decide what (if anything) to push to
+// each registered port, and return the updated "last URL" map. Pure for
+// testability — no chrome.* calls, no module state reads.
+function dedupeAndBroadcast(lastNavMap, navPortsMap, tabId, url) {
+  if (typeof tabId !== 'number' || !url) return { updated: false, lastNavMap, sent: 0 };
+  if (lastNavMap.get(tabId) === url) return { updated: false, lastNavMap, sent: 0 };
+  const next = new Map(lastNavMap);
+  next.set(tabId, url);
+  const set = navPortsMap.get(tabId);
+  if (!set || set.size === 0) return { updated: true, lastNavMap: next, sent: 0 };
+  for (const p of set) {
+    try { p.postMessage({ type: 'NAVIGATED', tabId, url, title: '' }); } catch (_) {}
+  }
+  return { updated: true, lastNavMap: next, sent: set.size };
+}
+
+function broadcastNav(tabId, url, title) {
+  if (typeof tabId !== 'number' || !url) return;
+  const result = dedupeAndBroadcast(lastNavBroadcast, navPorts, tabId, url);
+  if (!result.updated) return;
+  // dedupeAndBroadcast returned an updated map (which is either the same
+  // reference as lastNavBroadcast or a copy containing the new entry).
+  // lastNavBroadcast is a `const` Map, so we mutate in place.
+  if (result.lastNavMap !== lastNavBroadcast) {
+    lastNavBroadcast.clear();
+    for (const [k, v] of result.lastNavMap) lastNavBroadcast.set(k, v);
+  }
+  if (result.sent > 0) {
+    console.log(`browsa[bg]: nav broadcast tab=${tabId} url=${url} sentTo=${result.sent}`);
+  }
+}
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0) return; // only top frame
+  broadcastNav(details.tabId, details.url, '');
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  // Only fires for non-history-API commits. onHistoryStateUpdated handles
+  // the SPA case. This is a safety net for any other navigation path.
+  broadcastNav(details.tabId, details.url, '');
+});
+
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) return;
+  // Reset the dedup so a same-URL back/forward (which history treats as
+  // a new navigation) still fires. We can't know the new URL yet, so we
+  // just clear.
+  lastNavBroadcast.delete(details.tabId);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  lastNavBroadcast.delete(tabId);
+  const set = navPorts.get(tabId);
+  if (set) {
+    for (const p of set) {
+      try { p.postMessage({ type: 'NAVIGATED', tabId, url: '', title: '', closed: true }); } catch (_) {}
+    }
+    navPorts.delete(tabId);
+  }
+});

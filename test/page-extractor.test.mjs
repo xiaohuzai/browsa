@@ -419,3 +419,189 @@ test('xhs INITIAL_STATE: returns error when both sources fail', async () => {
   assert.ok(out.error, 'should return error');
   assert.match(out.error, /detail-title/);
 });
+
+// --- Navigation broadcast (background.js → side panel) ----------------------
+// We extract the pure dedupeAndBroadcast function from background.js and
+// test it directly. The function takes (lastNavMap, navPortsMap, tabId, url)
+// and returns the new map + number of ports notified. The navPortsMap is
+// `Map<tabId, Set<port>>` where each port has a postMessage method. We
+// can't serialize those across the vm boundary, so we stash the port
+// objects in a registry and reference them by id.
+
+const portRegistry = new Map();
+let portIdCounter = 0;
+function makePort(label, sink) {
+  const id = ++portIdCounter;
+  const port = {
+    __portId: id,
+    label,
+    postMessage: (m) => sink.push({ ...m, __portId: id, __label: label })
+  };
+  portRegistry.set(id, port);
+  return port;
+}
+
+async function loadDedupeFn() {
+  const src = await readFile(join(ROOT, 'background.js'), 'utf8');
+  const m = src.match(/function dedupeAndBroadcast\([^)]*\)\s*\{/);
+  if (!m) throw new Error('dedupeAndBroadcast not found in background.js');
+  const start = m.index;
+  let depth = 0, i = src.indexOf('{', start);
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  return src.slice(start, i + 1);
+}
+
+async function runDedupe(lastNavMap, navPortsMap, tabId, url) {
+  // Build a side map: tabId → array of portId. The function we're testing
+  // works on `Map<tabId, Set<port>>` where Set stores the actual port
+  // objects. Inside the vm sandbox we rebuild the Map+Set structure from
+  // the id arrays, but the postMessage method has to be replaced with a
+  // bridge that calls back into our Node-side port.
+  const navPortsSerialized = [];
+  for (const [tid, portSet] of navPortsMap) {
+    const ids = [];
+    for (const port of portSet) {
+      ids.push(port.__portId);
+    }
+    navPortsSerialized.push([tid, ids]);
+  }
+  // The vm sandbox needs the real port objects so postMessage works. We
+  // hand them in via a global `__ports` map keyed by id.
+  const portsForVm = {};
+  for (const [, portSet] of navPortsMap) {
+    for (const port of portSet) {
+      portsForVm[port.__portId] = port;
+    }
+  }
+  const fnSrc = await loadDedupeFn();
+  const ctx = vm.createContext({
+    __ports: portsForVm,
+    // Wrap postMessage to look up the real port by id
+    postMessageById: (id, msg) => {
+      const p = portRegistry.get(id);
+      if (p) p.postMessage(msg);
+    }
+  });
+  // Rewrite the function source so `p.postMessage(...)` calls the bridge
+  // instead. We do this with a tiny in-place string substitution that
+  // targets the postMessage call inside the function body.
+  const bridgeFn = fnSrc.replace(
+    /p\.postMessage\(\s*\{ type: 'NAVIGATED', tabId, url, title: '' \}\s*\)/,
+    `postMessageById(p.__portId, { type: 'NAVIGATED', tabId, url, title: '' })`
+  );
+  // The first runInContext just loads the function into the sandbox so
+  // it's available for the second call below. (We can't `eval` then call
+  // in one step because `arguments` isn't available in vm top-level code.)
+  vm.runInContext(bridgeFn, ctx);
+  // The function expects `Map<tabId, url>` and `Map<tabId, Set<port>>`.
+  // JSON serialization only gave us arrays of [k, v] pairs. Rebuild
+  // them inside the sandbox so the function sees the real types.
+  return vm.runInContext(
+    `(function() {`
+    + ` const lastNavMap = new Map(${JSON.stringify([...lastNavMap])});`
+    + ` const navPortsMap = new Map(${JSON.stringify(navPortsSerialized)}`
+    + `   .map(([k, ids]) => [k, new Set(ids.map(id => __ports[id]))]));`
+    + ` return dedupeAndBroadcast(lastNavMap, navPortsMap, ${tabId}, ${JSON.stringify(url)});`
+    + `})()`,
+    ctx
+  );
+}
+
+test('nav broadcast: first URL for a tab is broadcast and recorded', async () => {
+  const sink = [];
+  const port = makePort('A', sink);
+  const lastNav = new Map();
+  const navPorts = new Map([[1, new Set([port])]]);
+  const r = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/AAA');
+  assert.equal(r.updated, true);
+  assert.equal(r.sent, 1);
+  assert.equal(sink.length, 1);
+  assert.equal(sink[0].type, 'NAVIGATED');
+  assert.equal(sink[0].tabId, 1);
+  assert.equal(sink[0].url, 'https://xhs.com/explore/AAA');
+});
+
+test('nav broadcast: same URL twice is deduped (no second send)', async () => {
+  const sink = [];
+  const port = makePort('A', sink);
+  const lastNav = new Map();
+  const navPorts = new Map([[1, new Set([port])]]);
+  const r1 = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/AAA');
+  // The function returns a *new* map; we have to feed it back as the
+  // starting state for the second call, exactly as the production code
+  // does (it mutates module-scope lastNavBroadcast in place).
+  const lastNav2 = new Map(r1.lastNavMap);
+  const r2 = await runDedupe(lastNav2, navPorts, 1, 'https://xhs.com/explore/AAA');
+  assert.equal(r2.updated, false, 'should be deduped');
+  assert.equal(r2.sent, 0);
+  assert.equal(sink.length, 1, 'only one notification total');
+});
+
+test('nav broadcast: different URLs both fire (SPA note-to-note)', async () => {
+  const sink = [];
+  const port = makePort('A', sink);
+  let lastNav = new Map();
+  const navPorts = new Map([[1, new Set([port])]]);
+  const r1 = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/AAA');
+  lastNav = new Map(r1.lastNavMap);
+  const r2 = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/BBB');
+  lastNav = new Map(r2.lastNavMap);
+  const r3 = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/CCC');
+  assert.equal(sink.length, 3);
+  assert.match(sink[0].url, /AAA/);
+  assert.match(sink[1].url, /BBB/);
+  assert.match(sink[2].url, /CCC/);
+});
+
+test('nav broadcast: no listeners means updated=true but sent=0', async () => {
+  const lastNav = new Map();
+  const navPorts = new Map(); // empty
+  const r = await runDedupe(lastNav, navPorts, 1, 'https://xhs.com/explore/AAA');
+  assert.equal(r.updated, true, 'state still updates so subsequent navs are deduped');
+  assert.equal(r.sent, 0, 'no ports to send to');
+});
+
+test('nav broadcast: invalid tabId or empty URL is a no-op', async () => {
+  const sink = [];
+  const port = makePort('A', sink);
+  const lastNav = new Map();
+  const navPorts = new Map([[1, new Set([port])]]);
+  const r1 = await runDedupe(lastNav, navPorts, null, 'https://x.com');
+  assert.equal(r1.updated, false);
+  const r2 = await runDedupe(lastNav, navPorts, 1, '');
+  assert.equal(r2.updated, false);
+  assert.equal(sink.length, 0);
+});
+
+test('nav broadcast: fan-out to multiple ports on the same tab', async () => {
+  const a = []; const b = [];
+  const pa = makePort('A', a);
+  const pb = makePort('B', b);
+  const navPorts = new Map([[1, new Set([pa, pb])]]);
+  const r = await runDedupe(new Map(), navPorts, 1, 'https://x.com');
+  assert.equal(r.sent, 2);
+  assert.equal(a.length, 1);
+  assert.equal(b.length, 1);
+});
+
+test('nav broadcast: different tabs are independent', async () => {
+  const s1 = []; const s2 = [];
+  const p1 = makePort('A', s1);
+  const p2 = makePort('B', s2);
+  const navPorts = new Map([
+    [1, new Set([p1])],
+    [2, new Set([p2])]
+  ]);
+  let lastNav = new Map();
+  const r1 = await runDedupe(lastNav, navPorts, 1, 'https://x.com/A');
+  lastNav = new Map(r1.lastNavMap);
+  const r2 = await runDedupe(lastNav, navPorts, 2, 'https://x.com/B');
+  lastNav = new Map(r2.lastNavMap);
+  // Dedup should be per-tab
+  const r3 = await runDedupe(lastNav, navPorts, 1, 'https://x.com/A');
+  assert.equal(s1.length, 1, 'tab 1 deduped');
+  assert.equal(s2.length, 1, 'tab 2 got its own msg');
+});
