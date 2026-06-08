@@ -133,7 +133,7 @@ test('end-to-end: Readability → Turndown pipeline', async () => {
 // production source — no risk of the two drifting apart. If the function
 // ever stops existing or its signature changes, the tests will fail loudly.
 
-async function runXhsInSandbox(html) {
+async function runXhsInSandbox(html, url = 'https://www.xiaohongshu.com/explore/6a141d03000000003502b14f') {
   // Extract the function body of `extractXiaohongshuInPageWorld` from the
   // real source file. We match the `function ...(...)` header and grab
   // everything up to the matching closing brace. We strip the outer
@@ -156,13 +156,14 @@ async function runXhsInSandbox(html) {
   if (depth !== 0) throw new Error('unbalanced braces in extractXiaohongshuInPageWorld');
   const fnBody = src.slice(start, i + 1);
 
-  const dom = new JSDOM(html);
+  const dom = new JSDOM(html, { url });
   const ctx = vm.createContext({
     document: dom.window.document,
-    DOMParser: dom.window.DOMParser
+    DOMParser: dom.window.DOMParser,
+    location: dom.window.location
   });
-  // Emit as a top-level declaration so `document` resolves from the sandbox
-  // global, exactly as it would in the page world.
+  // Emit as a top-level declaration so `document` / `location` resolve
+  // from the sandbox global, exactly as they would in the page world.
   return vm.runInContext(`${fnBody}\n;extractXiaohongshuInPageWorld();`, ctx);
 }
 
@@ -322,4 +323,99 @@ test('xhs poll: does not treat whitespace-only desc as ready', async () => {
   );
   const out = await p;
   assert.equal(out.ready, false, 'whitespace-only desc should not satisfy the poll');
+});
+
+// --- INITIAL_STATE extractor path -------------------------------------------
+// The full extractXiaohongshuInPageWorld function tries two sources.
+// runXhsInSandbox already exercises the DOM fallback (the existing 5 tests).
+// Here we add tests that synthesize window.__INITIAL_STATE__ and verify
+// the INITIAL_STATE branch wins over the DOM branch (richer data, no race).
+
+async function runXhsWithStateInSandbox(html, initialState) {
+  const dom = new JSDOM(html, { url: 'https://www.xiaohongshu.com/explore/6a141d03000000003502b14f' });
+  // Inject the global
+  dom.window.__INITIAL_STATE__ = initialState;
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    DOMParser: dom.window.DOMParser,
+    window: dom.window,
+    location: dom.window.location,
+    __INITIAL_STATE__: initialState
+  });
+  const src = await readFile(join(ROOT, 'lib/page-extractor.js'), 'utf8');
+  const fnMatch = src.match(/function extractXiaohongshuInPageWorld\(\)\s*\{/);
+  const start = fnMatch.index;
+  let depth = 0, i = src.indexOf('{', start);
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  const fnBody = src.slice(start, i + 1);
+  return vm.runInContext(`${fnBody}\n;extractXiaohongshuInPageWorld();`, ctx);
+}
+
+test('xhs INITIAL_STATE: extracts title, desc, author, stats, tags', async () => {
+  const html = `<html><body><div id="detail-title">DOM_TITLE_IGNORE</div><div id="detail-desc">DOM_DESC_IGNORE</div></body></html>`;
+  const out = await runXhsWithStateInSandbox(html, {
+    note: {
+      noteDetailMap: {
+        '6a141d03000000003502b14f': {
+          note: {
+            title: '创业早期最大的幻觉之一',
+            desc: '创业团队常误以为"凑了一个局"即为团队',
+            user: { nickname: '某创业 CEO' },
+            imageList: [{ url: 'a' }, { url: 'b' }],
+            tagList: [{ name: '心智模式提升' }, { name: '#创业的本质' }],
+            interactInfo: { likedCount: 1234, commentCount: 56 }
+          }
+        }
+      }
+    }
+  });
+  assert.equal(out.xhsSubSource, 'initial-state');
+  assert.equal(out.articleTitle, '创业早期最大的幻觉之一');
+  assert.equal(out.articleByline, '某创业 CEO');
+  assert.ok(out.text.includes('# 创业早期最大的幻觉之一'));
+  assert.ok(out.text.includes('**作者**: 某创业 CEO'));
+  assert.ok(out.text.includes('创业团队常误以为'));
+  assert.ok(out.text.includes('#心智模式提升'), 'should auto-prefix #');
+  assert.ok(out.text.includes('#创业的本质'), 'should preserve existing #');
+  assert.ok(out.text.includes('👍 1234'), 'should include like count');
+  assert.ok(out.text.includes('💬 56'), 'should include comment count');
+  assert.ok(out.text.includes('🖼 2 图'), 'should include image count');
+  // DOM should NOT be consulted when INITIAL_STATE is present
+  assert.ok(!out.text.includes('DOM_TITLE_IGNORE'), 'should not include DOM title');
+  assert.ok(!out.text.includes('DOM_DESC_IGNORE'), 'should not include DOM desc');
+});
+
+test('xhs INITIAL_STATE: falls back to DOM when state is empty', async () => {
+  const html = `<html><body>
+    <div id="detail-title">DOM only title</div>
+    <div id="detail-desc">DOM only desc with content</div>
+  </body></html>`;
+  const out = await runXhsWithStateInSandbox(html, {
+    note: { noteDetailMap: { '6a141d03000000003502b14f': { note: {} } } }
+  });
+  assert.equal(out.xhsSubSource, 'dom');
+  assert.ok(out.text.includes('DOM only title'));
+  assert.ok(out.text.includes('DOM only desc with content'));
+});
+
+test('xhs INITIAL_STATE: falls back to DOM when state is missing the noteId', async () => {
+  const html = `<html><body>
+    <div id="detail-title">DOM fallback title</div>
+    <div id="detail-desc">DOM fallback desc</div>
+  </body></html>`;
+  const out = await runXhsWithStateInSandbox(html, {
+    note: { noteDetailMap: {} }  // different noteId
+  });
+  assert.equal(out.xhsSubSource, 'dom');
+  assert.ok(out.text.includes('DOM fallback title'));
+});
+
+test('xhs INITIAL_STATE: returns error when both sources fail', async () => {
+  const html = `<html><body><p>no anchors, no state</p></body></html>`;
+  const out = await runXhsWithStateInSandbox(html, { note: { noteDetailMap: {} } });
+  assert.ok(out.error, 'should return error');
+  assert.match(out.error, /detail-title/);
 });
