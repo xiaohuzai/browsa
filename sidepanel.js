@@ -25,6 +25,7 @@ const composerInfoEl = $('composerinfo');
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const autoAttachEl = $('autoattach');
+const waitJsEl = $('waitjs');
 const pagemetaEl = $('pagemeta');
 const imagePreviewsEl = $('imagepreviews');
 const imageInfoEl = $('imageinfo');
@@ -538,7 +539,8 @@ async function onSend() {
       contextMode: mode,
       stream: true,
       portName: 'browsa-chat',  // <- background's onConnect uses port.name to push deltas back
-      images: imageDataUrls
+      images: imageDataUrls,
+      waitMs: waitJsEl.checked ? 2000 : 0
     });
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);

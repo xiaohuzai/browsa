@@ -168,7 +168,8 @@ async function handle(msg, _sender) {
           }
           pageContext = await extractActiveTab({
             mode,
-            maxTextChars: all.maxTextChars
+            maxTextChars: all.maxTextChars,
+            waitMs: msg.waitMs || 0
           });
           if (pageContext) {
             console.log('browsa[bg]: pageContext', {
