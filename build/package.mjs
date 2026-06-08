@@ -33,7 +33,11 @@ with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
             continue
         for fn in filenames:
             if fn in exclude_files: continue
+            # Don't include the zip we're currently building, and don't include
+            # any prior version's zip that happens to live inside the project
+            # tree (e.g. browsa-v0.15.3.zip left inside browsa/).
             if fn == out_name: continue
+            if fn.startswith("browsa-v") and fn.endswith(".zip"): continue
             full = os.path.join(dirpath, fn)
             rel = os.path.relpath(full, os.path.dirname(root))
             if any(rel.startswith(p) for p in exclude_path_prefixes):

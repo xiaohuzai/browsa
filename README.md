@@ -1,6 +1,6 @@
 # browsa
 
-> Hand the current page to your AI agent — single side-panel chat for **Hermes**, **Claude Code**, or **OpenClaw**.
+> Hand the current page to your AI agent — single side-panel chat for **Hermes**, **Claude Code**, or any OpenAI-compatible API.
 
 browsa is a small Chrome / Edge extension (Manifest V3) that opens a side panel next to whatever tab you're on, lets you ask a question, and ships the page context (full HTML / selection / screenshot) to whichever OpenAI-compatible agent runtime you configure.
 
@@ -8,12 +8,12 @@ browsa is a small Chrome / Edge extension (Manifest V3) that opens a side panel 
 [Web page]  →  [browsa side panel]  →  [your agent runtime]  →  [streaming reply]
                                          http://<host>:8642/v1/chat/completions
                                          http://localhost:8000/v1/chat/completions
-                                         http://localhost:8080/v1/chat/completions
+                                         (or any OpenAI-compatible endpoint)
 ```
 
 ## Why
 
-- **Multi-provider** — works with any agent that exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Hermes `api_server`, Claude Code via an openai-compatible wrapper, OpenClaw gateway, or your own LLM proxy.
+- **Multi-provider** — works with any agent that exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Hermes `api_server`, Claude Code via an openai-compatible wrapper, or your own LLM proxy.
 - **One-click page context** — choose full HTML, text selection, or a screenshot. No copy-pasting.
 - **Per-tab history** — conversations are scoped to the tab you started them on.
 - **Per-provider config** — base URL, API key, default model, stream on/off. Switch providers from the side panel.
@@ -48,7 +48,7 @@ versions well past this.
 |---|---|---|
 | **Hermes** `api_server` | `http://<host>:8642` | `API_SERVER_KEY` from `~/.hermes/.env` |
 | **Claude Code** (via `claude-code-openai-wrapper` or `claude-code-api`) | `http://localhost:8000` | Wrapper bundles the Claude Agent SDK |
-| **OpenClaw** gateway | `http://localhost:8080` | Set `gateway.http.endpoints.chatCompletions.enabled = true` in OpenClaw config |
+| **Any OpenAI-compatible** | (your URL) | Point at any `/v1/chat/completions` endpoint — Ollama, vLLM, LM Studio, LiteLLM, etc. |
 
 See [`config.example.json`](./config.example.json) for a starting point.
 

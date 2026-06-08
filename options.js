@@ -151,7 +151,6 @@ function applyContextMode(mode) {
 function prettyProviderName(name) {
   if (name === 'hermes') return 'Hermes';
   if (name === 'claude-code') return 'Claude Code';
-  if (name === 'openclaw') return 'OpenClaw';
   return name;
 }
 
