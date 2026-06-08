@@ -1,0 +1,54 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Hand the current page to your AI agent",
+    "description": "Extension description"
+  },
+  "openSidebar": {
+    "message": "Open browsa sidebar",
+    "description": "Action button tooltip"
+  },
+  "settingsTooltip": {
+    "message": "Settings (provider / API key)",
+    "description": "Settings button tooltip"
+  },
+  "contextLabel": {
+    "message": "Context:",
+    "description": "Context mode label"
+  },
+  "contextReader": {
+    "message": "Reader",
+    "description": "Mozilla Readability mode"
+  },
+  "contextFull": {
+    "message": "Full",
+    "description": "Full body innerText mode"
+  },
+  "contextSelected": {
+    "message": "Selection",
+    "description": "Selected text mode"
+  },
+  "contextScreenshot": {
+    "message": "Screenshot",
+    "description": "Screenshot mode"
+  },
+  "autoAttach": {
+    "message": "Auto-attach",
+    "description": "Auto-attach checkbox"
+  },
+  "inputPlaceholder": {
+    "message": "Type a question for your agent… (Enter to send, Shift+Enter for newline)",
+    "description": "Composer placeholder"
+  },
+  "sendButton": {
+    "message": "Send",
+    "description": "Send button"
+  },
+  "noChunks": {
+    "message": "(no chunks received — check Service Worker DevTools)",
+    "description": "Hint when no streaming chunks arrive"
+  }
+}

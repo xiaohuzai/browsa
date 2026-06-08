@@ -6,36 +6,39 @@
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">browsa</div>
-      <select id="provider" class="provider" title="选择后端"></select>
-      <button id="settings" class="iconbtn" title="设置 (provider / API key)">⚙</button>
+    <a href="#input" class="skip-link">Skip to composer</a>
+    <header class="topbar" role="banner">
+      <div class="brand" aria-label="browsa">browsa</div>
+      <select id="provider" class="provider" aria-label="选择后端" title="选择后端"></select>
+      <button id="settings" class="iconbtn" aria-label="设置 (provider / API key)" title="设置 (provider / API key)">⚙</button>
     </header>
 
-    <div class="contextbar">
-      <span class="ctx-label">Context:</span>
+    <div class="contextbar" role="group" aria-label="Page context mode">
+      <span class="ctx-label" id="ctx-label">Context:</span>
       <label class="ctx-opt" title="Mozilla Readability: extract main article, strip nav/ads/comments"><input type="radio" name="ctx" value="reader" /> Reader</label>
       <label class="ctx-opt" title="Body innerText (no Readability filtering)"><input type="radio" name="ctx" value="full" /> Full</label>
       <label class="ctx-opt"><input type="radio" name="ctx" value="selected" /> Selection</label>
       <label class="ctx-opt"><input type="radio" name="ctx" value="screenshot" /> Screenshot</label>
       <label class="ctx-opt">
-        <input type="checkbox" id="autoattach" checked /> Auto-attach
+        <input type="checkbox" id="autoattach" checked aria-describedby="ctx-label" /> Auto-attach
       </label>
       <a id="pagemeta" class="pagemeta" target="_blank" title=""></a>
     </div>
 
-    <main id="messages" class="messages"></main>
+    <main id="messages" class="messages" role="log" aria-live="polite" aria-atomic="false"></main>
 
     <footer class="composer">
       <div class="row">
+        <label for="input" class="visually-hidden">Message input</label>
         <textarea
           id="input"
           rows="2"
           placeholder="Type a question for your agent… (Enter to send, Shift+Enter for newline)"
+          aria-label="Message input"
         ></textarea>
-        <button id="send" class="sendbtn">Send</button>
+        <button id="send" class="sendbtn" aria-label="Send message">Send</button>
       </div>
-      <div id="composerinfo" class="composerinfo" title="Approx input size (chars) and estimated tokens">
+      <div id="composerinfo" class="composerinfo" title="Approx input size (chars) and estimated tokens" aria-live="polite">
         <span id="charcount">0</span> chars · <span id="tokcount">~0</span> tokens
       </div>
     </footer>

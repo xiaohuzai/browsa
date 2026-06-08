@@ -1,0 +1,54 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "把当前页面交给你的 AI 代理",
+    "description": "Extension description"
+  },
+  "openSidebar": {
+    "message": "打开 browsa 侧边栏",
+    "description": "Action button tooltip"
+  },
+  "settingsTooltip": {
+    "message": "设置 (provider / API key)",
+    "description": "Settings button tooltip"
+  },
+  "contextLabel": {
+    "message": "上下文:",
+    "description": "Context mode label"
+  },
+  "contextReader": {
+    "message": "读者模式",
+    "description": "Mozilla Readability mode"
+  },
+  "contextFull": {
+    "message": "全文",
+    "description": "Full body innerText mode"
+  },
+  "contextSelected": {
+    "message": "选区",
+    "description": "Selected text mode"
+  },
+  "contextScreenshot": {
+    "message": "截图",
+    "description": "Screenshot mode"
+  },
+  "autoAttach": {
+    "message": "自动附加",
+    "description": "Auto-attach checkbox"
+  },
+  "inputPlaceholder": {
+    "message": "向你的代理提个问题… (Enter 发送，Shift+Enter 换行)",
+    "description": "Composer placeholder"
+  },
+  "sendButton": {
+    "message": "发送",
+    "description": "Send button"
+  },
+  "noChunks": {
+    "message": "(未收到流式响应 — 请检查 Service Worker DevTools)",
+    "description": "Hint when no streaming chunks arrive"
+  }
+}

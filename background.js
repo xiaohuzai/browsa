@@ -121,7 +121,7 @@ async function handle(msg, _sender) {
       let cfg;
       if (name) {
         cfg = (await storage.getAll()).providers[name];
-        if (!cfg) throw new ProviderConfigError(`Provider "${name}" not configured`);
+        if (!cfg) throw ProviderConfigError(`Provider "${name}" not configured`);
         cfg = { ...cfg, name };
       } else {
         cfg = { baseUrl, apiKey, model };
@@ -134,7 +134,7 @@ async function handle(msg, _sender) {
       // Stream a chat turn. The side panel receives deltas via CHUNK messages.
       const all = await storage.getAll();
       const provider = all.providers[all.activeProvider];
-      if (!provider) throw new ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
+      if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
 
       const tabId = msg.tabId;
       if (tabId == null) throw new Error('tabId required');

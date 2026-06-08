@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "browsa",
+  "name": "__MSG_extensionName__",
+  "short_name": "browsa",
   "version": "0.1.0",
-  "description": "Hand the current page to your AI agent (Hermes / Claude Code / OpenClaw) — single side-panel chat.",
+  "default_locale": "en",
+  "description": "__MSG_extensionDescription__",
   "permissions": [
     "sidePanel",
     "activeTab",
@@ -10,6 +12,7 @@
     "tabs",
     "storage"
   ],
+  "optional_permissions": ["scripting"],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
@@ -47,5 +50,8 @@
       "resources": ["lib/Readability.js", "lib/Turndown.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://*:* https://*:* ws://*:* wss://*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'none'; worker-src 'self'"
+  }
 }
