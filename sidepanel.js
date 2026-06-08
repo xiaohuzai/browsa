@@ -456,8 +456,8 @@ async function onSend() {
   try {
     const selRes = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'selected', targetTabId: currentTabId });
     const selText = (selRes?.text || '').trim();
-    if (selText && selText.length >= 8) {
-      // The user has selected something on the page — use it.
+    if (selText && selText.length >= 50) {
+      // The user has selected substantial text on the page — use it.
       mode = 'selected';
     }
   } catch (_) {
@@ -556,6 +556,10 @@ async function onSend() {
           `(limit ${t.textCap.toLocaleString()}). Raise limits in ⚙ Settings if you need more.`
         );
       }
+    }
+    // Detect empty extraction (JS-rendered pages like 小红书)
+    if (res.data?.pageContext?.text != null && res.data.pageContext.text.length < 50) {
+      appendSystem('⚠ Page content is empty or very short. This site may render content outside the DOM (Shadow DOM / Canvas). Try switching to 📸 Screenshot mode and sending the screenshot to a multimodal LLM.');
     }
   } catch (e) {
     appendError(e.message);
