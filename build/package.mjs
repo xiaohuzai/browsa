@@ -19,30 +19,39 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 // Use Python's stdlib zipfile (always available on the system; no native dep).
 // Exclude .git, node_modules, transient build deps, vendored source cache,
 // and the zip itself.
+//
+// We anchor the relative path against ROOT (the browsa/ project dir), not
+// against its parent, so files inside the zip are stored as
+// `manifest.json`, `sidepanel.js`, `lib/xhs-content-script.js`, etc.
+// — NOT as `browsa/manifest.json`. Edge and Chrome both require
+// manifest.json at the root of the extension directory; if the zip
+// is unzipped and the user points at the parent, the extension
+// fails to load.
 const py = `
 import os, sys, zipfile
 root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build/_deps"}
 exclude_files = {"package-lock.json"}
-exclude_path_prefixes = (os.path.join("browsa", "lib", "_src"),)
+exclude_path_prefixes = (os.path.join("lib", "_src"),)
 out_name = os.path.basename(out)
 with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
-        rel_dir = os.path.relpath(dirpath, os.path.dirname(root))
-        if any(rel_dir.startswith(p) for p in exclude_path_prefixes):
-            continue
+        rel_dir = os.path.relpath(dirpath, root)
+        if rel_dir == "." or rel_dir.startswith(".."):
+            rel = ""
+        else:
+            if any(rel_dir == p or rel_dir.startswith(p + os.sep) for p in exclude_path_prefixes):
+                continue
+            rel = rel_dir
         for fn in filenames:
             if fn in exclude_files: continue
-            # Don't include the zip we're currently building, and don't include
-            # any prior version's zip that happens to live inside the project
-            # tree (e.g. browsa-v0.15.3.zip left inside browsa/).
             if fn == out_name: continue
             if fn.startswith("browsa-v") and fn.endswith(".zip"): continue
             full = os.path.join(dirpath, fn)
-            rel = os.path.relpath(full, os.path.dirname(root))
-            if any(rel.startswith(p) for p in exclude_path_prefixes):
+            arcname = os.path.join(rel, fn) if rel else fn
+            if any(arcname.startswith(p) for p in exclude_path_prefixes):
                 continue
-            zf.write(full, rel)
+            zf.write(full, arcname)
 print(out)
 `;
 const r = spawnSync('python3', ['-c', py, ROOT, out], { encoding: 'utf8' });

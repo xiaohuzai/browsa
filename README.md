@@ -99,33 +99,54 @@ browsa/
 - Multi-modal image upload from clipboard
 - Fork-able: add your own provider preset in `lib/storage.js` defaults
 
-## ⚠️ Xiaohongshu (小红书) note: extraction is best-effort
+## Xiaohongshu (小红书) note: extraction
 
-The XHS detail page is a React SPA that fetches its actual content via
-`/api/sns/web/v1/feed`, with **signed requests** (`x-s`, `x-s-common`,
-`x-t` headers) and **login state required for the full desc**. Without
-the right signed headers or a logged-in `web_session` cookie, XHS
-serves a different note, a skeleton, or an empty body.
+`browsa` extracts 小红书 note detail pages via **XHR interception**.
 
-browsa reads the rendered DOM (`#detail-title`, `#detail-desc`) and
-`window.__INITIAL_STATE__.note.noteDetailMap[noteId].note`, but it
-**cannot generate the signed headers** without a full reverse-engineer
-of the x-s algorithm. So the extracted text may be:
-- the right note (when the user is logged in and the XHR succeeds)
-- a different note (when `xsec_token` has been reused/expired)
-- empty or a skeleton (when the XHR was rejected)
+### Why this works
+小红书's `/api/sns/web/v1/feed` XHR requires signed `x-s`, `x-s-common`,
+and `x-t` headers (per [jackwener/xiaohongshu-cli](https://github.com/jackwener/xiaohongshu-cli))
+plus a logged-in `web_session` cookie for the full desc. Without
+those, XHS serves a different note, a skeleton, or an empty body
+(see [jackwener/OpenCLI#994](https://github.com/jackwener/OpenCLI/issues/994)).
 
-As of v0.18.0, a yellow banner in the side panel warns you when the
-extraction looks suspect (empty title, desc < 20 chars, no images +
-near-empty body). The LLM still receives whatever was extracted, but
-at least you know to double-check.
+Rather than reverse-engineering the signing algorithm (fragile,
+version-coupled), `browsa` injects a content script into
+`xiaohongshu.com` pages that wraps `window.fetch` and
+`XMLHttpRequest.prototype.send`. The browser's own signed fetch runs
+unchanged — we just `.clone()` the response, parse the JSON, and
+forward the note summary to the background. The result has the full
+desc, image count, tag list, and interaction counts.
 
-A real fix requires either:
-1. XHR interception that piggybacks on the browser's already-signed
-   fetch (with a content script), or
-2. Embedding the x-s signing algorithm in the extension.
+### How the data flows
 
-Tracked for v0.19.0+.
+```
+[XHS SPA]   →  fetch('/api/sns/web/v1/feed', signed)
+                 ↓
+[content script: lib/xhs-content-script.js]
+                 wraps fetch + XHR, clones response, extracts note
+                 ↓ chrome.runtime.sendMessage
+[background.js]  xhsXhrCache (Map<tabId, note>)
+                 ↓ port.postMessage
+[sidepanel.js]   lastXhsNote → renderDiagnosticsFromXhr()
+                 ↓ sendMessage({type:'GET_PAGE_CONTEXT', ...})
+[page-extractor.js]  extractActiveTab({xhsXhrNote})
+                 ↓ if noteId matches URL
+[synthesizeXhsResultFromXhr(note)] → ctx with full desc
+```
+
+### What if it doesn't work?
+
+If the user isn't logged in to `xiaohongshu.com` in this browser,
+the XHR returns a skeleton (no `data.noteList`) and the content
+script filters it out via `isNoteDetailPayload()`. The side panel
+then falls back to the DOM/INITIAL_STATE scrape, which may also be
+unreliable. In that case a yellow banner appears explaining what
+to do.
+
+To fix: log in to `xiaohongshu.com` in this browser, reload the
+note page, then re-send. The XHR will return real data within a
+few hundred ms.
 
 ## Publish to GitHub
 
