@@ -141,6 +141,22 @@ async function handle(msg, _sender) {
       return storage.getAll();
     }
 
+    case 'XHS_XHR_NOTE': {
+      // Sent by the content script. tabId is in msg.tabId, the note
+      // summary is in msg.note. We trust the content script's tabId
+      // because the sender can't be impersonated (content scripts
+      // only run in pages matching our content_scripts.matches).
+      pushXhsNote(msg.tabId, msg.note);
+      return { ok: true };
+    }
+
+    case 'GET_XHS_NOTE': {
+      // Sent by the side panel when it wants the latest XHR data
+      // for a given tab. Returns null if we haven't seen one yet.
+      const t = msg.tabId;
+      return { note: xhsXhrCache.get(t) || null };
+    }
+
     case 'SET_ACTIVE_PROVIDER': {
       await storage.setActiveProvider(msg.name);
       return { activeProvider: msg.name };
@@ -183,9 +199,16 @@ async function handle(msg, _sender) {
         // and 'full' (uses body.innerText).
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
+      // If we have a recent XHR note for this tab, pass it in so the
+      // extractor can prefer it over the DOM scrape. The XHR data is
+      // far more reliable on 小红书 because the SPA often renders a
+      // skeleton until the JS catches up.
+      const t = tabIdOf(msg, sender);
+      const xhrNote = (typeof t === 'number') ? (xhsXhrCache.get(t) || null) : null;
       const ctx = await extractActiveTab({
         mode,
-        maxTextChars: all.maxTextChars
+        maxTextChars: all.maxTextChars,
+        xhsXhrNote: xhrNote
       });
       return ctx;
     }
@@ -403,8 +426,35 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   lastNavBroadcast.delete(details.tabId);
 });
 
+// Xiaohongshu XHR feed cache.
+//
+// The content script (lib/xhs-content-script.js) intercepts the
+// browser's own fetch / XHR against /api/sns/web/v1/feed and
+// forwards the JSON to us. We keep the most recent one per tab
+// and push it to any side panel that's listening for that tab.
+// The side panel then has the FULL XHR data — desc, imageList,
+// interactInfo — which is far more reliable than scraping the
+// rendered DOM (the SPA may have replaced or hidden it).
+//
+// Keyed by tabId, not noteId: when the user clicks a new note the
+// XHR for that note arrives and overwrites the previous one. We
+// always trust the most recent XHR.
+const xhsXhrCache = new Map(); // tabId -> note summary
+
+function pushXhsNote(tabId, note) {
+  if (typeof tabId !== 'number' || !note) return;
+  xhsXhrCache.set(tabId, note);
+  const set = navPorts.get(tabId);
+  if (!set || set.size === 0) return;
+  for (const p of set) {
+    try { p.postMessage({ type: 'XHS_XHR_NOTE', tabId, note }); } catch (_) {}
+  }
+  console.log(`browsa[bg]: xhs XHR note cached for tab=${tabId} noteId=${note.noteId}`);
+}
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   lastNavBroadcast.delete(tabId);
+  xhsXhrCache.delete(tabId);
   const set = navPorts.get(tabId);
   if (set) {
     for (const p of set) {

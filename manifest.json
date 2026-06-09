@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
@@ -24,6 +24,17 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.xiaohongshu.com/*",
+        "https://xiaohongshu.com/*"
+      ],
+      "js": ["lib/xhs-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
   "action": {
     "default_title": "Open browsa sidebar"
   },

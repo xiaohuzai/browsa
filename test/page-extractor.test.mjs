@@ -530,6 +530,182 @@ test('end-to-end: empty INITIAL_STATE desc flags degraded', async () => {
   assert.equal(out.xhsDegraded, true);
 });
 
+// --- Content script interceptor (lib/xhs-content-script.js) ---------------
+// The content script intercepts fetch + XHR on xiaohongshu.com and
+// forwards parsed feed responses to the background. The matching /
+// dispatch logic is pure and exported via module.exports, so we can
+// test it under Node directly.
+
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const xhsContentPath = fileURLToPath(new URL('../lib/xhs-content-script.js', import.meta.url));
+const xhsContent = require(xhsContentPath);
+const { isXhsFeedUrl, isNoteDetailPayload, extractNoteSummary, maybeExtract } = xhsContent;
+
+test('content script: isXhsFeedUrl accepts the real XHS feed endpoint', () => {
+  assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v1/feed'), true);
+  assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v1/feed?foo=bar'), true);
+});
+
+test('content script: isXhsFeedUrl rejects other paths and other hosts', () => {
+  assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v1/homefeed'), false);
+  assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v2/feed'), false);
+  assert.equal(isXhsFeedUrl('https://www.xiaohongshu.com/explore/abc'), false);  // wrong host
+  assert.equal(isXhsFeedUrl('https://example.com/api/sns/web/v1/feed'), false);  // wrong host
+  assert.equal(isXhsFeedUrl('not a url'), false);
+  assert.equal(isXhsFeedUrl(null), false);
+  assert.equal(isXhsFeedUrl(undefined), false);
+});
+
+test('content script: isNoteDetailPayload accepts a real-shaped feed response', () => {
+  const payload = {
+    success: true,
+    data: {
+      noteList: [{
+        noteId: 'abc123',
+        title: '某标题',
+        desc: '某内容',
+        user: { nickname: '某作者' },
+        imageList: [{ url: 'https://...' }, { url: 'https://...' }],
+        tagList: [{ name: 'tag1' }],
+        interactInfo: { likedCount: 10, commentCount: 2 }
+      }]
+    }
+  };
+  assert.equal(isNoteDetailPayload(payload), true);
+});
+
+test('content script: isNoteDetailPayload accepts a note that has only title (no desc)', () => {
+  // Title-only notes are valid (e.g. short video notes). Real notes
+  // almost always have both, but we don't want to reject edge cases.
+  const payload = {
+    success: true,
+    data: { noteList: [{ noteId: 'x', title: 'only title', desc: '' }] }
+  };
+  assert.equal(isNoteDetailPayload(payload), true);
+});
+
+test('content script: isNoteDetailPayload rejects skeletons and wrong shapes', () => {
+  assert.equal(isNoteDetailPayload({ success: false }), false);
+  assert.equal(isNoteDetailPayload({ success: true, data: {} }), false);
+  assert.equal(isNoteDetailPayload({ success: true, data: { noteList: [] } }), false);
+  assert.equal(isNoteDetailPayload({ success: true, data: { noteList: [{}] } }), false);
+  assert.equal(isNoteDetailPayload({ success: true, data: { noteList: [{ noteId: 'x' }] } }), false);
+  assert.equal(isNoteDetailPayload(null), false);
+  assert.equal(isNoteDetailPayload('not an object'), false);
+});
+
+test('content script: extractNoteSummary produces the shape background expects', () => {
+  const summary = extractNoteSummary({
+    data: { noteList: [{
+      noteId: '6a141d03000000003502b14f',
+      title: '创业早期最大的幻觉之一',
+      desc: '创业团队常误以为凑了一个局即为团队。真正的团队需共同目标。',
+      user: { nickname: 'Bianca', userId: 'u1' },
+      imageList: [{ url: 'a' }, { url: 'b' }, { url: 'c' }],
+      tagList: [{ name: '创业' }, { name: '心智' }, null],
+      interactInfo: { likedCount: 83, commentCount: 0, shareCount: 5, collectedCount: 12 }
+    }] }
+  });
+  assert.equal(summary.noteId, '6a141d03000000003502b14f');
+  assert.equal(summary.title, '创业早期最大的幻觉之一');
+  assert.equal(summary.author, 'Bianca');
+  assert.equal(summary.userId, 'u1');
+  assert.equal(summary.imageCount, 3);
+  assert.deepEqual(summary.tagList, ['创业', '心智']);  // null filtered
+  assert.equal(summary.likedCount, 83);
+  assert.equal(summary.commentCount, 0);
+  assert.equal(summary.shareCount, 5);
+  assert.equal(summary.collectedCount, 12);
+  assert.ok(typeof summary.rawAt === 'number');
+});
+
+test('content script: maybeExtract returns null for non-feed URLs', () => {
+  const payload = { success: true, data: { noteList: [{ noteId: 'x', title: 't', desc: 'd' }] } };
+  assert.equal(maybeExtract('https://example.com/api/feed', payload), null);
+  assert.equal(maybeExtract('https://edith.xiaohongshu.com/api/sns/web/v1/homefeed', payload), null);
+});
+
+test('content script: maybeExtract returns null for skeleton feed response', () => {
+  // The browser fetched /feed, but the response is a skeleton (no notes).
+  assert.equal(
+    maybeExtract('https://edith.xiaohongshu.com/api/sns/web/v1/feed', { success: true, data: { noteList: [] } }),
+    null
+  );
+});
+
+test('content script: maybeExtract returns a summary for a healthy feed response', () => {
+  const summary = maybeExtract(
+    'https://edith.xiaohongshu.com/api/sns/web/v1/feed',
+    { success: true, data: { noteList: [{
+      noteId: 'real', title: 't', desc: 'd', user: { nickname: 'n' },
+      imageList: [], tagList: [], interactInfo: {}
+    }] } }
+  );
+  assert.ok(summary);
+  assert.equal(summary.noteId, 'real');
+});
+
+// --- synthesizeXhsResultFromXhr (lib/page-extractor.js) --------------------
+// The page extractor uses this to build a complete extraction result
+// from a XHR-intercepted note, when the content script has delivered
+// one. This is the v0.19.0 fast path.
+
+async function runSynthesize(args) {
+  const fnBody = await loadSiblingFn('synthesizeXhsResultFromXhr');
+  const ctx = vm.createContext({});
+  vm.runInContext(fnBody, ctx);
+  return vm.runInContext(
+    `synthesizeXhsResultFromXhr(${JSON.stringify(args)})`,
+    ctx
+  );
+}
+
+test('synth-from-xhr: real note produces a non-degraded, xhr-intercepted result', async () => {
+  const out = await runSynthesize({
+    noteId: '6a141d03000000003502b14f',
+    title: '创业早期最大的幻觉之一',
+    desc: '创业团队常误以为凑了一个局即为团队。真正的团队需共同目标、深度投入。',
+    author: 'Bianca',
+    userId: 'u1',
+    imageCount: 0,
+    tagList: ['创业', '心智'],
+    likedCount: 83,
+    commentCount: 0,
+    shareCount: 5,
+    collectedCount: 12,
+    rawAt: Date.now()
+  });
+  assert.equal(out.xhsSource, true);
+  assert.equal(out.xhsSubSource, 'xhr-intercepted');
+  assert.equal(out.xhsDegraded, false);
+  assert.equal(out.xhsNoteId, '6a141d03000000003502b14f');
+  assert.equal(out.articleTitle, '创业早期最大的幻觉之一');
+  assert.equal(out.articleByline, 'Bianca');
+  assert.match(out.text, /# 创业早期最大的幻觉之一/);
+  assert.match(out.text, /真正的团队需共同目标/);
+  assert.match(out.text, /#创业 #心智/);
+  assert.match(out.text, /👍 83/);
+  assert.match(out.text, /⭐ 12/);
+});
+
+test('synth-from-xhr: empty fields render safely (no crashes)', async () => {
+  const out = await runSynthesize({ noteId: 'x' });
+  assert.equal(out.xhsDegraded, false);
+  assert.equal(out.articleTitle, '');
+  assert.equal(out.text, '');  // nothing to render
+});
+
+test('synth-from-xhr: tags are auto-prefixed with #', async () => {
+  const out = await runSynthesize({
+    noteId: 'x', title: 't', desc: 'd',
+    tagList: ['foo', '#bar', null, '']
+  });
+  assert.match(out.text, /#foo/);
+  assert.match(out.text, /#bar/);  // already-prefixed stays as-is
+  assert.equal(out.text.split('Tags:')[1].split(' ').filter(Boolean).length, 2);
+});
+
 // --- Navigation broadcast (background.js → side panel) ----------------------
 // We extract the pure dedupeAndBroadcast function from background.js and
 // test it directly. The function takes (lastNavMap, navPortsMap, tabId, url)

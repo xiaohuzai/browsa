@@ -36,6 +36,7 @@ let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
 let navPort = null;             // long-lived port for SPA navigation pushes
+let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
 
 init();
@@ -124,7 +125,21 @@ async function init() {
   navPort = chrome.runtime.connect({ name: 'browsa-nav' });
   navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
   navPort.onMessage.addListener((msg) => {
-    if (!msg || msg.type !== 'NAVIGATED') return;
+    if (!msg) return;
+    if (msg.type === 'XHS_XHR_NOTE') {
+      // Real XHR data from the content script. The most authoritative
+      // source — the browser's own signed fetch, with cookies. We
+      // always accept it (overwriting any prior note for this tab).
+      if (msg.tabId !== currentTabId) return;
+      lastXhsNote = msg.note;
+      // Re-probe the diagnostics banner so the user sees the
+      // "extraction is healthy" state if desc is now populated.
+      if (/^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(pagemetaEl.href)) {
+        renderDiagnosticsFromXhr(lastXhsNote);
+      }
+      return;
+    }
+    if (msg.type !== 'NAVIGATED') return;
     if (msg.tabId !== currentTabId) return; // firehose filter
     if (msg.closed) {
       pagemetaEl.textContent = '(tab closed)';
@@ -132,6 +147,7 @@ async function init() {
       pagemetaEl.title = '';
       diagnosticsEl.hidden = true;
       diagnosticsEl.innerHTML = '';
+      lastXhsNote = null;
       return;
     }
     if (msg.url) {
@@ -154,13 +170,18 @@ async function init() {
     // diagnostics banner needs to update. We don't await — the new
     // banner will appear when the probe finishes (a few hundred ms).
     if (msg.url && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(msg.url)) {
+      // New note — clear the prior XHR cache so we don't send
+      // stale data. The content script will deliver the new note's
+      // XHR within a few hundred ms.
+      lastXhsNote = null;
       sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId })
         .then((ctx) => renderDiagnostics(ctx))
         .catch(() => {});
     } else {
-      // Not a 小红书 note — clear the banner.
+      // Not a 小红书 note — clear the banner and cache.
       diagnosticsEl.hidden = true;
       diagnosticsEl.innerHTML = '';
+      lastXhsNote = null;
     }
   });
   navPort.onDisconnect.addListener(() => {
@@ -261,6 +282,37 @@ function renderDiagnostics(ctx) {
     `the XHR often returns a different note or a skeleton. ` +
     `Login there, reload this page, then re-send. ` +
     `<em>Sent content still includes whatever was read; this is just a heads-up.</em>`;
+}
+
+// Like renderDiagnostics but driven directly by a live XHR note we
+// just intercepted. We don't have to wait for the round-trip to the
+// background to re-probe the DOM. This is the post-v0.19.0 fast path.
+function renderDiagnosticsFromXhr(note) {
+  if (!note) {
+    // No XHR yet — fall through to the existing probe-based render.
+    sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId })
+      .then((ctx) => renderDiagnostics(ctx))
+      .catch(() => {});
+    return;
+  }
+  const descLen = (note.desc || '').length;
+  const titleLen = (note.title || '').length;
+  const reasons = [];
+  if (titleLen === 0) reasons.push('title empty (XHR)');
+  if (descLen < 20) reasons.push(`desc too short (${descLen} chars, XHR)`);
+  if (note.imageCount === 0 && descLen < 30) reasons.push('no images, near-empty desc (XHR)');
+  if (reasons.length > 0) {
+    diagnosticsEl.hidden = false;
+    diagnosticsEl.innerHTML =
+      `小红书 content may be incomplete (${reasons.map((r) => `<code>${escM(r)}</code>`).join(', ')}). ` +
+      `The XHR returned, but it looks thin. If this doesn't match the page, ` +
+      `try a hard refresh (Ctrl+Shift+R).`;
+  } else {
+    // Healthy XHR. The DOM may still be stale, but the data source
+    // is good — clear the warning.
+    diagnosticsEl.hidden = true;
+    diagnosticsEl.innerHTML = '';
+  }
 }
 
 function applyContextMode(mode) {
