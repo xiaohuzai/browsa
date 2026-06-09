@@ -159,7 +159,52 @@ gh repo create browsa --public --source=. --push
 
 MIT
 
-## Fixed in v0.20.4 — mid-stream tab switch
+## Changelog
+
+### v0.20.5 — cancel now actually cancels
+
+**Bug**: Esc-to-cancel (or clicking the cancel UI) was visual-only.
+The user saw a "⚠ Stream cancelled" toast, but the background kept
+streaming the reply to completion, then silently appended a
+half-baked assistant turn to the tab's history. Next time the user
+opened the side panel, that phantom reply showed up.
+
+**Why**: `cancelStream()` in `sidepanel.js` only sent
+`STREAM_RELEASE`, which cleared `streamState` (so PEEK would stop
+returning in-flight) but never actually aborted the LLM fetch. The
+fetch and SSE reader loop had no `AbortSignal` plumbing at all —
+the existing `signal: msg.signal ? AbortSignal.timeout(...)` line
+in the CHAT handler was a hard timeout, not a user-cancel signal.
+
+**Fix**:
+- `background.js` now keeps `chatControllers: Map<tabId, AbortController>`.
+  The CHAT handler creates one, stores it, and threads it as
+  `signal` into `chatStream()`.
+- New message type `STREAM_ABORT { tabId }` calls
+  `controller.abort('user-cancel')`. The CHAT handler's catch block
+  detects `AbortError`, pushes an `ERROR { code: 'ABORTED' }` chunk,
+  and returns `{ cancelled: true }` **before** the
+  `appendToHistory(tabId, { role: 'assistant' ... })` line — so
+  no half-reply gets persisted.
+- `lib/openai-client.js`: `reader.read()` does **not** auto-cancel
+  on abort (the `fetch` aborts but the reader happily keeps reading
+  the buffered chunks). Now the abort listener calls
+  `reader.cancel()`, and the read loop checks `aborted` after every
+  `read()` and after `done` — because `reader.cancel()` makes
+  `read()` resolve with `done: true`, not throw. Without this check,
+  abort looked fine in tests but the loop returned a partial
+  `full` string as if the stream had finished naturally.
+- `cancelStream()` distinguishes a user-cancel of an
+  user-initiated stream ("⚠ Stream cancelled") from a cancel of a
+  resumed stream ("⚠ Stopped watching resumed stream"). The latter
+  is honest about the fact that the LLM is still running on the
+  background for that tab.
+
+**Tested by**: `test/abort.test.mjs` — 8 cases, including
+"openai-client reader loop respects the AbortSignal" (verifies
+abort unblocks the read loop within 200ms with `AbortError`).
+
+### v0.20.4 — mid-stream tab switch
 
 **Bug**: If the user switched tabs while the LLM was streaming a reply and
 then switched back, the side panel appeared to freeze on a `▍` placeholder

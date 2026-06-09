@@ -380,20 +380,29 @@ async function clearChatHistory() {
 function cancelStream() {
   if (!activeController) return;
   activeController.cancelled = true;
+  const wasResumed = activeController.resumed === true;
+  // Send STREAM_ABORT first (best-effort). The background's CHAT handler
+  // is awaiting chatStream() with the matching AbortController; calling
+  // .abort() throws AbortError on the next read(), which the catch
+  // block catches and turns into a clean "no history write" return.
+  // Then GOODBYE tells the background to drop the port entry. We do
+  // NOT send STREAM_RELEASE — the CHAT handler's abort catch already
+  // calls clearStreamState, and a second release would just be a
+  // harmless no-op, but skipping it keeps the wire clean.
+  if (currentTabId != null) {
+    sendMessage({ type: 'STREAM_ABORT', tabId: currentTabId }).catch(() => {});
+  }
   if (activeController.port) {
     try { activeController.port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
     try { activeController.port.disconnect(); } catch (_) {}
   }
   activeController = null;
   sendBtn.disabled = false;
-  appendSystem('⚠ Stream cancelled');
-  // Tell the background to drop streamState so a subsequent PEEK
-  // doesn't resurrect this (now-cancelled) reply. The CHAT handler
-  // will still write whatever the LLM produced before noticing the
-  // port is gone — that's a known v0.20.4 limitation: we don't
-  // propagate abort across the message boundary. v0.20.5 will plumb
-  // an AbortController through.
-  sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
+  // Distinguish user-initiated cancel (wasResumed=false) from cancel
+  // of a resumed stream (wasResumed=true). A resumed stream's "cancel"
+  // is closer to "stop watching" — the LLM is still running for the
+  // tab. Same UX though: the local assistant bubble is dropped.
+  appendSystem(wasResumed ? '⚠ Stopped watching resumed stream' : '⚠ Stream cancelled');
 }
 
 let outputTokens = 0;
@@ -746,7 +755,25 @@ async function onSend() {
         try { port.disconnect(); } catch (_) {}
         sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
       } else if (m.type === 'ERROR') {
-        assistantEl.textContent = `❌ ${m.error}`;
+        if (m.code === 'ABORTED') {
+          // User hit cancel (STREAM_ABORT) — the background already
+          // sent "⚠ Stream cancelled" on our behalf? No, it just
+          // pushed an ERROR chunk. We render the cancel UX in the
+          // bubble itself so the user sees the half-stream they had
+          // so far + a "(cancelled)" suffix.
+          if (acc) {
+            assistantEl.textContent = acc + '\n\n_(cancelled)_';
+          } else {
+            assistantEl.textContent = '_(cancelled)_';
+          }
+          // The appendSystem("⚠ Stream cancelled") is already shown
+          // by cancelStream() itself. We don't double-print.
+        } else {
+          // Real error (network, config, API). The background's
+          // generic handler already surfaced a hint via the sendResponse
+          // path; this is just the bubble.
+          assistantEl.textContent = `❌ ${m.error}`;
+        }
       }
     });
   }
@@ -915,7 +942,11 @@ async function resumeInFlightStream(tabId) {
     } else if (m.type === 'ERROR') {
       // Render error into a single text node (skip markdown).
       const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
-      el.textContent = `❌ ${m.error}`;
+      if (m.code === 'ABORTED') {
+        el.textContent = acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_';
+      } else {
+        el.textContent = `❌ ${m.error}`;
+      }
       try { port.disconnect(); } catch (_) {}
     }
   });

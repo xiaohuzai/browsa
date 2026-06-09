@@ -29,6 +29,13 @@ export const streamPorts = new Map(); // tabId -> Port
 // "switch tab mid-stream → reply appears stuck" bug.
 export const streamState = new Map(); // tabId -> { acc: string, startedAt: number, lastDeltaAt: number }
 
+// AbortControllers per in-flight chat, keyed by tabId. The side panel
+// sends STREAM_ABORT to cancel — the controller kills the HTTP fetch
+// AND the SSE read loop (see openai-client.js). Without this, cancel
+// was a no-op: the LLM kept streaming, the user saw a "cancelled"
+// notice, and a phantom assistant turn got written to history.
+export const chatControllers = new Map(); // tabId -> AbortController
+
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
 // text into the new port as one synthetic CHUNK, then keep pushing new
@@ -286,6 +293,23 @@ async function handle(msg, sender) {
       return { released: true };
     }
 
+    case 'STREAM_ABORT': {
+      // Side panel hit Esc / clicked cancel. Trigger the AbortController
+      // that the CHAT handler stored in chatControllers. The fetch and
+      // SSE loop both respect the signal, so the LLM stops within ~1
+      // chunk. The CHAT handler's catch block pushes an ERROR {code:
+      // 'ABORTED'} and returns without writing to history.
+      const t = msg.tabId;
+      const controller = chatControllers.get(t);
+      if (controller) {
+        try { controller.abort('user-cancel'); } catch (_) {}
+      }
+      // Even if there's no live controller (stream already done), drop
+      // any leftover streamState so PEEK stops returning in-flight.
+      clearStreamState(t);
+      return { aborted: !!controller };
+    }
+
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
       const mode = msg.mode || all.contextMode || 'reader';
@@ -391,40 +415,72 @@ async function handle(msg, sender) {
       // port but not the LLM request) can be recovered via STREAM_PEEK.
       initStreamState(tabId);
 
+      // Wire an AbortController so the side panel can actually cancel
+      // the LLM fetch. Without this, Esc-to-cancel was visual-only —
+      // the background kept streaming, a phantom assistant turn got
+      // appended to history, and STREAM_RELEASE just hid it from PEEK.
+      // The 5-min hard timeout still stands as a safety net.
+      const controller = new AbortController();
+      chatControllers.set(tabId, controller);
+      const timeout = setTimeout(() => controller.abort('timeout'), 60_000 * 5);
+      const signal = controller.signal;
+
       // Stream
       let fullReply = '';
+      let aborted = false;
       const stream = msg.stream !== false && provider.stream !== false;
-
-      if (stream) {
-        fullReply = await chatStream({
-          baseUrl: provider.baseUrl,
-          apiKey: provider.apiKey,
-          model: provider.model || provider.defaultModel,
-          messages,
-          onDelta: (delta) => {
-            // Mirror every delta into streamState so a later side panel
-            // session can PEEK and resume. The port push below is
-            // best-effort — if no port is connected (panel was torn
-            // down), the chunk is dropped from the wire but stays in
-            // streamState.acc, ready to be re-flushed on STREAM_HELLO.
-            appendToStreamState(tabId, delta);
-            pushChunk(tabId, { type: 'CHUNK', delta });
-          },
-          signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined // 5 min cap
-        });
-      } else {
-        fullReply = await chat({
-          baseUrl: provider.baseUrl,
-          apiKey: provider.apiKey,
-          model: provider.model || provider.defaultModel,
-          messages,
-          signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined
-        });
-        appendToStreamState(tabId, fullReply);
-        pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
+      try {
+        if (stream) {
+          fullReply = await chatStream({
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            model: provider.model || provider.defaultModel,
+            messages,
+            onDelta: (delta) => {
+              // Mirror every delta into streamState so a later side panel
+              // session can PEEK and resume. The port push below is
+              // best-effort — if no port is connected (panel was torn
+              // down), the chunk is dropped from the wire but stays in
+              // streamState.acc, ready to be re-flushed on STREAM_HELLO.
+              appendToStreamState(tabId, delta);
+              pushChunk(tabId, { type: 'CHUNK', delta });
+            },
+            signal
+          });
+        } else {
+          fullReply = await chat({
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            model: provider.model || provider.defaultModel,
+            messages,
+            signal
+          });
+          appendToStreamState(tabId, fullReply);
+          pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
+        }
+      } catch (e) {
+        // Distinguish user-cancel from real errors. AbortError fires
+        // when the side panel's cancelStream() called
+        // STREAM_ABORT → controller.abort() → fetch threw. We must NOT
+        // append a half-finished reply to history in that case.
+        if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {
+          aborted = true;
+          // Tell the side panel it was a clean cancel so it can show
+          // its "⚠ Stream cancelled" message and skip DONE.
+          pushChunk(tabId, { type: 'ERROR', error: 'cancelled', code: 'ABORTED' });
+          clearStreamState(tabId);
+          return { ok: true, cancelled: true };
+        }
+        // Re-throw real errors so the generic onMessage handler can
+        // wrap them with a hint (network / config / API).
+        throw e;
+      } finally {
+        clearTimeout(timeout);
+        chatControllers.delete(tabId);
       }
 
       // Persist assistant turn — this is the durable source of truth.
+      // (Only reached if the stream completed naturally, not via abort.)
       await storage.appendToHistory(tabId, { role: 'assistant', content: fullReply });
 
       // Send DONE then drop streamState. The current port (if any) gets
