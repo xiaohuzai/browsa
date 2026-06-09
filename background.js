@@ -463,3 +463,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     navPorts.delete(tabId);
   }
 });
+
+// Exported for testing. handle() is the switch-based message dispatcher.
+export { handle };
