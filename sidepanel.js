@@ -103,7 +103,10 @@ async function init() {
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    // Save current tab's conversation DOM before switching away.
+    // Save current tab's conversation DOM before switching away. The
+    // saved snapshot includes any in-flight reply that had been
+    // streaming before the switch (the chunk listener writes to
+    // tabStates on every delta). We don't save scrollTop — see below.
     if (currentTabId != null && messagesEl.innerHTML.trim()) {
       tabStates.set(currentTabId, { html: messagesEl.innerHTML });
     }
@@ -116,6 +119,26 @@ async function init() {
     } else {
       await renderHistory();
     }
+    // CRITICAL: scroll to the bottom of the conversation after restore.
+    // Without this, the messages container keeps whatever scrollTop
+    // the browser happened to leave it at (often the previous tab's
+    // bottom, or clamped to 0 if scrollHeight shrank during the innerHTML
+    // swap), so the user lands staring at a blank middle of the chat
+    // instead of the latest reply. Standard chat UX (Slack, Discord,
+    // 微信) snaps to bottom on tab/route switch. We don't preserve
+    // scrollTop across the switch because (a) it would require saving
+    // and restoring it through tabStates, (b) users almost always want
+    // the latest message when coming back, and (c) Chrome doesn't make
+    // it easy anyway — innerHTML swaps don't preserve scrollTop
+    // reliably.
+    //
+    // We use rAF because the innerHTML write triggers a layout pass
+    // synchronously, but the visible scroll restoration can race with
+    // a late chunk from resumeInFlightStream (which appends more
+    // height). The rAF gives the layout one tick to settle, then we
+    // snap. resumeInFlightStream itself calls scrollToBottom on each
+    // chunk it appends, so a late chunk will still be visible.
+    requestAnimationFrame(() => scrollToBottom());
     // After DOM is rehydrated, ask the background whether a stream is
     // in-flight for this tab. If yes, re-attach a fresh streaming port
     // so the new panel session receives the in-progress reply (and any
@@ -126,6 +149,13 @@ async function init() {
     await resumeInFlightStream(tabId).catch((e) =>
       console.warn('browsa: resumeInFlightStream failed', e)
     );
+    // Snap again after the resume's pre-render. The resume inserts
+    // (or finds) the assistant bubble, sets textContent to the
+    // accumulated acc, and calls renderStream which scrolls inside
+    // its own rAF. That can leave the panel at a position captured
+    // before the resume's pre-render added new height. A second
+    // scrollToBottom here is cheap and idempotent.
+    requestAnimationFrame(() => scrollToBottom());
     const t = await chrome.tabs.get(tabId);
     if (t) {
       pagemetaEl.textContent = t.title || t.url || '';
@@ -267,6 +297,12 @@ async function init() {
       console.warn('browsa: init resumeInFlightStream failed', e)
     );
   }
+  // Snap to the bottom of the rendered history. renderHistory() does
+  // call scrollToBottom, but Chrome may not have finished the first
+  // layout pass by the time we read scrollHeight (the side panel
+  // iframe was just constructed, fonts are still loading, etc.). A
+  // rAF ensures the layout is done and the snap sticks.
+  requestAnimationFrame(() => scrollToBottom());
 
   inputEl.focus();
 }

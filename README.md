@@ -161,6 +161,41 @@ MIT
 
 ## Changelog
 
+### v0.20.6 — switch back to a tab snaps to the latest message
+
+**Bug**: After switching to another tab and coming back, the messages
+list didn't scroll to the bottom — it stayed wherever it happened to
+land (usually the old position from before the innerHTML swap, or 0).
+Users coming back from another tab stared at a blank middle of an old
+conversation instead of the latest reply.
+
+**Why**: `onActivated` replaced `messagesEl.innerHTML` with the saved
+DOM snapshot (or called `renderHistory`) but never called
+`scrollToBottom`. The browser kept the previous `scrollTop`, which
+after the innerHTML swap was either stale or clamped to 0.
+
+**Fix**: Schedule `requestAnimationFrame(() => scrollToBottom())` at
+two points in `onActivated`:
+- Right after the innerHTML/renderHistory restore (snap to bottom
+  of the just-rehydrated DOM).
+- Right after `resumeInFlightStream` (snap again, in case the
+  resume's pre-render added bubble height after the first snap).
+
+Also added a defensive rAF in `init()` after `resumeInFlightStream`
+for the first-open case, where the side panel's first layout pass
+may not be done by the time `renderHistory()` runs.
+
+Design note: we do **not** save/restore `scrollTop` across tab
+switches. Standard chat UX (Slack, Discord, 微信) snaps to bottom
+on tab/route switch, and Chrome's `innerHTML` swap doesn't preserve
+`scrollTop` reliably anyway. Adding save/restore would cost
+complexity for a feature users don't actually want.
+
+**Tested by**: `test/scroll-snap.test.mjs` — 5 cases covering the
+init and onActivated contracts. (jsdom doesn't simulate layout, so
+we test the source contract — the entry points must schedule
+`scrollToBottom` via `requestAnimationFrame`.)
+
 ### v0.20.5 — cancel now actually cancels
 
 **Bug**: Esc-to-cancel (or clicking the cancel UI) was visual-only.
