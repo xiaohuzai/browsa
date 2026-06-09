@@ -27,6 +27,7 @@ const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const autoAttachEl = $('autoattach');
 const waitJsEl = $('waitjs');
 const pagemetaEl = $('pagemeta');
+const diagnosticsEl = $('diagnostics');
 const imagePreviewsEl = $('imagepreviews');
 const imageInfoEl = $('imageinfo');
 const imagePicker = $('imagepicker');
@@ -129,6 +130,8 @@ async function init() {
       pagemetaEl.textContent = '(tab closed)';
       pagemetaEl.href = '#';
       pagemetaEl.title = '';
+      diagnosticsEl.hidden = true;
+      diagnosticsEl.innerHTML = '';
       return;
     }
     if (msg.url) {
@@ -147,11 +150,36 @@ async function init() {
         pagemetaEl.textContent = msg.url;
       }
     }
+    // Re-probe the new URL. If it's a 小红书 explore page, the
+    // diagnostics banner needs to update. We don't await — the new
+    // banner will appear when the probe finishes (a few hundred ms).
+    if (msg.url && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(msg.url)) {
+      sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId })
+        .then((ctx) => renderDiagnostics(ctx))
+        .catch(() => {});
+    } else {
+      // Not a 小红书 note — clear the banner.
+      diagnosticsEl.hidden = true;
+      diagnosticsEl.innerHTML = '';
+    }
   });
   navPort.onDisconnect.addListener(() => {
     navPort = null;
     console.log('browsa: nav port disconnected, will reconnect on next send');
   });
+
+  // Diagnostics: on init, do a one-shot XHS page-context probe so we
+  // can render a warning banner if extraction looks suspect (e.g. the
+  // user isn't logged in to 小红书, or x-s signing was rejected, etc.).
+  // We don't need to do this for every page — only when the user is on
+  // a 小红书 explore page. The result is purely informational.
+  try {
+    const live = await chrome.tabs.get(currentTabId);
+    if (live && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(live.url || '')) {
+      const ctx = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId });
+      renderDiagnostics(ctx);
+    }
+  } catch (_) { /* tab closed or not yet ready */ }
 
   // Listen for config changes (from options page)
   chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -198,6 +226,41 @@ function prettyProviderName(name) {
   if (name === 'hermes') return 'Hermes';
   if (name === 'claude-code') return 'Claude Code';
   return name;
+}
+
+// Render a yellow banner above the chat when the active page is 小红书
+// and the extraction result looks suspicious (too-short desc, no images,
+// no title, etc.). We DO NOT silence the result — it still gets sent to
+// the LLM — but we tell the user "this might not be the full note, you
+// may want to log in to 小红书 in this browser."
+function renderDiagnostics(ctx) {
+  if (!ctx || ctx.error) {
+    diagnosticsEl.hidden = false;
+    diagnosticsEl.innerHTML =
+      `Couldn't read this page: <code>${escM(ctx?.error || 'unknown')}</code>. ` +
+      `If this is 小红书, try logging in or opening the note in a regular tab.`;
+    return;
+  }
+  if (!ctx.xhsSource) {
+    // Non-小红书 page — no diagnostics needed.
+    diagnosticsEl.hidden = true;
+    diagnosticsEl.innerHTML = '';
+    return;
+  }
+  if (!ctx.xhsDegraded) {
+    diagnosticsEl.hidden = true;
+    diagnosticsEl.innerHTML = '';
+    return;
+  }
+  // Build the warning. The reasons array gives specific signals.
+  const reasons = (ctx.xhsDegradeReasons || []).map((r) => `<code>${escM(r)}</code>`).join(', ');
+  diagnosticsEl.hidden = false;
+  diagnosticsEl.innerHTML =
+    `小红书 content may be incomplete (${reasons}). ` +
+    `If you're not logged in to <code>xiaohongshu.com</code> in this browser, ` +
+    `the XHR often returns a different note or a skeleton. ` +
+    `Login there, reload this page, then re-send. ` +
+    `<em>Sent content still includes whatever was read; this is just a heads-up.</em>`;
 }
 
 function applyContextMode(mode) {

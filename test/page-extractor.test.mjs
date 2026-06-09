@@ -164,7 +164,13 @@ async function runXhsInSandbox(html, url = 'https://www.xiaohongshu.com/explore/
   });
   // Emit as a top-level declaration so `document` / `location` resolve
   // from the sandbox global, exactly as they would in the page world.
-  return vm.runInContext(`${fnBody}\n;extractXiaohongshuInPageWorld();`, ctx);
+  // gradeXiaohongshuResult is a sibling function the extractor calls
+  // — it has to be loaded into the sandbox too.
+  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult');
+  return vm.runInContext(
+    `${siblingBody}\n${fnBody}\n;extractXiaohongshuInPageWorld();`,
+    ctx
+  );
 }
 
 test('xhs extractor: extracts title and desc from real-looking detail page', async () => {
@@ -351,7 +357,11 @@ async function runXhsWithStateInSandbox(html, initialState) {
     else if (src[i] === '}') { depth--; if (depth === 0) break; }
   }
   const fnBody = src.slice(start, i + 1);
-  return vm.runInContext(`${fnBody}\n;extractXiaohongshuInPageWorld();`, ctx);
+  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult');
+  return vm.runInContext(
+    `${siblingBody}\n${fnBody}\n;extractXiaohongshuInPageWorld();`,
+    ctx
+  );
 }
 
 test('xhs INITIAL_STATE: extracts title, desc, author, stats, tags', async () => {
@@ -420,6 +430,106 @@ test('xhs INITIAL_STATE: returns error when both sources fail', async () => {
   assert.match(out.error, /detail-title/);
 });
 
+// --- Xiaohongshu grading guard ---------------------------------------------
+// gradeXiaohongshuResult is a small pure function that decides whether
+// the XHS extraction result looks trustworthy. We extract it from
+// page-extractor.js and exercise it directly. This is the v0.18.0
+// "honest mode" gate: rather than pretending the result is fine, we
+// surface a yellow banner when desc is suspiciously short or empty.
+
+async function runGrade(args) {
+  const fnBody = await loadSiblingFn('gradeXiaohongshuResult');
+  const ctx = vm.createContext({});
+  vm.runInContext(fnBody, ctx);
+  return vm.runInContext(
+    `gradeXiaohongshuResult(${JSON.stringify(args)})`,
+    ctx
+  );
+}
+
+test('grade: full real-looking note is NOT degraded', async () => {
+  const r = await runGrade({
+    desc: '创业团队常误以为"凑了一个局"即为团队，实则松散。真正的团队需共同目标、深度投入。',
+    title: '创业早期最大的幻觉之一',
+    imageCount: 0,
+    source: 'initial-state'
+  });
+  assert.equal(r.xhsDegraded, false);
+  // Cross-vm objects don't share prototypes; deepEqual is too strict.
+  // Compare JSON shape instead.
+  assert.equal(JSON.stringify(r.xhsDegradeReasons), '[]');
+  assert.ok(r.xhsDescLen > 30);
+});
+
+test('grade: tiny desc (the v0.16.x failure mode) IS degraded', async () => {
+  // This is what happens when 小红书 returns a skeleton or wrong note
+  // because the user isn't logged in / x-s signing failed / etc.
+  const r = await runGrade({
+    desc: '创业',  // 2 chars
+    title: '某标题',
+    imageCount: 0,
+    source: 'dom'
+  });
+  assert.equal(r.xhsDegraded, true);
+  assert.ok(r.xhsDegradeReasons.some((s) => /desc too short/.test(s)));
+});
+
+test('grade: empty title is degraded', async () => {
+  const r = await runGrade({
+    desc: 'Some reasonable desc that exceeds the threshold',
+    title: '',
+    imageCount: 5,
+    source: 'initial-state'
+  });
+  assert.equal(r.xhsDegraded, true);
+  assert.ok(r.xhsDegradeReasons.some((s) => /title empty/.test(s)));
+});
+
+test('grade: no images + short desc is degraded (videos with caption still pass)', async () => {
+  const r1 = await runGrade({ desc: '短', title: 't', imageCount: 0, source: 'dom' });
+  assert.equal(r1.xhsDegraded, true, 'no images + 1-char desc should flag');
+  // If the desc is longer (a real video caption), it's fine even with 0 images
+  const r2 = await runGrade({ desc: '这是一段超过三十个字符的足够长的视频说明文字好好好好好呀呀呀呀', title: 't', imageCount: 0, source: 'dom' });
+  assert.ok(r2.xhsDescLen > 30, `want >30 chars, got ${r2.xhsDescLen}`);
+  assert.equal(r2.xhsDegraded, false, 'long caption + no images is fine');
+});
+
+test('grade: missing fields default cleanly (no crash)', async () => {
+  const r = await runGrade({});
+  assert.equal(r.xhsDegraded, true, 'missing everything = degraded');
+  assert.equal(r.xhsDescLen, 0);
+});
+
+test('end-to-end: full XHS INITIAL_STATE pipeline returns xhsDegraded=false for a real note', async () => {
+  const html = `<html><body><div id="detail-title">x</div><div id="detail-desc">x</div></body></html>`;
+  const out = await runXhsWithStateInSandbox(html, {
+    note: { noteDetailMap: { '6a141d03000000003502b14f': { note: {
+      title: '创业早期最大的幻觉之一',
+      desc: '创业团队常误以为凑了一个局即为团队。真正的团队需共同目标、深度投入。',
+      user: { nickname: '某 CEO' },
+      imageList: [],
+      tagList: [],
+      interactInfo: { likedCount: 10, commentCount: 0 }
+    } } } }
+  });
+  assert.equal(out.xhsDegraded, false, 'a real-looking note should NOT be flagged');
+});
+
+test('end-to-end: empty INITIAL_STATE desc flags degraded', async () => {
+  const html = `<html><body><div id="detail-title">x</div><div id="detail-desc">x</div></body></html>`;
+  const out = await runXhsWithStateInSandbox(html, {
+    note: { noteDetailMap: { '6a141d03000000003502b14f': { note: {
+      title: '某标题',
+      desc: '',  // empty — the failure mode we want to surface
+      user: { nickname: 'x' },
+      imageList: [],
+      tagList: [],
+      interactInfo: {}
+    } } } }
+  });
+  assert.equal(out.xhsDegraded, true);
+});
+
 // --- Navigation broadcast (background.js → side panel) ----------------------
 // We extract the pure dedupeAndBroadcast function from background.js and
 // test it directly. The function takes (lastNavMap, navPortsMap, tabId, url)
@@ -451,6 +561,36 @@ async function loadDedupeFn() {
     if (src[i] === '{') depth++;
     else if (src[i] === '}') { depth--; if (depth === 0) break; }
   }
+  return src.slice(start, i + 1);
+}
+
+// Extract a top-level function body from a file by name. Used to
+// inject sibling functions into the vm sandbox so the function under
+// test can call them. Reads lib/page-extractor.js by default.
+//
+// Caveat: the function's parameter list may contain a destructured
+// object like `({ desc, title })` which has its own `{...}` braces.
+// We have to find the OPENING `{` of the function BODY, not the
+// parameter list. The body always follows the closing `)` of the
+// parameter list, possibly with whitespace and arrow markers.
+async function loadSiblingFn(name, file = join(ROOT, 'lib/page-extractor.js')) {
+  const src = await readFile(file, 'utf8');
+  // Match the function name and the position of the closing paren
+  // of its parameter list.
+  const m = src.match(new RegExp(`function ${name}\\s*\\([^)]*\\)`));
+  if (!m) throw new Error(`${name} not found in ${file}`);
+  const headerEnd = m.index + m[0].length;
+  // Skip whitespace / comments / newlines to find the body's `{`.
+  let i = headerEnd;
+  while (i < src.length && /\s/.test(src[i])) i++;
+  if (src[i] !== '{') throw new Error(`${name}: expected { at offset ${i}, got ${src[i]}`);
+  const start = m.index; // include the full "function name(...) {" header
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  if (depth !== 0) throw new Error(`${name}: unbalanced braces`);
   return src.slice(start, i + 1);
 }
 

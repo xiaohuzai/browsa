@@ -99,6 +99,34 @@ browsa/
 - Multi-modal image upload from clipboard
 - Fork-able: add your own provider preset in `lib/storage.js` defaults
 
+## ⚠️ Xiaohongshu (小红书) note: extraction is best-effort
+
+The XHS detail page is a React SPA that fetches its actual content via
+`/api/sns/web/v1/feed`, with **signed requests** (`x-s`, `x-s-common`,
+`x-t` headers) and **login state required for the full desc**. Without
+the right signed headers or a logged-in `web_session` cookie, XHS
+serves a different note, a skeleton, or an empty body.
+
+browsa reads the rendered DOM (`#detail-title`, `#detail-desc`) and
+`window.__INITIAL_STATE__.note.noteDetailMap[noteId].note`, but it
+**cannot generate the signed headers** without a full reverse-engineer
+of the x-s algorithm. So the extracted text may be:
+- the right note (when the user is logged in and the XHR succeeds)
+- a different note (when `xsec_token` has been reused/expired)
+- empty or a skeleton (when the XHR was rejected)
+
+As of v0.18.0, a yellow banner in the side panel warns you when the
+extraction looks suspect (empty title, desc < 20 chars, no images +
+near-empty body). The LLM still receives whatever was extracted, but
+at least you know to double-check.
+
+A real fix requires either:
+1. XHR interception that piggybacks on the browser's already-signed
+   fetch (with a content script), or
+2. Embedding the x-s signing algorithm in the extension.
+
+Tracked for v0.19.0+.
+
 ## Publish to GitHub
 
 ```bash
