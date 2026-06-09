@@ -135,7 +135,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-async function handle(msg, _sender) {
+async function handle(msg, sender) {
   switch (msg.type) {
     case 'GET_CONFIG': {
       return storage.getAll();
