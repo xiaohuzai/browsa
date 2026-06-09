@@ -310,6 +310,36 @@ async function handle(msg, sender) {
       return { aborted: !!controller };
     }
 
+    case 'STREAM_DEBUG': {
+      // Observability endpoint for the side panel. Returns the full
+      // state of streamState, streamPorts, and chatControllers so we
+      // can debug "switch tab and come back → reply appears stuck"
+      // bugs by inspecting actual Map contents from devtools.
+      // This is what tells us whether a stream is in-flight from the
+      // background's perspective vs the side panel's perspective.
+      const out = {
+        streamState: {},
+        streamPorts: {},
+        chatControllers: {}
+      };
+      for (const [tabId, st] of streamState.entries()) {
+        out.streamState[tabId] = {
+          accLen: st.acc.length,
+          accPreview: st.acc.slice(0, 80),
+          startedAt: st.startedAt,
+          lastDeltaAt: st.lastDeltaAt,
+          msSinceLastDelta: Date.now() - st.lastDeltaAt
+        };
+      }
+      for (const [tabId, port] of streamPorts.entries()) {
+        out.streamPorts[tabId] = '<Port>';
+      }
+      for (const [tabId, _ctrl] of chatControllers.entries()) {
+        out.chatControllers[tabId] = '<AbortController>';
+      }
+      return out;
+    }
+
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
       const mode = msg.mode || all.contextMode || 'reader';

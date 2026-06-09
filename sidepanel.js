@@ -103,6 +103,11 @@ async function init() {
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+    // [DEBUG] snapshot of background state on tab switch
+    try {
+      const dbg = await sendMessage({ type: 'STREAM_DEBUG' });
+      console.log('browsa[onActivated] tab', tabId, 'STREAM_DEBUG:', JSON.stringify(dbg));
+    } catch (_) {}
     // Save current tab's conversation DOM before switching away. The
     // saved snapshot includes any in-flight reply that had been
     // streaming before the switch (the chunk listener writes to
@@ -119,7 +124,7 @@ async function init() {
     } else {
       await renderHistory();
     }
-    // CRITICAL: scroll to the bottom of the conversation after restore.
+    // CRITICAL: snap to the bottom of the conversation after restore.
     // Without this, the messages container keeps whatever scrollTop
     // the browser happened to leave it at (often the previous tab's
     // bottom, or clamped to 0 if scrollHeight shrank during the innerHTML
@@ -139,23 +144,43 @@ async function init() {
     // snap. resumeInFlightStream itself calls scrollToBottom on each
     // chunk it appends, so a late chunk will still be visible.
     requestAnimationFrame(() => scrollToBottom());
-    // After DOM is rehydrated, ask the background whether a stream is
-    // in-flight for this tab. If yes, re-attach a fresh streaming port
-    // so the new panel session receives the in-progress reply (and any
-    // new chunks that arrive after the switch). This is the half of the
-    // bug fix the v0.20.2 in-memory tabStates couldn't handle: tabStates
-    // dies with the old panel instance, so the new instance has to
-    // re-discover in-flight state from the background, not from RAM.
-    await resumeInFlightStream(tabId).catch((e) =>
-      console.warn('browsa: resumeInFlightStream failed', e)
-    );
-    // Snap again after the resume's pre-render. The resume inserts
-    // (or finds) the assistant bubble, sets textContent to the
-    // accumulated acc, and calls renderStream which scrolls inside
-    // its own rAF. That can leave the panel at a position captured
-    // before the resume's pre-render added new height. A second
-    // scrollToBottom here is cheap and idempotent.
-    requestAnimationFrame(() => scrollToBottom());
+    // PEEK before deciding to resume — this lets us tell apart two
+    // cases that need different handling:
+    //   (a) stream still in flight → resumeInFlightStream takes over
+    //   (b) stream finished while we were away → the saved snapshot
+    //       has the latest "▍" placeholder (or partial text from
+    //       before the stream finished) but NOT the full DONE
+    //       render. Storage now has the full assistant turn, so
+    //       re-render from storage to pick it up. Without this,
+    //       the user lands on a half-baked "▍" or "partial text"
+    //       bubble and the full reply is invisible.
+    const peek = await sendMessage({ type: 'STREAM_PEEK', tabId }).catch(() => null);
+    if (peek?.inFlight) {
+      await resumeInFlightStream(tabId).catch((e) =>
+        console.warn('browsa: resumeInFlightStream failed', e)
+      );
+    } else {
+      // No live stream. Detect the "stream finished while away" case:
+      // the latest .msg.assistant bubble is still a "▍" placeholder,
+      // which means the chunk listener never received DONE (we were
+      // disconnected when background pushed it). Storage should have
+      // the full turn by now. Re-render to surface it.
+      const lastAssistant = messagesEl.querySelector('.msg.assistant:last-of-type');
+      const lastText = (lastAssistant?.textContent || '').trim();
+      const isPlaceholder = lastText === '▍' || lastText === '';
+      if (isPlaceholder && lastAssistant) {
+        console.log('browsa: stream finished while away, re-rendering from storage');
+        await renderHistory();
+        requestAnimationFrame(() => scrollToBottom());
+      }
+      // Also clear any stale tabStates entry — the snapshot we just
+      // wrote is now stale because storage has the authoritative
+      // version. We don't strictly need to delete it (the next
+      // onActivated will overwrite it), but it saves a few KB of
+      // memory and avoids confusion if anyone reads tabStates
+      // elsewhere.
+      tabStates.delete(tabId);
+    }
     const t = await chrome.tabs.get(tabId);
     if (t) {
       pagemetaEl.textContent = t.title || t.url || '';
@@ -884,20 +909,24 @@ async function onSend() {
 // for the entire duration of a slow reply.
 async function resumeInFlightStream(tabId) {
   if (tabId == null) return;
+  console.log('browsa[resume] enter tab', tabId, 'activeController:', activeController);
   // If this panel session is already the owner of an in-flight stream,
   // don't open a second port. This can happen if onActivated fires
   // before the panel's own onSend's port fully wired up.
   if (activeController && activeController.tabId === tabId && !activeController.cancelled) {
+    console.log('browsa[resume] skip — already owning this stream');
     return;
   }
   // Ask the background: is there a stream for this tab, and if so,
   // what do you have so far?
   const peek = await sendMessage({ type: 'STREAM_PEEK', tabId });
+  console.log('browsa[resume] peek:', JSON.stringify({ inFlight: peek?.inFlight, accLen: peek?.acc?.length, accPreview: peek?.acc?.slice(0, 60) }));
   if (!peek?.inFlight) {
     // No stream running. The "switch tab and come back" path lands
     // here for the common case where the stream finished while the
     // user was away — storage already has the reply, renderHistory
     // (called by onActivated / init) has shown it. Nothing to do.
+    console.log('browsa[resume] no in-flight stream, nothing to do');
     return;
   }
   // From here, the background is still streaming. The DOM is whatever
