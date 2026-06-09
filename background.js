@@ -260,8 +260,16 @@ async function handle(msg, sender) {
             });
           }
         } catch (e) {
-          // If extraction fails, just send without it.
+          // If extraction fails, just send without it. The most common
+          // failure is "No tab with id" — the user switched/closed tabs
+          // between clicking Send and the message reaching us. Surface a
+          // clean hint instead of an opaque stack.
           console.warn('browsa: page extract failed, sending without context', e);
+          const msg = String(e?.message || '');
+          if (/No tab with id/i.test(msg) || /Failed to read page DOM/i.test(msg)) {
+            return { ok: false, code: 'TAB_GONE', error: msg,
+              hint: 'The active tab was closed or changed. Click into the tab you want to talk about, then resend.' };
+          }
         }
       }
 
