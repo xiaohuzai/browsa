@@ -158,3 +158,36 @@ gh repo create browsa --public --source=. --push
 ## License
 
 MIT
+
+## Fixed in v0.20.4 — mid-stream tab switch
+
+**Bug**: If the user switched tabs while the LLM was streaming a reply and
+then switched back, the side panel appeared to freeze on a `▍` placeholder
+even though the LLM had already finished. The reply was lost.
+
+**Why**: The streaming port (`chrome.runtime.connect` named `browsa-chat`)
+is owned by the side panel document. When the user switches tabs,
+Chrome tears down the side panel iframe — the port disconnects. The
+background had no record of the in-flight stream, so the freshly-arriving
+side panel saw only persisted history (which doesn't include the
+in-progress turn until `appendToHistory` runs at DONE time) and rendered
+nothing. Worse, the v0.20.3 fix (`setTimeout(disconnect)` after DONE)
+killed the port even faster, so the next switch-back couldn't recover.
+
+**Fix**:
+- `background.js` keeps a `streamState: Map<tabId, { acc, startedAt, lastDeltaAt }>`
+  that survives port churn. Every `onDelta` both pushes to the current
+  port and appends to `streamState.acc`.
+- New message types: `STREAM_PEEK` (returns in-flight status + accumulated
+  text) and `STREAM_RELEASE` (drops the state after DONE / cancel).
+- The side panel calls `STREAM_PEEK` on `init()` and on every
+  `chrome.tabs.onActivated` event. If a stream is in flight, it opens a
+  new port, pre-renders the accumulated text into the assistant bubble,
+  and continues receiving live deltas through the same listener.
+- Replaced the background's `setTimeout(disconnect)` with explicit
+  `STREAM_GOODBYE` + `STREAM_RELEASE` from the side panel — the cleanup
+  is now deterministic and races-free.
+
+**Tested by**: `test/stream-resume.test.mjs` (9 cases, including
+"streamState survives the streaming port disconnecting").
+

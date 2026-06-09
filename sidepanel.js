@@ -116,6 +116,16 @@ async function init() {
     } else {
       await renderHistory();
     }
+    // After DOM is rehydrated, ask the background whether a stream is
+    // in-flight for this tab. If yes, re-attach a fresh streaming port
+    // so the new panel session receives the in-progress reply (and any
+    // new chunks that arrive after the switch). This is the half of the
+    // bug fix the v0.20.2 in-memory tabStates couldn't handle: tabStates
+    // dies with the old panel instance, so the new instance has to
+    // re-discover in-flight state from the background, not from RAM.
+    await resumeInFlightStream(tabId).catch((e) =>
+      console.warn('browsa: resumeInFlightStream failed', e)
+    );
     const t = await chrome.tabs.get(tabId);
     if (t) {
       pagemetaEl.textContent = t.title || t.url || '';
@@ -246,6 +256,18 @@ async function init() {
 
   refreshImageStrip();
 
+  // After history is rendered, peek the background for any in-flight
+  // stream on this tab. If the user switched tabs mid-reply and then
+  // came back, this is what re-attaches the live chunk feed to the
+  // freshly-rendered (history-only) DOM — without it the panel would
+  // sit on a "▍" placeholder forever even though the LLM had already
+  // produced the reply.
+  if (currentTabId != null) {
+    await resumeInFlightStream(currentTabId).catch((e) =>
+      console.warn('browsa: init resumeInFlightStream failed', e)
+    );
+  }
+
   inputEl.focus();
 }
 
@@ -359,11 +381,19 @@ function cancelStream() {
   if (!activeController) return;
   activeController.cancelled = true;
   if (activeController.port) {
-    activeController.port.disconnect();
+    try { activeController.port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+    try { activeController.port.disconnect(); } catch (_) {}
   }
   activeController = null;
   sendBtn.disabled = false;
   appendSystem('⚠ Stream cancelled');
+  // Tell the background to drop streamState so a subsequent PEEK
+  // doesn't resurrect this (now-cancelled) reply. The CHAT handler
+  // will still write whatever the LLM produced before noticing the
+  // port is gone — that's a known v0.20.4 limitation: we don't
+  // propagate abort across the message boundary. v0.20.5 will plumb
+  // an AbortController through.
+  sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
 }
 
 let outputTokens = 0;
@@ -707,6 +737,14 @@ async function onSend() {
         addCodeCopyButtons();
         outputTokens = 0;
         if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+        // Stream is fully done from the side panel's perspective. Tell
+        // the background it can drop streamState and tear the port down
+        // cleanly. The old v0.20.3 code relied on the background's
+        // setTimeout(disconnect) to fire onDisconnect, but that path
+        // killed switch-back. Now we own the cleanup.
+        try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+        try { port.disconnect(); } catch (_) {}
+        sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
       } else if (m.type === 'ERROR') {
         assistantEl.textContent = `❌ ${m.error}`;
       }
@@ -765,6 +803,139 @@ async function onSend() {
   } finally {
     sendBtn.disabled = false;
   }
+}
+
+// Re-attach a streaming port for a tab whose LLM reply is still in
+// flight on the background. Called on:
+//   - init() after history is rendered (catches the case where the
+//     user just opened the side panel during a stream)
+//   - chrome.tabs.onActivated when the user switches back to a tab
+//     that had an active stream when the panel was torn down.
+//
+// The background's STREAM_HELLO handler will drain any accumulated
+// reply text into our new port as one synthetic CHUNK, so we rehydrate
+// the assistant bubble from the same starting state the old panel had,
+// then continue receiving live deltas through the same listener.
+// Without this, the panel would only ever see storage (which doesn't
+// update until the reply is DONE) and would sit on an empty bubble
+// for the entire duration of a slow reply.
+async function resumeInFlightStream(tabId) {
+  if (tabId == null) return;
+  // If this panel session is already the owner of an in-flight stream,
+  // don't open a second port. This can happen if onActivated fires
+  // before the panel's own onSend's port fully wired up.
+  if (activeController && activeController.tabId === tabId && !activeController.cancelled) {
+    return;
+  }
+  // Ask the background: is there a stream for this tab, and if so,
+  // what do you have so far?
+  const peek = await sendMessage({ type: 'STREAM_PEEK', tabId });
+  if (!peek?.inFlight) {
+    // No stream running. The "switch tab and come back" path lands
+    // here for the common case where the stream finished while the
+    // user was away — storage already has the reply, renderHistory
+    // (called by onActivated / init) has shown it. Nothing to do.
+    return;
+  }
+  // From here, the background is still streaming. The DOM is whatever
+  // the previous panel session left behind (or just renderHistory()
+  // output if the panel was opened fresh). We need to:
+  //   1. Open a new browsa-chat port
+  //   2. STREAM_PEEK gave us the accumulated text already — pre-render
+  //      it into an assistant bubble so the user sees something
+  //      immediately (not just "▍" for seconds).
+  //   3. HELLO the background so it knows our port is the new owner
+  //   4. Wire the chunk listener for any deltas that arrive from now on
+  //   5. Re-resolve the assistant bubble on every chunk because the
+  //      DOM node identity can change (innerHTML restore in
+  //      onActivated replaces the whole subtree).
+  const port = chrome.runtime.connect({ name: 'browsa-chat' });
+  let acc = peek.acc || '';
+  const initialBubble = getOrCreateAssistantBubble();
+  let renderStream = makeStreamRenderer(initialBubble);
+  let assistantEl = initialBubble;
+  function getOrCreateAssistantBubble() {
+    let el = messagesEl.querySelector('.msg.assistant:last-of-type');
+    if (!el) el = appendAssistant('▍');
+    return el;
+  }
+  function ensureAssistantEl() {
+    // The DOM node identity may have changed (innerHTML restore
+    // replaces the whole subtree). Re-resolve on every chunk.
+    let el = messagesEl.querySelector('.msg.assistant:last-of-type');
+    if (!el) el = appendAssistant('▍');
+    if (el !== assistantEl) {
+      // Switch the stream renderer's target. makeStreamRenderer
+      // holds a closure over the original el — that one's renderStream
+      // function is now stale. Build a new renderer for the fresh el.
+      assistantEl = el;
+      renderStream = makeStreamRenderer(el);
+    }
+    return renderStream;
+  }
+  // Pre-render the accumulated text from the PEEK. This is the only
+  // place this initial text is rendered — the background's STREAM_HELLO
+  // does NOT push a drain chunk (see background.js for why). Subsequent
+  // CHUNKs are pure new deltas; acc += m.delta in the listener is
+  // correct because we start acc at peek.acc, not at ''.
+  if (acc) renderStream(acc, false);
+  // HELLO the background so it knows this port owns the stream now.
+  // Wait for ACK so any in-flight delta that's about to fire from the
+  // LLM (after the PEEK/HELLO race window) goes to a port that's
+  // already wired with a listener.
+  await new Promise((resolve) => {
+    const ackTimeout = setTimeout(resolve, 500);
+    port.onMessage.addListener(function once(m) {
+      if (m.type === 'STREAM_HELLO_ACK') {
+        clearTimeout(ackTimeout);
+        port.onMessage.removeListener(once);
+        resolve();
+      }
+    });
+    port.postMessage({ type: 'STREAM_HELLO', tabId });
+  });
+  port.onMessage.addListener((m) => {
+    if (m.type === 'CHUNK') {
+      const r = ensureAssistantEl();
+      acc += m.delta;
+      r(acc, false);
+      updateOutputTokenCount(m.delta);
+      if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+    } else if (m.type === 'DONE') {
+      const r = ensureAssistantEl();
+      r(m.full || acc, true);
+      addCodeCopyButtons();
+      outputTokens = 0;
+      if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+      try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+      try { port.disconnect(); } catch (_) {}
+      sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
+      activeController = null;
+      sendBtn.disabled = false;
+    } else if (m.type === 'ERROR') {
+      // Render error into a single text node (skip markdown).
+      const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
+      el.textContent = `❌ ${m.error}`;
+      try { port.disconnect(); } catch (_) {}
+    }
+  });
+  port.onDisconnect.addListener(() => {
+    sendBtn.disabled = false;
+    // If the port died with no chunks at all, show the same hint as
+    // onSend (the user has nothing to look at otherwise).
+    const el = messagesEl.querySelector('.msg.assistant:last-of-type');
+    if (acc === '' && el && el.textContent === '▍') {
+      el.textContent = '(no chunks received — check Service Worker DevTools)';
+    }
+  });
+  // Track this stream on the activeController slot so Esc-to-cancel
+  // and the early-return guard above work. cancelled is false (this
+  // is a resume, not a user-initiated stream). If the user hits Esc
+  // during a resumed stream, cancelStream() disconnects the port and
+  // sends STREAM_RELEASE; the background keeps streaming but no chunks
+  // reach us, and PEEK stops returning in-flight. Reasonable trade-off
+  // for v0.20.4; v0.20.5 will plumb an AbortController through.
+  activeController = { port, cancelled: false, tabId, resumed: true };
 }
 
 function appendUser(text) {

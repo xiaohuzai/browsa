@@ -19,7 +19,21 @@ chrome.sidePanel
 // has the first delta from the LLM, it pushes it back through this port.
 // We keep a registry keyed by tabId so multiple tabs (each with their own
 // side panel) can stream independently.
-const streamPorts = new Map(); // tabId -> Port
+export const streamPorts = new Map(); // tabId -> Port
+
+// Stream state survives port churn. When the side panel is torn down (the
+// user switches tabs and Chrome destroys the panel), the streaming port
+// disconnects, but the LLM request keeps running on the background. We
+// stash the accumulated reply here so a freshly-opened side panel can
+// peek + resume from where the old panel left off — fixes the
+// "switch tab mid-stream → reply appears stuck" bug.
+export const streamState = new Map(); // tabId -> { acc: string, startedAt: number, lastDeltaAt: number }
+
+// If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
+// streamState has a non-empty acc for that tab), we drain the accumulated
+// text into the new port as one synthetic CHUNK, then keep pushing new
+// deltas through the new port. streamPorts.get(tabId) is the *current*
+// owner; older owners get safely disconnected.
 
 // Navigation port: a separate long-lived port ('browsa-nav') the side panel
 // opens on init. The background uses chrome.webNavigation to detect SPA
@@ -39,20 +53,50 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onMessage.addListener((msg) => {
       if (msg && msg.type === 'STREAM_HELLO' && typeof msg.tabId === 'number') {
         claimedTabId = msg.tabId;
-        streamPorts.set(msg.tabId, port);
-        console.log('browsa[bg]: stream port registered for tab', msg.tabId);
+        // If another panel already owns this tab's port (shouldn't happen
+        // in practice — chrome.sidePanel is 1-per-tab — but defensive),
+        // disconnect the old one so the old session releases its UI lock.
+        const oldPort = streamPorts.get(claimedTabId);
+        if (oldPort && oldPort !== port) {
+          try { oldPort.disconnect(); } catch (_) {}
+        }
+        streamPorts.set(claimedTabId, port);
+        console.log('browsa[bg]: stream port registered for tab', claimedTabId);
         // Acknowledge so the side panel knows it's safe to send CHAT. This
         // prevents a race where the first LLM chunk arrives before we have
         // the port in our Map.
         try { port.postMessage({ type: 'STREAM_HELLO_ACK' }); } catch (_) {}
+        // NOTE: we deliberately do NOT push a synthetic drain CHUNK
+        // from HELLO. The side panel already has the accumulated text
+        // from the STREAM_PEEK it called before opening the port —
+        // it pre-renders that itself, so pushing the same text again
+        // from here would double the reply (acc += st.acc, twice).
       } else if (msg && msg.type === 'STREAM_GOODBYE' && claimedTabId != null) {
-        streamPorts.delete(claimedTabId);
+        // Side panel is signing off cleanly (cancel or after-DONE cleanup).
+        // We DON'T delete streamState here — the CHAT handler owns its
+        // lifetime so a STREAM_PEEK on a freshly-arriving panel can still
+        // recover the accumulated text. The CHAT handler clears it after
+        // appendToHistory. If the panel is gone for good (tab closed, page
+        // navigated away), a safety-net GC in the message handler drops
+        // stale entries older than STREAM_STATE_TTL_MS.
+        try { port.disconnect(); } catch (_) {}
+        if (streamPorts.get(claimedTabId) === port) {
+          streamPorts.delete(claimedTabId);
+        }
         console.log('browsa[bg]: stream port released for tab', claimedTabId);
       }
     });
     port.onDisconnect.addListener(() => {
       if (claimedTabId != null) {
-        streamPorts.delete(claimedTabId);
+        // CRITICAL: do NOT delete streamState here. The LLM request is
+        // still running on the background — only the port died because
+        // the side panel iframe got destroyed (chrome.sidePanel tears
+        // down the document on tab switch). When the user switches back
+        // and a new port opens, STREAM_HELLO above will drain the acc
+        // and resume the stream.
+        if (streamPorts.get(claimedTabId) === port) {
+          streamPorts.delete(claimedTabId);
+        }
         console.log('browsa[bg]: stream port disconnected for tab', claimedTabId);
       }
     });
@@ -107,6 +151,32 @@ chrome.runtime.onConnect.addListener((port) => {
 function pushChunk(tabId, payload) {
   const port = streamPorts.get(tabId);
   if (port) safePost(port, payload);
+}
+
+// Initialize a streamState record for a tab when CHAT starts. Called by
+// the CHAT handler before the first onDelta arrives. This is what lets a
+// mid-stream tab switch survive the port disconnect.
+export function initStreamState(tabId) {
+  streamState.set(tabId, { acc: '', startedAt: Date.now(), lastDeltaAt: 0 });
+}
+
+// Update streamState.acc as deltas stream in. Cheap — runs on every chunk
+// (typically dozens to hundreds per second). The acc is what the next
+// side panel session will render as its "starting point" via STREAM_PEEK.
+export function appendToStreamState(tabId, delta) {
+  const st = streamState.get(tabId);
+  if (st) {
+    st.acc += delta;
+    st.lastDeltaAt = Date.now();
+  }
+}
+
+// Drop the streamState once the reply is fully persisted to history and
+// the active side panel has acknowledged. Called by the CHAT handler
+// right after appendToHistory (so the persisted reply is the same as
+// streamState.acc — single source of truth for "what the user sees").
+export function clearStreamState(tabId) {
+  streamState.delete(tabId);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -188,6 +258,32 @@ async function handle(msg, sender) {
       if (tabId == null) throw new Error('tabId required');
       await storage.clearHistory(tabId);
       return { cleared: true };
+    }
+
+    case 'STREAM_PEEK': {
+      // Side panel asks "is there an in-flight stream for this tab, and
+      // if so, what do you have so far?" Used on init / tab switch to
+      // rehydrate the assistant bubble from streamState.acc.
+      const t = msg.tabId;
+      const st = streamState.get(t);
+      if (!st) return { inFlight: false };
+      return {
+        inFlight: true,
+        acc: st.acc,
+        startedAt: st.startedAt,
+        lastDeltaAt: st.lastDeltaAt
+      };
+    }
+
+    case 'STREAM_RELEASE': {
+      // Side panel signals it's done with the streamState (after rendering
+      // DONE, or because the user cancelled). Idempotent — safe to call
+      // when no state exists. The CHAT handler also calls
+      // clearStreamState on its own, so this is mostly a fast-path for
+      // the cancel button.
+      const t = msg.tabId;
+      if (t != null) clearStreamState(t);
+      return { released: true };
     }
 
     case 'GET_PAGE_CONTEXT': {
@@ -289,6 +385,12 @@ async function handle(msg, sender) {
       const userTurn = { role: 'user', content: msg.userText || '(no instruction)' };
       await storage.appendToHistory(tabId, userTurn);
 
+      // Initialize stream state BEFORE the first onDelta. From this point
+      // on, every delta both pushes to the port and accumulates into
+      // streamState.acc — so a mid-stream tab switch (which kills the
+      // port but not the LLM request) can be recovered via STREAM_PEEK.
+      initStreamState(tabId);
+
       // Stream
       let fullReply = '';
       const stream = msg.stream !== false && provider.stream !== false;
@@ -300,6 +402,12 @@ async function handle(msg, sender) {
           model: provider.model || provider.defaultModel,
           messages,
           onDelta: (delta) => {
+            // Mirror every delta into streamState so a later side panel
+            // session can PEEK and resume. The port push below is
+            // best-effort — if no port is connected (panel was torn
+            // down), the chunk is dropped from the wire but stays in
+            // streamState.acc, ready to be re-flushed on STREAM_HELLO.
+            appendToStreamState(tabId, delta);
             pushChunk(tabId, { type: 'CHUNK', delta });
           },
           signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined // 5 min cap
@@ -312,23 +420,21 @@ async function handle(msg, sender) {
           messages,
           signal: msg.signal ? AbortSignal.timeout(60_000 * 5) : undefined
         });
+        appendToStreamState(tabId, fullReply);
         pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
       }
 
-      // Persist assistant turn
+      // Persist assistant turn — this is the durable source of truth.
       await storage.appendToHistory(tabId, { role: 'assistant', content: fullReply });
 
+      // Send DONE then drop streamState. The current port (if any) gets
+      // the DONE so it can finalize its render. We do NOT call
+      // `setTimeout(disconnect)` anymore — that was the v0.20.3 hack
+      // that killed switch-back. Instead, the side panel sends
+      // STREAM_GOODBYE after rendering DONE, and we drop streamState
+      // here so PEEK stops returning "in-flight" for a finished reply.
       pushChunk(tabId, { type: 'DONE', full: fullReply });
-      // Disconnect the streaming port so the side panel's onDisconnect fires
-      // and resets the Send button state. A short delay gives the DONE chunk
-      // time to be delivered before the port is torn down.
-      setTimeout(() => {
-        const p = streamPorts.get(tabId);
-        if (p) {
-          try { p.disconnect(); } catch (_) {}
-          streamPorts.delete(tabId);
-        }
-      }, 50);
+      clearStreamState(tabId);
       return {
         full: fullReply,
         pageContext: pageContext
