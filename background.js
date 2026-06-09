@@ -273,7 +273,7 @@ async function handle(msg, sender) {
         history,
         userText: msg.userText,
         pageContext,
-        withImage: pageContext?.imageDataUrl ? true : false,
+        withImage: (pageContext?.imageDataUrl || (pageContext?.imageBase64List && pageContext.imageBase64List.length > 0)) ? true : false,
         userImages: msg.images // pasted / dropped images (base64 data URLs)
       });
 
