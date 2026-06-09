@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
@@ -32,7 +32,8 @@
       ],
       "js": ["lib/xhs-content-script.js"],
       "run_at": "document_start",
-      "all_frames": false
+      "all_frames": false,
+      "world": "MAIN"
     }
   ],
   "action": {
