@@ -38,6 +38,12 @@ let lastPageMeta = null;
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
+// Per-tab conversation DOM snapshot. When the user switches tabs, we save
+// the current messagesEl.innerHTML here and restore it when they switch back.
+// This preserves in-flight streaming replies that haven't been persisted to
+// storage yet — the v0.20.1 "switch tab → reply vanishes" bug.
+const tabStates = new Map();   // tabId -> { html: string }
+const clearBtn = $('clear');
 
 init();
 
@@ -58,6 +64,7 @@ async function init() {
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
   settingsBtn.addEventListener('click', openSettingsPage);
+  clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
   autoAttachEl.addEventListener('change', () => {
     // Persisted on background; also locally
@@ -94,10 +101,21 @@ async function init() {
     pagemetaEl.title = tab.url || '';
   }
 
-  // Update page meta when tab changes
+  // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+    // Save current tab's conversation DOM before switching away.
+    if (currentTabId != null && messagesEl.innerHTML.trim()) {
+      tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+    }
     currentTabId = tabId;
-    await renderHistory();
+    // Restore saved DOM if we've been on this tab before; otherwise
+    // load from persisted storage.
+    const saved = tabStates.get(tabId);
+    if (saved && saved.html.trim()) {
+      messagesEl.innerHTML = saved.html;
+    } else {
+      await renderHistory();
+    }
     const t = await chrome.tabs.get(tabId);
     if (t) {
       pagemetaEl.textContent = t.title || t.url || '';
@@ -333,6 +351,7 @@ async function clearChatHistory() {
   if (!currentTabId) return;
   await sendMessage({ type: 'CLEAR_HISTORY', tabId: currentTabId });
   messagesEl.innerHTML = '';
+  tabStates.delete(currentTabId);
   appendSystem('🗑 History cleared');
 }
 
@@ -681,10 +700,13 @@ async function onSend() {
         acc += m.delta;
         renderStream(acc, false);
         updateOutputTokenCount(m.delta);
+        // Persist in-flight HTML so tab switch doesn't lose it.
+        if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
       } else if (m.type === 'DONE') {
         renderStream(m.full || acc, true);
         addCodeCopyButtons();
         outputTokens = 0;
+        if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
       } else if (m.type === 'ERROR') {
         assistantEl.textContent = `❌ ${m.error}`;
       }
