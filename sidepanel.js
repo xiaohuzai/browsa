@@ -103,11 +103,6 @@ async function init() {
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    // [DEBUG] snapshot of background state on tab switch
-    try {
-      const dbg = await sendMessage({ type: 'STREAM_DEBUG' });
-      console.log('browsa[onActivated] tab', tabId, 'STREAM_DEBUG:', JSON.stringify(dbg));
-    } catch (_) {}
     // Save current tab's conversation DOM before switching away. The
     // saved snapshot includes any in-flight reply that had been
     // streaming before the switch (the chunk listener writes to
@@ -169,7 +164,6 @@ async function init() {
       const lastText = (lastAssistant?.textContent || '').trim();
       const isPlaceholder = lastText === '▍' || lastText === '';
       if (isPlaceholder && lastAssistant) {
-        console.log('browsa: stream finished while away, re-rendering from storage');
         await renderHistory();
         requestAnimationFrame(() => scrollToBottom());
       }
@@ -909,24 +903,20 @@ async function onSend() {
 // for the entire duration of a slow reply.
 async function resumeInFlightStream(tabId) {
   if (tabId == null) return;
-  console.log('browsa[resume] enter tab', tabId, 'activeController:', activeController);
   // If this panel session is already the owner of an in-flight stream,
   // don't open a second port. This can happen if onActivated fires
   // before the panel's own onSend's port fully wired up.
   if (activeController && activeController.tabId === tabId && !activeController.cancelled) {
-    console.log('browsa[resume] skip — already owning this stream');
     return;
   }
   // Ask the background: is there a stream for this tab, and if so,
   // what do you have so far?
   const peek = await sendMessage({ type: 'STREAM_PEEK', tabId });
-  console.log('browsa[resume] peek:', JSON.stringify({ inFlight: peek?.inFlight, accLen: peek?.acc?.length, accPreview: peek?.acc?.slice(0, 60) }));
   if (!peek?.inFlight) {
     // No stream running. The "switch tab and come back" path lands
     // here for the common case where the stream finished while the
     // user was away — storage already has the reply, renderHistory
     // (called by onActivated / init) has shown it. Nothing to do.
-    console.log('browsa[resume] no in-flight stream, nothing to do');
     return;
   }
   // From here, the background is still streaming. The DOM is whatever

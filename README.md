@@ -161,6 +161,49 @@ MIT
 
 ## Changelog
 
+### v0.20.8 — prepare for public release
+
+Removed the `console.log` debug noise that v0.20.7 added for diagnosing
+the mid-stream tab-switch bug. The `STREAM_DEBUG` message handler in
+`background.js` is preserved — call it from the side panel devtools
+console with `chrome.runtime.sendMessage({type: 'STREAM_DEBUG'})` to
+inspect `streamState`/`streamPorts`/`chatControllers` live.
+
+No behavior changes. The mid-stream tab-switch handling and the
+"stream finished while away → re-render from storage" branch are
+unchanged from v0.20.7.
+
+### v0.20.7 — DEBUG observability + handle 'stream finished while away' case
+
+**Bug**: When the user switched tabs and the LLM finished streaming
+while they were away, the side panel was stuck on the "▍" placeholder
+forever. The reply had been written to storage by the background, but
+the side panel never re-rendered to pick it up.
+
+**Why**: v0.20.4's `resumeInFlightStream` only handled the case where
+the stream was *still in flight* on switch-back. If the stream
+finished during the user's absence, the background's `pushChunk(DONE)`
+hit a dead port (silently dropped by `safePost`), then called
+`clearStreamState(tabId)`. When the user came back, `STREAM_PEEK`
+returned `{ inFlight: false }`, the resume code bailed, and the saved
+DOM snapshot (with the "▍" placeholder) just sat there.
+
+**Fix**:
+- `onActivated` now branches on the PEEK result. `inFlight: false` +
+  the latest assistant bubble is still a "▍" placeholder → re-render
+  from storage via `renderHistory()`. The full reply is already in
+  storage; we just weren't surfacing it.
+- New `STREAM_DEBUG` message handler in `background.js` dumps
+  `streamState` / `streamPorts` / `chatControllers` contents, so the
+  next time a tab-switch bug appears we can read the actual Map state
+  from devtools instead of guessing from the source.
+
+**Tested by**: `test/scroll-snap.test.mjs` (5 cases, the
+"stream finished while away" path has no unit test — it requires
+real-time timing simulation that the unit test framework can't
+do. The contract test is "onActivated branches on PEEK result",
+which is implicit in the source reading).
+
 ### v0.20.6 — switch back to a tab snaps to the latest message
 
 **Bug**: After switching to another tab and coming back, the messages
