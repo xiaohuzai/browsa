@@ -286,6 +286,17 @@ async function init() {
     }
   } catch (_) {}
 
+  // Show a one-time notice when the extension was just updated.
+  // Clears the badge and storage flag so it only appears once.
+  try {
+    const { pendingUpdateNotice } = await chrome.storage.local.get('pendingUpdateNotice');
+    if (pendingUpdateNotice) {
+      appendSystem(`🔄 browsa updated to v${pendingUpdateNotice} — if the floating toolbar doesn't respond on a page, refresh it once.`);
+      await chrome.storage.local.remove('pendingUpdateNotice');
+      chrome.action.setBadgeText({ text: '' });
+    }
+  } catch (_) {}
+
   inputEl.focus();
 }
 

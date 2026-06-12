@@ -15,12 +15,41 @@ chrome.sidePanel
   .catch((e) => console.error('browsa: setPanelBehavior failed', e));
 
 // Right-click context menu — shown when user has text selected.
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-ask',       title: '💬 Ask',                   parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
+
+  if (details.reason === 'install' || details.reason === 'update') {
+    // Best-effort: re-inject the selection toolbar into already-open tabs.
+    // Removes the old host element first so old detached handlers are harmless.
+    chrome.tabs.query({}).then((tabs) => {
+      for (const tab of tabs) {
+        if (!tab.id || !tab.url?.startsWith('https://')) continue;
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            document.getElementById('browsa-sel-host')?.remove();
+            delete window.__browsaSelectionToolbarInstalled;
+          }
+        }).then(() => chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['lib/selection-toolbar.js']
+        })).catch(() => {});
+      }
+    });
+
+    // Show a badge + side-panel notice on update so the user knows
+    // something changed and can refresh any page that still feels stale.
+    if (details.reason === 'update') {
+      const { version } = chrome.runtime.getManifest();
+      chrome.storage.local.set({ pendingUpdateNotice: version });
+      chrome.action.setBadgeText({ text: 'NEW' });
+      chrome.action.setBadgeBackgroundColor({ color: '#238636' });
+    }
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
