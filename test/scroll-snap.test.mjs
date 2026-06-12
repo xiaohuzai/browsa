@@ -41,43 +41,33 @@ test('sidepanel.js init() schedules scrollToBottom after renderHistory + resume'
     'init() must schedule a rAF scrollToBottom after resumeInFlightStream — first layout may not be done when renderHistory runs');
 });
 
-test('sidepanel.js onActivated handler calls scrollToBottom after restore', async () => {
+test('sidepanel.js onActivated handler does NOT touch the DOM (panel stays alive across tab switches)', async () => {
+  // Design: Chrome does NOT destroy the side panel document on tab switch.
+  // onActivated must NOT call renderHistory(), resumeInFlightStream(), or
+  // scrollToBottom() — doing so would wipe non-persisted UI elements like
+  // 📎 system messages and in-flight streaming bubbles.
+  // It should ONLY update currentTabId, page-meta, and the nav port.
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
 
-  // Find the onActivated listener body
   const m = src.match(/chrome\.tabs\.onActivated\.addListener\(async \(\{ tabId \}\) =>\s*\{/);
   assert.ok(m, 'onActivated handler must exist');
   const start = m.index + m[0].length;
   const rest = src.slice(start);
-  // Walk braces to find the close
-  let depth = 1;
-  let end = 0;
+  let depth = 1, end = 0;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '{') depth++;
-    else if (rest[i] === '}') {
-      depth--;
-      if (depth === 0) { end = i; break; }
-    }
+    else if (rest[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
   }
   const body = rest.slice(0, end);
-
-  // Two scrollToBottom calls expected: one right after the innerHTML /
-  // renderHistory restore, one after resumeInFlightStream (so we
-  // snap to the bottom of the resumed bubble, not a position from
-  // before its height was added). Strip line comments first so we
-  // don't count "scrollToBottom" mentioned in explanatory text.
   const bodyNoComments = body.replace(/\/\/.*$/gm, '');
-  const matches = bodyNoComments.match(/scrollToBottom/g) || [];
-  assert.ok(matches.length >= 2,
-    `onActivated must call scrollToBottom at least twice (post-restore + post-resume); found ${matches.length}`);
-  // Both must be wrapped in rAF (the previous-tab leftover scrollTop
-  // can be re-applied by Chrome between the innerHTML swap and our
-  // explicit scroll assignment; rAF ensures we run after Chrome's
-  // own scroll-restoration heuristics).
-  const rafMatches = bodyNoComments.match(/requestAnimationFrame\([^]*?scrollToBottom/g) || [];
-  assert.equal(rafMatches.length, matches.length,
-    'every scrollToBottom in onActivated must be scheduled via requestAnimationFrame');
+
+  assert.ok(!bodyNoComments.includes('renderHistory'),
+    'onActivated must NOT call renderHistory() — wiping DOM removes 📎 messages and streaming bubbles');
+  assert.ok(!bodyNoComments.includes('resumeInFlightStream'),
+    'onActivated must NOT call resumeInFlightStream() — panel is alive, port is still connected');
+  assert.ok(!bodyNoComments.includes('scrollToBottom'),
+    'onActivated must NOT call scrollToBottom() — scroll position is preserved; nothing changed in DOM');
 });
 
 test('sidepanel.js onActivated preserves tab url/title in pagemeta (regression check)', async () => {

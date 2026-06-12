@@ -15,6 +15,7 @@ async function init() {
   renderProviders();
   applyContextMode(cachedCfg.contextMode || 'reader');
   applyLimits(cachedCfg);
+  applyToolbarToggle();
 
   document.querySelectorAll('input[name="ctx"]').forEach((r) => {
     r.addEventListener('change', async () => {
@@ -146,6 +147,18 @@ async function resetCard(name, card) {
 
 function applyContextMode(mode) {
   for (const r of document.querySelectorAll('input[name="ctx"]')) r.checked = r.value === mode;
+}
+
+function applyToolbarToggle() {
+  const el = $('showSelectionToolbar');
+  if (!el) return;
+  chrome.storage.local.get('showSelectionToolbar', ({ showSelectionToolbar }) => {
+    el.checked = showSelectionToolbar !== false; // default on
+  });
+  el.addEventListener('change', () => {
+    chrome.storage.local.set({ showSelectionToolbar: el.checked });
+    flash('ok', el.checked ? 'Floating toolbar enabled.' : 'Floating toolbar disabled.');
+  });
 }
 
 function prettyProviderName(name) {
