@@ -7,39 +7,76 @@
   </head>
   <body>
     <main>
-      <h1>browsa settings</h1>
-      <p class="hint">
-        Configure any OpenAI-compatible endpoint as a provider. The active provider is the one the side panel
-        will send to. Use the <b>Ping</b> button to verify connectivity.
-      </p>
+      <header class="page-header">
+        <img src="icons/icon48.png" alt="" class="logo" />
+        <div>
+          <h1>browsa</h1>
+          <p class="subtitle">Settings</p>
+        </div>
+      </header>
 
-      <section id="providers"></section>
+      <section class="card">
+        <h2>AI Providers</h2>
+        <p class="hint">Configure OpenAI-compatible endpoints. The active provider is used for all conversations. Use <b>Ping</b> to verify connectivity.</p>
+        <div id="providers"></div>
+      </section>
 
-      <h2>Default context mode</h2>
-      <p class="hint">How the side panel attaches the current page when you press Send.</p>
-      <div class="row">
-        <label><input type="radio" name="ctx" value="reader" /> Reader (Mozilla Readability — recommended)</label>
-        <label><input type="radio" name="ctx" value="full" /> Full (body innerText, no filtering)</label>
-        <label><input type="radio" name="ctx" value="screenshot" /> Screenshot</label>
-      </div>
+      <section class="card">
+        <h2>System Prompt</h2>
+        <p class="hint">Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.</p>
+        <textarea id="systemPrompt" rows="5" placeholder="e.g. You are a helpful assistant. Use $...$ for inline math and $$...$$ for display math."></textarea>
+        <div class="card-actions">
+          <button data-act="save-system-prompt" class="primary">Save</button>
+          <button data-act="reset-system-prompt">Reset to default</button>
+        </div>
+      </section>
 
-      <h2>Floating selection toolbar</h2>
-      <p class="hint">When you select text on any page, a mini toolbar appears with quick actions (Ask, Explain, Translate, Summarize).</p>
-      <div class="row">
-        <label><input type="checkbox" id="showSelectionToolbar" /> Show floating toolbar on text selection</label>
-      </div>
+      <section class="card">
+        <h2>Default context mode</h2>
+        <p class="hint">How browsa reads the page when you click 📎 Attach.</p>
+        <div class="radio-group">
+          <label class="radio-card">
+            <input type="radio" name="ctx" value="reader" />
+            <div>
+              <strong>Reader</strong>
+              <span>Mozilla Readability — main article text, no clutter. Recommended.</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="ctx" value="full" />
+            <div>
+              <strong>Full</strong>
+              <span>Raw body innerText, no filtering. Larger context.</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="ctx" value="screenshot" />
+            <div>
+              <strong>Screenshot</strong>
+              <span>Captures a visible screenshot and sends as image.</span>
+            </div>
+          </label>
+        </div>
+      </section>
 
-      <h2>Page size limit</h2>
-      <p class="hint">
-        Hard cap on extracted text (chars). Readability typically yields 5-30K;
-        this is a safety net for huge pages. Default 1M is fine for any modern LLM.
-      </p>
-      <div class="row">
-        <label class="small">Max text chars (sent to model)
-          <input id="maxTextChars" type="number" min="1000" step="1000" />
+      <section class="card">
+        <h2>Floating selection toolbar</h2>
+        <p class="hint">A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.</p>
+        <label class="toggle-row">
+          <input type="checkbox" id="showSelectionToolbar" />
+          <span>Show floating toolbar on text selection</span>
         </label>
-        <button data-act="save-limits">Save</button>
-      </div>
+      </section>
+
+      <section class="card">
+        <h2>Page size limit</h2>
+        <p class="hint">Hard cap on extracted text sent to the model (characters). Readability typically yields 5–30K. Default 1M is safe for any modern LLM.</p>
+        <div class="inline-field">
+          <label for="maxTextChars">Max chars</label>
+          <input id="maxTextChars" type="number" min="1000" step="1000" />
+          <button data-act="save-limits" class="primary">Save</button>
+        </div>
+      </section>
 
       <div id="status" class="status"></div>
     </main>

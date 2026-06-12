@@ -29,8 +29,8 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 // fails to load.
 const py = `
 import os, sys, zipfile
-root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build/_deps"}
-exclude_files = {"package-lock.json"}
+root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test"}
+exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "CLAUDE.md"}
 exclude_path_prefixes = (os.path.join("lib", "_src"),)
 out_name = os.path.basename(out)
 with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:

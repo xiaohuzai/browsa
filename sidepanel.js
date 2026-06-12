@@ -4,6 +4,7 @@
 
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
+import katex from './lib/vendor/katex.bundle.js';
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
 // head features we don't need. Keep it simple; DOMPurify handles XSS later.
@@ -140,9 +141,10 @@ async function init() {
   // user clicks from one note to another. Without this, chrome.tabs.onUpdated
   // never fires (SPA pushState is invisible to it), and the side panel
   // would keep showing the title of the first note the user opened.
-  navPort = chrome.runtime.connect({ name: 'browsa-nav' });
-  navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
-  navPort.onMessage.addListener((msg) => {
+  // Extract navPort message handler as a named function so we can
+  // re-attach it every time the port reconnects (after SW restart, a new
+  // port object is created — the old listener is lost and must be re-bound).
+  function onNavPortMessage(msg) {
     if (!msg) return;
     if (msg.type === 'SELECTION_ACTION') {
       handleSelectionAction(msg.action, msg.text);
@@ -205,29 +207,37 @@ async function init() {
       diagnosticsEl.innerHTML = '';
       lastXhsNote = null;
     }
-  });
-  navPort.onDisconnect.addListener(() => {
-    navPort = null;
-    // Reconnect after a short delay — the service worker may have been sleeping.
-    // After reconnecting, also check for pending selection actions that arrived
-    // while the SW was restarting (navPorts Map was cleared on SW restart, so
-    // the relay failed and the action was stored as pending instead).
-    setTimeout(() => {
-      if (!navPort) {
-        try {
-          navPort = chrome.runtime.connect({ name: 'browsa-nav' });
-          navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
-          sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId })
-            .then((res) => {
-              if (res?.data?.pending) {
-                const { action, text } = res.data.pending;
-                setTimeout(() => handleSelectionAction(action, text), 150);
-              }
-            }).catch(() => {});
-        } catch (_) {}
-      }
-    }, 1000);
-  });
+  }
+
+  function connectNavPort() {
+    navPort = chrome.runtime.connect({ name: 'browsa-nav' });
+    navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
+    // Re-attach message listener on every new port object.
+    navPort.onMessage.addListener(onNavPortMessage);
+    navPort.onDisconnect.addListener(() => {
+      navPort = null;
+      // Reconnect after a short delay — the SW may have been sleeping.
+      // Also check session storage for any pending action stored while the
+      // SW was restarting (session storage survives SW restarts, unlike the
+      // in-memory navPorts Map).
+      setTimeout(() => {
+        if (!navPort) {
+          try {
+            connectNavPort();
+            sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId })
+              .then((res) => {
+                if (res?.data?.pending) {
+                  const { action, text } = res.data.pending;
+                  setTimeout(() => handleSelectionAction(action, text), 150);
+                }
+              }).catch(() => {});
+          } catch (_) {}
+        }
+      }, 1000);
+    });
+  }
+
+  connectNavPort();
 
   // Diagnostics: on init, do a one-shot XHS page-context probe so we
   // can render a warning banner if extraction looks suspect (e.g. the
@@ -244,10 +254,23 @@ async function init() {
 
   // Listen for config changes (from options page)
   chrome.storage.onChanged.addListener(async (changes, area) => {
-    if (area !== 'local') return;
-    if (changes.providers || changes.activeProvider) {
-      const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
-      populateProviderSelect(cfg2Res.data || cfg2Res);
+    if (area === 'local') {
+      if (changes.providers || changes.activeProvider) {
+        const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
+        populateProviderSelect(cfg2Res.data || cfg2Res);
+      }
+      return;
+    }
+    // Session storage: pick up pending selection actions written by the
+    // background when the navPort relay failed (SW just woke up, navPorts
+    // empty). This fires even when the SW restarts because storage.onChanged
+    // is delivered to the side panel directly, not through the SW.
+    if (area === 'session' && changes.pendingSelectionAction?.newValue) {
+      const { tabId, action, text } = changes.pendingSelectionAction.newValue;
+      if (tabId === currentTabId) {
+        chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+        handleSelectionAction(action, text);
+      }
     }
   });
 
@@ -326,7 +349,10 @@ async function handleSelectionAction(action, text) {
     // background may be empty if the SW was sleeping when the user selected.
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected', text }).catch(() => null);
     if (res?.data?.ok) {
-      appendSystem(`📎 已附加选中文字（${text.length} 字符）—— 现在可以提问了`);
+      const preview = text.length > 80
+        ? text.slice(0, 50) + ' … ' + text.slice(-25)
+        : text;
+      appendSystem(`📎 已附加：「${preview}」`);
     } else {
       appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
     }
@@ -465,6 +491,11 @@ async function onAttachPage() {
     const ctx = res.data?.ctx;
     const title = ctx?.articleTitle || ctx?.meta?.title || 'Page';
     appendSystem(`📎 已附加："${title}"（${mode} 模式）—— 现在可以提问了`);
+    // For screenshot mode, show the captured image in the chat so the user
+    // can verify what was captured before asking questions about it.
+    if (mode === 'screenshot' && ctx?.imageDataUrl) {
+      appendScreenshot(ctx.imageDataUrl);
+    }
   } catch (e) {
     appendError('Page attach failed: ' + e.message);
   } finally {
@@ -537,17 +568,61 @@ function addCodeCopyButtons() {
   }
 }
 
-// Markdown -> sanitized HTML pipeline. Returns HTML safe for innerHTML.
-// Also renders math formulas ($...$ and $$...$$) into styled HTML.
+// Markdown -> sanitized HTML pipeline with proper LaTeX rendering.
+//
+// Order of operations matters:
+//   1. Extract $...$ and $$...$$ BEFORE marked so markdown syntax (_, *, etc.)
+//      inside formulas doesn't get mangled.
+//   2. Parse the placeholder-substituted markdown with marked.
+//   3. Sanitize with DOMPurify (placeholders are plain text — safe, survive).
+//   4. Replace placeholders with KaTeX MathML output AFTER sanitization so
+//      DOMPurify never sees (or strips) MathML attributes.
+//
+// Chrome 114+ supports MathML Core natively, so output:'mathml' works with
+// zero extra CSS or font files.
 function renderSafe(markdown) {
   try {
-    let html = marked.parse(markdown || '');
-    html = renderMath(html);
-    return DOMPurify.sanitize(html, {
+    const mathParts = []; // { displayMode: bool, formula: string }
+
+    let md = (markdown || '')
+      // Block math: $$...$$ or \[...\]
+      .replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g, (_, a, b) => {
+        const i = mathParts.push({ displayMode: true,  formula: (a ?? b).trim() }) - 1;
+        return `\n\nBROWSAMATH${i}END\n\n`;
+      })
+      // Inline math: $...$ or \(...\)
+      .replace(/\$([^$\n]+?)\$|\\\(([^)]+?)\\\)/g, (_, a, b) => {
+        const i = mathParts.push({ displayMode: false, formula: (a ?? b).trim() }) - 1;
+        return `BROWSAMATH${i}END`;
+      });
+
+    let html = marked.parse(md);
+
+    html = DOMPurify.sanitize(html, {
       ADD_ATTR: ['target', 'rel'],
-      ADD_TAGS: ['math-inline', 'math-block'],
       ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
     });
+
+    // Restore rendered math after sanitization — KaTeX output is trusted.
+    if (mathParts.length > 0) {
+      html = html.replace(/BROWSAMATH(\d+)END/g, (_, idx) => {
+        const { displayMode, formula } = mathParts[+idx];
+        try {
+          return katex.renderToString(formula, {
+            output: 'mathml',
+            throwOnError: false,
+            displayMode,
+            strict: false
+          });
+        } catch (_e) {
+          return displayMode
+            ? `<div class="math-block">${escM(formula)}</div>`
+            : `<code>${escM(formula)}</code>`;
+        }
+      });
+    }
+
+    return html;
   } catch (e) {
     return DOMPurify.sanitize(
       (markdown || '').replace(/[&<>"']/g, (c) => ({
@@ -556,24 +631,6 @@ function renderSafe(markdown) {
       }[c]))
     );
   }
-}
-
-/** Render LaTeX math: $inline$ -> <math-inline>, $$block$$ -> <math-block> */
-function renderMath(html) {
-  const blocks = [];
-  let out = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, f) => {
-    blocks.push(f.trim());
-    return '%%MB' + (blocks.length - 1) + '%%';
-  });
-  out = out.replace(/\$([^$\n]+?)\$/g, (_, f) => {
-    blocks.push(f.trim());
-    return '%%MI' + (blocks.length - 1) + '%%';
-  });
-  out = out.replace(/%%MB(\d+)%%/g, (_, i) =>
-    '<div class="math-block">' + escM(blocks[+i]) + '</div>');
-  out = out.replace(/%%MI(\d+)%%/g, (_, i) =>
-    '<math-inline>' + escM(blocks[+i]) + '</math-inline>');
-  return out;
 }
 
 function escM(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -1055,6 +1112,18 @@ function appendAssistant(initial, done = false) {
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
+}
+function appendScreenshot(dataUrl) {
+  const el = document.createElement('div');
+  el.className = 'msg screenshot-preview';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.alt = 'Screenshot';
+  img.title = 'Click to open full size';
+  img.addEventListener('click', () => window.open(dataUrl));
+  el.appendChild(img);
+  messagesEl.appendChild(el);
+  scrollToBottom();
 }
 function appendSystem(text) {
   const el = document.createElement('div');
