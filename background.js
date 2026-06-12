@@ -363,9 +363,22 @@ async function handle(msg, sender) {
         }
       }
       if (!relayed) {
-        // Side panel not open — store and try to open it.
+        // navPort not registered yet — the SW may have just woken up and the
+        // side panel's port hasn't reconnected yet (it reconnects ~1s after
+        // detecting the disconnect). Store as pending AND schedule a retry so
+        // we catch the reconnect window without waiting for the user to act again.
         pendingSelectionActions.set(tabId, { action, text });
         try { await chrome.sidePanel.open({ tabId }); } catch (_) {}
+        setTimeout(() => {
+          if (!pendingSelectionActions.has(tabId)) return; // already delivered
+          const set2 = navPorts.get(tabId);
+          if (set2 && set2.size > 0) {
+            for (const p of set2) {
+              try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); } catch (_) {}
+            }
+            pendingSelectionActions.delete(tabId);
+          }
+        }, 1500);
       }
       return { ok: true };
     }

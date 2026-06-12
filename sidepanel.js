@@ -209,11 +209,21 @@ async function init() {
   navPort.onDisconnect.addListener(() => {
     navPort = null;
     // Reconnect after a short delay — the service worker may have been sleeping.
+    // After reconnecting, also check for pending selection actions that arrived
+    // while the SW was restarting (navPorts Map was cleared on SW restart, so
+    // the relay failed and the action was stored as pending instead).
     setTimeout(() => {
       if (!navPort) {
         try {
           navPort = chrome.runtime.connect({ name: 'browsa-nav' });
           navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
+          sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId })
+            .then((res) => {
+              if (res?.data?.pending) {
+                const { action, text } = res.data.pending;
+                setTimeout(() => handleSelectionAction(action, text), 150);
+              }
+            }).catch(() => {});
         } catch (_) {}
       }
     }, 1000);
