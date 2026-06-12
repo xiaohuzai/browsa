@@ -24,8 +24,15 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (!tab?.id || !info.selectionText) return;
-  const text = info.selectionText.trim();
+  if (!tab?.id) return;
+  // On Mac, a two-finger trackpad tap resets the visual selection to the
+  // word under the cursor BEFORE contextmenu fires, so info.selectionText
+  // is often just that one word — not the user's actual selection.
+  // The content script's contextmenu event handler re-sends the original
+  // selection to selectionCache just before this callback fires (the user
+  // still has to click a menu item, giving the async message time to land).
+  // We prefer the cache; fall back to info.selectionText for normal mice.
+  const text = (selectionCache.get(tab.id) || info.selectionText || '').trim();
   if (!text) return;
 
   const actionMap = {
