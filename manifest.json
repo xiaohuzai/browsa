@@ -11,10 +11,9 @@
     "scripting",
     "tabs",
     "storage",
-    "webNavigation"
-  ],
-  "optional_permissions": [
-    "scripting"
+    "webNavigation",
+    "alarms",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://*/*",
@@ -26,11 +25,49 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://www.xiaohongshu.com/*",
-        "https://xiaohongshu.com/*"
-      ],
+      "matches": ["https://www.xiaohongshu.com/*", "https://xiaohongshu.com/*"],
       "js": ["lib/xhs-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*/*"],
+      "js": ["lib/selection-toolbar.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://juejin.cn/*"],
+      "js": ["lib/juejin-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"],
+      "js": ["lib/youtube-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.zhihu.com/*", "https://zhuanlan.zhihu.com/*"],
+      "js": ["lib/zhihu-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.dedao.cn/*"],
+      "js": ["lib/dedao-content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://time.geekbang.org/*"],
+      "js": ["lib/geektime-content-script.js"],
       "run_at": "document_start",
       "all_frames": false,
       "world": "MAIN"

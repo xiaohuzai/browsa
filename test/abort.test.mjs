@@ -20,6 +20,7 @@ const chromeMock = {
   runtime: {
     onMessage: { addListener: () => {} },
     onConnect: { addListener: () => {} },
+    onInstalled: { addListener: () => {} },
     sendMessage: () => {},
     connect: () => ({
       name: 'browsa-chat',
@@ -51,6 +52,14 @@ const chromeMock = {
   },
   storage: {
     onChanged: { addListener: () => {} },
+  },
+  alarms: {
+    create: () => {},
+    onAlarm: { addListener: () => {} },
+  },
+  contextMenus: {
+    create: () => {},
+    onClicked: { addListener: () => {} },
   },
 };
 
@@ -159,7 +168,7 @@ test('CHAT handler catches AbortError and does NOT append to history', async () 
   // runs on the success path. The check: catch-return's index is
   // strictly less than the next appendToHistory assistant index.
   const catchReturnIdx = src.indexOf('return { ok: true, cancelled: true }');
-  const appendIdx = src.indexOf("await storage.appendToHistory(tabId, { role: 'assistant'", catchReturnIdx);
+  const appendIdx = src.indexOf("await storage.appendToHistory({ role: 'assistant'", catchReturnIdx);
   assert.ok(appendIdx > catchReturnIdx,
     'appendToHistory for assistant must appear AFTER the abort-return; abort returns early, skipping it');
 });

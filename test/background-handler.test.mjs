@@ -26,6 +26,7 @@ const chromeMock = {
   runtime: {
     onMessage: { addListener: () => {} },
     onConnect: { addListener: () => {} },
+    onInstalled: { addListener: () => {} },
     sendMessage: () => {},
     connect: () => null,
     getURL: (p) => p,
@@ -54,6 +55,14 @@ const chromeMock = {
     // We don't mock the real chrome.storage.sync/local; the storage module
     // has its own inline mocks. If a test reaches real storage.* calls,
     // we rely on the storage module's defaults.
+  },
+  alarms: {
+    create: () => {},
+    onAlarm: { addListener: () => {} },
+  },
+  contextMenus: {
+    create: () => {},
+    onClicked: { addListener: () => {} },
   },
 };
 
