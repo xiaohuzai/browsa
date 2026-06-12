@@ -400,7 +400,11 @@ async function handle(msg, sender) {
         // For 'selected' mode, use the cached selection (captured before focus
         // shifted to the side panel, which clears window.getSelection()).
         if (mode === 'selected') {
-          const cachedText = selectionCache.get(tabId) || '';
+          // Prefer the live cache; fall back to msg.text (passed explicitly by
+          // handleSelectionAction when the SW was sleeping and SELECTION_CACHE
+          // was dropped — right-click / toolbar path always has the text).
+          const cachedText = selectionCache.get(tabId) || msg.text || '';
+          if (cachedText) selectionCache.set(tabId, cachedText); // keep in sync
           const tab = await chrome.tabs.get(tabId).catch(() => null);
           const meta = tab ? { url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || '' } : { url: '', title: '', favIconUrl: '' };
           if (!cachedText) return { ok: false, error: 'No text selected. Select some text on the page first, then click 📎.' };

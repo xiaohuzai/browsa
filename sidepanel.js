@@ -301,11 +301,13 @@ async function handleSelectionAction(action, text) {
 
   if (action === 'chat') {
     // Attach the selected text as context (selection mode), then focus input.
-    // The selection is already cached in background from selectionchange event.
-    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected' }).catch(() => null);
-    if (res?.ok) {
-      const title = res.data?.ctx?.articleTitle || res.data?.ctx?.meta?.title || '选中文字';
+    // Pass text explicitly as fallback — the selectionchange cache in the
+    // background may be empty if the SW was sleeping when the user selected.
+    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected', text }).catch(() => null);
+    if (res?.data?.ok) {
       appendSystem(`📎 已附加选中文字（${text.length} 字符）—— 现在可以提问了`);
+    } else {
+      appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
     }
     inputEl.focus();
     updateComposerInfo();
@@ -435,8 +437,8 @@ async function onAttachPage() {
 
   try {
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode });
-    if (!res?.ok) {
-      appendError(res?.error || 'Failed to read page');
+    if (!res?.ok || !res.data?.ok) {
+      appendError(res?.data?.error || res?.error || 'Failed to read page');
       return;
     }
     const ctx = res.data?.ctx;
