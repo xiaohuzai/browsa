@@ -107,28 +107,14 @@ async function init() {
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    // Single global session: no per-tab history to save/restore.
-    // Just update currentTabId, refresh the page-meta display, and check
-    // for any in-flight stream that needs to be resumed.
+    // The side panel document stays alive across tab switches (Chrome does NOT
+    // tear it down). So we never touch the DOM here — no renderHistory(), no
+    // stream resume. The chat UI, in-flight bubbles, and system messages all
+    // remain exactly as the user left them. We only update:
+    //   1. currentTabId  — so the next ATTACH_PAGE / CHAT targets the right tab
+    //   2. page-meta bar — cosmetic, shows which page 📎 will attach
+    //   3. nav port      — so SPA nav events route to the new tab
     currentTabId = tabId;
-
-    requestAnimationFrame(() => scrollToBottom());
-
-    const peek = await sendMessage({ type: 'STREAM_PEEK', tabId }).catch(() => null);
-    if (peek?.inFlight) {
-      await resumeInFlightStream(tabId).catch((e) =>
-        console.warn('browsa: resumeInFlightStream failed', e)
-      );
-      requestAnimationFrame(() => scrollToBottom());
-    } else {
-      // If the last assistant bubble is not done, the stream completed while
-      // the panel was rebuilding — re-render from storage to show full reply.
-      const lastAssistant = messagesEl.querySelector('.msg.assistant:last-of-type');
-      if (lastAssistant && !lastAssistant.classList.contains('done')) {
-        await renderHistory();
-        requestAnimationFrame(() => scrollToBottom());
-      }
-    }
 
     const t = await chrome.tabs.get(tabId).catch(() => null);
     if (t) {
