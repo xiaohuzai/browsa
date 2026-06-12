@@ -22,10 +22,10 @@ const providerSel = $('provider');
 const charCountEl = $('charcount');
 const tokCountEl = $('tokcount');
 const composerInfoEl = $('composerinfo');
+const attachBtn = $('attach');
+if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user types
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
-const autoAttachEl = $('autoattach');
-const waitJsEl = $('waitjs');
 const pagemetaEl = $('pagemeta');
 const diagnosticsEl = $('diagnostics');
 const imagePreviewsEl = $('imagepreviews');
@@ -42,7 +42,7 @@ const images = [];             // { dataUrl, name } — attached for this turn
 // the current messagesEl.innerHTML here and restore it when they switch back.
 // This preserves in-flight streaming replies that haven't been persisted to
 // storage yet — the v0.20.1 "switch tab → reply vanishes" bug.
-const tabStates = new Map();   // tabId -> { html: string }
+// tabStates removed — single global session, no per-tab DOM snapshots needed.
 const clearBtn = $('clear');
 
 init();
@@ -53,11 +53,10 @@ async function init() {
   currentTabId = tab?.id;
 
   // Load config
-  const cfg = await sendMessage({ type: 'GET_CONFIG' });
+  const cfgRes = await sendMessage({ type: 'GET_CONFIG' });
+  const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
   populateProviderSelect(cfg);
   applyContextMode(cfg.contextMode || 'reader');
-  autoAttachEl.checked = !!cfg.autoAttachPage;
-
   // Load history
   await renderHistory();
 
@@ -66,13 +65,18 @@ async function init() {
   settingsBtn.addEventListener('click', openSettingsPage);
   clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
-  autoAttachEl.addEventListener('change', () => {
-    // Persisted on background; also locally
-  });
   sendBtn.addEventListener('click', onSend);
+  attachBtn?.addEventListener('click', onAttachPage);
+  document.querySelectorAll('.qa-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      inputEl.value = btn.dataset.cmd || '';
+      inputEl.focus();
+      onSend();
+    });
+  });
   inputEl.addEventListener('input', updateComposerInfo);
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       onSend();
     }
@@ -103,79 +107,30 @@ async function init() {
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    // Save current tab's conversation DOM before switching away. The
-    // saved snapshot includes any in-flight reply that had been
-    // streaming before the switch (the chunk listener writes to
-    // tabStates on every delta). We don't save scrollTop — see below.
-    if (currentTabId != null && messagesEl.innerHTML.trim()) {
-      tabStates.set(currentTabId, { html: messagesEl.innerHTML });
-    }
+    // Single global session: no per-tab history to save/restore.
+    // Just update currentTabId, refresh the page-meta display, and check
+    // for any in-flight stream that needs to be resumed.
     currentTabId = tabId;
-    // Restore saved DOM if we've been on this tab before; otherwise
-    // load from persisted storage.
-    const saved = tabStates.get(tabId);
-    if (saved && saved.html.trim()) {
-      messagesEl.innerHTML = saved.html;
-    } else {
-      await renderHistory();
-    }
-    // CRITICAL: snap to the bottom of the conversation after restore.
-    // Without this, the messages container keeps whatever scrollTop
-    // the browser happened to leave it at (often the previous tab's
-    // bottom, or clamped to 0 if scrollHeight shrank during the innerHTML
-    // swap), so the user lands staring at a blank middle of the chat
-    // instead of the latest reply. Standard chat UX (Slack, Discord,
-    // 微信) snaps to bottom on tab/route switch. We don't preserve
-    // scrollTop across the switch because (a) it would require saving
-    // and restoring it through tabStates, (b) users almost always want
-    // the latest message when coming back, and (c) Chrome doesn't make
-    // it easy anyway — innerHTML swaps don't preserve scrollTop
-    // reliably.
-    //
-    // We use rAF because the innerHTML write triggers a layout pass
-    // synchronously, but the visible scroll restoration can race with
-    // a late chunk from resumeInFlightStream (which appends more
-    // height). The rAF gives the layout one tick to settle, then we
-    // snap. resumeInFlightStream itself calls scrollToBottom on each
-    // chunk it appends, so a late chunk will still be visible.
+
     requestAnimationFrame(() => scrollToBottom());
-    // PEEK before deciding to resume — this lets us tell apart two
-    // cases that need different handling:
-    //   (a) stream still in flight → resumeInFlightStream takes over
-    //   (b) stream finished while we were away → the saved snapshot
-    //       has the latest "▍" placeholder (or partial text from
-    //       before the stream finished) but NOT the full DONE
-    //       render. Storage now has the full assistant turn, so
-    //       re-render from storage to pick it up. Without this,
-    //       the user lands on a half-baked "▍" or "partial text"
-    //       bubble and the full reply is invisible.
+
     const peek = await sendMessage({ type: 'STREAM_PEEK', tabId }).catch(() => null);
     if (peek?.inFlight) {
       await resumeInFlightStream(tabId).catch((e) =>
         console.warn('browsa: resumeInFlightStream failed', e)
       );
+      requestAnimationFrame(() => scrollToBottom());
     } else {
-      // No live stream. Detect the "stream finished while away" case:
-      // the latest .msg.assistant bubble is still a "▍" placeholder,
-      // which means the chunk listener never received DONE (we were
-      // disconnected when background pushed it). Storage should have
-      // the full turn by now. Re-render to surface it.
+      // If the last assistant bubble is not done, the stream completed while
+      // the panel was rebuilding — re-render from storage to show full reply.
       const lastAssistant = messagesEl.querySelector('.msg.assistant:last-of-type');
-      const lastText = (lastAssistant?.textContent || '').trim();
-      const isPlaceholder = lastText === '▍' || lastText === '';
-      if (isPlaceholder && lastAssistant) {
+      if (lastAssistant && !lastAssistant.classList.contains('done')) {
         await renderHistory();
         requestAnimationFrame(() => scrollToBottom());
       }
-      // Also clear any stale tabStates entry — the snapshot we just
-      // wrote is now stale because storage has the authoritative
-      // version. We don't strictly need to delete it (the next
-      // onActivated will overwrite it), but it saves a few KB of
-      // memory and avoids confusion if anyone reads tabStates
-      // elsewhere.
-      tabStates.delete(tabId);
     }
-    const t = await chrome.tabs.get(tabId);
+
+    const t = await chrome.tabs.get(tabId).catch(() => null);
     if (t) {
       pagemetaEl.textContent = t.title || t.url || '';
       pagemetaEl.href = t.url || '#';
@@ -203,6 +158,10 @@ async function init() {
   navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
   navPort.onMessage.addListener((msg) => {
     if (!msg) return;
+    if (msg.type === 'SELECTION_ACTION') {
+      handleSelectionAction(msg.action, msg.text);
+      return;
+    }
     if (msg.type === 'XHS_XHR_NOTE') {
       // Real XHR data from the content script. The most authoritative
       // source — the browser's own signed fetch, with cookies. We
@@ -251,7 +210,7 @@ async function init() {
       // stale data. The content script will deliver the new note's
       // XHR within a few hundred ms.
       lastXhsNote = null;
-      sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId })
+      sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId })
         .then((ctx) => renderDiagnostics(ctx))
         .catch(() => {});
     } else {
@@ -263,7 +222,15 @@ async function init() {
   });
   navPort.onDisconnect.addListener(() => {
     navPort = null;
-    console.log('browsa: nav port disconnected, will reconnect on next send');
+    // Reconnect after a short delay — the service worker may have been sleeping.
+    setTimeout(() => {
+      if (!navPort) {
+        try {
+          navPort = chrome.runtime.connect({ name: 'browsa-nav' });
+          navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
+        } catch (_) {}
+      }
+    }, 1000);
   });
 
   // Diagnostics: on init, do a one-shot XHS page-context probe so we
@@ -274,8 +241,8 @@ async function init() {
   try {
     const live = await chrome.tabs.get(currentTabId);
     if (live && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(live.url || '')) {
-      const ctx = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId });
-      renderDiagnostics(ctx);
+      const ctxRes = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId });
+      renderDiagnostics(ctxRes.data || ctxRes);
     }
   } catch (_) { /* tab closed or not yet ready */ }
 
@@ -283,8 +250,8 @@ async function init() {
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== 'local') return;
     if (changes.providers || changes.activeProvider) {
-      const cfg2 = await sendMessage({ type: 'GET_CONFIG' });
-      populateProviderSelect(cfg2);
+      const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
+      populateProviderSelect(cfg2Res.data || cfg2Res);
     }
   });
 
@@ -323,7 +290,55 @@ async function init() {
   // rAF ensures the layout is done and the snap sticks.
   requestAnimationFrame(() => scrollToBottom());
 
+  // Deliver any pending selection action (toolbar click that opened the panel).
+  try {
+    const res = await sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId });
+    if (res?.data?.pending) {
+      const { action, text } = res.data.pending;
+      // Small delay so the panel is visually ready before auto-sending.
+      setTimeout(() => handleSelectionAction(action, text), 150);
+    }
+  } catch (_) {}
+
   inputEl.focus();
+}
+
+/**
+ * Handle a selection action triggered by the floating toolbar.
+ * 'chat'      → pre-fills the textarea for the user to add a question.
+ * 'explain'   → auto-sends an explain prompt.
+ * 'translate' → auto-sends a translate prompt.
+ * 'summarize' → auto-sends a summarize prompt.
+ */
+async function handleSelectionAction(action, text) {
+  if (!text) return;
+
+  if (action === 'chat') {
+    // Attach the selected text as context (selection mode), then focus input.
+    // The selection is already cached in background from selectionchange event.
+    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected' }).catch(() => null);
+    if (res?.ok) {
+      const title = res.data?.ctx?.articleTitle || res.data?.ctx?.meta?.title || '选中文字';
+      appendSystem(`📎 已附加选中文字（${text.length} 字符）—— 现在可以提问了`);
+    }
+    inputEl.focus();
+    updateComposerInfo();
+    return;
+  }
+
+  const preview = text.length > 400 ? text.slice(0, 400) + '…' : text;
+  const quoted = `"${preview}"`;
+  const prompts = {
+    explain:   `Explain the following:\n\n${quoted}`,
+    translate: `Translate the following to Chinese:\n\n${quoted}`,
+    summarize: `Summarize the following:\n\n${quoted}`
+  };
+  const prompt = prompts[action];
+  if (!prompt) return;
+
+  inputEl.value = prompt;
+  updateComposerInfo();
+  onSend();
 }
 
 function populateProviderSelect(cfg) {
@@ -385,8 +400,8 @@ function renderDiagnostics(ctx) {
 function renderDiagnosticsFromXhr(note) {
   if (!note) {
     // No XHR yet — fall through to the existing probe-based render.
-    sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', targetTabId: currentTabId })
-      .then((ctx) => renderDiagnostics(ctx))
+    sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId })
+      .then((res) => renderDiagnostics(res.data || res))
       .catch(() => {});
     return;
   }
@@ -424,11 +439,35 @@ function cycleContextMode() {
   onContextModeChange(); // persist
 }
 
-async function clearChatHistory() {
+async function onAttachPage() {
   if (!currentTabId) return;
-  await sendMessage({ type: 'CLEAR_HISTORY', tabId: currentTabId });
+  const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
+  attachBtn.disabled = true;
+  attachBtn.style.opacity = '0.5';
+  const origTitle = attachBtn.title;
+  attachBtn.title = 'Reading page…';
+
+  try {
+    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode });
+    if (!res?.ok) {
+      appendError(res?.error || 'Failed to read page');
+      return;
+    }
+    const ctx = res.data?.ctx;
+    const title = ctx?.articleTitle || ctx?.meta?.title || 'Page';
+    appendSystem(`📎 已附加："${title}"（${mode} 模式）—— 现在可以提问了`);
+  } catch (e) {
+    appendError('Page attach failed: ' + e.message);
+  } finally {
+    attachBtn.disabled = false;
+    attachBtn.style.opacity = '';
+    attachBtn.title = origTitle;
+  }
+}
+
+async function clearChatHistory() {
+  await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
-  tabStates.delete(currentTabId);
   appendSystem('🗑 History cleared');
 }
 
@@ -586,10 +625,11 @@ function estimateTokens(text) {
 function updateComposerInfo() {
   if (!charCountEl || !tokCountEl) return;
   const t = inputEl.value;
-  charCountEl.textContent = t.length.toLocaleString();
   const est = estimateTokens(t);
+  charCountEl.textContent = t.length.toLocaleString();
   tokCountEl.textContent = '~' + est.toLocaleString();
-  // Color the line based on size
+  // Hide when empty, show and color when there's content
+  composerInfoEl.style.display = t.length === 0 ? 'none' : '';
   composerInfoEl.classList.remove('warn', 'danger');
   if (est > 50_000) composerInfoEl.classList.add('danger');
   else if (est > 10_000) composerInfoEl.classList.add('warn');
@@ -708,11 +748,7 @@ async function onSend() {
   }
   const rawText = inputEl.value.trim();
 
-  if (!rawText && autoAttachEl.checked) {
-    // Even with empty text, if page is attached, we can still send.
-  } else if (!rawText) {
-    return;
-  }
+  if (!rawText) return;
 
   // Slash commands: expand `/summarize` etc. into full prompts. The original
   // slash text is shown in the user bubble; the expanded prompt is what the
@@ -739,19 +775,7 @@ async function onSend() {
     }
   }
 
-  // Auto-detect: if user has highlighted text on the page, prefer Selection
-  // mode automatically. Otherwise respect the chosen context mode.
-  let mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
-  try {
-    const selRes = await sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'selected', targetTabId: currentTabId });
-    const selText = (selRes?.text || '').trim();
-    if (selText && selText.length >= 50) {
-      // The user has selected substantial text on the page — use it.
-      mode = 'selected';
-    }
-  } catch (_) {
-    // ignore; fall back to chosen mode
-  }
+  const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
 
   // User bubble — show the original slash command, not the expanded prompt
   appendUser(rawText || '(page only)');
@@ -795,12 +819,12 @@ async function onSend() {
         renderStream(acc, false);
         updateOutputTokenCount(m.delta);
         // Persist in-flight HTML so tab switch doesn't lose it.
-        if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+  
       } else if (m.type === 'DONE') {
         renderStream(m.full || acc, true);
         addCodeCopyButtons();
         outputTokens = 0;
-        if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+  
         // Stream is fully done from the side panel's perspective. Tell
         // the background it can drop streamState and tear the port down
         // cleanly. The old v0.20.3 code relied on the background's
@@ -853,31 +877,14 @@ async function onSend() {
       type: 'CHAT',
       tabId: currentTabId,
       userText: text,
-      attachPage: !!autoAttachEl.checked,
-      contextMode: mode,
       stream: true,
       portName: 'browsa-chat',
-      images: imageDataUrls,
-      waitMs: waitJsEl.checked ? 2000 : 0
+      images: imageDataUrls
     });
     if (!res.ok) {
       appendError(`${res.code || 'Error'}: ${res.error}`);
       if (res.hint) appendSystem(res.hint);
       assistantEl.remove();
-    } else if (res.data?.pageContext?.limitHint) {
-      appendSystem(res.data.pageContext.limitHint);
-    } else if (res.data?.pageContext?.truncated?.textLength) {
-      const t = res.data.pageContext.truncated;
-      if (t.rawHtmlLength > t.textLength) {
-        appendSystem(
-          `ℹ Page truncated: sent ${t.textLength.toLocaleString()} of ${t.rawHtmlLength.toLocaleString()} chars ` +
-          `(limit ${t.textCap.toLocaleString()}). Raise limits in ⚙ Settings if you need more.`
-        );
-      }
-    }
-    // Detect empty extraction (JS-rendered pages like 小红书)
-    if (res.data?.pageContext?.text != null && res.data.pageContext.text.length < 50) {
-      appendSystem('⚠ Page content is empty or very short. This site may render content outside the DOM (Shadow DOM / Canvas). Try switching to 📸 Screenshot mode and sending the screenshot to a multimodal LLM.');
     }
   } catch (e) {
     appendError(e.message);
@@ -982,13 +989,13 @@ async function resumeInFlightStream(tabId) {
       acc += m.delta;
       r(acc, false);
       updateOutputTokenCount(m.delta);
-      if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+
     } else if (m.type === 'DONE') {
       const r = ensureAssistantEl();
       r(m.full || acc, true);
       addCodeCopyButtons();
       outputTokens = 0;
-      if (currentTabId != null) tabStates.set(currentTabId, { html: messagesEl.innerHTML });
+
       try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
       try { port.disconnect(); } catch (_) {}
       sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
@@ -1032,9 +1039,9 @@ function appendUser(text) {
   scrollToBottom();
   return el;
 }
-function appendAssistant(initial) {
+function appendAssistant(initial, done = false) {
   const el = document.createElement('div');
-  el.className = 'msg assistant';
+  el.className = 'msg assistant' + (done ? ' done' : '');
   el.textContent = initial;
   messagesEl.appendChild(el);
   scrollToBottom();
@@ -1072,15 +1079,26 @@ function sendMessage(msg) {
   });
 }
 
+// Prefix used to identify page-context messages saved to history.
+// These are sent to the LLM for context but should not clutter the chat UI.
+const PAGE_CONTEXT_PREFIX = '[Page context attached by browsa]';
+
 async function renderHistory() {
-  if (!currentTabId) return;
   messagesEl.innerHTML = '';
-  // Pull history directly from storage
-  const { history = {} } = await chrome.storage.local.get('history');
-  const list = history[String(currentTabId)] || [];
+  const { history } = await chrome.storage.local.get('history');
+  const list = Array.isArray(history) ? history : [];
   for (const m of list) {
-    if (m.role === 'user') appendUser(m.content);
-    else if (m.role === 'assistant') appendAssistant(m.content);
+    if (m.role === 'user') {
+      // Skip page-context messages — they're for the LLM only, not the UI.
+      if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
+      appendUser(m.content);
+    } else if (m.role === 'assistant') {
+      // History messages are always complete — render markdown and mark done
+      // so the blinking caret and streamEndedWhileAway check don't trigger.
+      const el = appendAssistant('', true);
+      el.innerHTML = renderSafe(m.content);
+      decorateLinks(el);
+    }
   }
   scrollToBottom();
 }

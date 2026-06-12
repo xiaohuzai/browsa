@@ -7,12 +7,53 @@
 
 import * as storage from './lib/storage.js';
 import { chatStream, chat, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
-import { extractActiveTab, buildMessages, ensureReadabilityInjected } from './lib/page-extractor.js';
+import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((e) => console.error('browsa: setPanelBehavior failed', e));
+
+// Right-click context menu — shown when user has text selected.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-ask',       title: '💬 Ask',                   parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id || !info.selectionText) return;
+  const text = info.selectionText.trim();
+  if (!text) return;
+
+  const actionMap = {
+    'browsa-ask':       'chat',
+    'browsa-explain':   'explain',
+    'browsa-translate': 'translate',
+    'browsa-summarize': 'summarize'
+  };
+  const action = actionMap[info.menuItemId];
+  if (!action) return;
+
+  // Cache the selection — right-click gives us selectionText directly,
+  // no focus-shift problem. Store it so ATTACH_PAGE(selected) works too.
+  selectionCache.set(tab.id, text);
+
+  // Relay to side panel if open, otherwise open it and deliver on connect.
+  const set = navPorts.get(tab.id);
+  let relayed = false;
+  if (set && set.size > 0) {
+    for (const p of set) {
+      try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); relayed = true; } catch (_) {}
+    }
+  }
+  if (!relayed) {
+    pendingSelectionActions.set(tab.id, { action, text });
+    try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
+  }
+});
 
 // Streaming port: the side panel opens a long-lived port named 'browsa-chat'
 // before sending the CHAT message. As soon as the background's CHAT handler
@@ -186,6 +227,36 @@ export function clearStreamState(tabId) {
   streamState.delete(tabId);
 }
 
+// GC for stale streamState entries. A stream can be orphaned when a tab
+// is closed (or crashes) mid-stream before the CHAT handler's finally{} runs.
+// Entries older than STREAM_STATE_TTL_MS are safe to drop — the side panel
+// would never PEEK them because the tab is gone.
+//
+// MV3 service workers can sleep between events, so a setTimeout/setInterval
+// would be cleared on sleep. We use chrome.alarms (which survives sleep) to
+// guarantee GC runs even when the extension is idle for long periods.
+const STREAM_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const GC_ALARM_NAME = 'browsa-stream-gc';
+const GC_ALARM_PERIOD_MINUTES = 5;
+
+function gcStreamState() {
+  const now = Date.now();
+  for (const [tabId, st] of streamState.entries()) {
+    if (now - st.startedAt > STREAM_STATE_TTL_MS) {
+      streamState.delete(tabId);
+      console.log('browsa[bg]: GC stale streamState for tab', tabId);
+    }
+  }
+}
+
+// Register a periodic alarm on service-worker startup. chrome.alarms.create
+// is idempotent when given the same name — repeated calls just update the
+// schedule, so registering on every startup is safe.
+chrome.alarms.create(GC_ALARM_NAME, { periodInMinutes: GC_ALARM_PERIOD_MINUTES });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === GC_ALARM_NAME) gcStreamState();
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Every handler is async; return true to keep the channel open.
   (async () => {
@@ -228,10 +299,76 @@ async function handle(msg, sender) {
     }
 
     case 'GET_XHS_NOTE': {
-      // Sent by the side panel when it wants the latest XHR data
-      // for a given tab. Returns null if we haven't seen one yet.
       const t = msg.tabId;
       return { note: xhsXhrCache.get(t) || null };
+    }
+
+    case 'SELECTION_CACHE': {
+      // Content script sends this on every selectionchange. We only store
+      // non-empty selections — clicking elsewhere clears the visual selection
+      // but we deliberately keep the cache so the user can still use 📎
+      // or the floating toolbar after clicking into the side panel.
+      const tabId = sender?.tab?.id;
+      if (tabId && msg.text) selectionCache.set(tabId, msg.text);
+      return { ok: true };
+    }
+
+    case 'SELECTION_ACTION': {
+      // Sent by lib/selection-toolbar.js when user clicks a toolbar button.
+      const tabId = sender?.tab?.id;
+      if (!tabId) return { ok: false };
+      const { action, text } = msg;
+      // Try relaying to the side panel through the existing nav port.
+      const set = navPorts.get(tabId);
+      let relayed = false;
+      if (set && set.size > 0) {
+        for (const p of set) {
+          try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); relayed = true; } catch (_) {}
+        }
+      }
+      if (!relayed) {
+        // Side panel not open — store and try to open it.
+        pendingSelectionActions.set(tabId, { action, text });
+        try { await chrome.sidePanel.open({ tabId }); } catch (_) {}
+      }
+      return { ok: true };
+    }
+
+    case 'GET_PENDING_ACTION': {
+      const tabId = msg.tabId;
+      const pending = pendingSelectionActions.get(tabId) || null;
+      if (pending) pendingSelectionActions.delete(tabId);
+      return { pending };
+    }
+
+    case 'YOUTUBE_DATA': {
+      const tabId = sender?.tab?.id;
+      if (tabId) youtubeCache.set(tabId, msg.video);
+      return { ok: true };
+    }
+
+    case 'JUEJIN_ARTICLE': {
+      const tabId = sender?.tab?.id;
+      if (tabId) juejinCache.set(tabId, msg.article);
+      return { ok: true };
+    }
+
+    case 'ZHIHU_CONTENT': {
+      const tabId = sender?.tab?.id;
+      if (tabId) zhihuCache.set(tabId, msg.content);
+      return { ok: true };
+    }
+
+    case 'DEDAO_ARTICLE': {
+      const tabId = sender?.tab?.id;
+      if (tabId) dedaoCache.set(tabId, msg.article);
+      return { ok: true };
+    }
+
+    case 'GEEKTIME_ARTICLE': {
+      const tabId = sender?.tab?.id;
+      if (tabId) geektimeCache.set(tabId, msg.article);
+      return { ok: true };
     }
 
     case 'SET_ACTIVE_PROVIDER': {
@@ -245,9 +382,52 @@ async function handle(msg, sender) {
     }
 
     case 'CLEAR_HISTORY': {
-      await storage.clearHistory(msg.tabId);
-      console.log('browsa[bg]: history cleared for tab', msg.tabId);
-      return {};
+      await storage.clearHistory();
+      console.log('browsa[bg]: global history cleared');
+      return { cleared: true };
+    }
+
+    case 'ATTACH_PAGE': {
+      // User explicitly clicked "📎 Attach page". Extract the current page,
+      // save it to global history as a user message, and return the result
+      // so the side panel can render a context bubble.
+      const tabId = msg.tabId ?? tabIdOf(msg, sender);
+      if (!tabId) return { ok: false, error: 'no tabId' };
+      const all = await storage.getAll();
+      const mode = msg.mode || all.contextMode || 'reader';
+      try {
+        let ctx;
+        // For 'selected' mode, use the cached selection (captured before focus
+        // shifted to the side panel, which clears window.getSelection()).
+        if (mode === 'selected') {
+          const cachedText = selectionCache.get(tabId) || '';
+          const tab = await chrome.tabs.get(tabId).catch(() => null);
+          const meta = tab ? { url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || '' } : { url: '', title: '', favIconUrl: '' };
+          if (!cachedText) return { ok: false, error: 'No text selected. Select some text on the page first, then click 📎.' };
+          ctx = {
+            meta, mode: 'selected',
+            text: cachedText,
+            truncated: { rawTextLength: cachedText.length, textLength: cachedText.length, wasCapped: false }
+          };
+        } else {
+          if (mode === 'reader') await ensureReadabilityInjected(tabId).catch(() => {});
+          ctx = await extractActiveTab({
+            mode,
+            maxTextChars: all.maxTextChars,
+            xhsXhrNote: xhsXhrCache.get(tabId) || null,
+            siteCache: getSiteCache(tabId)
+          });
+          if (!ctx) return { ok: false, error: 'extraction returned null' };
+        }
+        // Save to global history (text only — no base64 images)
+        const contextText = buildPageContextText(ctx);
+        await storage.appendToHistory({ role: 'user', content: contextText });
+        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
+        return { ok: true, ctx };
+      } catch (e) {
+        console.warn('browsa: ATTACH_PAGE failed', e);
+        return { ok: false, error: e?.message || String(e) };
+      }
     }
 
     case 'OPEN_OPTIONS_TAB': {
@@ -258,13 +438,6 @@ async function handle(msg, sender) {
       const url = msg.url || chrome.runtime.getURL('options.html');
       await chrome.tabs.create({ url });
       return { opened: true };
-    }
-
-    case 'CLEAR_HISTORY': {
-      const tabId = msg.tabId;
-      if (tabId == null) throw new Error('tabId required');
-      await storage.clearHistory(tabId);
-      return { cleared: true };
     }
 
     case 'STREAM_PEEK': {
@@ -344,21 +517,14 @@ async function handle(msg, sender) {
       const all = await storage.getAll();
       const mode = msg.mode || all.contextMode || 'reader';
       if (mode === 'reader') {
-        // Readability + Turndown need to be in the page world for reader
-        // mode. Skip injection for 'selected' (only reads window.getSelection)
-        // and 'full' (uses body.innerText).
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
-      // If we have a recent XHR note for this tab, pass it in so the
-      // extractor can prefer it over the DOM scrape. The XHR data is
-      // far more reliable on 小红书 because the SPA often renders a
-      // skeleton until the JS catches up.
       const t = tabIdOf(msg, sender);
-      const xhrNote = (typeof t === 'number') ? (xhsXhrCache.get(t) || null) : null;
       const ctx = await extractActiveTab({
         mode,
         maxTextChars: all.maxTextChars,
-        xhsXhrNote: xhrNote
+        xhsXhrNote: (typeof t === 'number') ? (xhsXhrCache.get(t) || null) : null,
+        siteCache: (typeof t === 'number') ? getSiteCache(t) : null
       });
       return ctx;
     }
@@ -378,7 +544,9 @@ async function handle(msg, sender) {
     }
 
     case 'CHAT': {
-      // Stream a chat turn. The side panel receives deltas via CHUNK messages.
+      // Stream a chat turn. Page context is NOT extracted here — the user
+      // explicitly attaches it via ATTACH_PAGE before asking questions.
+      // History is now global (single session across all tabs).
       const all = await storage.getAll();
       const provider = all.providers[all.activeProvider];
       if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
@@ -386,58 +554,21 @@ async function handle(msg, sender) {
       const tabId = msg.tabId;
       if (tabId == null) throw new Error('tabId required');
 
-      // Page context: optional based on msg.attachPage
-      let pageContext = null;
-      if (msg.attachPage) {
-        try {
-          const mode = msg.contextMode || all.contextMode || 'reader';
-          if (mode === 'reader') {
-            const inj = await ensureReadabilityInjected(tabId).catch((e) => ({ injected: false, error: e.message }));
-            console.log('browsa[bg]: ensurePageLibrariesInjected →', inj);
-          }
-          pageContext = await extractActiveTab({
-            mode,
-            maxTextChars: all.maxTextChars,
-            waitMs: msg.waitMs || 0
-          });
-          if (pageContext) {
-            console.log('browsa[bg]: pageContext', {
-              mode: pageContext.mode,
-              format: pageContext.format,
-              textLength: pageContext.text?.length,
-              wasCapped: pageContext.truncated?.wasCapped,
-              imageCount: pageContext.imageCount
-            });
-          }
-        } catch (e) {
-          // If extraction fails, just send without it. The most common
-          // failure is "No tab with id" — the user switched/closed tabs
-          // between clicking Send and the message reaching us. Surface a
-          // clean hint instead of an opaque stack.
-          console.warn('browsa: page extract failed, sending without context', e);
-          const msg = String(e?.message || '');
-          if (/No tab with id/i.test(msg) || /Failed to read page DOM/i.test(msg)) {
-            return { ok: false, code: 'TAB_GONE', error: msg,
-              hint: 'The active tab was closed or changed. Click into the tab you want to talk about, then resend.' };
-          }
-        }
-      }
+      // Load global history
+      const history = await storage.getHistory();
 
-      // History (without the new turn yet)
-      const history = await storage.getHistory(tabId);
-
-      // Build messages
+      // Build messages — no pageContext (handled by ATTACH_PAGE)
       const messages = buildMessages({
         history,
         userText: msg.userText,
-        pageContext,
-        withImage: (pageContext?.imageDataUrl || (pageContext?.imageBase64List && pageContext.imageBase64List.length > 0)) ? true : false,
-        userImages: msg.images // pasted / dropped images (base64 data URLs)
+        pageContext: null,
+        withImage: false,
+        userImages: msg.images
       });
 
-      // Persist the user turn (text only, no image)
+      // Persist user turn to global history
       const userTurn = { role: 'user', content: msg.userText || '(no instruction)' };
-      await storage.appendToHistory(tabId, userTurn);
+      await storage.appendToHistory(userTurn);
 
       // Initialize stream state BEFORE the first onDelta. From this point
       // on, every delta both pushes to the port and accumulates into
@@ -511,7 +642,7 @@ async function handle(msg, sender) {
 
       // Persist assistant turn — this is the durable source of truth.
       // (Only reached if the stream completed naturally, not via abort.)
-      await storage.appendToHistory(tabId, { role: 'assistant', content: fullReply });
+      await storage.appendToHistory({ role: 'assistant', content: fullReply });
 
       // Send DONE then drop streamState. The current port (if any) gets
       // the DONE so it can finalize its render. We do NOT call
@@ -521,18 +652,7 @@ async function handle(msg, sender) {
       // here so PEEK stops returning "in-flight" for a finished reply.
       pushChunk(tabId, { type: 'DONE', full: fullReply });
       clearStreamState(tabId);
-      return {
-        full: fullReply,
-        pageContext: pageContext
-          ? {
-              mode: pageContext.mode,
-              url: pageContext.meta.url,
-              title: pageContext.meta.title,
-              truncated: pageContext.truncated,
-              limitHint: pageContext.limitHint
-            }
-          : null
-      };
+      return { full: fullReply };
     }
 
     default:
@@ -573,49 +693,39 @@ function tabIdOf(msg, sender) {
 const lastNavBroadcast = new Map(); // tabId -> url
 // (The Map is mutated in place; we never replace the reference.)
 
-// Pure broadcast helper: given the current "last URL" map, the nav-port
-// registry, a tabId, and a new URL, decide what (if anything) to push to
-// each registered port, and return the updated "last URL" map. Pure for
-// testability — no chrome.* calls, no module state reads.
+// Pure broadcast helper: mutates lastNavMap in-place (no copy) and fans out to
+// registered ports. Kept as a named function so tests can import and call it
+// with their own Map/port stubs without importing the full module.
 function dedupeAndBroadcast(lastNavMap, navPortsMap, tabId, url) {
   if (typeof tabId !== 'number' || !url) return { updated: false, lastNavMap, sent: 0 };
   if (lastNavMap.get(tabId) === url) return { updated: false, lastNavMap, sent: 0 };
-  const next = new Map(lastNavMap);
-  next.set(tabId, url);
+  lastNavMap.set(tabId, url); // mutate in place — no Map copy needed
   const set = navPortsMap.get(tabId);
-  if (!set || set.size === 0) return { updated: true, lastNavMap: next, sent: 0 };
+  if (!set || set.size === 0) return { updated: true, lastNavMap, sent: 0 };
   for (const p of set) {
     try { p.postMessage({ type: 'NAVIGATED', tabId, url, title: '' }); } catch (_) {}
   }
-  return { updated: true, lastNavMap: next, sent: set.size };
+  return { updated: true, lastNavMap, sent: set.size };
 }
 
-function broadcastNav(tabId, url, title) {
+function broadcastNav(tabId, url) {
   if (typeof tabId !== 'number' || !url) return;
   const result = dedupeAndBroadcast(lastNavBroadcast, navPorts, tabId, url);
-  if (!result.updated) return;
-  // dedupeAndBroadcast returned an updated map (which is either the same
-  // reference as lastNavBroadcast or a copy containing the new entry).
-  // lastNavBroadcast is a `const` Map, so we mutate in place.
-  if (result.lastNavMap !== lastNavBroadcast) {
-    lastNavBroadcast.clear();
-    for (const [k, v] of result.lastNavMap) lastNavBroadcast.set(k, v);
-  }
-  if (result.sent > 0) {
+  if (result.updated && result.sent > 0) {
     console.log(`browsa[bg]: nav broadcast tab=${tabId} url=${url} sentTo=${result.sent}`);
   }
 }
 
 chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   if (details.frameId !== 0) return; // only top frame
-  broadcastNav(details.tabId, details.url, '');
+  broadcastNav(details.tabId, details.url);
 });
 
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId !== 0) return;
   // Only fires for non-history-API commits. onHistoryStateUpdated handles
   // the SPA case. This is a safety net for any other navigation path.
-  broadcastNav(details.tabId, details.url, '');
+  broadcastNav(details.tabId, details.url);
 });
 
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
@@ -626,20 +736,35 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   lastNavBroadcast.delete(details.tabId);
 });
 
-// Xiaohongshu XHR feed cache.
+// Per-site XHR intercept caches.
 //
-// The content script (lib/xhs-content-script.js) intercepts the
-// browser's own fetch / XHR against /api/sns/web/v1/feed and
-// forwards the JSON to us. We keep the most recent one per tab
-// and push it to any side panel that's listening for that tab.
-// The side panel then has the FULL XHR data — desc, imageList,
-// interactInfo — which is far more reliable than scraping the
-// rendered DOM (the SPA may have replaced or hidden it).
-//
-// Keyed by tabId, not noteId: when the user clicks a new note the
-// XHR for that note arrives and overwrites the previous one. We
-// always trust the most recent XHR.
-const xhsXhrCache = new Map(); // tabId -> note summary
+// Each content script intercepts the SPA's own API calls and forwards
+// structured article data here. We cache by tabId (most-recent wins),
+// so when the user asks browsa to read the page, we have the full content
+// from the browser's own authenticated request — no signing, no re-auth.
+// Pending selection actions: when the side panel isn't open yet, we store
+// the action here and deliver it once the panel connects via nav port.
+const pendingSelectionActions = new Map(); // tabId -> { action, text }
+
+// (pageContextUrls removed — history is now global, not per-tab)
+
+const selectionCache   = new Map(); // tabId -> last selected text (from selectionchange)
+const xhsXhrCache      = new Map(); // tabId -> XHS note summary
+const youtubeCache     = new Map(); // tabId -> YouTube video data
+const juejinCache      = new Map(); // tabId -> Juejin article
+const zhihuCache       = new Map(); // tabId -> Zhihu article or Q&A
+const dedaoCache       = new Map(); // tabId -> Dedao article
+const geektimeCache    = new Map(); // tabId -> Geektime article
+
+/** Return cached site data for a tab, regardless of which site it came from. */
+function getSiteCache(tabId) {
+  if (youtubeCache.has(tabId))  return { source: 'youtube',  data: youtubeCache.get(tabId) };
+  if (juejinCache.has(tabId))   return { source: 'juejin',   data: juejinCache.get(tabId) };
+  if (zhihuCache.has(tabId))    return { source: 'zhihu',    data: zhihuCache.get(tabId) };
+  if (dedaoCache.has(tabId))    return { source: 'dedao',    data: dedaoCache.get(tabId) };
+  if (geektimeCache.has(tabId)) return { source: 'geektime', data: geektimeCache.get(tabId) };
+  return null;
+}
 
 function pushXhsNote(tabId, note) {
   if (typeof tabId !== 'number' || !note) return;
@@ -654,7 +779,14 @@ function pushXhsNote(tabId, note) {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   lastNavBroadcast.delete(tabId);
+  selectionCache.delete(tabId);
+  pendingSelectionActions.delete(tabId);
   xhsXhrCache.delete(tabId);
+  youtubeCache.delete(tabId);
+  juejinCache.delete(tabId);
+  zhihuCache.delete(tabId);
+  dedaoCache.delete(tabId);
+  geektimeCache.delete(tabId);
   const set = navPorts.get(tabId);
   if (set) {
     for (const p of set) {

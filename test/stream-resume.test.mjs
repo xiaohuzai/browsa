@@ -26,6 +26,7 @@ const ports = new Map(); // tabId -> { port, onMessage, onDisconnect, postMessag
 const chromeMock = {
   runtime: {
     onMessage: { addListener: () => {} },
+    onInstalled: { addListener: () => {} },
     onConnect: {
       addListener: (cb) => {
         // Stash so a test can simulate connect() if it wants
@@ -67,6 +68,14 @@ const chromeMock = {
   },
   storage: {
     onChanged: { addListener: () => {} },
+  },
+  alarms: {
+    create: () => {},
+    onAlarm: { addListener: () => {} },
+  },
+  contextMenus: {
+    create: () => {},
+    onClicked: { addListener: () => {} },
   },
 };
 
@@ -216,7 +225,7 @@ test('CHAT handler clears streamState after appendToHistory (no leaks)', async (
 
   // Find the chatStream call and check that clearStreamState(tabId)
   // appears AFTER appendToHistory in the CHAT handler.
-  const persistIdx = src.indexOf('await storage.appendToHistory(tabId, { role: \'assistant\'');
+  const persistIdx = src.indexOf('await storage.appendToHistory({ role: \'assistant\'');
   const clearIdx = src.indexOf('clearStreamState(tabId)', persistIdx);
   assert.ok(persistIdx > 0, 'background.js should persist assistant turn');
   assert.ok(clearIdx > 0,

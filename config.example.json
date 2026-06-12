@@ -1,15 +1,15 @@
 {
-  "_comment": "Copy this file content into the extension's Options page (or paste as values). Do NOT commit your real API keys.",
+  "_comment": "Reference for provider config. Set values in the extension's Options page — do NOT commit real API keys.",
   "providers": {
     "hermes": {
-      "baseUrl": "http://101.47.17.208:8642",
-      "apiKey": "your-hermes-api-key",
+      "baseUrl": "http://localhost:8642",
+      "apiKey": "",
       "defaultModel": "hermes-agent",
       "stream": true
     },
     "claude-code": {
       "baseUrl": "http://localhost:8000",
-      "apiKey": "not-required-for-claude-code-wrapper",
+      "apiKey": "",
       "defaultModel": "claude-sonnet-4-6",
       "stream": true
     }

@@ -1,316 +1,169 @@
 # browsa
 
-> Hand the current page to your AI agent — single side-panel chat for **Hermes**, **Claude Code**, or any OpenAI-compatible API.
+> Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
 
-browsa is a small Chrome / Edge extension (Manifest V3) that opens a side panel next to whatever tab you're on, lets you ask a question, and ships the page context (full HTML / selection / screenshot) to whichever OpenAI-compatible agent runtime you configure.
+browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
 
 ```
-[Web page]  →  [browsa side panel]  →  [your agent runtime]  →  [streaming reply]
-                                         http://<host>:8642/v1/chat/completions
-                                         http://localhost:8000/v1/chat/completions
+[Web page]  →  [browsa side panel]  →  [your LLM / agent runtime]  →  streaming reply
+                                         http://localhost:8642/v1/chat/completions
                                          (or any OpenAI-compatible endpoint)
 ```
 
-## Why
-
-- **Multi-provider** — works with any agent that exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Hermes `api_server`, Claude Code via an openai-compatible wrapper, or your own LLM proxy.
-- **One-click page context** — choose full HTML, text selection, or a screenshot. No copy-pasting.
-- **Per-tab history** — conversations are scoped to the tab you started them on.
-- **Per-provider config** — base URL, API key, default model, stream on/off. Switch providers from the side panel.
-
-## Install (development / unpacked)
+## Install (unpacked)
 
 1. Clone or download this repo.
-2. Open `edge://extensions` (or `chrome://extensions`).
-3. Enable **Developer mode** (bottom-left toggle).
+2. Open `chrome://extensions` (or `edge://extensions`).
+3. Enable **Developer mode**.
 4. Click **Load unpacked** → select the `browsa/` directory.
-5. Click the browsa icon in the toolbar (or press `Ctrl+Shift+H`) to open the side panel.
+5. Press `Ctrl+Shift+H` (or click the toolbar icon) to open the side panel.
 6. Click **⚙ Settings** to configure providers (base URL, API key, model).
-7. Use the **Ping** button to verify each provider.
 
-## Browser compatibility
+## Build & package
 
-| Browser        | Status     | Notes                                              |
-| -------------- | ---------- | -------------------------------------------------- |
-| **Edge** 114+  | ✅ Primary | Default development target. Side panel works.      |
-| **Chrome** 114+| ✅ Same as Edge | Same Chromium base; identical install steps.   |
-| **Brave** 1.56+| ✅ Should work | Same Chromium API surface as Chrome.              |
-| **Opera** 100+ | ⚠️ Untested | Should work; side panel API is supported since 100. |
-| **Firefox**    | ❌ Not supported | Uses different manifest keys (`browser_specific_settings`, no `side_panel`). Would need a separate build. |
+```bash
+npm install          # first time only
+npm test             # run tests
+npm run package      # → browsa-v<version>.zip
+```
 
-The `manifest.json` declares `minimum_chrome_version: "114"` because the
-`chrome.sidePanel` API shipped in 114. Both Edge and Chrome auto-update to
-versions well past this.
+To install from the zip: unzip, then **Load unpacked** as above.
 
 ## Configure a provider
 
-| Provider | Typical base URL | Notes |
+| Provider | Base URL | Notes |
 |---|---|---|
-| **Hermes** `api_server` | `http://<host>:8642` | `API_SERVER_KEY` from `~/.hermes/.env` |
-| **Claude Code** (via `claude-code-openai-wrapper` or `claude-code-api`) | `http://localhost:8000` | Wrapper bundles the Claude Agent SDK |
-| **Any OpenAI-compatible** | (your URL) | Point at any `/v1/chat/completions` endpoint — Ollama, vLLM, LM Studio, LiteLLM, etc. |
+| **Hermes** `api_server` | `http://<host>:8642` | Set `API_SERVER_KEY` from `~/.hermes/.env` |
+| **Claude Code** | `http://localhost:8000` | Via an OpenAI-compatible wrapper |
+| **Any OpenAI-compatible** | your URL | Ollama, vLLM, LM Studio, LiteLLM, etc. |
 
-See [`config.example.json`](./config.example.json) for a starting point.
+Use the **Ping** button in Settings to verify connectivity before chatting.
+
+## Context modes
+
+| Mode | What gets sent |
+|---|---|
+| **Reader** (default) | Mozilla Readability extracts the main article — clean, ~5–30 KB |
+| **Full** | Raw `body.innerText` — everything, unfiltered |
+| **Selection** | Only the text you've highlighted |
+| **Screenshot** | PNG of the visible tab (for multimodal models) |
+
+## Supported sites (XHR interception)
+
+For SPA sites where Readability fails, browsa intercepts the browser's own API calls — no signing, no re-auth, just observing what the page already fetched:
+
+| Site | What's intercepted | Content |
+|---|---|---|
+| **小红书** | `/api/sns/web/v1/feed` | Note title, desc, tags, images, stats |
+| **掘金** | `api.juejin.cn/content_api/v1/article/detail` | `mark_content` — raw Markdown |
+| **知乎** | `/api/v4/articles/{id}` (专栏) + `/api/v4/questions/{id}/answers` (问答) | HTML → text, top 3 answers |
+| **得到** | `/content/detail` or `/article/detail` on dedao.cn | Article text |
+| **极客时间** | `time.geekbang.org/serv/v1/article` | HTML → text |
+
+> **Note:** Open the article page first and let it fully load. Then send your message. The interception happens when the SPA makes its own API call — browsa just observes it.
+
+## Slash commands
+
+Type these in the composer:
+
+| Command | Action |
+|---|---|
+| `/summarize` | 3–5 bullet summary |
+| `/translate` | Translate to Chinese |
+| `/rewrite` | More concise rewrite |
+| `/explain` | Explain for a beginner |
+| `/outline` | Heading-only outline |
+| `/keypoints` | Top 5 takeaways |
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Shift+H` | Open / close side panel |
+| `Enter` | Send message |
+| `Shift+Enter` | New line |
+| `Ctrl+K` | Clear history |
+| `Ctrl+/` | Cycle context mode |
+| `Esc` | Cancel streaming reply |
 
 ## How it works
 
-- `manifest.json` declares `host_permissions: ["http://*/*", "https://*/*"]` so any provider URL works without rebuilding the extension.
-- `lib/openai-client.js` is a ~150-line OpenAI Chat Completions client. It handles both **streaming** (SSE via `fetch` + `ReadableStream`) and **non-streaming** calls, and emits typed errors for config / network / API failures.
-- `lib/page-extractor.js` runs in the page's **MAIN world** via `chrome.scripting.executeScript`. It loads `Readability.js` (Mozilla, MIT) for main-content extraction and `Turndown.js` (HTML→Markdown), then returns one of three context modes:
-  - `full` — full page (Readability → Markdown), capped at 60 KB
-  - `selected` — only the user's text selection (falls back to full if empty)
-  - `screenshot` — a `data:image/png;...` URL of the visible tab (multimodal)
-- `background.js` is a module service worker. It routes messages from the side panel, extracts page context, builds the messages array, calls the active provider, and streams deltas back via a long-lived `Port`.
-- `sidepanel.js` renders the chat UI with **blinking caret streaming** (60fps textContent during generation), then post-processes the final reply with `marked` (Markdown→HTML) and `DOMPurify` (XSS sanitization) so headings/lists/code blocks/quotes/tables render cleanly.
-
-## Security
-
-- The API key is stored in `chrome.storage.local` on your machine only. It is **not** transmitted anywhere except the configured `baseUrl`.
-- `host_permissions` is intentionally wide so you can change providers without rebuilding. This is a development-time convenience; if you fork and publish, consider narrowing it to your own domain.
+- **`background.js`** — MV3 service worker. Routes messages, manages per-site XHR caches, streams LLM replies via a long-lived port. Handles mid-stream tab switching via `streamState` (accumulated reply survives port disconnect).
+- **`lib/page-extractor.js`** — Injects Readability + Turndown into the page's MAIN world for reader mode. For SPA sites, uses the XHR cache first and skips DOM injection entirely.
+- **`lib/openai-client.js`** — Minimal fetch-based SSE streaming client for `/v1/chat/completions`.
+- **`sidepanel.js`** — Chat UI with 60fps blinking-caret streaming, per-tab history, Markdown rendering (marked + DOMPurify).
+- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XHR.prototype` to observe SPA API calls and forward structured data to the background.
 
 ## Project structure
 
 ```
 browsa/
 ├── manifest.json
-├── background.js               # service worker (module)
-├── sidepanel.html / .css / .js # chat UI + Markdown rendering
-├── options.html / .css / .js   # provider config UI
+├── background.js                    # service worker
+├── sidepanel.{html,css,js}          # chat UI
+├── options.{html,css,js}            # settings page
 ├── lib/
-│   ├── openai-client.js        # OpenAI Chat Completions + SSE
-│   ├── page-extractor.js       # tab context extraction (MAIN world)
-│   ├── storage.js              # chrome.storage wrapper
-│   ├── Readability.js          # Mozilla main-content extractor (bundled)
-│   ├── Turndown.js             # HTML → Markdown (bundled)
-│   ├── marked.min.js           # Markdown → HTML for LLM replies (bundled)
-│   └── purify.min.js           # XSS sanitizer for LLM replies (bundled)
-├── icons/                      # 16 / 48 / 128
-├── config.example.json
-├── .gitignore
-├── LICENSE                     # MIT
-└── README.md
+│   ├── openai-client.js             # SSE streaming client
+│   ├── page-extractor.js            # content extraction + site synthesis
+│   ├── storage.js                   # chrome.storage wrapper
+│   ├── xhs-content-script.js        # 小红书 XHR interceptor
+│   ├── juejin-content-script.js     # 掘金 XHR interceptor
+│   ├── zhihu-content-script.js      # 知乎 XHR interceptor
+│   ├── dedao-content-script.js      # 得到 XHR interceptor
+│   ├── geektime-content-script.js   # 极客时间 XHR interceptor
+│   └── vendor/                      # bundled third-party libs
+│       ├── Readability.iife.js
+│       ├── Turndown.iife.js
+│       ├── marked.bundle.js
+│       └── purify.bundle.js
+├── _locales/{en,zh_CN}/
+├── icons/
+├── build/                           # build + package scripts
+├── test/                            # node:test unit tests
+└── check-compat.sh                  # MV3 / cross-browser lint
 ```
 
-## Roadmap
+## Browser compatibility
 
-- Per-tab history UI (clear / export)
-- Image paste into composer
-- Slash commands (`/summarize`, `/translate`, `/rewrite`)
-- Multi-modal image upload from clipboard
-- Fork-able: add your own provider preset in `lib/storage.js` defaults
+| Browser | Status | Notes |
+|---|---|---|
+| **Edge 114+** | ✅ Primary | Default target |
+| **Chrome 114+** | ✅ Same as Edge | Identical install |
+| **Brave 1.56+** | ✅ Should work | Same Chromium surface |
+| **Firefox** | ❌ Not supported | No `side_panel` API |
 
-## Xiaohongshu (小红书) note: extraction
+## Security
 
-`browsa` extracts 小红书 note detail pages via **XHR interception**.
+- API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
+- LLM replies are sanitized with DOMPurify before rendering.
+- Content scripts only observe requests; they never modify them.
 
-### Why this works
-小红书's `/api/sns/web/v1/feed` XHR requires signed `x-s`, `x-s-common`,
-and `x-t` headers (per [jackwener/xiaohongshu-cli](https://github.com/jackwener/xiaohongshu-cli))
-plus a logged-in `web_session` cookie for the full desc. Without
-those, XHS serves a different note, a skeleton, or an empty body
-(see [jackwener/OpenCLI#994](https://github.com/jackwener/OpenCLI/issues/994)).
+## Changelog
 
-Rather than reverse-engineering the signing algorithm (fragile,
-version-coupled), `browsa` injects a content script into
-`xiaohongshu.com` pages that wraps `window.fetch` and
-`XMLHttpRequest.prototype.send`. The browser's own signed fetch runs
-unchanged — we just `.clone()` the response, parse the JSON, and
-forward the note summary to the background. The result has the full
-desc, image count, tag list, and interaction counts.
+### v0.20.8
+- Multi-site XHR interception: 掘金, 知乎, 得到, 极客时间
+- Removed Auto-attach and Wait JS controls (context mode selection is sufficient)
+- `chrome.alarms`-based GC for stream state (MV3 best practice)
+- Readability/Turndown source caching in service worker memory
+- `tabStates` memory cap (10 tabs)
+- Fixed: screenshot mode (`captureVisibleTab` used wrong variable)
+- Fixed: `limitHint` for large pages was always null
+- Fixed: `ensureReadabilityInjected` didn't inject missing library when one was already present
+- Fixed: duplicate `CLEAR_HISTORY` case; `CHAT` path now uses XHR cache
+- Fixed: `autoAttachPage` preference was never persisted
 
-### How the data flows
+### v0.20.7
+Fixed "stream finished while away → stuck on ▍" bug. Added `STREAM_DEBUG` message for observability.
 
-```
-[XHS SPA]   →  fetch('/api/sns/web/v1/feed', signed)
-                 ↓
-[content script: lib/xhs-content-script.js]
-                 wraps fetch + XHR, clones response, extracts note
-                 ↓ chrome.runtime.sendMessage
-[background.js]  xhsXhrCache (Map<tabId, note>)
-                 ↓ port.postMessage
-[sidepanel.js]   lastXhsNote → renderDiagnosticsFromXhr()
-                 ↓ sendMessage({type:'GET_PAGE_CONTEXT', ...})
-[page-extractor.js]  extractActiveTab({xhsXhrNote})
-                 ↓ if noteId matches URL
-[synthesizeXhsResultFromXhr(note)] → ctx with full desc
-```
+### v0.20.6
+Snap to bottom when switching back to a tab mid-stream.
 
-### What if it doesn't work?
+### v0.20.5
+Cancel (Esc) now actually aborts the LLM fetch via `AbortController`.
 
-If the user isn't logged in to `xiaohongshu.com` in this browser,
-the XHR returns a skeleton (no `data.noteList`) and the content
-script filters it out via `isNoteDetailPayload()`. The side panel
-then falls back to the DOM/INITIAL_STATE scrape, which may also be
-unreliable. In that case a yellow banner appears explaining what
-to do.
-
-To fix: log in to `xiaohongshu.com` in this browser, reload the
-note page, then re-send. The XHR will return real data within a
-few hundred ms.
-
-## Publish to GitHub
-
-```bash
-cd browsa
-gh repo create browsa --public --source=. --push
-```
+### v0.20.4
+Mid-stream tab switch: `streamState` survives port disconnect; `STREAM_PEEK` / `STREAM_HELLO` resume on switch-back.
 
 ## License
 
 MIT
-
-## Changelog
-
-### v0.20.8 — prepare for public release
-
-Removed the `console.log` debug noise that v0.20.7 added for diagnosing
-the mid-stream tab-switch bug. The `STREAM_DEBUG` message handler in
-`background.js` is preserved — call it from the side panel devtools
-console with `chrome.runtime.sendMessage({type: 'STREAM_DEBUG'})` to
-inspect `streamState`/`streamPorts`/`chatControllers` live.
-
-No behavior changes. The mid-stream tab-switch handling and the
-"stream finished while away → re-render from storage" branch are
-unchanged from v0.20.7.
-
-### v0.20.7 — DEBUG observability + handle 'stream finished while away' case
-
-**Bug**: When the user switched tabs and the LLM finished streaming
-while they were away, the side panel was stuck on the "▍" placeholder
-forever. The reply had been written to storage by the background, but
-the side panel never re-rendered to pick it up.
-
-**Why**: v0.20.4's `resumeInFlightStream` only handled the case where
-the stream was *still in flight* on switch-back. If the stream
-finished during the user's absence, the background's `pushChunk(DONE)`
-hit a dead port (silently dropped by `safePost`), then called
-`clearStreamState(tabId)`. When the user came back, `STREAM_PEEK`
-returned `{ inFlight: false }`, the resume code bailed, and the saved
-DOM snapshot (with the "▍" placeholder) just sat there.
-
-**Fix**:
-- `onActivated` now branches on the PEEK result. `inFlight: false` +
-  the latest assistant bubble is still a "▍" placeholder → re-render
-  from storage via `renderHistory()`. The full reply is already in
-  storage; we just weren't surfacing it.
-- New `STREAM_DEBUG` message handler in `background.js` dumps
-  `streamState` / `streamPorts` / `chatControllers` contents, so the
-  next time a tab-switch bug appears we can read the actual Map state
-  from devtools instead of guessing from the source.
-
-**Tested by**: `test/scroll-snap.test.mjs` (5 cases, the
-"stream finished while away" path has no unit test — it requires
-real-time timing simulation that the unit test framework can't
-do. The contract test is "onActivated branches on PEEK result",
-which is implicit in the source reading).
-
-### v0.20.6 — switch back to a tab snaps to the latest message
-
-**Bug**: After switching to another tab and coming back, the messages
-list didn't scroll to the bottom — it stayed wherever it happened to
-land (usually the old position from before the innerHTML swap, or 0).
-Users coming back from another tab stared at a blank middle of an old
-conversation instead of the latest reply.
-
-**Why**: `onActivated` replaced `messagesEl.innerHTML` with the saved
-DOM snapshot (or called `renderHistory`) but never called
-`scrollToBottom`. The browser kept the previous `scrollTop`, which
-after the innerHTML swap was either stale or clamped to 0.
-
-**Fix**: Schedule `requestAnimationFrame(() => scrollToBottom())` at
-two points in `onActivated`:
-- Right after the innerHTML/renderHistory restore (snap to bottom
-  of the just-rehydrated DOM).
-- Right after `resumeInFlightStream` (snap again, in case the
-  resume's pre-render added bubble height after the first snap).
-
-Also added a defensive rAF in `init()` after `resumeInFlightStream`
-for the first-open case, where the side panel's first layout pass
-may not be done by the time `renderHistory()` runs.
-
-Design note: we do **not** save/restore `scrollTop` across tab
-switches. Standard chat UX (Slack, Discord, 微信) snaps to bottom
-on tab/route switch, and Chrome's `innerHTML` swap doesn't preserve
-`scrollTop` reliably anyway. Adding save/restore would cost
-complexity for a feature users don't actually want.
-
-**Tested by**: `test/scroll-snap.test.mjs` — 5 cases covering the
-init and onActivated contracts. (jsdom doesn't simulate layout, so
-we test the source contract — the entry points must schedule
-`scrollToBottom` via `requestAnimationFrame`.)
-
-### v0.20.5 — cancel now actually cancels
-
-**Bug**: Esc-to-cancel (or clicking the cancel UI) was visual-only.
-The user saw a "⚠ Stream cancelled" toast, but the background kept
-streaming the reply to completion, then silently appended a
-half-baked assistant turn to the tab's history. Next time the user
-opened the side panel, that phantom reply showed up.
-
-**Why**: `cancelStream()` in `sidepanel.js` only sent
-`STREAM_RELEASE`, which cleared `streamState` (so PEEK would stop
-returning in-flight) but never actually aborted the LLM fetch. The
-fetch and SSE reader loop had no `AbortSignal` plumbing at all —
-the existing `signal: msg.signal ? AbortSignal.timeout(...)` line
-in the CHAT handler was a hard timeout, not a user-cancel signal.
-
-**Fix**:
-- `background.js` now keeps `chatControllers: Map<tabId, AbortController>`.
-  The CHAT handler creates one, stores it, and threads it as
-  `signal` into `chatStream()`.
-- New message type `STREAM_ABORT { tabId }` calls
-  `controller.abort('user-cancel')`. The CHAT handler's catch block
-  detects `AbortError`, pushes an `ERROR { code: 'ABORTED' }` chunk,
-  and returns `{ cancelled: true }` **before** the
-  `appendToHistory(tabId, { role: 'assistant' ... })` line — so
-  no half-reply gets persisted.
-- `lib/openai-client.js`: `reader.read()` does **not** auto-cancel
-  on abort (the `fetch` aborts but the reader happily keeps reading
-  the buffered chunks). Now the abort listener calls
-  `reader.cancel()`, and the read loop checks `aborted` after every
-  `read()` and after `done` — because `reader.cancel()` makes
-  `read()` resolve with `done: true`, not throw. Without this check,
-  abort looked fine in tests but the loop returned a partial
-  `full` string as if the stream had finished naturally.
-- `cancelStream()` distinguishes a user-cancel of an
-  user-initiated stream ("⚠ Stream cancelled") from a cancel of a
-  resumed stream ("⚠ Stopped watching resumed stream"). The latter
-  is honest about the fact that the LLM is still running on the
-  background for that tab.
-
-**Tested by**: `test/abort.test.mjs` — 8 cases, including
-"openai-client reader loop respects the AbortSignal" (verifies
-abort unblocks the read loop within 200ms with `AbortError`).
-
-### v0.20.4 — mid-stream tab switch
-
-**Bug**: If the user switched tabs while the LLM was streaming a reply and
-then switched back, the side panel appeared to freeze on a `▍` placeholder
-even though the LLM had already finished. The reply was lost.
-
-**Why**: The streaming port (`chrome.runtime.connect` named `browsa-chat`)
-is owned by the side panel document. When the user switches tabs,
-Chrome tears down the side panel iframe — the port disconnects. The
-background had no record of the in-flight stream, so the freshly-arriving
-side panel saw only persisted history (which doesn't include the
-in-progress turn until `appendToHistory` runs at DONE time) and rendered
-nothing. Worse, the v0.20.3 fix (`setTimeout(disconnect)` after DONE)
-killed the port even faster, so the next switch-back couldn't recover.
-
-**Fix**:
-- `background.js` keeps a `streamState: Map<tabId, { acc, startedAt, lastDeltaAt }>`
-  that survives port churn. Every `onDelta` both pushes to the current
-  port and appends to `streamState.acc`.
-- New message types: `STREAM_PEEK` (returns in-flight status + accumulated
-  text) and `STREAM_RELEASE` (drops the state after DONE / cancel).
-- The side panel calls `STREAM_PEEK` on `init()` and on every
-  `chrome.tabs.onActivated` event. If a stream is in flight, it opens a
-  new port, pre-renders the accumulated text into the assistant bubble,
-  and continues receiving live deltas through the same listener.
-- Replaced the background's `setTimeout(disconnect)` with explicit
-  `STREAM_GOODBYE` + `STREAM_RELEASE` from the side panel — the cleanup
-  is now deterministic and races-free.
-
-**Tested by**: `test/stream-resume.test.mjs` (9 cases, including
-"streamState survives the streaming port disconnecting").
-
