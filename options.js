@@ -1,5 +1,6 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
+import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,6 +17,7 @@ async function init() {
   applyContextMode(cachedCfg.contextMode || 'reader');
   applyLimits(cachedCfg);
   applyToolbarToggle();
+  applySystemPrompt();
 
   document.querySelectorAll('input[name="ctx"]').forEach((r) => {
     r.addEventListener('change', async () => {
@@ -83,6 +85,7 @@ function renderProviders() {
         <button data-act="save">Save</button>
         <button data-act="ping">Ping</button>
         <button data-act="reset">Reset</button>
+        <span class="card-status"></span>
       </div>
     `;
     providersEl.appendChild(card);
@@ -115,38 +118,58 @@ function readCard(card) {
   return out;
 }
 
+function flashCard(card, cls, text) {
+  const el = card.querySelector('.card-status');
+  if (!el) return;
+  el.className = 'card-status ' + cls;
+  el.textContent = text;
+  clearTimeout(el._timer);
+  if (cls === 'ok') el._timer = setTimeout(() => { el.textContent = ''; el.className = 'card-status'; }, 4000);
+}
+
 async function saveCard(name, card) {
   const data = readCard(card);
   cachedCfg.providers[name] = { ...cachedCfg.providers[name], ...data };
   await chrome.storage.local.set({ providers: cachedCfg.providers });
-  flash('ok', `Saved ${prettyProviderName(name)}.`);
+  flashCard(card, 'ok', '✓ Saved');
 }
 
 async function pingCard(name, card) {
-  // Save first so we ping the latest values
   await saveCard(name, card);
   const cfg = cachedCfg.providers[name];
-  flash('', `Pinging ${prettyProviderName(name)}…`);
+  flashCard(card, '', 'Pinging…');
   try {
     const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model || cfg.defaultModel });
-    flash('ok', `✅ Ping ok. Reply: ${reply.slice(0, 120)}`);
+    flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
   } catch (e) {
-    const cls = e instanceof ProviderConfigError ? 'err' : 'err';
-    flash(cls, `❌ ${e.name || 'Error'}: ${e.message}`);
+    flashCard(card, 'err', `❌ ${e.message}`);
   }
 }
 
 async function resetCard(name, card) {
-  // Reset to the DEFAULTS in storage.js
   const fresh = await storage.getAll();
   cachedCfg.providers[name] = fresh.providers[name];
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   renderProviders();
-  flash('ok', `Reset ${prettyProviderName(name)} to defaults.`);
 }
 
 function applyContextMode(mode) {
   for (const r of document.querySelectorAll('input[name="ctx"]')) r.checked = r.value === mode;
+}
+
+function applySystemPrompt() {
+  const el = $('systemPrompt');
+  if (!el) return;
+  el.value = cachedCfg.systemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? '';
+  document.querySelector('button[data-act="save-system-prompt"]')?.addEventListener('click', async () => {
+    await chrome.storage.local.set({ systemPrompt: el.value });
+    flash('ok', 'System prompt saved.');
+  });
+  document.querySelector('button[data-act="reset-system-prompt"]')?.addEventListener('click', async () => {
+    el.value = DEFAULT_SYSTEM_PROMPT;
+    await chrome.storage.local.set({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
+    flash('ok', 'System prompt reset to default.');
+  });
 }
 
 function applyToolbarToggle() {

@@ -191,6 +191,20 @@ body {
   animation: none;
   max-width: 100%;
 }
+.msg.screenshot-preview {
+  align-self: center;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--surface-2, #1e2530);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.msg.screenshot-preview img {
+  display: block;
+  max-width: 100%;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: zoom-in;
+}
 
 /* ─── Markdown inside assistant ─────────────────────────────────────────────── */
 .msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 {
@@ -272,23 +286,26 @@ body {
 .msg.assistant img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 0.3em 0; }
 
 /* Math */
-math-inline {
-  font-family: "KaTeX_Main", "Times New Roman", serif;
-  font-style: italic;
-  background: var(--accent-dim);
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
-  white-space: nowrap;
+/* MathML rendered by KaTeX (output:'mathml'). Chrome 114+ renders natively. */
+math {
+  font-size: 1.05em;
 }
+math[display="block"] {
+  display: block;
+  text-align: center;
+  margin: 0.7em 0;
+  overflow-x: auto;
+  padding: 0.3em 0;
+}
+/* Fallback for the rare error path */
 .math-block {
-  font-family: "KaTeX_Main", "Times New Roman", serif;
-  font-style: italic;
   text-align: center;
   margin: 0.6em 0;
   padding: 0.5em;
   background: var(--accent-dim);
   border-radius: var(--radius);
   overflow-x: auto;
+  font-family: monospace;
 }
 
 /* ─── Code copy button ──────────────────────────────────────────────────────── */

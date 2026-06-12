@@ -363,30 +363,34 @@ async function handle(msg, sender) {
         }
       }
       if (!relayed) {
-        // navPort not registered yet — the SW may have just woken up and the
-        // side panel's port hasn't reconnected yet (it reconnects ~1s after
-        // detecting the disconnect). Store as pending AND schedule a retry so
-        // we catch the reconnect window without waiting for the user to act again.
+        // navPort not registered yet — the SW just woke up and navPorts is
+        // empty (module-level Map resets on every SW restart). A setTimeout
+        // retry won't work because the SW goes back to sleep as soon as this
+        // message handler returns. Instead, persist to chrome.storage.session
+        // which survives SW restarts. The side panel picks it up via
+        // storage.onChanged or on navPort reconnect.
         pendingSelectionActions.set(tabId, { action, text });
+        chrome.storage.session.set({ pendingSelectionAction: { tabId, action, text } }).catch(() => {});
         try { await chrome.sidePanel.open({ tabId }); } catch (_) {}
-        setTimeout(() => {
-          if (!pendingSelectionActions.has(tabId)) return; // already delivered
-          const set2 = navPorts.get(tabId);
-          if (set2 && set2.size > 0) {
-            for (const p of set2) {
-              try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); } catch (_) {}
-            }
-            pendingSelectionActions.delete(tabId);
-          }
-        }, 1500);
       }
       return { ok: true };
     }
 
     case 'GET_PENDING_ACTION': {
       const tabId = msg.tabId;
-      const pending = pendingSelectionActions.get(tabId) || null;
-      if (pending) pendingSelectionActions.delete(tabId);
+      // Check in-memory Map first (fast path, same SW instance).
+      // Fall back to session storage (survives SW restarts).
+      let pending = pendingSelectionActions.get(tabId) || null;
+      if (pending) {
+        pendingSelectionActions.delete(tabId);
+        chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+      } else {
+        const sess = await chrome.storage.session.get('pendingSelectionAction').catch(() => ({}));
+        if (sess.pendingSelectionAction?.tabId === tabId) {
+          pending = { action: sess.pendingSelectionAction.action, text: sess.pendingSelectionAction.text };
+          chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+        }
+      }
       return { pending };
     }
 
@@ -472,9 +476,23 @@ async function handle(msg, sender) {
           });
           if (!ctx) return { ok: false, error: 'extraction returned null' };
         }
-        // Save to global history (text only — no base64 images)
+        // Save to global history. For screenshots, include the image data so
+        // the LLM actually receives it as a vision message. JPEG at 70% quality
+        // keeps the payload under ~200KB, within chrome.storage.local limits.
         const contextText = buildPageContextText(ctx);
-        await storage.appendToHistory({ role: 'user', content: contextText });
+        let historyEntry;
+        if (mode === 'screenshot' && ctx.imageDataUrl) {
+          historyEntry = {
+            role: 'user',
+            content: [
+              { type: 'text', text: contextText },
+              { type: 'image_url', image_url: { url: ctx.imageDataUrl } }
+            ]
+          };
+        } else {
+          historyEntry = { role: 'user', content: contextText };
+        }
+        await storage.appendToHistory(historyEntry);
         console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
         return { ok: true, ctx };
       } catch (e) {
@@ -616,7 +634,8 @@ async function handle(msg, sender) {
         userText: msg.userText,
         pageContext: null,
         withImage: false,
-        userImages: msg.images
+        userImages: msg.images,
+        systemPrompt: all.systemPrompt || ''
       });
 
       // Persist user turn to global history
