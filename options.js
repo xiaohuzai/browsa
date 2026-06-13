@@ -158,15 +158,12 @@ async function pingCard(name, card) {
     const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
       const hasResponses = !!(caps.features.responses_api);
-      const hasRuns = !!(caps.features.run_submission);
-      if (cachedCfg.providers[name].useResponsesApi !== hasResponses ||
-          cachedCfg.providers[name].useRunsApi !== hasRuns) {
+      if (cachedCfg.providers[name].useResponsesApi !== hasResponses) {
         cachedCfg.providers[name].useResponsesApi = hasResponses;
-        cachedCfg.providers[name].useRunsApi = hasRuns;
         await chrome.storage.local.set({ providers: cachedCfg.providers });
         renderProviders(); // refresh cards to reflect new checkboxes
       }
-      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [responses:${hasResponses ? '✓' : '✗'} runs:${hasRuns ? '✓' : '✗'}]`);
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [responses:${hasResponses ? '✓' : '✗'}]`);
     } else {
       flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
     }

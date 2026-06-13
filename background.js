@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, chat, responsesApiStream, runsApiStream, stopRun, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { chatStream, chat, responsesApiStream, stopRun, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
@@ -112,7 +112,6 @@ export const streamState = new Map(); // tabId -> { acc: string, startedAt: numb
 // was a no-op: the LLM kept streaming, the user saw a "cancelled"
 // notice, and a phantom assistant turn got written to history.
 export const chatControllers = new Map(); // tabId -> AbortController
-const chatRunIds = new Map();             // tabId -> Hermes run_id (for /v1/runs stop)
 
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
@@ -557,14 +556,6 @@ async function handle(msg, sender) {
       if (controller) {
         try { controller.abort('user-cancel'); } catch (_) {}
       }
-      // For Hermes runs: also send a graceful stop request to the server.
-      const runId = chatRunIds.get(t);
-      if (runId) {
-        const allCfg = await storage.getAll().catch(() => ({}));
-        const prov = allCfg.providers?.[allCfg.activeProvider];
-        stopRun({ baseUrl: prov?.baseUrl, apiKey: prov?.apiKey, runId }).catch(() => {});
-        chatRunIds.delete(t);
-      }
       clearStreamState(t);
       return { aborted: !!controller };
     }
@@ -737,25 +728,7 @@ async function handle(msg, sender) {
         if (stream) {
           const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
 
-          if (useResponsesApi && provider.useRunsApi) {
-            // /v1/runs: best lifecycle management — can detach/reattach, graceful cancel
-            const runsResult = await runsApiStream({
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-              model: provider.model || provider.defaultModel,
-              input: responsesInput,
-              instructions: all.systemPrompt || undefined,
-              conversation: responsesConversation,
-              onDelta: (delta) => {
-                appendToStreamState(tabId, delta);
-                pushChunk(tabId, { type: 'CHUNK', delta });
-              },
-              onToolProgress,
-              signal
-            });
-            fullReply = runsResult.result;
-            chatRunIds.set(tabId, runsResult.runId);
-          } else if (useResponsesApi) {
+          if (useResponsesApi) {
             // /v1/responses: stateful, server stores conversation history
             fullReply = await responsesApiStream({
               baseUrl: provider.baseUrl,
