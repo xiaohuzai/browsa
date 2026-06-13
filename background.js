@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, chat, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { chatStream, chat, responsesApiStream, runsApiStream, stopRun, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
@@ -112,6 +112,7 @@ export const streamState = new Map(); // tabId -> { acc: string, startedAt: numb
 // was a no-op: the LLM kept streaming, the user saw a "cancelled"
 // notice, and a phantom assistant turn got written to history.
 export const chatControllers = new Map(); // tabId -> AbortController
+const chatRunIds = new Map();             // tabId -> Hermes run_id (for /v1/runs stop)
 
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
@@ -436,6 +437,14 @@ async function handle(msg, sender) {
 
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
+      // Reset session IDs for all providers so the next conversation
+      // starts a fresh Hermes session (no bleed-over from the old one).
+      const allCfg = await storage.getAll();
+      for (const name of Object.keys(allCfg.providers || {})) {
+        if (allCfg.providers[name]?.useResponsesApi) {
+          await storage.resetConversationId(name);
+        }
+      }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
     }
@@ -548,8 +557,14 @@ async function handle(msg, sender) {
       if (controller) {
         try { controller.abort('user-cancel'); } catch (_) {}
       }
-      // Even if there's no live controller (stream already done), drop
-      // any leftover streamState so PEEK stops returning in-flight.
+      // For Hermes runs: also send a graceful stop request to the server.
+      const runId = chatRunIds.get(t);
+      if (runId) {
+        const allCfg = await storage.getAll().catch(() => ({}));
+        const prov = allCfg.providers?.[allCfg.activeProvider];
+        stopRun({ baseUrl: prov?.baseUrl, apiKey: prov?.apiKey, runId }).catch(() => {});
+        chatRunIds.delete(t);
+      }
       clearStreamState(t);
       return { aborted: !!controller };
     }
@@ -628,15 +643,71 @@ async function handle(msg, sender) {
       // Load global history
       const history = await storage.getHistory();
 
-      // Build messages — no pageContext (handled by ATTACH_PAGE)
-      const messages = buildMessages({
-        history,
-        userText: msg.userText,
-        pageContext: null,
-        withImage: false,
-        userImages: msg.images,
-        systemPrompt: all.systemPrompt || ''
-      });
+      // Hermes /v1/responses API: stateful, server stores conversation history.
+      // Only the current input is sent — Hermes remembers previous turns via
+      // the `conversation` UUID. The first turn includes any attached page
+      // context so Hermes learns it; subsequent turns send only the new message.
+      const useResponsesApi = !!(provider.useResponsesApi);
+
+      let messages = null;       // used by chat/chatStream (stateless)
+      let responsesInput = null; // used by responsesApiStream (stateful)
+      let responsesConversation = null;
+      let extraHeaders = undefined;
+
+      if (useResponsesApi) {
+        responsesConversation = await storage.getOrCreateConversationId(all.activeProvider);
+        const hasAssistantTurn = history.some(m => m.role === 'assistant');
+        if (hasAssistantTurn) {
+          // Subsequent turns: Hermes already knows the context.
+          // Only send the new user message (+ any pasted images).
+          if (msg.images?.length) {
+            responsesInput = [
+              { role: 'user', content: [
+                  { type: 'input_text', text: msg.userText || '' },
+                  ...msg.images.map(url => ({ type: 'input_image', image_url: url }))
+                ]
+              }
+            ];
+          } else {
+            responsesInput = msg.userText || '';
+          }
+        } else {
+          // First turn: include page context from history so Hermes learns it.
+          const pageContextMsg = history.find(m =>
+            m.role === 'user' && (
+              (typeof m.content === 'string' && m.content.startsWith('[Page context attached by browsa]')) ||
+              (Array.isArray(m.content))
+            )
+          );
+          const parts = [];
+          if (pageContextMsg) {
+            if (typeof pageContextMsg.content === 'string') {
+              parts.push({ type: 'input_text', text: pageContextMsg.content });
+            } else if (Array.isArray(pageContextMsg.content)) {
+              // Multimodal (screenshot)
+              for (const p of pageContextMsg.content) {
+                if (p.type === 'text') parts.push({ type: 'input_text', text: p.text });
+                else if (p.type === 'image_url') parts.push({ type: 'input_image', image_url: p.image_url?.url || p.image_url });
+              }
+            }
+          }
+          parts.push({ type: 'input_text', text: msg.userText || '' });
+          if (msg.images?.length) {
+            msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
+          }
+          responsesInput = [{ role: 'user', content: parts }];
+        }
+      } else {
+        // Standard stateless mode: send full history on every turn.
+        messages = buildMessages({
+          history,
+          userText: msg.userText,
+          pageContext: null,
+          withImage: false,
+          userImages: msg.images,
+          systemPrompt: all.systemPrompt || ''
+        });
+      }
 
       // Persist user turn to global history
       const userTurn = { role: 'user', content: msg.userText || '(no instruction)' };
@@ -664,29 +735,68 @@ async function handle(msg, sender) {
       const stream = msg.stream !== false && provider.stream !== false;
       try {
         if (stream) {
-          fullReply = await chatStream({
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-            model: provider.model || provider.defaultModel,
-            messages,
-            onDelta: (delta) => {
-              // Mirror every delta into streamState so a later side panel
-              // session can PEEK and resume. The port push below is
-              // best-effort — if no port is connected (panel was torn
-              // down), the chunk is dropped from the wire but stays in
-              // streamState.acc, ready to be re-flushed on STREAM_HELLO.
-              appendToStreamState(tabId, delta);
-              pushChunk(tabId, { type: 'CHUNK', delta });
-            },
-            signal
-          });
+          const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+
+          if (useResponsesApi && provider.useRunsApi) {
+            // /v1/runs: best lifecycle management — can detach/reattach, graceful cancel
+            const runsResult = await runsApiStream({
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+              model: provider.model || provider.defaultModel,
+              input: responsesInput,
+              instructions: all.systemPrompt || undefined,
+              conversation: responsesConversation,
+              onDelta: (delta) => {
+                appendToStreamState(tabId, delta);
+                pushChunk(tabId, { type: 'CHUNK', delta });
+              },
+              onToolProgress,
+              signal
+            });
+            fullReply = runsResult.result;
+            chatRunIds.set(tabId, runsResult.runId);
+          } else if (useResponsesApi) {
+            // /v1/responses: stateful, server stores conversation history
+            fullReply = await responsesApiStream({
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+              model: provider.model || provider.defaultModel,
+              input: responsesInput,
+              instructions: all.systemPrompt || undefined,
+              conversation: responsesConversation,
+              onDelta: (delta) => {
+                appendToStreamState(tabId, delta);
+                pushChunk(tabId, { type: 'CHUNK', delta });
+              },
+              onToolProgress,
+              signal
+            });
+          } else {
+            // Standard stateless /v1/chat/completions
+            fullReply = await chatStream({
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+              model: provider.model || provider.defaultModel,
+              messages,
+              onDelta: (delta) => {
+                appendToStreamState(tabId, delta);
+                pushChunk(tabId, { type: 'CHUNK', delta });
+              },
+              onToolProgress,
+              signal,
+              extraHeaders
+            });
+          }
         } else {
+          // Non-streaming fallback (responses API doesn't support non-stream well,
+          // so always fall through to chatStream for simplicity)
           fullReply = await chat({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             model: provider.model || provider.defaultModel,
-            messages,
-            signal
+            messages: messages || buildMessages({ history, userText: msg.userText, pageContext: null, withImage: false, userImages: msg.images, systemPrompt: all.systemPrompt || '' }),
+            signal,
+            extraHeaders
           });
           appendToStreamState(tabId, fullReply);
           pushChunk(tabId, { type: 'CHUNK', delta: fullReply });

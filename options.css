@@ -108,6 +108,17 @@ main {
   gap: 8px;
 }
 .provider h3 .name { flex: 1; }
+.provider-badge {
+  font-size: 11px;
+  font-weight: 400;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.provider-badge.configured   { background: rgba(59,130,246,0.1); color: var(--accent); }
+.provider-badge.unconfigured { background: rgba(156,163,175,0.12); color: var(--muted); }
+.provider-badge.reachable    { background: rgba(34,197,94,0.12); color: var(--ok); }
+.provider-badge.unreachable  { background: rgba(248,113,113,0.12); color: var(--err); }
 .row {
   display: flex;
   flex-wrap: wrap;
