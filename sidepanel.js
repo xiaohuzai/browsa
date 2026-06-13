@@ -382,7 +382,8 @@ function populateProviderSelect(cfg) {
   for (const name of providers) {
     const opt = document.createElement('option');
     opt.value = name;
-    opt.textContent = prettyProviderName(name);
+    const configured = !!(cfg.providers[name]?.baseUrl?.trim());
+    opt.textContent = prettyProviderName(name) + (configured ? '' : ' (not set)');
     if (name === cfg.activeProvider) opt.selected = true;
     providerSel.appendChild(opt);
   }
@@ -884,13 +885,18 @@ async function onSend() {
         acc += m.delta;
         renderStream(acc, false);
         updateOutputTokenCount(m.delta);
-        // Persist in-flight HTML so tab switch doesn't lose it.
-  
+
+      } else if (m.type === 'TOOL_PROGRESS') {
+        // Show what Hermes is doing (web search, file ops, etc.) as a
+        // faint italic line below the streaming bubble.
+        showToolProgress(assistantEl, m.text);
+
       } else if (m.type === 'DONE') {
+        clearToolProgress(assistantEl);
         renderStream(m.full || acc, true);
         addCodeCopyButtons();
         outputTokens = 0;
-  
+
         // Stream is fully done from the side panel's perspective. Tell
         // the background it can drop streamState and tear the port down
         // cleanly. The old v0.20.3 code relied on the background's
@@ -1113,6 +1119,23 @@ function appendAssistant(initial, done = false) {
   scrollToBottom();
   return el;
 }
+/** Show a faint "tool progress" line below a streaming bubble. */
+function showToolProgress(bubbleEl, text) {
+  if (!bubbleEl) return;
+  let el = bubbleEl.nextElementSibling;
+  if (!el || !el.classList.contains('tool-progress')) {
+    el = document.createElement('div');
+    el.className = 'tool-progress';
+    bubbleEl.insertAdjacentElement('afterend', el);
+  }
+  el.textContent = `⚙ ${text}`;
+}
+/** Remove the tool progress indicator once the reply is done. */
+function clearToolProgress(bubbleEl) {
+  const el = bubbleEl?.nextElementSibling;
+  if (el?.classList.contains('tool-progress')) el.remove();
+}
+
 function appendScreenshot(dataUrl) {
   const el = document.createElement('div');
   el.className = 'msg screenshot-preview';
@@ -1167,7 +1190,10 @@ async function renderHistory() {
   const list = Array.isArray(history) ? history : [];
   for (const m of list) {
     if (m.role === 'user') {
-      // Skip page-context messages — they're for the LLM only, not the UI.
+      // content can be a string (text) or an array (multimodal — screenshot).
+      // Multimodal entries are always page-context attachments; skip in UI.
+      if (Array.isArray(m.content)) continue;
+      // Skip text page-context messages — for the LLM only, not the UI.
       if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
       appendUser(m.content);
     } else if (m.role === 'assistant') {

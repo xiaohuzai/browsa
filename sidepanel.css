@@ -191,6 +191,18 @@ body {
   animation: none;
   max-width: 100%;
 }
+.tool-progress {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted, #8b949e);
+  padding: 2px 8px;
+  animation: tool-pulse 1.5s ease-in-out infinite;
+}
+@keyframes tool-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
 .msg.screenshot-preview {
   align-self: center;
   max-width: 100%;

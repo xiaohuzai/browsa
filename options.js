@@ -1,7 +1,7 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
-import { ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { ping, getCapabilities, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 
 const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');
@@ -55,9 +55,11 @@ function renderProviders() {
     const card = document.createElement('div');
     card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '');
 
+    const isConfigured = !!(cfg.baseUrl?.trim());
     card.innerHTML = `
       <h3>
         <span class="name">${escapeHtml(prettyProviderName(name))}</span>
+        <span class="provider-badge ${isConfigured ? 'configured' : 'unconfigured'}">${isConfigured ? '○ not pinged' : '○ not set'}</span>
         <label style="font-size:12px;font-weight:normal;">
           <input type="radio" name="active" value="${name}" ${name === cachedCfg.activeProvider ? 'checked' : ''} /> Active
         </label>
@@ -78,6 +80,18 @@ function renderProviders() {
           <span style="visibility:hidden;">.</span>
           <span>
             <input data-k="stream" type="checkbox" ${cfg.stream ? 'checked' : ''} /> Stream responses
+          </span>
+        </label>
+        <label style="min-width:auto;">
+          <span style="visibility:hidden;">.</span>
+          <span>
+            <input data-k="useResponsesApi" type="checkbox" ${cfg.useResponsesApi ? 'checked' : ''} /> Use Responses API <small>(stateful, saves tokens)</small>
+          </span>
+        </label>
+        <label style="min-width:auto;">
+          <span style="visibility:hidden;">.</span>
+          <span>
+            <input data-k="useRunsApi" type="checkbox" ${cfg.useRunsApi ? 'checked' : ''} /> Use Runs API <small>(long tasks, better cancel)</small>
           </span>
         </label>
       </div>
@@ -140,9 +154,35 @@ async function pingCard(name, card) {
   flashCard(card, '', 'Pinging…');
   try {
     const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model || cfg.defaultModel });
-    flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
+    // Auto-detect capabilities and update useResponsesApi accordingly
+    const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+    if (caps?.features) {
+      const hasResponses = !!(caps.features.responses_api);
+      if (cachedCfg.providers[name].useResponsesApi !== hasResponses) {
+        cachedCfg.providers[name].useResponsesApi = hasResponses;
+        await chrome.storage.local.set({ providers: cachedCfg.providers });
+        renderProviders(); // refresh cards to reflect new checkboxes
+      }
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [responses:${hasResponses ? '✓' : '✗'}]`);
+    } else {
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
+    }
+    setBadge(card, 'reachable');
   } catch (e) {
     flashCard(card, 'err', `❌ ${e.message}`);
+    setBadge(card, 'unreachable');
+  }
+}
+
+function setBadge(card, state) {
+  const badge = card.querySelector('.provider-badge');
+  if (!badge) return;
+  if (state === 'reachable') {
+    badge.className = 'provider-badge reachable';
+    badge.textContent = '● reachable';
+  } else {
+    badge.className = 'provider-badge unreachable';
+    badge.textContent = '● unreachable';
   }
 }
 
