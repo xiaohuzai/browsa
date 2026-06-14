@@ -1,6 +1,6 @@
 # browsa
 
-> **browsa** = **brow**ser + **s**ide p**a**nel. Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
+> **browsa** = **brow**ser **s**ide p**a**nel **A**I. Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
 
 browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
 
@@ -171,13 +171,13 @@ tmux attach -t claude-wrapper
 
 For SPA sites where Readability fails, browsa intercepts the browser's own API calls — no signing, no re-auth, just observing what the page already fetched:
 
-| Site | What's intercepted | Content |
-|---|---|---|
-| **小红书** | `/api/sns/web/v1/feed` | Note title, desc, tags, images, stats |
-| **掘金** | `api.juejin.cn/content_api/v1/article/detail` | `mark_content` — raw Markdown |
-| **知乎** | `/api/v4/articles/{id}` (专栏) + `/api/v4/questions/{id}/answers` (问答) | HTML → text, top 3 answers |
-| **得到** | `/content/detail` or `/article/detail` on dedao.cn | Article text |
-| **极客时间** | `time.geekbang.org/serv/v1/article` | HTML → text |
+| Site | Content extracted |
+|---|---|
+| **小红书** | Note title, description, tags, images, stats |
+| **掘金** | Full article Markdown |
+| **知乎** | 专栏 article or top 3 question answers |
+| **得到** | Article text |
+| **极客时间** | Article text |
 
 > **Note:** Open the article page first and let it fully load. Then send your message. The interception happens when the SPA makes its own API call — browsa just observes it.
 
@@ -256,32 +256,6 @@ browsa/
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
 - LLM replies are sanitized with DOMPurify before rendering.
 - Content scripts only observe requests; they never modify them.
-
-## Changelog
-
-### v0.20.8
-- Multi-site XHR interception: 掘金, 知乎, 得到, 极客时间
-- Removed Auto-attach and Wait JS controls (context mode selection is sufficient)
-- `chrome.alarms`-based GC for stream state (MV3 best practice)
-- Readability/Turndown source caching in service worker memory
-- `tabStates` memory cap (10 tabs)
-- Fixed: screenshot mode (`captureVisibleTab` used wrong variable)
-- Fixed: `limitHint` for large pages was always null
-- Fixed: `ensureReadabilityInjected` didn't inject missing library when one was already present
-- Fixed: duplicate `CLEAR_HISTORY` case; `CHAT` path now uses XHR cache
-- Fixed: `autoAttachPage` preference was never persisted
-
-### v0.20.7
-Fixed "stream finished while away → stuck on ▍" bug. Added `STREAM_DEBUG` message for observability.
-
-### v0.20.6
-Snap to bottom when switching back to a tab mid-stream.
-
-### v0.20.5
-Cancel (Esc) now actually aborts the LLM fetch via `AbortController`.
-
-### v0.20.4
-Mid-stream tab switch: `streamState` survives port disconnect; `STREAM_PEEK` / `STREAM_HELLO` resume on switch-back.
 
 ## License
 
