@@ -31,13 +31,109 @@ To install from the zip: unzip, then **Load unpacked** as above.
 
 ## Configure a provider
 
-| Provider | Base URL | Notes |
-|---|---|---|
-| **Hermes** `api_server` | `http://<host>:8642` | Set `API_SERVER_KEY` from `~/.hermes/.env` |
-| **Claude Code** | `http://localhost:8000` | Via an OpenAI-compatible wrapper |
-| **Any OpenAI-compatible** | your URL | Ollama, vLLM, LM Studio, LiteLLM, etc. |
+browsa works with any OpenAI-compatible endpoint. Two agent backends are pre-configured as presets: **Hermes Agent** and **Claude Code**. Both give you a full agentic experience — the AI can search the web, run code, read files, and more on the server side.
 
 Use the **Ping** button in Settings to verify connectivity before chatting.
+
+---
+
+### Hermes Agent
+
+Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn, Hermes stores the full conversation history server-side.
+
+**1. Install Hermes**
+
+```bash
+pip install hermes-agent   # or follow the official install guide
+```
+
+**2. Enable the API server** — add to `~/.hermes/.env`:
+
+```bash
+API_SERVER_ENABLED=true
+API_SERVER_KEY=your-secret-key
+```
+
+**3. Start Hermes**
+
+```bash
+hermes gateway
+# → [API Server] API server listening on http://127.0.0.1:8642
+```
+
+**4. Configure browsa** — open ⚙ Settings, select the **hermes** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | `http://<server-ip>:8642` |
+| API Key | value of `API_SERVER_KEY` |
+| Default model | `hermes-agent` |
+| Responses API | ✅ auto-enabled on Ping |
+
+**5. Ping** to verify. Responses API will be auto-detected and enabled.
+
+---
+
+### Claude Code (via claude-code-openai-wrapper)
+
+This setup runs the real Claude Code CLI on your server — with its full tool suite (bash, file read/write, etc.) — and exposes it as a standard OpenAI-compatible HTTP API. browsa talks to the wrapper; the wrapper runs `claude` locally.
+
+**Prerequisites:** `claude` CLI installed and authenticated on the server (`claude auth login` or `ANTHROPIC_API_KEY` set).
+
+**1. Clone and install the wrapper**
+
+```bash
+git clone https://github.com/RichardAtCT/claude-code-openai-wrapper
+cd claude-code-openai-wrapper
+poetry install
+```
+
+**2. Configure** — create `.env`:
+
+```bash
+# Directory where Claude Code will operate (your project root)
+CLAUDE_CWD=/path/to/your/project
+
+# API key for browsa to authenticate with the wrapper
+API_KEYS=your-secret-key
+
+# Optional: auth method (auto-detected if not set)
+# CLAUDE_AUTH_METHOD=cli   # use existing `claude auth login`
+# ANTHROPIC_API_KEY=sk-... # or direct API key
+```
+
+**3. Start the wrapper**
+
+```bash
+poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+**4. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | `http://<server-ip>:8000` |
+| API Key | value of `API_KEYS` |
+| Default model | `claude-sonnet-4-6` (or any model your account supports) |
+| Responses API | ☐ leave off |
+
+`enable_tools` is always on — Claude Code's bash, file, and other tools are active for every request. No extra configuration needed.
+
+**5. Ping** to verify.
+
+> **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files. Leave it unset to use a temporary isolated sandbox.
+
+---
+
+### Any OpenAI-compatible endpoint
+
+| Provider | Base URL | Notes |
+|---|---|---|
+| Ollama | `http://localhost:11434` | Local models |
+| vLLM | `http://localhost:8000` | GPU inference |
+| LM Studio | `http://localhost:1234` | Desktop app |
+| LiteLLM | `http://localhost:4000` | Multi-provider proxy |
+| OpenAI | `https://api.openai.com` | Direct API |
 
 ## Context modes
 
