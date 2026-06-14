@@ -80,35 +80,69 @@ This setup runs the real Claude Code CLI on your server — with its full tool s
 
 **Prerequisites:** `claude` CLI installed and authenticated on the server (`claude auth login` or `ANTHROPIC_API_KEY` set).
 
-**1. Clone and install the wrapper**
+**1. Install uv** (if not already installed)
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**2. Clone and install the wrapper**
 
 ```bash
 git clone https://github.com/RichardAtCT/claude-code-openai-wrapper
 cd claude-code-openai-wrapper
-poetry install
+uv python install 3.11          # download Python 3.11 if not available
+uv venv --python 3.11           # create isolated venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
-**2. Configure** — create `.env`:
+**3. Configure** — create `claude-code-openai-wrapper/.env` (same folder as `pyproject.toml`):
 
 ```bash
 # Directory where Claude Code will operate (your project root)
 CLAUDE_CWD=/path/to/your/project
 
-# API key for browsa to authenticate with the wrapper
-API_KEYS=your-secret-key
+# A password you make up — browsa will use this same value in its API Key field
+# This is NOT an Anthropic API key, just a local access token for the wrapper
+API_KEYS=make-up-any-password-here
 
-# Optional: auth method (auto-detected if not set)
-# CLAUDE_AUTH_METHOD=cli   # use existing `claude auth login`
-# ANTHROPIC_API_KEY=sk-... # or direct API key
+# Auth method — pick one:
+# Option A: use existing `claude auth login` session (recommended)
+CLAUDE_AUTH_METHOD=cli
+# Option B: direct Anthropic API key
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# Required if running as root (e.g. on a server)
+IS_SANDBOX=1
+
+# Max tool-call turns per request (default 10, increase for complex tasks)
+MAX_TURNS=50
 ```
 
-**3. Start the wrapper**
+**4. Start the wrapper**
 
 ```bash
-poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000
+source .venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
-**4. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
+To keep running in background, use tmux:
+
+```bash
+tmux new -s claude-wrapper
+source .venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8000
+# Ctrl+B D to detach (server keeps running)
+```
+
+To reattach and view logs later:
+
+```bash
+tmux attach -t claude-wrapper
+```
+
+**5. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
 
 | Field | Value |
 |---|---|
@@ -119,7 +153,7 @@ poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 `enable_tools` is always on — Claude Code's bash, file, and other tools are active for every request. No extra configuration needed.
 
-**5. Ping** to verify.
+**6. Ping** to verify.
 
 > **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files. Leave it unset to use a temporary isolated sandbox.
 
