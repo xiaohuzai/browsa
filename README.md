@@ -31,13 +31,132 @@ To install from the zip: unzip, then **Load unpacked** as above.
 
 ## Configure a provider
 
-| Provider | Base URL | Notes |
-|---|---|---|
-| **Hermes** `api_server` | `http://<host>:8642` | Set `API_SERVER_KEY` from `~/.hermes/.env` |
-| **Claude Code** | `http://localhost:8000` | Via an OpenAI-compatible wrapper |
-| **Any OpenAI-compatible** | your URL | Ollama, vLLM, LM Studio, LiteLLM, etc. |
+browsa works with any OpenAI-compatible endpoint. Two agent backends are pre-configured as presets: **Hermes Agent** and **Claude Code**. Both give you a full agentic experience — the AI can search the web, run code, read files, and more on the server side.
 
 Use the **Ping** button in Settings to verify connectivity before chatting.
+
+---
+
+### Hermes Agent
+
+Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn, Hermes stores the full conversation history server-side.
+
+**1. Install Hermes**
+
+```bash
+pip install hermes-agent   # or follow the official install guide
+```
+
+**2. Enable the API server** — add to `~/.hermes/.env`:
+
+```bash
+API_SERVER_ENABLED=true
+API_SERVER_KEY=your-secret-key
+```
+
+**3. Start Hermes**
+
+```bash
+hermes gateway
+# → [API Server] API server listening on http://127.0.0.1:8642
+```
+
+**4. Configure browsa** — open ⚙ Settings, select the **hermes** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | `http://<server-ip>:8642` |
+| API Key | value of `API_SERVER_KEY` |
+| Default model | `hermes-agent` |
+| Responses API | ✅ auto-enabled on Ping |
+
+**5. Ping** to verify. Responses API will be auto-detected and enabled.
+
+---
+
+### Claude Code (via claude-code-openai-wrapper)
+
+This setup runs the real Claude Code CLI on your server — with its full tool suite (bash, file read/write, etc.) — and exposes it as a standard OpenAI-compatible HTTP API. browsa talks to the wrapper; the wrapper runs `claude` locally.
+
+**Prerequisites:** `claude` CLI installed and authenticated on the server (`claude auth login` or `ANTHROPIC_API_KEY` set).
+
+**1. Install uv** (if not already installed)
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**2. Clone and install the wrapper**
+
+```bash
+git clone https://github.com/RichardAtCT/claude-code-openai-wrapper
+cd claude-code-openai-wrapper
+uv python install 3.11          # download Python 3.11 if not available
+uv venv --python 3.11           # create isolated venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+**3. Configure** — create `claude-code-openai-wrapper/.env` (same folder as `pyproject.toml`):
+
+```bash
+# Directory where Claude Code will operate (your project root)
+CLAUDE_CWD=/path/to/your/project
+
+# A password you make up — browsa will use this same value in its API Key field
+# This is NOT an Anthropic API key, just a local access token for the wrapper
+API_KEYS=make-up-any-password-here
+
+# Auth method — pick one:
+# Option A: use existing `claude auth login` session (recommended)
+CLAUDE_AUTH_METHOD=cli
+# Option B: direct Anthropic API key
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# Required if running as root (e.g. on a server)
+IS_SANDBOX=1
+
+# Max tool-call turns per request (default 10, increase for complex tasks)
+MAX_TURNS=50
+```
+
+**4. Start the wrapper**
+
+```bash
+source .venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+To keep running in background, use tmux:
+
+```bash
+tmux new -s claude-wrapper
+source .venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8000
+# Ctrl+B D to detach (server keeps running)
+```
+
+To reattach and view logs later:
+
+```bash
+tmux attach -t claude-wrapper
+```
+
+**5. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | `http://<server-ip>:8000` |
+| API Key | value of `API_KEYS` |
+| Default model | `claude-sonnet-4-6` (or any model your account supports) |
+| Responses API | ☐ leave off |
+
+`enable_tools` is always on — Claude Code's bash, file, and other tools are active for every request. No extra configuration needed.
+
+**6. Ping** to verify.
+
+> **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files. Leave it unset to use a temporary isolated sandbox.
+
 
 ## Context modes
 
