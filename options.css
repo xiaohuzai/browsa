@@ -1,48 +1,64 @@
 /* options.css */
 
 :root {
-  --bg: #f8f9fb;
+  --bg: #f7f6f3;
   --surface: #ffffff;
-  --fg: #111827;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --ok: #15803d;
-  --err: #b91c1c;
+  --fg: #18160f;
+  --fg-2: #44403a;
+  --muted: #78716c;
+  --border: #e6e3dc;
+  --border-strong: #c8c4bb;
+  --accent: #c2410c;
+  --accent-bg: rgba(194, 65, 12, 0.07);
+  --accent-hover: #9a3409;
+  --ok: #166534;
+  --ok-bg: rgba(22, 101, 52, 0.07);
+  --err: #991b1b;
+  --err-bg: rgba(153, 27, 27, 0.07);
   --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --fg: #e6edf3;
-    --muted: #8b949e;
-    --border: #30363d;
-    --accent: #58a6ff;
-    --accent-hover: #79b8ff;
-    --ok: #3fb950;
-    --err: #f85149;
+    --bg: #111008;
+    --surface: #1a1811;
+    --fg: #ede8dc;
+    --fg-2: #c4bdb0;
+    --muted: #78716c;
+    --border: #2c2820;
+    --border-strong: #3d3830;
+    --accent: #f97316;
+    --accent-bg: rgba(249, 115, 22, 0.08);
+    --accent-hover: #fb923c;
+    --ok: #4ade80;
+    --ok-bg: rgba(74, 222, 128, 0.07);
+    --err: #f87171;
+    --err-bg: rgba(248, 113, 113, 0.07);
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
   }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   background: var(--bg);
   color: var(--fg);
-  padding: 32px 24px 64px;
+  padding: 36px 24px 80px;
+  -webkit-font-smoothing: antialiased;
 }
 
 main {
-  max-width: 680px;
+  max-width: 660px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* ── Page header ─────────────────────────────────────────────────────────── */
@@ -50,36 +66,73 @@ main {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 4px 0 8px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
 }
-.page-header .logo { width: 40px; height: 40px; border-radius: 8px; }
-.page-header h1 { font-size: 22px; font-weight: 700; line-height: 1.2; }
-.page-header .subtitle { font-size: 13px; color: var(--muted); }
+.page-header .logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.page-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.page-header .subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
 
-/* ── Cards ───────────────────────────────────────────────────────────────── */
+/* ── Section cards ────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 24px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.card-header {
+  padding: 14px 20px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-body {
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
+
 .card h2 {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
+
 .hint {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.55;
 }
+.hint b { color: var(--fg-2); font-weight: 500; }
 .hint code {
-  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11.5px;
   background: var(--border);
   padding: 1px 5px;
   border-radius: 4px;
+  color: var(--fg-2);
 }
 .card-actions {
   display: flex;
@@ -88,69 +141,146 @@ main {
 }
 
 /* ── Provider cards ──────────────────────────────────────────────────────── */
+#providers {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border-radius: calc(var(--radius) - 1px);
+  overflow: hidden;
+}
+
 .provider {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--surface);
   padding: 14px 16px;
-  margin-bottom: 10px;
+  position: relative;
+  transition: background 0.1s;
 }
-.provider:last-child { margin-bottom: 0; }
+.provider::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.provider.active::before {
+  background: var(--accent);
+}
 .provider.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
 }
+
 .provider h3 {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding-left: 8px;
 }
 .provider h3 .name { flex: 1; }
+
 .provider-badge {
-  font-size: 11px;
-  font-weight: 400;
+  font-size: 10.5px;
+  font-weight: 500;
   padding: 2px 8px;
-  border-radius: 10px;
-  white-space: nowrap;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
 }
-.provider-badge.configured   { background: rgba(59,130,246,0.1); color: var(--accent); }
-.provider-badge.unconfigured { background: rgba(156,163,175,0.12); color: var(--muted); }
-.provider-badge.reachable    { background: rgba(34,197,94,0.12); color: var(--ok); }
-.provider-badge.unreachable  { background: rgba(248,113,113,0.12); color: var(--err); }
+.provider-badge.configured   { background: var(--accent-bg); color: var(--accent); }
+.provider-badge.unconfigured { background: var(--border); color: var(--muted); }
+.provider-badge.reachable    { background: var(--ok-bg); color: var(--ok); }
+.provider-badge.unreachable  { background: var(--err-bg); color: var(--err); }
+
+/* ── Form rows ───────────────────────────────────────────────────────────── */
 .row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: flex-end;
   margin-bottom: 8px;
+  padding-left: 8px;
 }
 .row:last-child { margin-bottom: 0; }
 .row label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   flex: 1;
   min-width: 180px;
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--muted);
 }
 .row .small { max-width: 180px; }
+
 .row input[type="text"],
 .row input[type="password"],
 .row input[type="number"],
 .row select {
   font: inherit;
   font-size: 13px;
-  padding: 6px 9px;
+  padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.row input:focus, .row select:focus { outline: none; border-color: var(--accent); }
+.row input:focus,
+.row select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+/* ── Options grid (provider checkboxes) ──────────────────────────────────── */
+.options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 20px;
+  padding: 4px 0 2px 8px;
+}
+.opt-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.1s;
+}
+.opt-check:hover { background: var(--border); }
+.opt-check input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.opt-check span {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--fg);
+}
+.opt-check small {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ── Action row ──────────────────────────────────────────────────────────── */
+.provider .row.action-row {
+  align-items: center;
+  margin-top: 4px;
+}
 
 /* ── Textarea ────────────────────────────────────────────────────────────── */
 textarea {
@@ -159,59 +289,90 @@ textarea {
   line-height: 1.6;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   width: 100%;
   resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-textarea:focus { outline: none; border-color: var(--accent); }
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
 textarea::placeholder { color: var(--muted); }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 button {
   font: inherit;
-  font-size: 13px;
-  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 20px;
   background: var(--surface);
-  color: var(--fg);
+  color: var(--fg-2);
   cursor: pointer;
-  transition: border-color 0.1s, background 0.1s;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
-button:hover { border-color: var(--accent); color: var(--accent); }
+button:hover {
+  border-color: var(--border-strong);
+  color: var(--fg);
+  background: var(--bg);
+}
 button.primary {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
 }
-button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+
+/* Active radio on label */
+input[type="radio"] { accent-color: var(--accent); }
 
 /* ── Radio group ─────────────────────────────────────────────────────────── */
 .radio-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .radio-card {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 11px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: border-color 0.1s;
+  transition: border-color 0.15s, background 0.15s;
 }
+.radio-card:hover { border-color: var(--border-strong); }
 .radio-card:has(input:checked) {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  background: var(--accent-bg);
 }
-.radio-card input[type="radio"] { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); }
-.radio-card strong { display: block; font-size: 13px; }
-.radio-card span { font-size: 12px; color: var(--muted); }
+.radio-card input[type="radio"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.radio-card strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.radio-card span {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
 
 /* ── Toggle row ──────────────────────────────────────────────────────────── */
 .toggle-row {
@@ -220,29 +381,44 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
   gap: 10px;
   cursor: pointer;
   font-size: 13px;
+  padding: 4px 0;
 }
-.toggle-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.toggle-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
 
-/* ── Inline field (label + input + button on one line) ───────────────────── */
+/* ── Inline field ────────────────────────────────────────────────────────── */
 .inline-field {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.inline-field label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.inline-field label {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .inline-field input[type="number"] {
   font: inherit;
   font-size: 13px;
-  padding: 6px 9px;
+  padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   width: 140px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.inline-field input:focus { outline: none; border-color: var(--accent); }
+.inline-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
 
-/* ── Per-card status (Save/Ping/Reset feedback) ──────────────────────────── */
+/* ── Per-card status ─────────────────────────────────────────────────────── */
 .card-status {
   font-size: 12px;
   color: var(--muted);
@@ -254,7 +430,7 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 .card-status.ok  { color: var(--ok); }
 .card-status.err { color: var(--err); }
 
-/* ── Global status bar (System prompt / other sections) ──────────────────── */
+/* ── Global status bar ───────────────────────────────────────────────────── */
 .status {
   font-size: 13px;
   color: var(--muted);
