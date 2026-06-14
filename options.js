@@ -76,26 +76,18 @@ function renderProviders() {
         <label>API key
           <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
         </label>
-        <label style="min-width:auto;">
-          <span style="visibility:hidden;">.</span>
-          <span>
-            <input data-k="stream" type="checkbox" ${cfg.stream ? 'checked' : ''} /> Stream responses
-          </span>
+      </div>
+      <div class="options-grid">
+        <label class="opt-check">
+          <input data-k="stream" type="checkbox" ${cfg.stream ? 'checked' : ''} />
+          <span>Stream responses</span>
         </label>
-        <label style="min-width:auto;">
-          <span style="visibility:hidden;">.</span>
-          <span>
-            <input data-k="useResponsesApi" type="checkbox" ${cfg.useResponsesApi ? 'checked' : ''} /> Use Responses API <small>(stateful, saves tokens)</small>
-          </span>
-        </label>
-        <label style="min-width:auto;">
-          <span style="visibility:hidden;">.</span>
-          <span>
-            <input data-k="useRunsApi" type="checkbox" ${cfg.useRunsApi ? 'checked' : ''} /> Use Runs API <small>(long tasks, better cancel)</small>
-          </span>
+        <label class="opt-check">
+          <input data-k="useResponsesApi" type="checkbox" ${cfg.useResponsesApi ? 'checked' : ''} />
+          <span>Responses API<small>stateful, saves tokens</small></span>
         </label>
       </div>
-      <div class="row">
+      <div class="row action-row">
         <button data-act="save">Save</button>
         <button data-act="ping">Ping</button>
         <button data-act="reset">Reset</button>
@@ -119,6 +111,7 @@ function renderProviders() {
     card.querySelector('button[data-act="save"]').addEventListener('click', () => saveCard(name, card));
     card.querySelector('button[data-act="ping"]').addEventListener('click', () => pingCard(name, card));
     card.querySelector('button[data-act="reset"]').addEventListener('click', () => resetCard(name, card));
+
   }
 }
 
