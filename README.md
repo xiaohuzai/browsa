@@ -123,17 +123,6 @@ poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 > **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files. Leave it unset to use a temporary isolated sandbox.
 
----
-
-### Any OpenAI-compatible endpoint
-
-| Provider | Base URL | Notes |
-|---|---|---|
-| Ollama | `http://localhost:11434` | Local models |
-| vLLM | `http://localhost:8000` | GPU inference |
-| LM Studio | `http://localhost:1234` | Desktop app |
-| LiteLLM | `http://localhost:4000` | Multi-provider proxy |
-| OpenAI | `https://api.openai.com` | Direct API |
 
 ## Context modes
 
