@@ -257,32 +257,6 @@ browsa/
 - LLM replies are sanitized with DOMPurify before rendering.
 - Content scripts only observe requests; they never modify them.
 
-## Changelog
-
-### v0.20.8
-- Multi-site XHR interception: 掘金, 知乎, 得到, 极客时间
-- Removed Auto-attach and Wait JS controls (context mode selection is sufficient)
-- `chrome.alarms`-based GC for stream state (MV3 best practice)
-- Readability/Turndown source caching in service worker memory
-- `tabStates` memory cap (10 tabs)
-- Fixed: screenshot mode (`captureVisibleTab` used wrong variable)
-- Fixed: `limitHint` for large pages was always null
-- Fixed: `ensureReadabilityInjected` didn't inject missing library when one was already present
-- Fixed: duplicate `CLEAR_HISTORY` case; `CHAT` path now uses XHR cache
-- Fixed: `autoAttachPage` preference was never persisted
-
-### v0.20.7
-Fixed "stream finished while away → stuck on ▍" bug. Added `STREAM_DEBUG` message for observability.
-
-### v0.20.6
-Snap to bottom when switching back to a tab mid-stream.
-
-### v0.20.5
-Cancel (Esc) now actually aborts the LLM fetch via `AbortController`.
-
-### v0.20.4
-Mid-stream tab switch: `streamState` survives port disconnect; `STREAM_PEEK` / `STREAM_HELLO` resume on switch-back.
-
 ## License
 
 MIT
