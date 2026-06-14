@@ -171,13 +171,13 @@ tmux attach -t claude-wrapper
 
 For SPA sites where Readability fails, browsa intercepts the browser's own API calls — no signing, no re-auth, just observing what the page already fetched:
 
-| Site | What's intercepted | Content |
-|---|---|---|
-| **小红书** | `/api/sns/web/v1/feed` | Note title, desc, tags, images, stats |
-| **掘金** | `api.juejin.cn/content_api/v1/article/detail` | `mark_content` — raw Markdown |
-| **知乎** | `/api/v4/articles/{id}` (专栏) + `/api/v4/questions/{id}/answers` (问答) | HTML → text, top 3 answers |
-| **得到** | `/content/detail` or `/article/detail` on dedao.cn | Article text |
-| **极客时间** | `time.geekbang.org/serv/v1/article` | HTML → text |
+| Site | Content extracted |
+|---|---|
+| **小红书** | Note title, description, tags, images, stats |
+| **掘金** | Full article Markdown |
+| **知乎** | 专栏 article or top 3 question answers |
+| **得到** | Article text |
+| **极客时间** | Article text |
 
 > **Note:** Open the article page first and let it fully load. Then send your message. The interception happens when the SPA makes its own API call — browsa just observes it.
 

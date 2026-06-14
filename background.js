@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, chat, responsesApiStream, stopRun, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { chatStream, chat, responsesApiStream, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
