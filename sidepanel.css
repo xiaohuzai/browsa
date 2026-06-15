@@ -195,6 +195,22 @@ body {
   max-width: 100%;
   text-align: center;
 }
+.attach-msg { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.undo-attach {
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  flex-shrink: 0;
+}
+.undo-attach:hover { opacity: 0.75; }
+.undo-attach:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+
 .msg.error {
   align-self: center;
   color: var(--error);

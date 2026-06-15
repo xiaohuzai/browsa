@@ -352,7 +352,7 @@ async function handleSelectionAction(action, text) {
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
-      appendSystem(`📎 已附加：「${preview}」`);
+      appendAttachSystem(`📎 已附加：「${preview}」`);
     } else {
       appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
     }
@@ -491,7 +491,10 @@ async function onAttachPage() {
     }
     const ctx = res.data?.ctx;
     const title = ctx?.articleTitle || ctx?.meta?.title || 'Page';
-    appendSystem(`📎 已附加："${title}"（${mode} 模式）—— 现在可以提问了`);
+    const charCount = ctx?.truncated?.textLength ?? (ctx?.text?.length || 0);
+    const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
+    const fallbackLabel = ctx?.fallback ? '（已回退至全文模式）' : '';
+    appendAttachSystem(`📎 已附加："${title}"（${mode} 模式${charLabel}）${fallbackLabel}`);
     // For screenshot mode, show the captured image in the chat so the user
     // can verify what was captured before asking questions about it.
     if (mode === 'screenshot' && ctx?.imageDataUrl) {
@@ -1152,6 +1155,32 @@ function appendSystem(text) {
   const el = document.createElement('div');
   el.className = 'msg system';
   el.textContent = text;
+  messagesEl.appendChild(el);
+  scrollToBottom();
+}
+
+function appendAttachSystem(text) {
+  const el = document.createElement('div');
+  el.className = 'msg system attach-msg';
+  const span = document.createElement('span');
+  span.textContent = text;
+  const btn = document.createElement('button');
+  btn.className = 'undo-attach';
+  btn.textContent = '撤销';
+  btn.title = '从会话中移除此次附加的页面内容';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const res = await sendMessage({ type: 'UNDO_ATTACH' }).catch(() => null);
+    if (res?.ok) {
+      span.textContent = text + '（已撤销）';
+      span.style.opacity = '0.45';
+      btn.remove();
+    } else {
+      btn.disabled = false;
+    }
+  });
+  el.appendChild(span);
+  el.appendChild(btn);
   messagesEl.appendChild(el);
   scrollToBottom();
 }
