@@ -434,6 +434,11 @@ async function handle(msg, sender) {
       return { contextMode: msg.mode };
     }
 
+    case 'UNDO_ATTACH': {
+      const removed = await storage.removeLastPageContext();
+      return { ok: removed };
+    }
+
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
       // Reset session IDs for all providers so the next conversation
@@ -649,9 +654,34 @@ async function handle(msg, sender) {
         responsesConversation = await storage.getOrCreateConversationId(all.activeProvider);
         const hasAssistantTurn = history.some(m => m.role === 'assistant');
         if (hasAssistantTurn) {
-          // Subsequent turns: Hermes already knows the context.
-          // Only send the new user message (+ any pasted images).
-          if (msg.images?.length) {
+          // Subsequent turns: Hermes already knows previous context.
+          // BUT if the user attached a new page after the last assistant turn,
+          // we must include it — Hermes has never seen it.
+          const lastAssistantIdx = history.map(m => m.role).lastIndexOf('assistant');
+          const newPageContextMsg = history.slice(lastAssistantIdx + 1).find(m =>
+            m.role === 'user' && (
+              (typeof m.content === 'string' && m.content.startsWith('[Page context attached by browsa]')) ||
+              (Array.isArray(m.content))
+            )
+          );
+
+          if (newPageContextMsg) {
+            // New page was attached — include it alongside the user message.
+            const parts = [];
+            if (typeof newPageContextMsg.content === 'string') {
+              parts.push({ type: 'input_text', text: newPageContextMsg.content });
+            } else if (Array.isArray(newPageContextMsg.content)) {
+              for (const p of newPageContextMsg.content) {
+                if (p.type === 'text') parts.push({ type: 'input_text', text: p.text });
+                else if (p.type === 'image_url') parts.push({ type: 'input_image', image_url: p.image_url?.url || p.image_url });
+              }
+            }
+            parts.push({ type: 'input_text', text: msg.userText || '' });
+            if (msg.images?.length) {
+              msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
+            }
+            responsesInput = [{ role: 'user', content: parts }];
+          } else if (msg.images?.length) {
             responsesInput = [
               { role: 'user', content: [
                   { type: 'input_text', text: msg.userText || '' },
