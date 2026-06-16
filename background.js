@@ -87,6 +87,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (!relayed) {
     pendingSelectionActions.set(tab.id, { action, text });
+    // Also persist to session storage so the action survives SW restarts
+    // (mirrors the SELECTION_ACTION message path).
+    chrome.storage.session.set({ pendingSelectionAction: { tabId: tab.id, action, text } }).catch(() => {});
     try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
   }
 });
@@ -386,7 +389,9 @@ async function handle(msg, sender) {
         chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
       } else {
         const sess = await chrome.storage.session.get('pendingSelectionAction').catch(() => ({}));
-        if (sess.pendingSelectionAction?.tabId === tabId) {
+        if (sess.pendingSelectionAction) {
+          // Accept any pending action regardless of tabId — the panel may have
+          // switched tabs between the selection and the SW restart.
           pending = { action: sess.pendingSelectionAction.action, text: sess.pendingSelectionAction.text };
           chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
         }

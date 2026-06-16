@@ -222,22 +222,20 @@ async function init() {
     navPort.onMessage.addListener(onNavPortMessage);
     navPort.onDisconnect.addListener(() => {
       navPort = null;
-      // Reconnect after a short delay — the SW may have been sleeping.
-      // Also check session storage for any pending action stored while the
-      // SW was restarting (session storage survives SW restarts, unlike the
-      // in-memory navPorts Map).
+      // Read session storage DIRECTLY — no SW roundtrip needed, no 1-second
+      // wait. If a selection action was stored while the SW was restarting,
+      // the sidepanel can read and deliver it immediately by itself.
+      chrome.storage.session.get('pendingSelectionAction').then((sess) => {
+        if (sess.pendingSelectionAction) {
+          chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+          const { action, text } = sess.pendingSelectionAction;
+          handleSelectionAction(action, text);
+        }
+      }).catch(() => {});
+      // Also reconnect the nav port after a short delay so future events work.
       setTimeout(() => {
         if (!navPort) {
-          try {
-            connectNavPort();
-            sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId })
-              .then((res) => {
-                if (res?.data?.pending) {
-                  const { action, text } = res.data.pending;
-                  setTimeout(() => handleSelectionAction(action, text), 150);
-                }
-              }).catch(() => {});
-          } catch (_) {}
+          try { connectNavPort(); } catch (_) {}
         }
       }, 1000);
     });
@@ -272,11 +270,12 @@ async function init() {
     // empty). This fires even when the SW restarts because storage.onChanged
     // is delivered to the side panel directly, not through the SW.
     if (area === 'session' && changes.pendingSelectionAction?.newValue) {
-      const { tabId, action, text } = changes.pendingSelectionAction.newValue;
-      if (tabId === currentTabId) {
-        chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
-        handleSelectionAction(action, text);
-      }
+      const { action, text } = changes.pendingSelectionAction.newValue;
+      // Deliver regardless of tabId — the panel may have switched tabs between
+      // the selection and the SW restart. The action text is self-contained.
+      // First writer wins: remove so a second panel in another window won't double-fire.
+      chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+      handleSelectionAction(action, text);
     }
   });
 
@@ -315,12 +314,13 @@ async function init() {
   // rAF ensures the layout is done and the snap sticks.
   requestAnimationFrame(() => scrollToBottom());
 
-  // Deliver any pending selection action (toolbar click that opened the panel).
+  // Deliver any pending selection action (toolbar/right-click that opened
+  // the panel). Read session storage directly — no SW roundtrip needed.
   try {
-    const res = await sendMessage({ type: 'GET_PENDING_ACTION', tabId: currentTabId });
-    if (res?.data?.pending) {
-      const { action, text } = res.data.pending;
-      // Small delay so the panel is visually ready before auto-sending.
+    const sess = await chrome.storage.session.get('pendingSelectionAction');
+    if (sess.pendingSelectionAction) {
+      chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+      const { action, text } = sess.pendingSelectionAction;
       setTimeout(() => handleSelectionAction(action, text), 150);
     }
   } catch (_) {}
