@@ -6,8 +6,6 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```
 [Web page]  →  [browsa side panel]  →  [your LLM / agent runtime]  →  streaming reply
-                                         http://localhost:8642/v1/chat/completions
-                                         (or any OpenAI-compatible endpoint)
 ```
 
 ## Install (unpacked)
@@ -209,7 +207,7 @@ Type these in the composer:
 
 - **`background.js`** — MV3 service worker. Routes messages, manages per-site XHR caches, streams LLM replies via a long-lived port. Handles mid-stream tab switching via `streamState` (accumulated reply survives port disconnect).
 - **`lib/page-extractor.js`** — Injects Readability + Turndown into the page's MAIN world for reader mode. For SPA sites, uses the XHR cache first and skips DOM injection entirely.
-- **`lib/openai-client.js`** — Minimal fetch-based SSE streaming client for `/v1/chat/completions`.
+- **`lib/openai-client.js`** — Fetch-based SSE streaming client (OpenAI-compatible chat completions and Responses API).
 - **`sidepanel.js`** — Chat UI with 60fps blinking-caret streaming, per-tab history, Markdown rendering (marked + DOMPurify).
 - **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XHR.prototype` to observe SPA API calls and forward structured data to the background.
 
