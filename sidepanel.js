@@ -37,6 +37,8 @@ let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
+let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
+let deleteLock = false; // serialises message-delete operations to prevent index races
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
@@ -353,6 +355,7 @@ async function handleSelectionAction(action, text) {
     // background may be empty if the SW was sleeping when the user selected.
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected', text }).catch(() => null);
     if (res?.data?.ok) {
+      nextHistoryIdx++; // selected-text context stored to history
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
@@ -495,15 +498,33 @@ async function onAttachPage() {
     }
     const ctx = res.data?.ctx;
     const title = ctx?.articleTitle || ctx?.meta?.title || 'Page';
+
+    // Screenshot mode: show crop UI before storing. User can select a region
+    // or use the full image. Storing to history happens only on confirm.
+    if (mode === 'screenshot' && ctx?.imageDataUrl) {
+      showScreenshotCropUI({
+        imageDataUrl: ctx.imageDataUrl,
+        metaUrl: ctx.meta?.url || '',
+        metaTitle: title,
+      }, async (finalDataUrl) => {
+        // Confirmed (full or cropped image) — await so nextHistoryIdx only
+        // increments if the storage write actually succeeded.
+        const res = await sendMessage({ type: 'ATTACH_SCREENSHOT_CONFIRM',
+          imageDataUrl: finalDataUrl,
+          metaUrl: ctx.meta?.url || '',
+          metaTitle: title }).catch(() => null);
+        if (res?.ok) nextHistoryIdx++;
+        appendAttachSystem(`📎 已附加截图："${title}"`);
+        appendScreenshot(finalDataUrl);
+      });
+      return; // crop UI takes over; nothing else to do here
+    }
+
+    nextHistoryIdx++; // page context stored in ATTACH_PAGE handler
     const charCount = ctx?.truncated?.textLength ?? (ctx?.text?.length || 0);
     const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
     const fallbackLabel = ctx?.fallback ? '（已回退至全文模式）' : '';
     appendAttachSystem(`📎 已附加："${title}"（${mode} 模式${charLabel}）${fallbackLabel}`);
-    // For screenshot mode, show the captured image in the chat so the user
-    // can verify what was captured before asking questions about it.
-    if (mode === 'screenshot' && ctx?.imageDataUrl) {
-      appendScreenshot(ctx.imageDataUrl);
-    }
   } catch (e) {
     appendError('Page attach failed: ' + e.message);
   } finally {
@@ -516,7 +537,34 @@ async function onAttachPage() {
 async function clearChatHistory() {
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
+  nextHistoryIdx = 0;
+  deleteLock = false; // reset in case a delete was in-flight when history was cleared
   appendSystem('🗑 History cleared');
+}
+
+/**
+ * Reconcile nextHistoryIdx with the actual storage length.
+ * Called after every DONE event to catch auto-trim (history capped at 60
+ * entries / 300K chars): if storage trimmed old entries off the front,
+ * nextHistoryIdx and all data-hidx values drift high by the same amount.
+ * Fire-and-forget (no await needed at call sites).
+ */
+async function reconcileHistoryIdx() {
+  try {
+    const { history: h } = await chrome.storage.local.get('history');
+    const actualLen = Array.isArray(h) ? h.length : nextHistoryIdx;
+    const drift = nextHistoryIdx - actualLen;
+    if (drift <= 0) return; // no trim, nothing to do
+    // Shift every visible bubble's data-hidx down by the trim count.
+    // Bubbles whose index goes below 0 are no longer in storage; their
+    // delete buttons will be no-ops (REMOVE_HISTORY_ENTRY_BY_INDEX returns
+    // false for out-of-range indices), so they degrade safely.
+    messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+      const bidx = parseInt(b.dataset.hidx, 10);
+      if (!isNaN(bidx)) b.dataset.hidx = bidx - drift;
+    });
+    nextHistoryIdx = actualLen;
+  } catch (_) { /* storage unavailable — leave as-is */ }
 }
 
 const SEND_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>`;
@@ -682,8 +730,7 @@ function makeStreamRenderer(el) {
       el.innerHTML = renderSafe(text);
       el.classList.add('done');
       decorateLinks(el);
-      // Add reply button once content is finalised (only once — check for existing)
-      if (!el.querySelector('.reply-btn')) addReplyButton(el, () => text);
+      addMsgActions(el, () => text); // idempotent — addMsgActions checks for existing
       scrollToBottom();
       return;
     }
@@ -875,7 +922,8 @@ async function onSend() {
 
   // User bubble — show the original slash command, not the expanded prompt
   lastSentRaw = rawText;
-  appendUser(rawText || '(page only)');
+  const userBubble = appendUser(rawText || '(page only)');
+  userBubble.dataset.hidx = nextHistoryIdx++;  // user turn stored in background CHAT handler
   inputEl.value = '';
   setStreamingUI(true);
 
@@ -928,6 +976,7 @@ async function onSend() {
           toolEvents = [];
         }
         const finalText = m.full || acc;
+        assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
         renderStream(finalText, true);
         addCodeCopyButtons();
         outputTokens = 0;
@@ -940,22 +989,12 @@ async function onSend() {
         try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
         try { port.disconnect(); } catch (_) {}
         sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
+        reconcileHistoryIdx(); // detect + correct auto-trim drift (fire-and-forget)
       } else if (m.type === 'ERROR') {
+        // Only ABORTED reaches here — real errors are re-thrown by background
+        // and handled via the !res.ok block below (no pushChunk for real errors).
         if (m.code === 'ABORTED') {
-          // Preserve partial markdown — use renderStream so formatting survives.
           renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
-        } else {
-          // Real error: keep whatever the stream produced so far, then
-          // append the error and a Retry button. (personal_ai_assistant pattern)
-          if (acc) {
-            renderStream(acc + `\n\n---\n❌ **${m.error}**`, true);
-          } else {
-            assistantEl.textContent = `❌ ${m.error}`;
-          }
-          appendMsgAction(assistantEl, '↺ 重试', () => {
-            // Remove the action row, restore the last input, re-send.
-            if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
-          });
         }
       }
     });
@@ -986,13 +1025,33 @@ async function onSend() {
       images: imageDataUrls
     });
     if (!res.ok) {
-      appendError(`${res.code || 'Error'}: ${res.error}`);
+      // Real error (re-thrown by background, port receives nothing).
+      // Preserve any partial streaming content; append the error inline.
+      const errMsg = res.error || 'Unknown error';
+      if (acc) {
+        renderStream(acc + `\n\n---\n❌ **${errMsg}**`, true);
+      } else {
+        assistantEl.textContent = `❌ ${errMsg}`;
+      }
+      appendMsgAction(assistantEl, '↺ 重试', () => {
+        if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
+      });
       if (res.hint) appendSystem(res.hint);
-      assistantEl.remove();
+      // Resync counter — user turn may or may not have been stored.
+      reconcileHistoryIdx();
     }
   } catch (e) {
-    appendError(e.message);
-    assistantEl.remove();
+    // sendMessage itself threw (SW restart, no receiver, etc.).
+    // The CHAT handler never ran, so the user turn was likely NOT stored.
+    if (acc) {
+      renderStream(acc + `\n\n---\n❌ **${e.message}**`, true);
+    } else {
+      assistantEl.textContent = `❌ ${e.message}`;
+    }
+    appendMsgAction(assistantEl, '↺ 重试', () => {
+      if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
+    });
+    reconcileHistoryIdx();
   } finally {
     setStreamingUI(false);
   }
@@ -1096,6 +1155,7 @@ async function resumeInFlightStream(tabId) {
 
     } else if (m.type === 'DONE') {
       const r = ensureAssistantEl();
+      assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       r(m.full || acc, true);
       addCodeCopyButtons();
       outputTokens = 0;
@@ -1105,13 +1165,12 @@ async function resumeInFlightStream(tabId) {
       sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
       activeController = null;
       setStreamingUI(false);
+      reconcileHistoryIdx();
     } else if (m.type === 'ERROR') {
-      // Render error into a single text node (skip markdown).
+      // Only ABORTED reaches here (same reasoning as onSend path).
       const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
       if (m.code === 'ABORTED') {
         el.textContent = acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_';
-      } else {
-        el.textContent = `❌ ${m.error}`;
       }
       try { port.disconnect(); } catch (_) {}
     }
@@ -1135,11 +1194,135 @@ async function resumeInFlightStream(tabId) {
   activeController = { port, cancelled: false, tabId, resumed: true };
 }
 
+/**
+ * Show a full-panel crop UI over the sidepanel.
+ * The user can drag to select a rectangular region or use the full image.
+ * onConfirm(dataUrl) is called with the final (possibly cropped) JPEG data URL.
+ */
+function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
+  const modal = document.createElement('div');
+  modal.className = 'crop-modal';
+
+  modal.innerHTML = `
+    <div class="crop-header">
+      <span class="crop-hint">拖动选择区域</span>
+      <div class="crop-actions">
+        <button class="crop-cancel">取消</button>
+        <button class="crop-use-full">使用完整截图</button>
+        <button class="crop-confirm" disabled>裁剪并使用</button>
+      </div>
+    </div>
+    <div class="crop-body">
+      <canvas class="crop-canvas"></canvas>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const canvas   = modal.querySelector('.crop-canvas');
+  const body     = modal.querySelector('.crop-body');
+  const confirmBtn = modal.querySelector('.crop-confirm');
+  const fullBtn  = modal.querySelector('.crop-use-full');
+  const cancelBtn = modal.querySelector('.crop-cancel');
+
+  const img = new Image();
+  img.onload = () => {
+    // Scale image to fit the crop body area
+    const maxW = body.clientWidth  || 380;
+    const maxH = body.clientHeight || 480;
+    const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+    canvas.width  = Math.round(img.naturalWidth  * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx2d = canvas.getContext('2d');
+
+    function redraw(sel) {
+      ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (!sel || sel.w < 2 || sel.h < 2) return;
+      // dim outside selection
+      ctx2d.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+      // clear selection hole + redraw image inside
+      ctx2d.clearRect(sel.x, sel.y, sel.w, sel.h);
+      ctx2d.drawImage(img,
+        sel.x / scale, sel.y / scale, sel.w / scale, sel.h / scale,
+        sel.x, sel.y, sel.w, sel.h);
+      // selection border
+      ctx2d.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx2d.lineWidth = 1.5;
+      ctx2d.strokeRect(sel.x + 0.75, sel.y + 0.75, sel.w - 1.5, sel.h - 1.5);
+      // corner handles
+      const hs = 6;
+      ctx2d.fillStyle = '#fff';
+      [[sel.x, sel.y], [sel.x + sel.w, sel.y],
+       [sel.x, sel.y + sel.h], [sel.x + sel.w, sel.y + sel.h]].forEach(([hx, hy]) => {
+        ctx2d.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+      });
+    }
+    redraw(null);
+
+    let startX = 0, startY = 0, dragging = false, selection = null;
+
+    canvas.addEventListener('mousedown', (e) => {
+      const r = canvas.getBoundingClientRect();
+      startX = e.clientX - r.left;
+      startY = e.clientY - r.top;
+      dragging = true;
+      selection = null;
+      confirmBtn.disabled = true;
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const r = canvas.getBoundingClientRect();
+      const cx = Math.max(0, Math.min(canvas.width,  e.clientX - r.left));
+      const cy = Math.max(0, Math.min(canvas.height, e.clientY - r.top));
+      selection = {
+        x: Math.round(Math.min(startX, cx)),
+        y: Math.round(Math.min(startY, cy)),
+        w: Math.round(Math.abs(cx - startX)),
+        h: Math.round(Math.abs(cy - startY)),
+      };
+      redraw(selection);
+    });
+    canvas.addEventListener('mouseup', () => {
+      dragging = false;
+      if (selection && selection.w > 5 && selection.h > 5) {
+        confirmBtn.disabled = false;
+      } else {
+        selection = null;
+        redraw(null);
+      }
+    });
+
+    function close() { modal.remove(); }
+
+    cancelBtn.addEventListener('click', close);
+
+    fullBtn.addEventListener('click', () => {
+      close();
+      onConfirm(imageDataUrl);
+    });
+
+    confirmBtn.addEventListener('click', () => {
+      if (!selection || selection.w < 2 || selection.h < 2) return;
+      // Crop at original resolution
+      const oc = document.createElement('canvas');
+      oc.width  = Math.round(selection.w / scale);
+      oc.height = Math.round(selection.h / scale);
+      oc.getContext('2d').drawImage(img,
+        selection.x / scale, selection.y / scale,
+        oc.width, oc.height,
+        0, 0, oc.width, oc.height);
+      close();
+      onConfirm(oc.toDataURL('image/jpeg', 0.85));
+    });
+  };
+  img.src = imageDataUrl;
+}
+
 function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
   el.textContent = text;
-  addReplyButton(el, () => text);
+  addMsgActions(el, () => text);
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -1148,32 +1331,72 @@ function appendAssistant(initial, done = false) {
   const el = document.createElement('div');
   el.className = 'msg assistant' + (done ? ' done' : '');
   el.textContent = initial;
-  // Reply button added lazily when streaming is done (done=true) to avoid
-  // attaching to the placeholder bubble before content arrives.
-  if (done) addReplyButton(el, () => el.textContent);
+  // Actions are added by the caller once raw markdown content is available.
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
 }
 
-/** Add a hoverable reply/quote button to a message bubble. */
-function addReplyButton(el, getText) {
-  const btn = document.createElement('button');
-  btn.className = 'reply-btn';
-  btn.title = 'Quote this message';
-  btn.textContent = '↩';
-  btn.addEventListener('click', (e) => {
+/**
+ * Add a hoverable action bar (reply + delete) to a message bubble.
+ * getRaw() must return the original un-rendered text (raw markdown for
+ * assistant, plain text for user) — used for history content matching.
+ */
+function addMsgActions(el, getRaw) {
+  if (el.querySelector('.msg-actions')) return; // idempotent
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-actions';
+
+  // ↩ Reply / quote
+  const replyBtn = document.createElement('button');
+  replyBtn.className = 'msg-action-icon';
+  replyBtn.title = 'Quote';
+  replyBtn.textContent = '↩';
+  replyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const raw = (getText() || '').trim();
+    const raw = (getRaw() || '').trim();
     if (!raw) return;
     const preview = raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
     const quoted = preview.split('\n').map(l => `> ${l}`).join('\n');
     inputEl.value = quoted + '\n\n' + inputEl.value;
     inputEl.focus();
-    // Move cursor to end of the appended area
     inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
   });
-  el.appendChild(btn);
+
+  // 🗑 Delete
+  const delBtn = document.createElement('button');
+  delBtn.className = 'msg-action-icon delete-icon';
+  delBtn.title = 'Delete message';
+  delBtn.textContent = '🗑';
+  delBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    // Serialise: ignore rapid concurrent clicks to prevent index races.
+    if (deleteLock) return;
+    deleteLock = true;
+    const idx = parseInt(el.dataset.hidx, 10);
+    el.remove(); // optimistic DOM removal
+    try {
+      if (!isNaN(idx)) {
+        const res = await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
+        if (res?.ok) {
+          // Confirmed: shift indices of all remaining bubbles after the deleted slot.
+          messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+            const bidx = parseInt(b.dataset.hidx, 10);
+            if (bidx > idx) b.dataset.hidx = bidx - 1;
+          });
+          nextHistoryIdx--;
+        } else {
+          // Removal failed (index out of range or storage error) — resync.
+          reconcileHistoryIdx();
+        }
+      }
+    } finally {
+      deleteLock = false;
+    }
+  });
+
+  wrap.append(replyBtn, delBtn);
+  el.appendChild(wrap);
 }
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text) {
@@ -1237,6 +1460,15 @@ function appendAttachSystem(text) {
     btn.disabled = true;
     const res = await sendMessage({ type: 'UNDO_ATTACH' }).catch(() => null);
     if (res?.ok) {
+      const removedIdx = res.removedIdx ?? -1;
+      if (removedIdx >= 0) {
+        // Shift data-hidx on every DOM bubble that came after the removed entry.
+        messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+          const bidx = parseInt(b.dataset.hidx, 10);
+          if (bidx > removedIdx) b.dataset.hidx = bidx - 1;
+        });
+      }
+      nextHistoryIdx--;
       span.textContent = text + '（已撤销）';
       span.style.opacity = '0.45';
       btn.remove();
@@ -1359,20 +1591,21 @@ async function renderHistory() {
   messagesEl.innerHTML = '';
   const { history } = await chrome.storage.local.get('history');
   const list = Array.isArray(history) ? history : [];
-  for (const m of list) {
+  nextHistoryIdx = list.length; // keep local mirror in sync with storage
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i];
     if (m.role === 'user') {
-      // content can be a string (text) or an array (multimodal — screenshot).
-      // Multimodal entries are always page-context attachments; skip in UI.
       if (Array.isArray(m.content)) continue;
-      // Skip text page-context messages — for the LLM only, not the UI.
       if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
-      appendUser(m.content);
+      const el = appendUser(m.content);
+      el.dataset.hidx = i;
     } else if (m.role === 'assistant') {
-      // History messages are always complete — render markdown and mark done
-      // so the blinking caret and streamEndedWhileAway check don't trigger.
+      const rawContent = m.content;
       const el = appendAssistant('', true);
-      el.innerHTML = renderSafe(m.content);
+      el.innerHTML = renderSafe(rawContent);
       decorateLinks(el);
+      addMsgActions(el, () => rawContent);
+      el.dataset.hidx = i;
     }
   }
   scrollToBottom();

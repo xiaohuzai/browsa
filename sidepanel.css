@@ -195,12 +195,23 @@ body {
   max-width: 100%;
   text-align: center;
 }
-/* ─── Reply / quote button ───────────────────────────────────────────────── */
+/* ─── Message action bar (reply + delete) ───────────────────────────────── */
 .msg { position: relative; }
-.reply-btn {
+.msg-actions {
   position: absolute;
   top: 4px;
   right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.msg:hover .msg-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.msg-action-icon {
   font-size: 11px;
   line-height: 1;
   padding: 2px 5px;
@@ -209,15 +220,10 @@ body {
   background: var(--bg-3);
   color: var(--fg-dim);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s;
-  pointer-events: none;
+  transition: background 0.12s, color 0.12s;
 }
-.msg:hover .reply-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-.reply-btn:hover { background: var(--border); color: var(--fg); }
+.msg-action-icon:hover { background: var(--border); color: var(--fg); }
+.msg-action-icon.delete-icon:hover { background: rgba(248,113,113,0.15); color: var(--error); }
 
 /* ─── Tool history panel ─────────────────────────────────────────────────── */
 .tool-history {
@@ -359,6 +365,54 @@ body {
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
 }
+
+/* ─── Screenshot crop modal ──────────────────────────────────────────────── */
+.crop-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.crop-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.crop-hint { font-size: 12px; color: var(--fg-dim); white-space: nowrap; }
+.crop-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.crop-actions button {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.crop-actions button:hover:not(:disabled) { background: var(--bg-3); }
+.crop-confirm { border-color: var(--accent) !important; color: var(--accent) !important; }
+.crop-confirm:not(:disabled):hover { background: var(--accent) !important; color: #fff !important; }
+.crop-confirm:disabled { opacity: 0.35; cursor: not-allowed; }
+.crop-cancel:hover { color: var(--error) !important; border-color: var(--error) !important; }
+.crop-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+  padding: 4px;
+}
+.crop-canvas { display: block; cursor: crosshair; max-width: 100%; max-height: 100%; }
 
 .msg.screenshot-preview {
   align-self: center;
