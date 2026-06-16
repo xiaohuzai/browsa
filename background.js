@@ -825,17 +825,25 @@ async function handle(msg, sender) {
         chatControllers.delete(tabId);
       }
 
+      // Parse CHOICE_REQUEST: agent may embed an interactive choice at the
+      // end of its reply. Strip it from the stored text so history stays
+      // clean, but forward the parsed data to the side panel so it can
+      // render clickable buttons. Format (from personal_ai_assistant):
+      //   CHOICE_REQUEST:{"question":"...","choices":["A","B"]}
+      let choiceRequest = null;
+      const choiceMatch = fullReply.match(/CHOICE_REQUEST:(\{[\s\S]*?\})\s*$/);
+      if (choiceMatch) {
+        try {
+          choiceRequest = JSON.parse(choiceMatch[1]);
+          fullReply = fullReply.slice(0, choiceMatch.index).trimEnd();
+        } catch (_) { /* malformed JSON — leave as-is */ }
+      }
+
       // Persist assistant turn — this is the durable source of truth.
       // (Only reached if the stream completed naturally, not via abort.)
       await storage.appendToHistory({ role: 'assistant', content: fullReply });
 
-      // Send DONE then drop streamState. The current port (if any) gets
-      // the DONE so it can finalize its render. We do NOT call
-      // `setTimeout(disconnect)` anymore — that was the v0.20.3 hack
-      // that killed switch-back. Instead, the side panel sends
-      // STREAM_GOODBYE after rendering DONE, and we drop streamState
-      // here so PEEK stops returning "in-flight" for a finished reply.
-      pushChunk(tabId, { type: 'DONE', full: fullReply });
+      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest });
       clearStreamState(tabId);
       return { full: fullReply };
     }

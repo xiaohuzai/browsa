@@ -36,6 +36,7 @@ const imagePicker = $('imagepicker');
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
+let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
@@ -66,7 +67,10 @@ async function init() {
   settingsBtn.addEventListener('click', openSettingsPage);
   clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
-  sendBtn.addEventListener('click', onSend);
+  sendBtn.addEventListener('click', () => {
+    if (activeController && !activeController.cancelled) cancelStream();
+    else onSend();
+  });
   attachBtn?.addEventListener('click', onAttachPage);
   document.querySelectorAll('.qa-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -515,6 +519,23 @@ async function clearChatHistory() {
   appendSystem('🗑 History cleared');
 }
 
+const SEND_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>`;
+const STOP_ICON  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
+function setStreamingUI(on) {
+  if (on) {
+    sendBtn.innerHTML = STOP_ICON;
+    sendBtn.classList.add('is-stopping');
+    sendBtn.disabled = false;
+    sendBtn.title = 'Stop (Esc)';
+  } else {
+    sendBtn.innerHTML = SEND_ICON;
+    sendBtn.classList.remove('is-stopping');
+    sendBtn.disabled = false;
+    sendBtn.title = '';
+  }
+}
+
 function cancelStream() {
   if (!activeController) return;
   activeController.cancelled = true;
@@ -535,7 +556,7 @@ function cancelStream() {
     try { activeController.port.disconnect(); } catch (_) {}
   }
   activeController = null;
-  sendBtn.disabled = false;
+  setStreamingUI(false);
   // Distinguish user-initiated cancel (wasResumed=false) from cancel
   // of a resumed stream (wasResumed=true). A resumed stream's "cancel"
   // is closer to "stop watching" — the LLM is still running for the
@@ -661,6 +682,8 @@ function makeStreamRenderer(el) {
       el.innerHTML = renderSafe(text);
       el.classList.add('done');
       decorateLinks(el);
+      // Add reply button once content is finalised (only once — check for existing)
+      if (!el.querySelector('.reply-btn')) addReplyButton(el, () => text);
       scrollToBottom();
       return;
     }
@@ -799,6 +822,9 @@ const SLASH_COMMANDS = {
   '/explain':    'Explain the page content as if teaching a beginner. Use simple language.',
   '/outline':    'List the structure of the page as a nested outline (headings only).',
   '/keypoints':  'Extract the 5 most important takeaways from the page.',
+  // Session / context management (mirrors personal_ai_assistant)
+  '/compact':    'Please compact our conversation: summarize what we have discussed so far into a concise context note, then confirm what you now know.',
+  '/context':    'Briefly describe the conversation context and any page content you currently have. What topics have we covered?',
 };
 
 function expandSlash(text) {
@@ -848,13 +874,15 @@ async function onSend() {
   const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
 
   // User bubble — show the original slash command, not the expanded prompt
+  lastSentRaw = rawText;
   appendUser(rawText || '(page only)');
   inputEl.value = '';
-  sendBtn.disabled = true;
+  setStreamingUI(true);
 
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('▍');
   let acc = '';
+  let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
   const renderStream = makeStreamRenderer(assistantEl);
 
   // Open streaming port FIRST so the background can push CHUNKs as they
@@ -890,49 +918,50 @@ async function onSend() {
         updateOutputTokenCount(m.delta);
 
       } else if (m.type === 'TOOL_PROGRESS') {
-        // Show what Hermes is doing (web search, file ops, etc.) as a
-        // faint italic line below the streaming bubble.
+        toolEvents.push(m.text);
         showToolProgress(assistantEl, m.text);
 
       } else if (m.type === 'DONE') {
         clearToolProgress(assistantEl);
-        renderStream(m.full || acc, true);
+        if (toolEvents.length > 0) {
+          renderToolHistory(assistantEl, toolEvents);
+          toolEvents = [];
+        }
+        const finalText = m.full || acc;
+        renderStream(finalText, true);
         addCodeCopyButtons();
         outputTokens = 0;
-
-        // Stream is fully done from the side panel's perspective. Tell
-        // the background it can drop streamState and tear the port down
-        // cleanly. The old v0.20.3 code relied on the background's
-        // setTimeout(disconnect) to fire onDisconnect, but that path
-        // killed switch-back. Now we own the cleanup.
+        if (m.choiceRequest) renderChoiceRequest(assistantEl, m.choiceRequest);
+        // Detect max-turns: agent hit the tool-call ceiling and is asking
+        // the user to continue. Show a one-click Continue button.
+        if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
+          appendMsgAction(assistantEl, '→ 继续', () => { inputEl.value = '继续'; onSend(); });
+        }
         try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
         try { port.disconnect(); } catch (_) {}
         sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
       } else if (m.type === 'ERROR') {
         if (m.code === 'ABORTED') {
-          // User hit cancel (STREAM_ABORT) — the background already
-          // sent "⚠ Stream cancelled" on our behalf? No, it just
-          // pushed an ERROR chunk. We render the cancel UX in the
-          // bubble itself so the user sees the half-stream they had
-          // so far + a "(cancelled)" suffix.
-          if (acc) {
-            assistantEl.textContent = acc + '\n\n_(cancelled)_';
-          } else {
-            assistantEl.textContent = '_(cancelled)_';
-          }
-          // The appendSystem("⚠ Stream cancelled") is already shown
-          // by cancelStream() itself. We don't double-print.
+          // Preserve partial markdown — use renderStream so formatting survives.
+          renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
         } else {
-          // Real error (network, config, API). The background's
-          // generic handler already surfaced a hint via the sendResponse
-          // path; this is just the bubble.
-          assistantEl.textContent = `❌ ${m.error}`;
+          // Real error: keep whatever the stream produced so far, then
+          // append the error and a Retry button. (personal_ai_assistant pattern)
+          if (acc) {
+            renderStream(acc + `\n\n---\n❌ **${m.error}**`, true);
+          } else {
+            assistantEl.textContent = `❌ ${m.error}`;
+          }
+          appendMsgAction(assistantEl, '↺ 重试', () => {
+            // Remove the action row, restore the last input, re-send.
+            if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
+          });
         }
       }
     });
   }
   port.onDisconnect.addListener(() => {
-    sendBtn.disabled = false;
+    setStreamingUI(false);
     activeController = null;
     if (acc === '' && assistantEl.textContent === '▍') {
       // No chunks received AND the assistant bubble still shows the
@@ -965,7 +994,7 @@ async function onSend() {
     appendError(e.message);
     assistantEl.remove();
   } finally {
-    sendBtn.disabled = false;
+    setStreamingUI(false);
   }
 }
 
@@ -1075,7 +1104,7 @@ async function resumeInFlightStream(tabId) {
       try { port.disconnect(); } catch (_) {}
       sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
       activeController = null;
-      sendBtn.disabled = false;
+      setStreamingUI(false);
     } else if (m.type === 'ERROR') {
       // Render error into a single text node (skip markdown).
       const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
@@ -1088,7 +1117,7 @@ async function resumeInFlightStream(tabId) {
     }
   });
   port.onDisconnect.addListener(() => {
-    sendBtn.disabled = false;
+    setStreamingUI(false);
     // If the port died with no chunks at all, show the same hint as
     // onSend (the user has nothing to look at otherwise).
     const el = messagesEl.querySelector('.msg.assistant:last-of-type');
@@ -1110,6 +1139,7 @@ function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
   el.textContent = text;
+  addReplyButton(el, () => text);
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -1118,9 +1148,32 @@ function appendAssistant(initial, done = false) {
   const el = document.createElement('div');
   el.className = 'msg assistant' + (done ? ' done' : '');
   el.textContent = initial;
+  // Reply button added lazily when streaming is done (done=true) to avoid
+  // attaching to the placeholder bubble before content arrives.
+  if (done) addReplyButton(el, () => el.textContent);
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
+}
+
+/** Add a hoverable reply/quote button to a message bubble. */
+function addReplyButton(el, getText) {
+  const btn = document.createElement('button');
+  btn.className = 'reply-btn';
+  btn.title = 'Quote this message';
+  btn.textContent = '↩';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const raw = (getText() || '').trim();
+    if (!raw) return;
+    const preview = raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
+    const quoted = preview.split('\n').map(l => `> ${l}`).join('\n');
+    inputEl.value = quoted + '\n\n' + inputEl.value;
+    inputEl.focus();
+    // Move cursor to end of the appended area
+    inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+  });
+  el.appendChild(btn);
 }
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text) {
@@ -1131,7 +1184,19 @@ function showToolProgress(bubbleEl, text) {
     el.className = 'tool-progress';
     bubbleEl.insertAdjacentElement('afterend', el);
   }
-  el.textContent = `⚙ ${text}`;
+  // Classify the progress text into a visual tier so the user can
+  // tell at a glance whether the agent is thinking, running a tool,
+  // or waiting — mirrors personal_ai_assistant's event-type display.
+  let icon = '⚙';
+  let tier = '';
+  const t = text.toLowerCase();
+  if (/think|reason|analyz|consid/.test(t))          { icon = '🤔'; tier = 'thinking'; }
+  else if (/search|fetch|web|http|url/.test(t))      { icon = '🔍'; tier = 'searching'; }
+  else if (/read|open|load|file|path/.test(t))       { icon = '📖'; tier = 'reading'; }
+  else if (/write|edit|creat|sav|updat/.test(t))     { icon = '✏️'; tier = 'writing'; }
+  else if (/run|exec|bash|shell|cmd|command/.test(t)){ icon = '💻'; tier = 'running'; }
+  el.dataset.tier = tier;
+  el.innerHTML = `<span class="tp-icon">${icon}</span><span class="tp-text">${text}</span>`;
 }
 /** Remove the tool progress indicator once the reply is done. */
 function clearToolProgress(bubbleEl) {
@@ -1184,6 +1249,83 @@ function appendAttachSystem(text) {
   messagesEl.appendChild(el);
   scrollToBottom();
 }
+/**
+ * After streaming ends, render accumulated tool-call events as a collapsible
+ * <details> panel *above* the assistant bubble — mirrors personal_ai_assistant's
+ * "completed events → folded panels" pattern.
+ */
+function renderToolHistory(bubbleEl, events) {
+  if (!events.length) return;
+  const details = document.createElement('details');
+  details.className = 'tool-history';
+  const summary = document.createElement('summary');
+  summary.textContent = `⚙ ${events.length} step${events.length > 1 ? 's' : ''}`;
+  details.appendChild(summary);
+  const ul = document.createElement('ul');
+  for (const ev of events) {
+    const li = document.createElement('li');
+    // Re-use the same icon classification as showToolProgress
+    let icon = '⚙';
+    const t = ev.toLowerCase();
+    if (/think|reason|analyz|consid/.test(t))           icon = '🤔';
+    else if (/search|fetch|web|http|url/.test(t))       icon = '🔍';
+    else if (/read|open|load|file|path/.test(t))        icon = '📖';
+    else if (/write|edit|creat|sav|updat/.test(t))      icon = '✏️';
+    else if (/run|exec|bash|shell|cmd|command/.test(t)) icon = '💻';
+    li.textContent = `${icon} ${ev}`;
+    ul.appendChild(li);
+  }
+  details.appendChild(ul);
+  bubbleEl.insertAdjacentElement('beforebegin', details);
+}
+
+/**
+ * Render CHOICE_REQUEST interactive buttons after the assistant bubble.
+ * The agent outputs: CHOICE_REQUEST:{"question":"...","choices":["A","B"]}
+ */
+function renderChoiceRequest(bubbleEl, req) {
+  const { question, choices } = req || {};
+  if (!Array.isArray(choices) || !choices.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'choice-request';
+  if (question) {
+    const q = document.createElement('p');
+    q.className = 'choice-question';
+    q.textContent = question;
+    wrap.appendChild(q);
+  }
+  const row = document.createElement('div');
+  row.className = 'choice-buttons';
+  for (const choice of choices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = choice;
+    btn.addEventListener('click', () => {
+      wrap.remove();
+      inputEl.value = choice;
+      onSend();
+    });
+    row.appendChild(btn);
+  }
+  wrap.appendChild(row);
+  bubbleEl.insertAdjacentElement('afterend', wrap);
+}
+
+/** Append a small action button row directly after a message bubble. */
+function appendMsgAction(bubbleEl, label, onClick) {
+  // Remove any existing action row on this bubble first (avoid stacking).
+  bubbleEl.nextElementSibling?.classList.contains('msg-action-row') &&
+    bubbleEl.nextElementSibling.remove();
+  const row = document.createElement('div');
+  row.className = 'msg-action-row';
+  const btn = document.createElement('button');
+  btn.className = 'msg-action-btn';
+  btn.textContent = label;
+  btn.addEventListener('click', () => { row.remove(); onClick(); });
+  row.appendChild(btn);
+  bubbleEl.insertAdjacentElement('afterend', row);
+}
+
 function appendError(text) {
   const el = document.createElement('div');
   el.className = 'msg error';
