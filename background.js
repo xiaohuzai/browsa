@@ -435,8 +435,29 @@ async function handle(msg, sender) {
     }
 
     case 'UNDO_ATTACH': {
-      const removed = await storage.removeLastPageContext();
+      const removedIdx = await storage.removeLastPageContext();
+      return { ok: removedIdx >= 0, removedIdx };
+    }
+
+    case 'REMOVE_HISTORY_ENTRY_BY_INDEX': {
+      const removed = await storage.removeHistoryEntryByIndex(msg.index);
       return { ok: removed };
+    }
+
+    case 'ATTACH_SCREENSHOT_CONFIRM': {
+      // Side panel confirmed the screenshot (possibly cropped). Store it now.
+      const { imageDataUrl, metaUrl, metaTitle } = msg;
+      if (!imageDataUrl) return { ok: false, error: 'no imageDataUrl' };
+      const contextText =
+        `[Page context attached by browsa]\nURL: ${metaUrl || ''}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
+      await storage.appendToHistory({
+        role: 'user',
+        content: [
+          { type: 'text', text: contextText },
+          { type: 'image_url', image_url: { url: imageDataUrl } }
+        ]
+      });
+      return { ok: true };
     }
 
     case 'CLEAR_HISTORY': {
@@ -489,22 +510,15 @@ async function handle(msg, sender) {
           });
           if (!ctx) return { ok: false, error: 'extraction returned null' };
         }
-        // Save to global history. For screenshots, include the image data so
-        // the LLM actually receives it as a vision message. JPEG at 70% quality
-        // keeps the payload under ~200KB, within chrome.storage.local limits.
-        const contextText = buildPageContextText(ctx);
-        let historyEntry;
+        // Screenshot mode: don't store to history yet. The side panel shows
+        // a crop UI first; once the user confirms (with or without a crop),
+        // it calls ATTACH_SCREENSHOT_CONFIRM with the final image data URL.
         if (mode === 'screenshot' && ctx.imageDataUrl) {
-          historyEntry = {
-            role: 'user',
-            content: [
-              { type: 'text', text: contextText },
-              { type: 'image_url', image_url: { url: ctx.imageDataUrl } }
-            ]
-          };
-        } else {
-          historyEntry = { role: 'user', content: contextText };
+          return { ok: true, ctx };
         }
+        // All other modes: save to global history immediately.
+        const contextText = buildPageContextText(ctx);
+        const historyEntry = { role: 'user', content: contextText };
         await storage.appendToHistory(historyEntry);
         console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
         return { ok: true, ctx };
