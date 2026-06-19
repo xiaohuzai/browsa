@@ -95,13 +95,12 @@ test('sidepanel.js onActivated preserves tab url/title in pagemeta (regression c
 test('scrollToBottom sets scrollTop to scrollHeight (correct implementation)', async () => {
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
-  const m = src.match(/function scrollToBottom\(\)\s*\{([^}]*)\}/);
+  // Match function with optional parameters (may now accept force=false param)
+  const m = src.match(/function scrollToBottom\([^)]*\)\s*\{([\s\S]*?)\n\}/);
   assert.ok(m, 'scrollToBottom() must exist');
   const body = m[1];
-  // The body should be exactly: messagesEl.scrollTop = messagesEl.scrollHeight
-  // (not clientHeight, not offsetHeight, and not the broken sequence
-  // `messagesEl.scrollHeight = messagesEl.scrollTop` — flipped assignment
-  // would scroll to 0.)
+  // The body must set messagesEl.scrollTop = messagesEl.scrollHeight
+  // (not clientHeight, not offsetHeight, and not the broken flipped assignment)
   assert.match(body, /messagesEl\.scrollTop\s*=\s*messagesEl\.scrollHeight/,
     'scrollToBottom must set messagesEl.scrollTop = messagesEl.scrollHeight (not clientHeight, not offsetHeight)');
   assert.doesNotMatch(body, /scrollHeight\s*=\s*scrollTop/,

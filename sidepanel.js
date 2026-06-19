@@ -5,6 +5,7 @@
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
+import { parser as smdParser, parser_write as smdWrite, default_renderer as smdRenderer } from './lib/vendor/smd.bundle.js';
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
 // head features we don't need. Keep it simple; DOMPurify handles XSS later.
@@ -41,6 +42,8 @@ let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
 let deleteLock = false; // serialises message-delete operations to prevent index races
+let isUserScrolledUp = false; // true when user has manually scrolled up during streaming
+let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
@@ -365,6 +368,25 @@ async function init() {
       chrome.action.setBadgeText({ text: '' });
     }
   } catch (_) {}
+
+  // Scroll-to-bottom button: show when user scrolls up, hide at bottom
+  scrollToBottomBtn = document.createElement('button');
+  scrollToBottomBtn.className = 'scroll-to-bottom-btn';
+  scrollToBottomBtn.hidden = true;
+  scrollToBottomBtn.title = 'Jump to bottom';
+  scrollToBottomBtn.textContent = '↓';
+  scrollToBottomBtn.addEventListener('click', () => {
+    isUserScrolledUp = false;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottomBtn.hidden = true;
+  });
+  document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
+
+  messagesEl.addEventListener('scroll', () => {
+    const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    isUserScrolledUp = dist > 80;
+    scrollToBottomBtn.hidden = !isUserScrolledUp;
+  }, { passive: true });
 
   inputEl.focus();
 }
@@ -692,11 +714,20 @@ async function onAttachPage() {
 }
 
 async function clearChatHistory() {
+  const ok = await showConfirmDialog({
+    title: 'Clear conversation',
+    message: 'Delete all messages? This cannot be undone.',
+    confirmLabel: 'Clear',
+    danger: true
+  });
+  if (!ok) return;
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
   nextHistoryIdx = 0;
-  deleteLock = false; // reset in case a delete was in-flight when history was cleared
-  appendSystem('🗑 History cleared');
+  deleteLock = false;
+  isUserScrolledUp = false;
+  if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+  showToast('Conversation cleared', 'success');
 }
 
 /**
@@ -778,6 +809,7 @@ function updateOutputTokenCount(delta) {
 }
 
 function addCodeCopyButtons() {
+  highlightDiffBlocks(messagesEl);
   for (const pre of messagesEl.querySelectorAll('.msg.assistant pre')) {
     // Add language label (from code[class*="language-xxx"])
     const code = pre.querySelector('code[class*="language-"]');
@@ -791,7 +823,12 @@ function addCodeCopyButtons() {
     btn.textContent = 'Copy';
     btn.addEventListener('click', async () => {
       const text = code?.textContent || pre.textContent || '';
-      try { await navigator.clipboard.writeText(text); btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); } catch {}
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = '✓';
+        showToast('Copied', 'success');
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      } catch {}
     });
     pre.style.position = 'relative';
     pre.appendChild(btn);
@@ -904,29 +941,35 @@ function decorateLinks(el) {
   }
 }
 
-// Build a streaming-render closure for a specific bubble. Streaming path is
-// fast (textContent via rAF throttle); the final DONE render goes through
-// marked + DOMPurify for proper Markdown formatting.
+// Build a streaming-render closure for a specific bubble.
+// During streaming, smd (streaming-markdown) writes incrementally to the DOM
+// via RAF-throttled delta batching — no full re-parse each tick.
+// At DONE, the full accumulated text goes through renderSafe (adds KaTeX + think blocks).
 function makeStreamRenderer(el) {
+  const renderer = smdRenderer(el);
+  const p = smdParser(renderer);
+  let pendingDelta = '';
   let raf = null;
-  return function renderStream(text, isDone) {
+  return function renderStream(delta, isDone) {
     if (isDone) {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      el.innerHTML = renderSafe(text);
+      // Flush any pending buffered delta before final render
+      if (pendingDelta) { smdWrite(p, pendingDelta); pendingDelta = ''; }
+      // Full render: KaTeX + think blocks + DOMPurify
+      el.innerHTML = renderSafe(delta);
       el.classList.add('done');
       decorateLinks(el);
-      addMsgActions(el, () => text); // idempotent — addMsgActions checks for existing
-      scrollToBottom();
+      addMsgActions(el, () => delta);
+      scrollToBottom(true);
       return;
     }
-    if (raf != null) return; // already scheduled
+    // Buffer delta and flush in next animation frame
+    pendingDelta += delta;
+    if (raf != null) return;
     raf = requestAnimationFrame(() => {
       raf = null;
-      // Lightweight markdown render during streaming. Skips KaTeX and think
-      // blocks (too expensive per-tick); full renderSafe runs at DONE.
-      el.innerHTML = renderStreamingSafe(text);
-      el.classList.remove('done');
-      scrollToBottom();
+      if (pendingDelta) { smdWrite(p, pendingDelta); pendingDelta = ''; }
+      scrollToBottom(); // respects isUserScrolledUp
     });
   };
 }
@@ -981,7 +1024,7 @@ async function openSettingsPage() {
 async function onProviderChange() {
   const name = providerSel.value;
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
-  appendSystem(`Switched to provider: ${prettyProviderName(name)}`);
+  showToast(`Switched to ${prettyProviderName(name)}`, 'success');
 }
 
 async function onContextModeChange() {
@@ -1147,7 +1190,7 @@ async function onSend() {
     port.onMessage.addListener((m) => {
       if (m.type === 'CHUNK') {
         acc += m.delta;
-        renderStream(acc, false);
+        renderStream(m.delta, false); // smd: pass delta, not accumulated text
         updateOutputTokenCount(m.delta);
 
       } else if (m.type === 'TOOL_PROGRESS') {
@@ -1336,7 +1379,7 @@ async function resumeInFlightStream(tabId) {
     if (m.type === 'CHUNK') {
       const r = ensureAssistantEl();
       acc += m.delta;
-      r(acc, false);
+      r(m.delta, false); // smd: pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
 
     } else if (m.type === 'DONE') {
@@ -1513,7 +1556,7 @@ function appendUser(text) {
   addTimestamp(el);
   addMsgActions(el, () => text);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 function appendAssistant(initial, done = false) {
@@ -1523,7 +1566,7 @@ function appendAssistant(initial, done = false) {
   addTimestamp(el);
   // Actions are added by the caller once raw markdown content is available.
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 
@@ -1587,7 +1630,7 @@ function addMsgActions(el, getRaw) {
 
   const buttons = [replyBtn, delBtn];
 
-  // ↺ Regenerate — only for assistant messages
+  // ↺ Regenerate + ⎘ Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
     const regenBtn = document.createElement('button');
     regenBtn.className = 'msg-action-icon';
@@ -1600,6 +1643,25 @@ function addMsgActions(el, getRaw) {
       await doRegen(prevUser, el);
     });
     buttons.push(regenBtn);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action-icon';
+    copyBtn.title = 'Copy response';
+    copyBtn.textContent = '⎘';
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const text = getRaw() || el.innerText || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = '✓';
+        showToast('Copied', 'success');
+        setTimeout(() => { copyBtn.textContent = '⎘'; }, 2000);
+      } catch (_) {
+        copyBtn.textContent = '✗';
+        setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+      }
+    });
+    buttons.push(copyBtn);
   }
 
   wrap.append(...buttons);
@@ -1644,14 +1706,14 @@ function appendScreenshot(dataUrl) {
   img.addEventListener('click', () => window.open(dataUrl));
   el.appendChild(img);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
 function appendSystem(text) {
   const el = document.createElement('div');
   el.className = 'msg system';
   el.textContent = text;
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 
@@ -1687,7 +1749,7 @@ function appendAttachSystem(text) {
   el.appendChild(span);
   el.appendChild(btn);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
 /**
  * After streaming ends, render accumulated tool-call events as a collapsible
@@ -1771,10 +1833,99 @@ function appendError(text) {
   el.className = 'msg error';
   el.textContent = '⚠ ' + text;
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
-function scrollToBottom() {
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+// force=true: always scroll (user action, new message).
+// force=false (default): respect user scroll position during streaming.
+function scrollToBottom(force = false) {
+  if (force || !isUserScrolledUp) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+    isUserScrolledUp = false;
+  }
+}
+
+// ─── Toast notifications ──────────────────────────────────────────────────────
+let _toastContainer = null;
+function showToast(msg, type) {
+  if (!_toastContainer) {
+    _toastContainer = document.createElement('div');
+    _toastContainer.className = 'toast-container';
+    document.body.appendChild(_toastContainer);
+  }
+  if (!type) {
+    const low = String(msg).toLowerCase();
+    if (/fail|error|denied|invalid|❌/.test(low)) type = 'error';
+    else if (/warn|⚠/.test(low)) type = 'warn';
+    else if (/cleared|copied|switched|saved|✓/.test(low)) type = 'success';
+    else type = 'info';
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const msgEl = document.createElement('span');
+  msgEl.textContent = msg;
+  toast.appendChild(msgEl);
+  const x = document.createElement('button');
+  x.className = 'toast-x';
+  x.textContent = '×';
+  x.addEventListener('click', () => toast.remove());
+  toast.appendChild(x);
+  _toastContainer.appendChild(toast);
+  if (type !== 'error') setTimeout(() => toast.remove(), type === 'success' ? 2000 : 3500);
+}
+
+// ─── Confirm dialog ───────────────────────────────────────────────────────────
+function showConfirmDialog({ title = '', message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal' + (danger ? ' danger' : '');
+    modal.innerHTML = `
+      <div class="confirm-title">${escM(title)}</div>
+      <div class="confirm-msg">${escM(message)}</div>
+      <div class="confirm-btns">
+        <button class="confirm-cancel">${escM(cancelLabel)}</button>
+        <button class="confirm-ok${danger ? ' danger' : ''}">${escM(confirmLabel)}</button>
+      </div>`;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    function done(v) {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Enter') done(true);
+    }
+    modal.querySelector('.confirm-cancel').addEventListener('click', () => done(false));
+    modal.querySelector('.confirm-ok').addEventListener('click', () => done(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+    document.addEventListener('keydown', onKey);
+    modal.querySelector('.confirm-ok').focus();
+  });
+}
+
+// ─── Diff syntax highlighting ─────────────────────────────────────────────────
+function highlightDiffBlocks(el) {
+  for (const code of el.querySelectorAll('code.language-diff, code.language-patch')) {
+    if (code.dataset.diffDone) continue;
+    code.dataset.diffDone = '1';
+    const lines = code.textContent.split('\n');
+    code.textContent = '';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const span = document.createElement('span');
+      if (/^@@/.test(line))       span.className = 'diff-hunk';
+      else if (line.startsWith('+')) span.className = 'diff-add';
+      else if (line.startsWith('-')) span.className = 'diff-del';
+      span.textContent = line;
+      code.appendChild(span);
+      if (i < lines.length - 1) code.appendChild(document.createTextNode('\n'));
+    }
+  }
 }
 
 function sendMessage(msg) {
@@ -1818,5 +1969,5 @@ async function renderHistory() {
     }
   }
   addCodeCopyButtons();
-  scrollToBottom();
+  scrollToBottom(true);
 }
