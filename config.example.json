@@ -4,13 +4,11 @@
     "hermes": {
       "baseUrl": "http://localhost:8642",
       "apiKey": "",
-      "defaultModel": "hermes-agent",
       "stream": true
     },
     "claude-code": {
       "baseUrl": "http://localhost:8000",
       "apiKey": "",
-      "defaultModel": "claude-sonnet-4-6",
       "stream": true
     }
   },

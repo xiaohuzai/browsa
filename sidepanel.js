@@ -66,6 +66,7 @@ async function init() {
 
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
+
   settingsBtn.addEventListener('click', openSettingsPage);
   clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
@@ -401,6 +402,7 @@ function prettyProviderName(name) {
   if (name === 'claude-code') return 'Claude Code';
   return name;
 }
+
 
 // Render a yellow banner above the chat when the active page is 小红书
 // and the extraction result looks suspicious (too-short desc, no images,
@@ -1445,6 +1447,7 @@ function appendSystem(text) {
   el.textContent = text;
   messagesEl.appendChild(el);
   scrollToBottom();
+  return el;
 }
 
 function appendAttachSystem(text) {
