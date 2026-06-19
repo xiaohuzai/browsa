@@ -449,6 +449,11 @@ async function handle(msg, sender) {
       return { ok: removed };
     }
 
+    case 'TRUNCATE_HISTORY_FROM_INDEX': {
+      const ok = await storage.truncateHistoryFromIndex(msg.index);
+      return { ok };
+    }
+
     case 'ATTACH_SCREENSHOT_CONFIRM': {
       // Side panel confirmed the screenshot (possibly cropped). Store it now.
       const { imageDataUrl, metaUrl, metaTitle } = msg;

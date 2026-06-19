@@ -379,6 +379,7 @@ async function init() {
     isUserScrolledUp = false;
     messagesEl.scrollTop = messagesEl.scrollHeight;
     scrollToBottomBtn.hidden = true;
+    scrollToBottomBtn.classList.remove('has-new');
   });
   document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
 
@@ -580,6 +581,90 @@ async function doRegen(prevUserEl, assistantEl) {
   await onSend();
 }
 
+
+// ─── Edit user message in-place ──────────────────────────────────────────────
+function enterEditMode(userEl) {
+  if (userEl.dataset.editing || activeController) return;
+  userEl.dataset.editing = '1';
+  const originalText = userEl.dataset.raw || '';
+
+  const textSpan = userEl.querySelector('.msg-text');
+  const actionsEl = userEl.querySelector('.msg-actions');
+  const timeEl = userEl.querySelector('.msg-time');
+  if (textSpan) textSpan.hidden = true;
+  if (actionsEl) actionsEl.hidden = true;
+  if (timeEl) timeEl.hidden = true;
+
+  const ta = document.createElement('textarea');
+  ta.className = 'msg-edit-area';
+  ta.value = originalText;
+  userEl.insertBefore(ta, timeEl || actionsEl || null);
+
+  const bar = document.createElement('div');
+  bar.className = 'msg-edit-bar';
+  const sendBtn2 = document.createElement('button');
+  sendBtn2.className = 'msg-edit-send';
+  sendBtn2.textContent = 'Send';
+  const cancelBtn2 = document.createElement('button');
+  cancelBtn2.className = 'msg-edit-cancel';
+  cancelBtn2.textContent = 'Cancel';
+  bar.appendChild(sendBtn2);
+  bar.appendChild(cancelBtn2);
+  userEl.appendChild(bar);
+
+  requestAnimationFrame(() => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = ta.value.length;
+  });
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+  });
+  sendBtn2.addEventListener('click', async () => {
+    const newText = ta.value.trim();
+    if (!newText) return;
+    await submitUserEdit(userEl, newText);
+  });
+  cancelBtn2.addEventListener('click', () => cancelUserEdit(userEl));
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendBtn2.click(); }
+    if (e.key === 'Escape') cancelUserEdit(userEl);
+  });
+}
+
+function cancelUserEdit(userEl) {
+  delete userEl.dataset.editing;
+  userEl.querySelector('.msg-edit-area')?.remove();
+  userEl.querySelector('.msg-edit-bar')?.remove();
+  const textSpan = userEl.querySelector('.msg-text');
+  const actionsEl = userEl.querySelector('.msg-actions');
+  const timeEl = userEl.querySelector('.msg-time');
+  if (textSpan) textSpan.hidden = false;
+  if (actionsEl) actionsEl.hidden = false;
+  if (timeEl) timeEl.hidden = false;
+}
+
+async function submitUserEdit(userEl, newText) {
+  if (deleteLock) return;
+  const userHidx = parseInt(userEl.dataset.hidx, 10);
+  deleteLock = true;
+  try {
+    if (!isNaN(userHidx)) {
+      await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: userHidx }).catch(() => null);
+      nextHistoryIdx = userHidx;
+    }
+    // Remove this message and everything after it from DOM
+    let next = userEl.nextElementSibling;
+    while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
+    userEl.remove();
+  } finally {
+    deleteLock = false;
+  }
+  inputEl.value = newText;
+  await onSend();
+}
 
 // Render a yellow banner above the chat when the active page is 小红书
 // and the extraction result looks suspicious (too-short desc, no images,
@@ -808,8 +893,32 @@ function updateOutputTokenCount(delta) {
   tokCountEl.textContent = `~${outputTokens}`;
 }
 
+// Add a copy button to each think-block <summary> (idempotent).
+function addThinkCopyButtons(el) {
+  for (const details of (el || messagesEl).querySelectorAll('.think-block:not([data-copy-added])')) {
+    details.dataset.copyAdded = '1';
+    const summary = details.querySelector('summary');
+    if (!summary) continue;
+    const btn = document.createElement('button');
+    btn.className = 'think-copy-btn';
+    btn.title = 'Copy thinking';
+    btn.textContent = '⎘';
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // don't toggle the details
+      const body = details.querySelector('.think-body');
+      try {
+        await _copyText(body?.textContent || '');
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+      } catch (_) {}
+    });
+    summary.appendChild(btn);
+  }
+}
+
 function addCodeCopyButtons() {
   highlightDiffBlocks(messagesEl);
+  addThinkCopyButtons(messagesEl);
   for (const pre of messagesEl.querySelectorAll('.msg.assistant pre')) {
     // Add language label (from code[class*="language-xxx"])
     const code = pre.querySelector('code[class*="language-"]');
@@ -824,11 +933,11 @@ function addCodeCopyButtons() {
     btn.addEventListener('click', async () => {
       const text = code?.textContent || pre.textContent || '';
       try {
-        await navigator.clipboard.writeText(text);
+        await _copyText(text);
         btn.textContent = '✓';
         showToast('Copied', 'success');
         setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-      } catch {}
+      } catch (_) {}
     });
     pre.style.position = 'relative';
     pre.appendChild(btn);
@@ -930,6 +1039,26 @@ function renderSafe(markdown) {
 
 function escM(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Clipboard write with execCommand fallback (works in non-secure contexts too).
+function _fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    return Promise.resolve();
+  } catch (e) { return Promise.reject(e); }
+}
+function _copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).catch(() => _fallbackCopy(text));
+  }
+  return _fallbackCopy(text);
+}
+
 // After every innerHTML update, ensure external links open in new tab with
 // rel="noopener noreferrer". Cheap (runs on the bubble subtree only).
 function decorateLinks(el) {
@@ -942,33 +1071,101 @@ function decorateLinks(el) {
 }
 
 // Build a streaming-render closure for a specific bubble.
-// During streaming, smd (streaming-markdown) writes incrementally to the DOM
-// via RAF-throttled delta batching — no full re-parse each tick.
-// At DONE, the full accumulated text goes through renderSafe (adds KaTeX + think blocks).
+// During streaming:
+//   - <think>…</think> content is routed to a collapsible "live think" element above the bubble
+//   - Normal text is written incrementally via smd (RAF-throttled)
+// At DONE: live think element is removed; full renderSafe() handles KaTeX + final think blocks.
 function makeStreamRenderer(el) {
-  const renderer = smdRenderer(el);
-  const p = smdParser(renderer);
-  let pendingDelta = '';
+  const mainRenderer = smdRenderer(el);
+  const p = smdParser(mainRenderer);
+  let fullAccum = '';    // full accumulated text (for routing)
+  let routedUpTo = 0;   // how many chars have been routed to smd/think
   let raf = null;
+
+  // Live think block state
+  let inThink = false;
+  let thinkBuf = '';
+  let thinkEl = null;
+  let thinkBodyEl = null;
+
+  function ensureThinkEl() {
+    if (!thinkEl) {
+      thinkEl = document.createElement('details');
+      thinkEl.className = 'think-block live-think';
+      thinkEl.open = true; // open while streaming so user can watch
+      const sum = document.createElement('summary');
+      sum.textContent = 'Thinking…';
+      thinkBodyEl = document.createElement('div');
+      thinkBodyEl.className = 'think-body';
+      thinkEl.appendChild(sum);
+      thinkEl.appendChild(thinkBodyEl);
+      el.parentNode.insertBefore(thinkEl, el);
+    }
+  }
+
+  function routeNewContent() {
+    // Process fullAccum[routedUpTo..], routing <think> to thinkBodyEl and normal text to smd.
+    // Hold back up to 7 chars at end to handle tags split across chunk boundaries.
+    const HOLD = 7; // len('<think>') - 1
+    let remaining = fullAccum.slice(routedUpTo);
+    let smdBuf = '';
+
+    while (remaining.length > 0) {
+      if (!inThink) {
+        const openIdx = remaining.indexOf('<think>');
+        if (openIdx === -1) {
+          // No full <think> tag — flush safe portion, hold tail
+          const safe = remaining.length > HOLD ? remaining.slice(0, -HOLD) : '';
+          smdBuf += safe;
+          routedUpTo += safe.length;
+          break;
+        }
+        smdBuf += remaining.slice(0, openIdx);
+        routedUpTo += openIdx + 7;
+        remaining = remaining.slice(openIdx + 7);
+        inThink = true;
+        ensureThinkEl();
+      } else {
+        const closeIdx = remaining.indexOf('</think>');
+        if (closeIdx === -1) {
+          const safe = remaining.length > HOLD ? remaining.slice(0, -HOLD) : '';
+          thinkBuf += safe;
+          routedUpTo += safe.length;
+          if (thinkBodyEl) thinkBodyEl.textContent = thinkBuf;
+          break;
+        }
+        thinkBuf += remaining.slice(0, closeIdx);
+        routedUpTo += closeIdx + 8;
+        remaining = remaining.slice(closeIdx + 8);
+        inThink = false;
+        if (thinkBodyEl) thinkBodyEl.textContent = thinkBuf;
+        if (thinkEl) thinkEl.open = false; // collapse when thinking done
+      }
+    }
+
+    if (smdBuf) smdWrite(p, smdBuf);
+  }
+
   return function renderStream(delta, isDone) {
     if (isDone) {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      // Flush any pending buffered delta before final render
-      if (pendingDelta) { smdWrite(p, pendingDelta); pendingDelta = ''; }
-      // Full render: KaTeX + think blocks + DOMPurify
-      el.innerHTML = renderSafe(delta);
+      // Remove live think element — renderSafe handles think blocks properly
+      if (thinkEl) { thinkEl.remove(); thinkEl = null; thinkBodyEl = null; }
+      el.innerHTML = renderSafe(delta); // full text with KaTeX + think blocks
       el.classList.add('done');
+      addThinkCopyButtons(el);
       decorateLinks(el);
       addMsgActions(el, () => delta);
       scrollToBottom(true);
       return;
     }
-    // Buffer delta and flush in next animation frame
-    pendingDelta += delta;
+    fullAccum += delta;
     if (raf != null) return;
     raf = requestAnimationFrame(() => {
       raf = null;
-      if (pendingDelta) { smdWrite(p, pendingDelta); pendingDelta = ''; }
+      routeNewContent();
+      // Badge the scroll button when user is scrolled up and new content arrives
+      if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
       scrollToBottom(); // respects isUserScrolledUp
     });
   };
@@ -1551,10 +1748,13 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
 function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
-  el.textContent = text;
-  el.dataset.raw = text; // used by Regenerate to re-submit the original text
+  el.dataset.raw = text;
+  const span = document.createElement('span');
+  span.className = 'msg-text';
+  span.textContent = text;
+  el.appendChild(span);
   addTimestamp(el);
-  addMsgActions(el, () => text);
+  addMsgActions(el, () => el.dataset.raw || text);
   messagesEl.appendChild(el);
   scrollToBottom(true);
   return el;
@@ -1628,7 +1828,21 @@ function addMsgActions(el, getRaw) {
     }
   });
 
-  const buttons = [replyBtn, delBtn];
+  // ✏ Edit — only for user messages
+  const buttons = [];
+  if (el.classList.contains('user')) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action-icon';
+    editBtn.title = 'Edit message';
+    editBtn.textContent = '✏';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (activeController) return; // can't edit during streaming
+      enterEditMode(el);
+    });
+    buttons.push(editBtn);
+  }
+  buttons.push(replyBtn, delBtn);
 
   // ↺ Regenerate + ⎘ Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
@@ -1652,7 +1866,7 @@ function addMsgActions(el, getRaw) {
       e.stopPropagation();
       const text = getRaw() || el.innerText || '';
       try {
-        await navigator.clipboard.writeText(text);
+        await _copyText(text);
         copyBtn.textContent = '✓';
         showToast('Copied', 'success');
         setTimeout(() => { copyBtn.textContent = '⎘'; }, 2000);
@@ -1841,7 +2055,7 @@ function appendError(text) {
 function scrollToBottom(force = false) {
   if (force || !isUserScrolledUp) {
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+    if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
     isUserScrolledUp = false;
   }
 }
@@ -1866,13 +2080,32 @@ function showToast(msg, type) {
   const msgEl = document.createElement('span');
   msgEl.textContent = msg;
   toast.appendChild(msgEl);
-  const x = document.createElement('button');
-  x.className = 'toast-x';
-  x.textContent = '×';
-  x.addEventListener('click', () => toast.remove());
-  toast.appendChild(x);
+
+  if (type === 'error') {
+    // Error toasts: Copy + Dismiss, no auto-dismiss
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'toast-copy';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', () => _copyText(msg).catch(() => {}));
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'toast-x';
+    dismissBtn.textContent = 'Dismiss';
+    dismissBtn.addEventListener('click', () => toast.remove());
+    toast.appendChild(copyBtn);
+    toast.appendChild(dismissBtn);
+  } else {
+    const x = document.createElement('button');
+    x.className = 'toast-x';
+    x.textContent = '×';
+    x.addEventListener('click', () => toast.remove());
+    toast.appendChild(x);
+    // Auto-dismiss, paused on hover
+    const duration = type === 'success' ? 2000 : 3500;
+    let timer = setTimeout(() => toast.remove(), duration);
+    toast.addEventListener('mouseenter', () => clearTimeout(timer));
+    toast.addEventListener('mouseleave', () => { timer = setTimeout(() => toast.remove(), duration); });
+  }
   _toastContainer.appendChild(toast);
-  if (type !== 'error') setTimeout(() => toast.remove(), type === 'success' ? 2000 : 3500);
 }
 
 // ─── Confirm dialog ───────────────────────────────────────────────────────────
