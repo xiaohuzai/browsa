@@ -168,15 +168,17 @@ body {
   to   { opacity: 1; transform: none; }
 }
 
-/* User bubble — solid warm tint, no heavy gradient */
+/* User message — no bubble, right-aligned clean text */
 .msg.user {
   align-self: flex-end;
-  background: var(--user-bg);
-  color: var(--fg);
-  border: 1px solid var(--user-border);
-  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  color: var(--fg-2);
   white-space: pre-wrap;
   font-size: 13.5px;
+  text-align: right;
+  max-width: 88%;
 }
 
 /* Assistant bubble — transparent background, clean text flow */
@@ -933,6 +935,8 @@ math[display="block"] {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
   border-radius: 4px;
 }
+/* Textarea is inside composer-box which already shows focus via border+shadow */
+#input:focus-visible { box-shadow: none; }
 .skip-link {
   position: absolute;
   top: -40px; left: 8px;
