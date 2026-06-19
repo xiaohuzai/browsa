@@ -68,9 +68,6 @@ function renderProviders() {
         <label>Base URL
           <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" />
         </label>
-        <label class="small">Default model
-          <input data-k="defaultModel" type="text" value="${escapeAttr(cfg.defaultModel)}" />
-        </label>
       </div>
       <div class="row">
         <label>API key
@@ -146,7 +143,7 @@ async function pingCard(name, card) {
   const cfg = cachedCfg.providers[name];
   flashCard(card, '', 'Pinging…');
   try {
-    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model || cfg.defaultModel });
+    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     // Auto-detect capabilities and update useResponsesApi accordingly
     const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {

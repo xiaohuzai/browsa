@@ -782,7 +782,6 @@ async function handle(msg, sender) {
             fullReply = await responsesApiStream({
               baseUrl: provider.baseUrl,
               apiKey: provider.apiKey,
-              model: provider.model || provider.defaultModel,
               input: responsesInput,
               instructions: all.systemPrompt || undefined,
               conversation: responsesConversation,
@@ -798,7 +797,6 @@ async function handle(msg, sender) {
             fullReply = await chatStream({
               baseUrl: provider.baseUrl,
               apiKey: provider.apiKey,
-              model: provider.model || provider.defaultModel,
               messages,
               onDelta: (delta) => {
                 appendToStreamState(tabId, delta);
@@ -815,7 +813,6 @@ async function handle(msg, sender) {
           fullReply = await chat({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
-            model: provider.model || provider.defaultModel,
             messages: messages || buildMessages({ history, userText: msg.userText, pageContext: null, withImage: false, userImages: msg.images, systemPrompt: all.systemPrompt || '' }),
             signal,
             extraHeaders
