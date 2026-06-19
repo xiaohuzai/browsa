@@ -36,6 +36,8 @@ const imagePicker = $('imagepicker');
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
+let mermaidModule = null;   // lazily loaded on first mermaid block
+let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
 let deleteLock = false; // serialises message-delete operations to prevent index races
@@ -48,6 +50,7 @@ const images = [];             // { dataUrl, name } — attached for this turn
 // storage yet — the v0.20.1 "switch tab → reply vanishes" bug.
 // tabStates removed — single global session, no per-tab DOM snapshots needed.
 const clearBtn = $('clear');
+const slashSuggestEl = $('slash-suggest');
 
 init();
 
@@ -82,8 +85,34 @@ async function init() {
       onSend();
     });
   });
-  inputEl.addEventListener('input', updateComposerInfo);
+  inputEl.addEventListener('input', () => { updateComposerInfo(); updateSlashSuggest(); });
+  inputEl.addEventListener('blur', () => setTimeout(() => hideSlashSuggest(), 150));
   inputEl.addEventListener('keydown', (e) => {
+    // Slash autocomplete navigation
+    if (slashSuggestEl && !slashSuggestEl.hidden) {
+      const items = slashSuggestEl.querySelectorAll('.slash-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        slashSuggestIdx = Math.min(slashSuggestIdx + 1, items.length - 1);
+        items.forEach((it, i) => it.classList.toggle('active', i === slashSuggestIdx));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        slashSuggestIdx = Math.max(slashSuggestIdx - 1, 0);
+        items.forEach((it, i) => it.classList.toggle('active', i === slashSuggestIdx));
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && slashSuggestIdx >= 0)) {
+        e.preventDefault();
+        const active = slashSuggestIdx >= 0 ? items[slashSuggestIdx] : items[0];
+        if (active) inputEl.value = active.dataset.cmd;
+        hideSlashSuggest();
+        if (e.key === 'Enter') onSend();
+        return;
+      }
+      if (e.key === 'Escape') { hideSlashSuggest(); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       onSend();
@@ -403,6 +432,132 @@ function prettyProviderName(name) {
   return name;
 }
 
+// ─── Timestamps ──────────────────────────────────────────────────────────────
+function nowTimeStr() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function nowDateStr() { return new Date().toLocaleString(); }
+function addTimestamp(el) {
+  const span = document.createElement('span');
+  span.className = 'msg-time';
+  span.textContent = nowTimeStr();
+  span.title = nowDateStr();
+  el.appendChild(span);
+}
+
+// ─── Slash autocomplete ───────────────────────────────────────────────────────
+function updateSlashSuggest() {
+  if (!slashSuggestEl) return;
+  const val = inputEl.value;
+  if (!val.startsWith('/') || val.includes(' ')) { hideSlashSuggest(); return; }
+  const q = val.toLowerCase();
+  const matches = Object.keys(SLASH_COMMANDS).filter(k => k.toLowerCase().startsWith(q));
+  if (!matches.length) { hideSlashSuggest(); return; }
+  slashSuggestEl.innerHTML = '';
+  slashSuggestIdx = -1;
+  for (const cmd of matches) {
+    const item = document.createElement('div');
+    item.className = 'slash-item';
+    item.dataset.cmd = cmd;
+    const desc = SLASH_COMMANDS[cmd];
+    const shortDesc = desc.length > 55 ? desc.slice(0, 55) + '…' : desc;
+    item.innerHTML = `<span class="slash-cmd">${cmd}</span><span class="slash-desc">${shortDesc}</span>`;
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      inputEl.value = cmd;
+      hideSlashSuggest();
+      inputEl.focus();
+      onSend();
+    });
+    slashSuggestEl.appendChild(item);
+  }
+  slashSuggestEl.hidden = false;
+}
+function hideSlashSuggest() {
+  if (slashSuggestEl) slashSuggestEl.hidden = true;
+  slashSuggestIdx = -1;
+}
+
+// ─── Mermaid (lazy-loaded) ────────────────────────────────────────────────────
+async function getMermaid() {
+  if (mermaidModule) return mermaidModule;
+  try {
+    const mod = await import('./lib/vendor/mermaid.bundle.js');
+    mod.default.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+    mermaidModule = mod;
+  } catch (e) {
+    console.warn('browsa: mermaid load failed', e);
+  }
+  return mermaidModule;
+}
+async function renderMermaid(el) {
+  const blocks = el.querySelectorAll('code.language-mermaid');
+  if (!blocks.length) return;
+  const m = await getMermaid();
+  if (!m) return;
+  for (const code of [...blocks]) {
+    const pre = code.closest('pre') || code;
+    const source = code.textContent;
+    try {
+      const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
+      const { svg } = await m.default.render(id, source);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mermaid-diagram';
+      wrapper.innerHTML = svg;
+      pre.replaceWith(wrapper);
+    } catch (e) {
+      console.warn('browsa: mermaid render failed', e);
+    }
+  }
+}
+
+// ─── Regenerate ──────────────────────────────────────────────────────────────
+function findPrevUserBubble(assistantEl) {
+  let el = assistantEl.previousElementSibling;
+  while (el) {
+    if (el.classList.contains('msg') && el.classList.contains('user')) return el;
+    el = el.previousElementSibling;
+  }
+  return null;
+}
+async function doRegen(prevUserEl, assistantEl) {
+  if (activeController) return;
+  if (deleteLock) return;
+  const userText = prevUserEl.dataset.raw || prevUserEl.textContent.trim();
+  const assistantHidx = parseInt(assistantEl.dataset.hidx, 10);
+  const userHidx = parseInt(prevUserEl.dataset.hidx, 10);
+  deleteLock = true;
+  try {
+    // Delete assistant first (higher index), then user (lower index, unaffected)
+    if (!isNaN(assistantHidx)) {
+      const r = await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: assistantHidx }).catch(() => null);
+      if (r?.ok) {
+        messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+          const i = parseInt(b.dataset.hidx, 10);
+          if (i > assistantHidx) b.dataset.hidx = i - 1;
+        });
+        nextHistoryIdx--;
+      }
+    }
+    assistantEl.remove();
+    if (!isNaN(userHidx)) {
+      const r = await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: userHidx }).catch(() => null);
+      if (r?.ok) {
+        messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+          const i = parseInt(b.dataset.hidx, 10);
+          if (i > userHidx) b.dataset.hidx = i - 1;
+        });
+        nextHistoryIdx--;
+      }
+    }
+    prevUserEl.remove();
+  } finally {
+    deleteLock = false;
+  }
+  inputEl.value = userText;
+  await onSend();
+}
+
 
 // Render a yellow banner above the chat when the active page is 小红书
 // and the extraction result looks suspicious (too-short desc, no images,
@@ -655,11 +810,30 @@ function addCodeCopyButtons() {
 //
 // Chrome 114+ supports MathML Core natively, so output:'mathml' works with
 // zero extra CSS or font files.
+// Lightweight markdown render used during streaming (skips KaTeX + think blocks).
+function renderStreamingSafe(text) {
+  try {
+    return DOMPurify.sanitize(marked.parse(text || ''), {
+      ADD_ATTR: ['target', 'rel'],
+      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
+    });
+  } catch (_) {
+    return DOMPurify.sanitize(text || '');
+  }
+}
+
 function renderSafe(markdown) {
   try {
     const mathParts = []; // { displayMode: bool, formula: string }
+    const thinkBlocks = []; // extracted <think>…</think> content
 
     let md = (markdown || '')
+      // Extract complete <think>…</think> blocks before marked so they
+      // don't get mangled by markdown syntax inside them.
+      .replace(/<think>([\s\S]*?)<\/think>/gi, (_, content) => {
+        const i = thinkBlocks.push(content.trim()) - 1;
+        return `\n\n<div data-think="${i}"></div>\n\n`;
+      })
       // Block math: $$...$$ or \[...\]
       .replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g, (_, a, b) => {
         const i = mathParts.push({ displayMode: true,  formula: (a ?? b).trim() }) - 1;
@@ -674,7 +848,7 @@ function renderSafe(markdown) {
     let html = marked.parse(md);
 
     html = DOMPurify.sanitize(html, {
-      ADD_ATTR: ['target', 'rel'],
+      ADD_ATTR: ['target', 'rel', 'data-think'],
       ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
     });
 
@@ -694,6 +868,15 @@ function renderSafe(markdown) {
             ? `<div class="math-block">${escM(formula)}</div>`
             : `<code>${escM(formula)}</code>`;
         }
+      });
+    }
+
+    // Restore think blocks as collapsible <details> elements (after sanitization
+    // so DOMPurify never sees the raw inner content).
+    if (thinkBlocks.length > 0) {
+      html = html.replace(/<div data-think="(\d+)"><\/div>/g, (_, idx) => {
+        const inner = DOMPurify.sanitize(marked.parse(thinkBlocks[+idx]));
+        return `<details class="think-block"><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
       });
     }
 
@@ -739,9 +922,9 @@ function makeStreamRenderer(el) {
     if (raf != null) return; // already scheduled
     raf = requestAnimationFrame(() => {
       raf = null;
-      // Plain text during streaming — fast (1 textContent assignment) and
-      // we save the expensive Markdown parse for the final render.
-      el.textContent = text;
+      // Lightweight markdown render during streaming. Skips KaTeX and think
+      // blocks (too expensive per-tick); full renderSafe runs at DONE.
+      el.innerHTML = renderStreamingSafe(text);
       el.classList.remove('done');
       scrollToBottom();
     });
@@ -981,6 +1164,7 @@ async function onSend() {
         assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
         renderStream(finalText, true);
         addCodeCopyButtons();
+        renderMermaid(assistantEl);
         outputTokens = 0;
         if (m.choiceRequest) renderChoiceRequest(assistantEl, m.choiceRequest);
         // Detect max-turns: agent hit the tool-call ceiling and is asking
@@ -1160,6 +1344,7 @@ async function resumeInFlightStream(tabId) {
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       r(m.full || acc, true);
       addCodeCopyButtons();
+      renderMermaid(assistantEl);
       outputTokens = 0;
 
       try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
@@ -1324,6 +1509,8 @@ function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
   el.textContent = text;
+  el.dataset.raw = text; // used by Regenerate to re-submit the original text
+  addTimestamp(el);
   addMsgActions(el, () => text);
   messagesEl.appendChild(el);
   scrollToBottom();
@@ -1333,6 +1520,7 @@ function appendAssistant(initial, done = false) {
   const el = document.createElement('div');
   el.className = 'msg assistant' + (done ? ' done' : '');
   el.textContent = initial;
+  addTimestamp(el);
   // Actions are added by the caller once raw markdown content is available.
   messagesEl.appendChild(el);
   scrollToBottom();
@@ -1397,7 +1585,24 @@ function addMsgActions(el, getRaw) {
     }
   });
 
-  wrap.append(replyBtn, delBtn);
+  const buttons = [replyBtn, delBtn];
+
+  // ↺ Regenerate — only for assistant messages
+  if (el.classList.contains('assistant')) {
+    const regenBtn = document.createElement('button');
+    regenBtn.className = 'msg-action-icon';
+    regenBtn.title = 'Regenerate';
+    regenBtn.textContent = '↺';
+    regenBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const prevUser = findPrevUserBubble(el);
+      if (!prevUser) return;
+      await doRegen(prevUser, el);
+    });
+    buttons.push(regenBtn);
+  }
+
+  wrap.append(...buttons);
   el.appendChild(wrap);
 }
 /** Show a faint "tool progress" line below a streaming bubble. */
@@ -1608,8 +1813,10 @@ async function renderHistory() {
       el.innerHTML = renderSafe(rawContent);
       decorateLinks(el);
       addMsgActions(el, () => rawContent);
+      renderMermaid(el);
       el.dataset.hidx = i;
     }
   }
+  addCodeCopyButtons();
   scrollToBottom();
 }

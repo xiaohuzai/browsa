@@ -58,6 +58,13 @@ const VENDORS = [
     srcDir:    join(DEPS, 'node_modules'),
     esmBundle: true,
     outName:   'purify'
+  },
+  {
+    name: 'mermaid',
+    srcEntry:  'mermaid/dist/mermaid.esm.min.mjs',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'mermaid'
   }
 ];
 
