@@ -14,6 +14,7 @@ init();
 
 async function init() {
   cachedCfg = await storage.getAll();
+  Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
   applyContextMode(cachedCfg.contextMode || 'reader');
   applyLimits(cachedCfg);
