@@ -7,6 +7,8 @@
 
 import * as storage from './lib/storage.js';
 import { chatStream, chat, responsesApiStream, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+// Session management re-exported from storage for use in handle()
+const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Allow side panel to open on action click (Chrome MV3)
@@ -14,13 +16,15 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((e) => console.error('browsa: setPanelBehavior failed', e));
 
-// Right-click context menu — shown when user has text selected.
+// Right-click context menu — text selection + image contexts.
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-ask',       title: '💬 Ask',                   parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
+  // Image context menu
+  chrome.contextMenus.create({ id: 'browsa-image-ask', title: '🖼 Ask browsa about this image', contexts: ['image'] });
 
   if (details.reason === 'install' || details.reason === 'update') {
     // Best-effort: re-inject the selection toolbar into already-open tabs.
@@ -54,13 +58,74 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.id) return;
+
+  // ── Image right-click ────────────────────────────────────────────────────
+  if (info.menuItemId === 'browsa-image-ask') {
+    const srcUrl = info.srcUrl;
+    if (!srcUrl) return;
+
+    // Fetch the image inside the page's MAIN world so cookies + CORS headers
+    // are automatically applied (e.g. authenticated CDN images on XHS, etc.).
+    let dataUrl = null;
+    try {
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: async (url) => {
+          try {
+            const r = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(8000) });
+            if (!r.ok) return null;
+            const blob = await r.blob();
+            // Resize to max 1024px and encode as JPEG to keep size reasonable
+            return await new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                const maxDim = 1024;
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (w > maxDim || h > maxDim) {
+                  const s = Math.min(maxDim / w, maxDim / h);
+                  w = Math.round(w * s); h = Math.round(h * s);
+                }
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/jpeg', 0.85));
+                URL.revokeObjectURL(img.src);
+              };
+              img.onerror = () => resolve(null);
+              img.src = URL.createObjectURL(blob);
+            });
+          } catch (_) { return null; }
+        },
+        args: [srcUrl],
+        world: 'MAIN'
+      });
+      dataUrl = res?.result || null;
+    } catch (_) {}
+
+    // Fall back to raw URL if fetch failed (public images, no auth needed)
+    const imagePayload = dataUrl || srcUrl;
+
+    const payload = { type: 'IMAGE_ACTION', dataUrl: imagePayload, srcUrl };
+    const set = navPorts.get(tab.id);
+    let relayed = false;
+    if (set && set.size > 0) {
+      for (const p of set) {
+        try { p.postMessage(payload); relayed = true; } catch (_) {}
+      }
+    }
+    if (!relayed) {
+      chrome.storage.session.set({ pendingImageAction: { tabId: tab.id, dataUrl: imagePayload, srcUrl } }).catch(() => {});
+      try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
+    }
+    return;
+  }
+
+  // ── Text selection right-click ────────────────────────────────────────────
   // On Mac, a two-finger trackpad tap resets the visual selection to the
   // word under the cursor BEFORE contextmenu fires, so info.selectionText
   // is often just that one word — not the user's actual selection.
   // The content script's contextmenu event handler re-sends the original
-  // selection to selectionCache just before this callback fires (the user
-  // still has to click a menu item, giving the async message time to land).
-  // We prefer the cache; fall back to info.selectionText for normal mice.
+  // selection to selectionCache just before this callback fires.
   const text = (selectionCache.get(tab.id) || info.selectionText || '').trim();
   if (!text) return;
 
@@ -73,11 +138,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const action = actionMap[info.menuItemId];
   if (!action) return;
 
-  // Cache the selection — right-click gives us selectionText directly,
-  // no focus-shift problem. Store it so ATTACH_PAGE(selected) works too.
   selectionCache.set(tab.id, text);
 
-  // Relay to side panel if open, otherwise open it and deliver on connect.
   const set = navPorts.get(tab.id);
   let relayed = false;
   if (set && set.size > 0) {
@@ -87,8 +149,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (!relayed) {
     pendingSelectionActions.set(tab.id, { action, text });
-    // Also persist to session storage so the action survives SW restarts
-    // (mirrors the SELECTION_ACTION message path).
     chrome.storage.session.set({ pendingSelectionAction: { tabId: tab.id, action, text } }).catch(() => {});
     try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
   }
@@ -470,6 +530,31 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'SAVE_SESSION': {
+      const session = await saveCurrentSession(msg.name || '');
+      return { ok: !!session, session };
+    }
+
+    case 'GET_SESSIONS': {
+      const sessions = await getSavedSessions();
+      return { sessions };
+    }
+
+    case 'LOAD_SESSION': {
+      const len = await loadSession(msg.id);
+      return { ok: len >= 0, len };
+    }
+
+    case 'DELETE_SESSION': {
+      await deleteSession(msg.id);
+      return { ok: true };
+    }
+
+    case 'RENAME_SESSION': {
+      await renameSession(msg.id, msg.name || '');
+      return { ok: true };
+    }
+
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
       // Reset session IDs for all providers so the next conversation
@@ -511,7 +596,8 @@ async function handle(msg, sender) {
             truncated: { rawTextLength: cachedText.length, textLength: cachedText.length, wasCapped: false }
           };
         } else {
-          if (mode === 'reader') await ensureReadabilityInjected(tabId).catch(() => {});
+          // auto and reader modes may need Readability; dom/full don't
+          if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
           ctx = await extractActiveTab({
             mode,
             maxTextChars: all.maxTextChars,
@@ -526,6 +612,20 @@ async function handle(msg, sender) {
         if (mode === 'screenshot' && ctx.imageDataUrl) {
           return { ok: true, ctx };
         }
+        // Apply mask rules (sensitive data redaction) before storing
+        const maskRules = all.maskRules || [];
+        if (maskRules.length && ctx.text) {
+          let masked = ctx.text;
+          for (const rule of maskRules) {
+            if (!rule.pattern) continue;
+            try {
+              const re = new RegExp(rule.pattern, rule.flags || 'gi');
+              masked = masked.replace(re, rule.replacement || '***');
+            } catch (_) {}
+          }
+          ctx.text = masked;
+        }
+
         // All other modes: save to global history immediately.
         const contextText = buildPageContextText(ctx);
         const historyEntry = { role: 'user', content: contextText };
@@ -621,8 +721,8 @@ async function handle(msg, sender) {
 
     case 'GET_PAGE_CONTEXT': {
       const all = await storage.getAll();
-      const mode = msg.mode || all.contextMode || 'reader';
-      if (mode === 'reader') {
+      const mode = msg.mode || all.contextMode || 'auto';
+      if (mode === 'reader' || mode === 'auto') {
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
       const t = tabIdOf(msg, sender);
@@ -660,6 +760,21 @@ async function handle(msg, sender) {
 
       const tabId = msg.tabId;
       if (tabId == null) throw new Error('tabId required');
+
+      // Build effective system prompt: base + per-domain rule + llms.txt
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      const tabUrl = tab?.url || '';
+      const domainRules = all.domainRules || [];
+      const matchedRule = domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
+      const domainExtra = matchedRule?.prompt?.trim() || '';
+      const llmsTxt = tabUrl ? await fetchLlmsTxt(tabUrl) : null;
+      const llmsTxtExtra = llmsTxt
+        ? `\n\n[Site instructions from ${(() => { try { return new URL(tabUrl).origin; } catch(_){return tabUrl;} })()}/llms.txt]\n${llmsTxt}`
+        : '';
+      const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
+      const langExtra = langMap[all.replyLanguage] || '';
+      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra]
+        .map(s => s.trim()).filter(Boolean).join('\n\n');
 
       // Load global history
       const history = await storage.getHistory();
@@ -751,7 +866,7 @@ async function handle(msg, sender) {
           pageContext: null,
           withImage: false,
           userImages: msg.images,
-          systemPrompt: all.systemPrompt || ''
+          systemPrompt: effectiveSystemPrompt
         });
       }
 
@@ -789,7 +904,7 @@ async function handle(msg, sender) {
               baseUrl: provider.baseUrl,
               apiKey: provider.apiKey,
               input: responsesInput,
-              instructions: all.systemPrompt || undefined,
+              instructions: effectiveSystemPrompt || undefined,
               conversation: responsesConversation,
               onDelta: (delta) => {
                 appendToStreamState(tabId, delta);
@@ -891,6 +1006,32 @@ function tabIdOf(msg, sender) {
   if (msg?.tabId != null) return msg.tabId;
   if (sender?.tab?.id != null) return sender.tab.id;
   return null;
+}
+
+// llms.txt cache: origin → { content: string|null, fetchedAt: number }
+// Persists across message handling within a SW lifetime (not durable).
+const llmsTxtCache = new Map();
+const LLMS_TXT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function fetchLlmsTxt(tabUrl) {
+  if (!tabUrl) return null;
+  let origin;
+  try { origin = new URL(tabUrl).origin; } catch (_) { return null; }
+  const cached = llmsTxtCache.get(origin);
+  if (cached && Date.now() - cached.fetchedAt < LLMS_TXT_TTL_MS) return cached.content;
+  try {
+    const res = await fetch(`${origin}/llms.txt`, {
+      signal: AbortSignal.timeout(3000),
+      headers: { 'Accept': 'text/plain' }
+    });
+    if (!res.ok) { llmsTxtCache.set(origin, { content: null, fetchedAt: Date.now() }); return null; }
+    const text = (await res.text()).trim().slice(0, 8000); // cap at 8 KB
+    llmsTxtCache.set(origin, { content: text || null, fetchedAt: Date.now() });
+    return text || null;
+  } catch (_) {
+    llmsTxtCache.set(origin, { content: null, fetchedAt: Date.now() });
+    return null;
+  }
 }
 
 // SPA navigation watch.

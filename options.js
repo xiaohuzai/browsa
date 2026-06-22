@@ -20,6 +20,9 @@ async function init() {
   applyLimits(cachedCfg);
   applyToolbarToggle();
   applySystemPrompt();
+  applyReplyLanguage();
+  renderDomainRules(cachedCfg.domainRules || []);
+  renderMaskRules(cachedCfg.maskRules || []);
 
   document.querySelectorAll('input[name="ctx"]').forEach((r) => {
     r.addEventListener('change', async () => {
@@ -31,6 +34,22 @@ async function init() {
 
   // Save-limits button
   document.querySelector('button[data-act="save-limits"]')?.addEventListener('click', saveLimits);
+
+  // Domain rules
+  document.querySelector('button[data-act="add-domain-rule"]')?.addEventListener('click', () => {
+    const rules = readDomainRules();
+    rules.push({ pattern: '', prompt: '' });
+    renderDomainRules(rules);
+  });
+  document.querySelector('button[data-act="save-domain-rules"]')?.addEventListener('click', saveDomainRules);
+
+  // Mask rules
+  document.querySelector('button[data-act="add-mask-rule"]')?.addEventListener('click', () => {
+    const rules = readMaskRules();
+    rules.push({ pattern: '', flags: 'gi', replacement: '***' });
+    renderMaskRules(rules);
+  });
+  document.querySelector('button[data-act="save-mask-rules"]')?.addEventListener('click', saveMaskRules);
 }
 
 function applyLimits(cfg) {
@@ -106,7 +125,10 @@ function buildProviderCard(name, cfg) {
     </div>
     <div class="row">
       <label>API key
-        <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
+        <div class="apikey-wrap">
+          <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
+          <button type="button" class="apikey-toggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
+        </div>
       </label>
     </div>
     ${showModel ? `
@@ -122,6 +144,18 @@ function buildProviderCard(name, cfg) {
       <span class="card-status"></span>
     </div>
   `;
+
+  // API key show/hide toggle
+  const apiToggle = card.querySelector('.apikey-toggle');
+  const apiInput  = card.querySelector('[data-k="apiKey"]');
+  if (apiToggle && apiInput) {
+    apiToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const show = apiInput.type === 'password';
+      apiInput.type = show ? 'text' : 'password';
+      apiToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
 
   card.addEventListener('click', (e) => {
     if (e.target.closest('input, button, select, textarea')) return;
@@ -247,6 +281,16 @@ function applySystemPrompt() {
   });
 }
 
+function applyReplyLanguage() {
+  const el = $('replyLanguage');
+  if (!el) return;
+  el.value = cachedCfg.replyLanguage || '';
+  document.querySelector('button[data-act="save-reply-language"]')?.addEventListener('click', async () => {
+    await chrome.storage.local.set({ replyLanguage: el.value });
+    flash('ok', el.value ? `Reply language set to "${el.options[el.selectedIndex]?.text}".` : 'Reply language: Auto.');
+  });
+}
+
 function applyToolbarToggle() {
   const el = $('showSelectionToolbar');
   if (!el) return;
@@ -274,4 +318,103 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;');
+}
+
+// ─── Domain Rules ─────────────────────────────────────────────────────────────
+
+function renderDomainRules(rules) {
+  const el = document.getElementById('domainRules');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rules.length) {
+    el.innerHTML = '<p class="hint" style="margin:0">No rules yet. Add one below.</p>';
+    return;
+  }
+  for (let i = 0; i < rules.length; i++) {
+    const r = rules[i];
+    const row = document.createElement('div');
+    row.className = 'domain-rule-row';
+    row.innerHTML = `
+      <div class="domain-rule-fields">
+        <label>URL pattern
+          <input type="text" data-field="pattern" value="${escapeAttr(r.pattern || '')}" placeholder="e.g. github.com" />
+        </label>
+        <label>Extra system prompt
+          <textarea data-field="prompt" rows="3" placeholder="e.g. Focus on code changes. Use English.">${escapeHtml(r.prompt || '')}</textarea>
+        </label>
+      </div>
+      <button class="del-rule-btn" title="Remove this rule">✕</button>`;
+    row.querySelector('.del-rule-btn').addEventListener('click', () => {
+      const cur = readDomainRules();
+      cur.splice(i, 1);
+      renderDomainRules(cur);
+    });
+    el.appendChild(row);
+  }
+}
+
+function readDomainRules() {
+  const el = document.getElementById('domainRules');
+  if (!el) return [];
+  return [...el.querySelectorAll('.domain-rule-row')].map(row => ({
+    pattern: row.querySelector('[data-field="pattern"]')?.value?.trim() || '',
+    prompt: row.querySelector('[data-field="prompt"]')?.value?.trim() || ''
+  })).filter(r => r.pattern);
+}
+
+async function saveDomainRules() {
+  const rules = readDomainRules();
+  cachedCfg.domainRules = rules;
+  await chrome.storage.local.set({ domainRules: rules });
+  flash('ok', `Domain rules saved (${rules.length} rule${rules.length !== 1 ? 's' : ''}).`);
+}
+
+// ─── Mask Rules ───────────────────────────────────────────────────────────────
+
+function renderMaskRules(rules) {
+  const el = document.getElementById('maskRules');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rules.length) {
+    el.innerHTML = '<tr><td colspan="4" class="hint" style="padding:8px">No rules yet.</td></tr>';
+    return;
+  }
+  for (let i = 0; i < rules.length; i++) {
+    const r = rules[i];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-field="pattern" value="${escapeAttr(r.pattern || '')}" placeholder="e.g. 1[3-9]\\d{9}" style="width:100%" /></td>
+      <td><input type="text" data-field="flags" value="${escapeAttr(r.flags || 'gi')}" placeholder="gi" style="width:48px" /></td>
+      <td><input type="text" data-field="replacement" value="${escapeAttr(r.replacement ?? '***')}" placeholder="***" style="width:80px" /></td>
+      <td><button class="del-rule-btn" title="Remove">✕</button></td>`;
+    tr.querySelector('.del-rule-btn').addEventListener('click', () => {
+      const cur = readMaskRules();
+      cur.splice(i, 1);
+      renderMaskRules(cur);
+    });
+    el.appendChild(tr);
+  }
+}
+
+function readMaskRules() {
+  const el = document.getElementById('maskRules');
+  if (!el) return [];
+  return [...el.querySelectorAll('tr')].map(tr => ({
+    pattern: tr.querySelector('[data-field="pattern"]')?.value?.trim() || '',
+    flags: tr.querySelector('[data-field="flags"]')?.value?.trim() || 'gi',
+    replacement: tr.querySelector('[data-field="replacement"]')?.value ?? '***'
+  })).filter(r => r.pattern);
+}
+
+async function saveMaskRules() {
+  const rules = readMaskRules();
+  for (const r of rules) {
+    try { new RegExp(r.pattern, r.flags); } catch (e) {
+      flash('err', `Invalid regex "${r.pattern}": ${e.message}`);
+      return;
+    }
+  }
+  cachedCfg.maskRules = rules;
+  await chrome.storage.local.set({ maskRules: rules });
+  flash('ok', `Mask rules saved (${rules.length} rule${rules.length !== 1 ? 's' : ''}).`);
 }

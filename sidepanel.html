@@ -11,10 +11,26 @@
     <!-- Slim topbar: just provider + utility buttons -->
     <header class="topbar" role="banner">
       <select id="provider" class="provider" aria-label="AI provider"></select>
+      <button id="sessions-btn" class="iconbtn" aria-label="Session history" title="Session history">
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+      </button>
+
       <button id="settings" class="iconbtn" aria-label="Settings" title="Settings">
         <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       </button>
     </header>
+
+    <!-- Sessions drawer (slides in from the right) -->
+    <div id="sessions-drawer" class="sessions-drawer" hidden aria-label="Session history" role="dialog">
+      <div class="sessions-drawer-header">
+        <span class="sessions-drawer-title">Session History</span>
+        <button id="sessions-close" class="iconbtn" title="Close">✕</button>
+      </div>
+      <div class="sessions-drawer-actions">
+        <button id="sessions-new" class="sessions-new-btn">＋ New session</button>
+      </div>
+      <div id="sessions-list" class="sessions-list"></div>
+    </div>
 
     <!-- Diagnostics banner -->
     <div id="diagnostics" class="diagnostics" role="status" aria-live="polite" hidden></div>
@@ -60,9 +76,7 @@
       <!-- Context mode + page link -->
       <div class="composer-footer">
         <div class="ctx-group" role="group" aria-label="Context mode">
-          <label class="ctx-pill" title="Readability article extraction"><input type="radio" name="ctx" value="reader" />Reader</label>
-          <label class="ctx-pill" title="Full page text"><input type="radio" name="ctx" value="full" />Full</label>
-
+          <label class="ctx-pill" title="Auto: Reader → DOM → Full (smart cascade)"><input type="radio" name="ctx" value="auto" />Auto</label>
           <label class="ctx-pill" title="Capture screenshot"><input type="radio" name="ctx" value="screenshot" />📷</label>
         </div>
         <a id="pagemeta" class="pagemeta" target="_blank" title=""></a>
