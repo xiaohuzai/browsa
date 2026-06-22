@@ -1197,3 +1197,166 @@ code.language-patch {
 .diff-add  { color: #4ade80; display: block; }
 .diff-del  { color: #f87171; display: block; }
 .diff-hunk { color: var(--fg-dim); display: block; }
+
+/* ── Sessions drawer ─────────────────────────────────────────────────────── */
+.sessions-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 280px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+  animation: slideInRight 0.18s ease;
+}
+.sessions-drawer[hidden] { display: none !important; }
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.sessions-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sessions-drawer-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.sessions-drawer-actions {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sessions-new-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+}
+.sessions-new-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: background 0.1s;
+}
+.session-item:hover { background: var(--hover-bg, rgba(128,128,128,0.08)); }
+.session-item.active { background: var(--accent-bg); }
+.session-item-body { flex: 1; min-width: 0; }
+.session-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-item.active .session-item-name { color: var(--accent); }
+.session-item-date {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.session-del-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.session-item:hover .session-del-btn { opacity: 1; }
+.session-del-btn:hover { color: var(--err); }
+.sessions-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 32px 16px;
+  line-height: 1.6;
+}
+
+/* ── Prompt inspector modal ──────────────────────────────────────────────── */
+.prompt-inspector-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 440px;
+  width: calc(100% - 40px);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.prompt-inspector-url {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prompt-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 10px 0 4px;
+}
+.prompt-section-body {
+  background: var(--code-bg, rgba(128,128,128,0.08));
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg-2);
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.pi-copy {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.pi-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Sessions drawer backdrop ────────────────────────────────────────────── */
+.sessions-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0,0,0,0.25);
+}
+.sessions-backdrop.active { display: block; }

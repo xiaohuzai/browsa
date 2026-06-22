@@ -36,6 +36,20 @@
             <button data-act="save-system-prompt" class="primary">Save</button>
             <button data-act="reset-system-prompt">Reset to default</button>
           </div>
+          <div class="inline-field" style="margin-top:12px">
+            <label for="replyLanguage">Reply language</label>
+            <select id="replyLanguage">
+              <option value="">Auto (follow system prompt)</option>
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+            <button data-act="save-reply-language" class="primary">Save</button>
+          </div>
         </div>
       </section>
 
@@ -47,24 +61,17 @@
           <p class="hint">How browsa reads the page when you click 📎 Attach.</p>
           <div class="radio-group">
             <label class="radio-card">
-              <input type="radio" name="ctx" value="reader" />
+              <input type="radio" name="ctx" value="auto" />
               <div>
-                <strong>Reader</strong>
-                <span>Mozilla Readability — main article text, no clutter. Recommended.</span>
-              </div>
-            </label>
-            <label class="radio-card">
-              <input type="radio" name="ctx" value="full" />
-              <div>
-                <strong>Full</strong>
-                <span>Raw body innerText, no filtering. Larger context.</span>
+                <strong>Auto</strong>
+                <span>Smart cascade: tries Reader → DOM → Full. Works on articles, SPAs, and apps alike.</span>
               </div>
             </label>
             <label class="radio-card">
               <input type="radio" name="ctx" value="screenshot" />
               <div>
                 <strong>Screenshot</strong>
-                <span>Captures a visible screenshot and sends as image.</span>
+                <span>Captures a visible screenshot and sends as image (for multimodal models).</span>
               </div>
             </label>
           </div>
@@ -84,19 +91,55 @@
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Page size limit</h2>
-        </div>
-        <div class="card-body">
-          <p class="hint">Hard cap on extracted text sent to the model (characters). Readability typically yields 5–30K. Default 1M is safe for any modern LLM.</p>
-          <div class="inline-field">
-            <label for="maxTextChars">Max chars</label>
-            <input id="maxTextChars" type="number" min="1000" step="1000" />
-            <button data-act="save-limits" class="primary">Save</button>
+      <details class="advanced-section">
+        <summary class="advanced-summary">⚙ Advanced</summary>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Domain Rules</h2>
           </div>
-        </div>
-      </section>
+          <div class="card-body">
+            <p class="hint">Add extra instructions to the system prompt for specific websites. The <b>Pattern</b> is matched against the page URL (simple substring match).</p>
+            <div id="domainRules"></div>
+            <div class="card-actions">
+              <button data-act="add-domain-rule">+ Add rule</button>
+              <button data-act="save-domain-rules" class="primary">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Content Masking</h2>
+          </div>
+          <div class="card-body">
+            <p class="hint">Regex patterns to redact sensitive data in page content before it is sent to the AI. Use standard JavaScript regex syntax.</p>
+            <table class="mask-table">
+              <thead><tr><th>Pattern (regex)</th><th>Flags</th><th>Replace with</th><th></th></tr></thead>
+              <tbody id="maskRules"></tbody>
+            </table>
+            <div class="card-actions">
+              <button data-act="add-mask-rule">+ Add rule</button>
+              <button data-act="save-mask-rules" class="primary">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Page size limit</h2>
+          </div>
+          <div class="card-body">
+            <p class="hint">Hard cap on extracted text sent to the model (characters). Readability typically yields 5–30K. Default 1M is safe for any modern LLM.</p>
+            <div class="inline-field">
+              <label for="maxTextChars">Max chars</label>
+              <input id="maxTextChars" type="number" min="1000" step="1000" />
+              <button data-act="save-limits" class="primary">Save</button>
+            </div>
+          </div>
+        </section>
+
+      </details>
 
       <div id="status" class="status"></div>
     </main>
