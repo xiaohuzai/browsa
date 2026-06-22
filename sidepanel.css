@@ -958,3 +958,242 @@ math[display="block"] {
   white-space: nowrap;
   border: 0;
 }
+
+/* ─── Scroll-to-bottom button ───────────────────────────────────────────────── */
+.scroll-to-bottom-btn {
+  position: fixed;
+  bottom: 134px; /* sits above quickbar + composer */
+  right: 14px;
+  z-index: 20;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--fg-2);
+  font-size: 14px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: background var(--t), opacity var(--t);
+}
+.scroll-to-bottom-btn:hover { background: var(--bg-4); color: var(--accent); }
+
+/* ─── Toast notifications ────────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 9999;
+  pointer-events: none;
+  width: calc(100% - 32px);
+  max-width: 360px;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: all;
+  animation: toast-in 0.18s ease;
+  border: 1px solid transparent;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.toast span { flex: 1; }
+.toast-x {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.toast-x:hover { opacity: 1; }
+.toast-success { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+.toast-error   { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: #f87171; }
+.toast-warn    { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+.toast-info    { background: rgba(148,163,184,0.12); border-color: rgba(148,163,184,0.3); color: var(--fg-2); }
+
+/* ─── Confirm dialog ─────────────────────────────────────────────────────────── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: var(--shadow-md);
+}
+.confirm-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+.confirm-msg {
+  font-size: 13px;
+  color: var(--fg-2);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.confirm-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.confirm-cancel {
+  padding: 6px 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.confirm-cancel:hover { background: var(--bg-4); }
+.confirm-ok {
+  padding: 6px 14px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background var(--t);
+}
+.confirm-ok:hover { background: var(--accent-hover); }
+.confirm-ok.danger {
+  background: rgba(248,113,113,0.12);
+  border-color: #f87171;
+  color: #f87171;
+}
+.confirm-ok.danger:hover { background: rgba(248,113,113,0.22); }
+
+/* ─── Scroll-to-bottom button badge ─────────────────────────────────────────── */
+.scroll-to-bottom-btn.has-new { color: var(--accent); }
+.scroll-to-bottom-btn.has-new::after {
+  content: '';
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* ─── Toast: error Copy button ───────────────────────────────────────────────── */
+.toast-copy {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+  transition: opacity var(--t);
+}
+.toast-copy:hover { opacity: 1; }
+
+/* ─── Think block: copy button in summary ────────────────────────────────────── */
+.think-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg-dim);
+  font-size: 13px;
+  padding: 0 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+  transition: color var(--t);
+}
+.think-copy-btn:hover { color: var(--fg); }
+
+/* ─── Live think block (during streaming) ────────────────────────────────────── */
+.think-block.live-think .think-body { white-space: pre-wrap; }
+
+/* ─── User message text span ─────────────────────────────────────────────────── */
+.msg.user .msg-text { white-space: pre-wrap; }
+
+/* ─── Edit mode ──────────────────────────────────────────────────────────────── */
+.msg-edit-area {
+  display: block;       /* override inline-block so text-align:right on .msg.user doesn't shift it */
+  text-align: left;
+  width: 100%;
+  min-height: 60px;
+  max-height: 200px;
+  resize: none;
+  background: var(--bg-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+.msg-edit-bar {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+  justify-content: flex-end;
+}
+.msg-edit-send {
+  padding: 4px 12px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.msg-edit-send:hover { background: var(--accent-hover); }
+.msg-edit-cancel {
+  padding: 4px 10px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.msg-edit-cancel:hover { background: var(--bg-4); }
+
+/* ─── Diff syntax highlighting ───────────────────────────────────────────────── */
+code.language-diff,
+code.language-patch {
+  display: block;
+}
+.diff-add  { color: #4ade80; display: block; }
+.diff-del  { color: #f87171; display: block; }
+.diff-hunk { color: var(--fg-dim); display: block; }

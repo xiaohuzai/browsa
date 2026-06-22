@@ -5,6 +5,7 @@
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
+// smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
 // head features we don't need. Keep it simple; DOMPurify handles XSS later.
@@ -41,6 +42,8 @@ let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
 let deleteLock = false; // serialises message-delete operations to prevent index races
+let isUserScrolledUp = false; // true when user has manually scrolled up during streaming
+let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
@@ -289,7 +292,7 @@ async function init() {
   // Listen for config changes (from options page)
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === 'local') {
-      if (changes.providers || changes.activeProvider) {
+      if (changes.providers || changes.activeProvider || changes.pingStates) {
         const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
         populateProviderSelect(cfg2Res.data || cfg2Res);
       }
@@ -366,6 +369,26 @@ async function init() {
     }
   } catch (_) {}
 
+  // Scroll-to-bottom button: show when user scrolls up, hide at bottom
+  scrollToBottomBtn = document.createElement('button');
+  scrollToBottomBtn.className = 'scroll-to-bottom-btn';
+  scrollToBottomBtn.hidden = true;
+  scrollToBottomBtn.title = 'Jump to bottom';
+  scrollToBottomBtn.textContent = '↓';
+  scrollToBottomBtn.addEventListener('click', () => {
+    isUserScrolledUp = false;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottomBtn.hidden = true;
+    scrollToBottomBtn.classList.remove('has-new');
+  });
+  document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
+
+  messagesEl.addEventListener('scroll', () => {
+    const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    isUserScrolledUp = dist > 80;
+    scrollToBottomBtn.hidden = !isUserScrolledUp;
+  }, { passive: true });
+
   inputEl.focus();
 }
 
@@ -415,21 +438,26 @@ async function handleSelectionAction(action, text) {
 
 function populateProviderSelect(cfg) {
   const providers = Object.keys(cfg.providers || {});
+  const pingStates = cfg.pingStates || {};
   providerSel.innerHTML = '';
   for (const name of providers) {
     const opt = document.createElement('option');
     opt.value = name;
     const configured = !!(cfg.providers[name]?.baseUrl?.trim());
-    opt.textContent = prettyProviderName(name) + (configured ? '' : ' (not set)');
+    let status;
+    if (!configured)               status = 'not set';
+    else if (pingStates[name] === 'reachable')   status = '● reachable';
+    else if (pingStates[name] === 'unreachable') status = '○ unreachable';
+    else                           status = 'not pinged';
+    opt.textContent = `${prettyProviderName(name)} — ${status}`;
     if (name === cfg.activeProvider) opt.selected = true;
     providerSel.appendChild(opt);
   }
 }
 
 function prettyProviderName(name) {
-  if (name === 'hermes') return 'Hermes';
-  if (name === 'claude-code') return 'Claude Code';
-  return name;
+  const map = { hermes: 'Hermes', 'claude-code': 'Claude Code', compatible: 'OpenAI-compatible' };
+  return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -558,6 +586,94 @@ async function doRegen(prevUserEl, assistantEl) {
   await onSend();
 }
 
+
+// ─── Edit user message in-place ──────────────────────────────────────────────
+function enterEditMode(userEl) {
+  if (userEl.dataset.editing || activeController) return;
+  userEl.dataset.editing = '1';
+  const originalText = userEl.dataset.raw || '';
+
+  const textSpan = userEl.querySelector('.msg-text');
+  const actionsEl = userEl.querySelector('.msg-actions');
+  const timeEl = userEl.querySelector('.msg-time');
+  if (actionsEl) actionsEl.hidden = true;
+  if (timeEl) timeEl.hidden = true;
+
+  // Replace text span with textarea so the container keeps its width.
+  // (hiding the span would collapse the container, making the textarea invisible.)
+  const ta = document.createElement('textarea');
+  ta.className = 'msg-edit-area';
+  ta.value = originalText;
+  if (textSpan) textSpan.replaceWith(ta);
+  else userEl.insertBefore(ta, timeEl || actionsEl || null);
+
+  const bar = document.createElement('div');
+  bar.className = 'msg-edit-bar';
+  const sendBtn2 = document.createElement('button');
+  sendBtn2.className = 'msg-edit-send';
+  sendBtn2.textContent = 'Send';
+  const cancelBtn2 = document.createElement('button');
+  cancelBtn2.className = 'msg-edit-cancel';
+  cancelBtn2.textContent = 'Cancel';
+  bar.appendChild(sendBtn2);
+  bar.appendChild(cancelBtn2);
+  userEl.appendChild(bar);
+
+  requestAnimationFrame(() => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = ta.value.length;
+  });
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+  });
+  sendBtn2.addEventListener('click', async () => {
+    const newText = ta.value.trim();
+    if (!newText) return;
+    await submitUserEdit(userEl, newText);
+  });
+  cancelBtn2.addEventListener('click', () => cancelUserEdit(userEl, ta, textSpan));
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendBtn2.click(); }
+    if (e.key === 'Escape') cancelUserEdit(userEl, ta, textSpan);
+  });
+}
+
+function cancelUserEdit(userEl, ta, textSpan) {
+  delete userEl.dataset.editing;
+  userEl.querySelector('.msg-edit-bar')?.remove();
+  // Restore original text span
+  if (ta && ta.parentNode === userEl) {
+    if (textSpan) ta.replaceWith(textSpan);
+    else ta.remove();
+  }
+  const actionsEl = userEl.querySelector('.msg-actions');
+  const timeEl = userEl.querySelector('.msg-time');
+  if (actionsEl) actionsEl.hidden = false;
+  if (timeEl) timeEl.hidden = false;
+}
+
+async function submitUserEdit(userEl, newText) {
+  if (deleteLock) return;
+  const userHidx = parseInt(userEl.dataset.hidx, 10);
+  deleteLock = true;
+  try {
+    if (!isNaN(userHidx)) {
+      await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: userHidx }).catch(() => null);
+      nextHistoryIdx = userHidx;
+    }
+    // Remove this message and everything after it from DOM
+    let next = userEl.nextElementSibling;
+    while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
+    userEl.remove();
+  } finally {
+    deleteLock = false;
+  }
+  inputEl.value = newText;
+  await onSend();
+}
 
 // Render a yellow banner above the chat when the active page is 小红书
 // and the extraction result looks suspicious (too-short desc, no images,
@@ -692,11 +808,20 @@ async function onAttachPage() {
 }
 
 async function clearChatHistory() {
+  const ok = await showConfirmDialog({
+    title: 'Clear conversation',
+    message: 'Delete all messages? This cannot be undone.',
+    confirmLabel: 'Clear',
+    danger: true
+  });
+  if (!ok) return;
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
   nextHistoryIdx = 0;
-  deleteLock = false; // reset in case a delete was in-flight when history was cleared
-  appendSystem('🗑 History cleared');
+  deleteLock = false;
+  isUserScrolledUp = false;
+  if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+  showToast('Conversation cleared', 'success');
 }
 
 /**
@@ -777,7 +902,32 @@ function updateOutputTokenCount(delta) {
   tokCountEl.textContent = `~${outputTokens}`;
 }
 
+// Add a copy button to each think-block <summary> (idempotent).
+function addThinkCopyButtons(el) {
+  for (const details of (el || messagesEl).querySelectorAll('.think-block:not([data-copy-added])')) {
+    details.dataset.copyAdded = '1';
+    const summary = details.querySelector('summary');
+    if (!summary) continue;
+    const btn = document.createElement('button');
+    btn.className = 'think-copy-btn';
+    btn.title = 'Copy thinking';
+    btn.textContent = '⎘';
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // don't toggle the details
+      const body = details.querySelector('.think-body');
+      try {
+        await _copyText(body?.textContent || '');
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+      } catch (_) {}
+    });
+    summary.appendChild(btn);
+  }
+}
+
 function addCodeCopyButtons() {
+  highlightDiffBlocks(messagesEl);
+  addThinkCopyButtons(messagesEl);
   for (const pre of messagesEl.querySelectorAll('.msg.assistant pre')) {
     // Add language label (from code[class*="language-xxx"])
     const code = pre.querySelector('code[class*="language-"]');
@@ -791,7 +941,12 @@ function addCodeCopyButtons() {
     btn.textContent = 'Copy';
     btn.addEventListener('click', async () => {
       const text = code?.textContent || pre.textContent || '';
-      try { await navigator.clipboard.writeText(text); btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); } catch {}
+      try {
+        await _copyText(text);
+        btn.textContent = '✓';
+        showToast('Copied', 'success');
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      } catch (_) {}
     });
     pre.style.position = 'relative';
     pre.appendChild(btn);
@@ -828,9 +983,8 @@ function renderSafe(markdown) {
     const thinkBlocks = []; // extracted <think>…</think> content
 
     let md = (markdown || '')
-      // Extract complete <think>…</think> blocks before marked so they
-      // don't get mangled by markdown syntax inside them.
-      .replace(/<think>([\s\S]*?)<\/think>/gi, (_, content) => {
+      // Extract <think>/<thinking> blocks before marked (handles Claude + DeepSeek).
+      .replace(/<(?:think|thinking|antml:thinking)[^>]*>([\s\S]*?)<\/(?:think|thinking|antml:thinking)>/gi, (_, content) => {
         const i = thinkBlocks.push(content.trim()) - 1;
         return `\n\n<div data-think="${i}"></div>\n\n`;
       })
@@ -893,6 +1047,26 @@ function renderSafe(markdown) {
 
 function escM(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Clipboard write with execCommand fallback (works in non-secure contexts too).
+function _fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    return Promise.resolve();
+  } catch (e) { return Promise.reject(e); }
+}
+function _copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).catch(() => _fallbackCopy(text));
+  }
+  return _fallbackCopy(text);
+}
+
 // After every innerHTML update, ensure external links open in new tab with
 // rel="noopener noreferrer". Cheap (runs on the bubble subtree only).
 function decorateLinks(el) {
@@ -904,28 +1078,83 @@ function decorateLinks(el) {
   }
 }
 
-// Build a streaming-render closure for a specific bubble. Streaming path is
-// fast (textContent via rAF throttle); the final DONE render goes through
-// marked + DOMPurify for proper Markdown formatting.
+// Matches <think> / <thinking> opening and closing tags (Claude, DeepSeek, etc.)
+const _THINK_OPEN_RE  = /<(think|antml:thinking)(\s[^>]*)?>|<thinking>/i;
+const _THINK_CLOSE_RE = /<\/(think|antml:thinking)>|<\/thinking>/i;
+
+// Build a streaming-render closure for a specific bubble.
+// During streaming:
+//   - <think>/<thinking> content shown in a live collapsible element above the bubble
+//   - Non-think text rendered each tick via renderStreamingSafe (marked + DOMPurify)
+// At DONE: live think removed; full renderSafe() handles KaTeX + final think blocks.
 function makeStreamRenderer(el) {
+  let fullAccum = '';
   let raf = null;
-  return function renderStream(text, isDone) {
+  let thinkEl = null;
+  let thinkBodyEl = null;
+
+  function ensureThinkEl() {
+    if (!thinkEl) {
+      thinkEl = document.createElement('details');
+      thinkEl.className = 'think-block live-think';
+      thinkEl.open = true;
+      const sum = document.createElement('summary');
+      sum.textContent = 'Thinking…';
+      thinkBodyEl = document.createElement('div');
+      thinkBodyEl.className = 'think-body';
+      thinkEl.appendChild(sum);
+      thinkEl.appendChild(thinkBodyEl);
+      el.parentNode.insertBefore(thinkEl, el);
+    }
+  }
+
+  // Split accumulated text into display (non-think) and think portions.
+  // Scans the full buffer each tick so partial tags across chunk boundaries are handled.
+  function splitThink(text) {
+    let display = '';
+    let think = '';
+    let rest = text;
+    let inside = false;
+    while (rest.length > 0) {
+      if (!inside) {
+        const m = _THINK_OPEN_RE.exec(rest);
+        if (!m) { display += rest; break; }
+        display += rest.slice(0, m.index);
+        rest = rest.slice(m.index + m[0].length);
+        inside = true;
+      } else {
+        const m = _THINK_CLOSE_RE.exec(rest);
+        if (!m) { think += rest; break; }
+        think += rest.slice(0, m.index);
+        rest = rest.slice(m.index + m[0].length);
+        inside = false;
+        if (thinkEl) thinkEl.open = false; // collapse once tag closed
+      }
+    }
+    return { display, think };
+  }
+
+  return function renderStream(delta, isDone) {
     if (isDone) {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      el.innerHTML = renderSafe(text);
+      if (thinkEl) { thinkEl.remove(); thinkEl = null; thinkBodyEl = null; }
+      el.innerHTML = renderSafe(delta);
       el.classList.add('done');
+      addThinkCopyButtons(el);
       decorateLinks(el);
-      addMsgActions(el, () => text); // idempotent — addMsgActions checks for existing
-      scrollToBottom();
+      addMsgActions(el, () => delta);
+      scrollToBottom(true);
       return;
     }
-    if (raf != null) return; // already scheduled
+    fullAccum += delta;
+    if (raf != null) return;
     raf = requestAnimationFrame(() => {
       raf = null;
-      // Lightweight markdown render during streaming. Skips KaTeX and think
-      // blocks (too expensive per-tick); full renderSafe runs at DONE.
-      el.innerHTML = renderStreamingSafe(text);
+      const { display, think } = splitThink(fullAccum);
+      if (think) { ensureThinkEl(); thinkBodyEl.textContent = think; }
+      el.innerHTML = renderStreamingSafe(display);
       el.classList.remove('done');
+      if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
       scrollToBottom();
     });
   };
@@ -981,7 +1210,7 @@ async function openSettingsPage() {
 async function onProviderChange() {
   const name = providerSel.value;
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
-  appendSystem(`Switched to provider: ${prettyProviderName(name)}`);
+  showToast(`Switched to ${prettyProviderName(name)}`, 'success');
 }
 
 async function onContextModeChange() {
@@ -1113,7 +1342,7 @@ async function onSend() {
   setStreamingUI(true);
 
   // Placeholder assistant bubble
-  const assistantEl = appendAssistant('▍');
+  const assistantEl = appendAssistant('');
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
   const renderStream = makeStreamRenderer(assistantEl);
@@ -1147,7 +1376,7 @@ async function onSend() {
     port.onMessage.addListener((m) => {
       if (m.type === 'CHUNK') {
         acc += m.delta;
-        renderStream(acc, false);
+        renderStream(m.delta, false); // smd: pass delta, not accumulated text
         updateOutputTokenCount(m.delta);
 
       } else if (m.type === 'TOOL_PROGRESS') {
@@ -1294,14 +1523,14 @@ async function resumeInFlightStream(tabId) {
   let assistantEl = initialBubble;
   function getOrCreateAssistantBubble() {
     let el = messagesEl.querySelector('.msg.assistant:last-of-type');
-    if (!el) el = appendAssistant('▍');
+    if (!el) el = appendAssistant('');
     return el;
   }
   function ensureAssistantEl() {
     // The DOM node identity may have changed (innerHTML restore
     // replaces the whole subtree). Re-resolve on every chunk.
     let el = messagesEl.querySelector('.msg.assistant:last-of-type');
-    if (!el) el = appendAssistant('▍');
+    if (!el) el = appendAssistant('');
     if (el !== assistantEl) {
       // Switch the stream renderer's target. makeStreamRenderer
       // holds a closure over the original el — that one's renderStream
@@ -1336,7 +1565,7 @@ async function resumeInFlightStream(tabId) {
     if (m.type === 'CHUNK') {
       const r = ensureAssistantEl();
       acc += m.delta;
-      r(acc, false);
+      r(m.delta, false); // smd: pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
 
     } else if (m.type === 'DONE') {
@@ -1508,12 +1737,15 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
 function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
-  el.textContent = text;
-  el.dataset.raw = text; // used by Regenerate to re-submit the original text
+  el.dataset.raw = text;
+  const span = document.createElement('span');
+  span.className = 'msg-text';
+  span.textContent = text;
+  el.appendChild(span);
   addTimestamp(el);
-  addMsgActions(el, () => text);
+  addMsgActions(el, () => el.dataset.raw || text);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 function appendAssistant(initial, done = false) {
@@ -1523,7 +1755,7 @@ function appendAssistant(initial, done = false) {
   addTimestamp(el);
   // Actions are added by the caller once raw markdown content is available.
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 
@@ -1585,9 +1817,23 @@ function addMsgActions(el, getRaw) {
     }
   });
 
-  const buttons = [replyBtn, delBtn];
+  // ✏ Edit — only for user messages
+  const buttons = [];
+  if (el.classList.contains('user')) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action-icon';
+    editBtn.title = 'Edit message';
+    editBtn.textContent = '✏';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (activeController) return; // can't edit during streaming
+      enterEditMode(el);
+    });
+    buttons.push(editBtn);
+  }
+  buttons.push(replyBtn, delBtn);
 
-  // ↺ Regenerate — only for assistant messages
+  // ↺ Regenerate + ⎘ Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
     const regenBtn = document.createElement('button');
     regenBtn.className = 'msg-action-icon';
@@ -1600,6 +1846,25 @@ function addMsgActions(el, getRaw) {
       await doRegen(prevUser, el);
     });
     buttons.push(regenBtn);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action-icon';
+    copyBtn.title = 'Copy response';
+    copyBtn.textContent = '⎘';
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const text = getRaw() || el.innerText || '';
+      try {
+        await _copyText(text);
+        copyBtn.textContent = '✓';
+        showToast('Copied', 'success');
+        setTimeout(() => { copyBtn.textContent = '⎘'; }, 2000);
+      } catch (_) {
+        copyBtn.textContent = '✗';
+        setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+      }
+    });
+    buttons.push(copyBtn);
   }
 
   wrap.append(...buttons);
@@ -1644,14 +1909,14 @@ function appendScreenshot(dataUrl) {
   img.addEventListener('click', () => window.open(dataUrl));
   el.appendChild(img);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
 function appendSystem(text) {
   const el = document.createElement('div');
   el.className = 'msg system';
   el.textContent = text;
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
   return el;
 }
 
@@ -1687,7 +1952,7 @@ function appendAttachSystem(text) {
   el.appendChild(span);
   el.appendChild(btn);
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
 /**
  * After streaming ends, render accumulated tool-call events as a collapsible
@@ -1771,10 +2036,118 @@ function appendError(text) {
   el.className = 'msg error';
   el.textContent = '⚠ ' + text;
   messagesEl.appendChild(el);
-  scrollToBottom();
+  scrollToBottom(true);
 }
-function scrollToBottom() {
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+// force=true: always scroll (user action, new message).
+// force=false (default): respect user scroll position during streaming.
+function scrollToBottom(force = false) {
+  if (force || !isUserScrolledUp) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
+    isUserScrolledUp = false;
+  }
+}
+
+// ─── Toast notifications ──────────────────────────────────────────────────────
+let _toastContainer = null;
+function showToast(msg, type) {
+  if (!_toastContainer) {
+    _toastContainer = document.createElement('div');
+    _toastContainer.className = 'toast-container';
+    document.body.appendChild(_toastContainer);
+  }
+  if (!type) {
+    const low = String(msg).toLowerCase();
+    if (/fail|error|denied|invalid|❌/.test(low)) type = 'error';
+    else if (/warn|⚠/.test(low)) type = 'warn';
+    else if (/cleared|copied|switched|saved|✓/.test(low)) type = 'success';
+    else type = 'info';
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const msgEl = document.createElement('span');
+  msgEl.textContent = msg;
+  toast.appendChild(msgEl);
+
+  if (type === 'error') {
+    // Error toasts: Copy + Dismiss, no auto-dismiss
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'toast-copy';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', () => _copyText(msg).catch(() => {}));
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'toast-x';
+    dismissBtn.textContent = 'Dismiss';
+    dismissBtn.addEventListener('click', () => toast.remove());
+    toast.appendChild(copyBtn);
+    toast.appendChild(dismissBtn);
+  } else {
+    const x = document.createElement('button');
+    x.className = 'toast-x';
+    x.textContent = '×';
+    x.addEventListener('click', () => toast.remove());
+    toast.appendChild(x);
+    // Auto-dismiss, paused on hover
+    const duration = type === 'success' ? 2000 : 3500;
+    let timer = setTimeout(() => toast.remove(), duration);
+    toast.addEventListener('mouseenter', () => clearTimeout(timer));
+    toast.addEventListener('mouseleave', () => { timer = setTimeout(() => toast.remove(), duration); });
+  }
+  _toastContainer.appendChild(toast);
+}
+
+// ─── Confirm dialog ───────────────────────────────────────────────────────────
+function showConfirmDialog({ title = '', message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal' + (danger ? ' danger' : '');
+    modal.innerHTML = `
+      <div class="confirm-title">${escM(title)}</div>
+      <div class="confirm-msg">${escM(message)}</div>
+      <div class="confirm-btns">
+        <button class="confirm-cancel">${escM(cancelLabel)}</button>
+        <button class="confirm-ok${danger ? ' danger' : ''}">${escM(confirmLabel)}</button>
+      </div>`;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    function done(v) {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Enter') done(true);
+    }
+    modal.querySelector('.confirm-cancel').addEventListener('click', () => done(false));
+    modal.querySelector('.confirm-ok').addEventListener('click', () => done(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+    document.addEventListener('keydown', onKey);
+    modal.querySelector('.confirm-ok').focus();
+  });
+}
+
+// ─── Diff syntax highlighting ─────────────────────────────────────────────────
+function highlightDiffBlocks(el) {
+  for (const code of el.querySelectorAll('code.language-diff, code.language-patch')) {
+    if (code.dataset.diffDone) continue;
+    code.dataset.diffDone = '1';
+    const lines = code.textContent.split('\n');
+    code.textContent = '';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const span = document.createElement('span');
+      if (/^@@/.test(line))       span.className = 'diff-hunk';
+      else if (line.startsWith('+')) span.className = 'diff-add';
+      else if (line.startsWith('-')) span.className = 'diff-del';
+      span.textContent = line;
+      code.appendChild(span);
+      if (i < lines.length - 1) code.appendChild(document.createTextNode('\n'));
+    }
+  }
 }
 
 function sendMessage(msg) {
@@ -1818,5 +2191,5 @@ async function renderHistory() {
     }
   }
   addCodeCopyButtons();
-  scrollToBottom();
+  scrollToBottom(true);
 }
