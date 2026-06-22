@@ -656,6 +656,7 @@ async function handle(msg, sender) {
       const all = await storage.getAll();
       const provider = all.providers[all.activeProvider];
       if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
+      if (!provider.baseUrl?.trim()) throw ProviderConfigError('Base URL is not set. Open Settings (⚙) and configure the provider.');
 
       const tabId = msg.tabId;
       if (tabId == null) throw new Error('tabId required');
@@ -777,7 +778,7 @@ async function handle(msg, sender) {
       // Stream
       let fullReply = '';
       let aborted = false;
-      const stream = msg.stream !== false && provider.stream !== false;
+      const stream = true; // always stream — better UX, no toggle needed
       try {
         if (stream) {
           const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
@@ -802,6 +803,7 @@ async function handle(msg, sender) {
             fullReply = await chatStream({
               baseUrl: provider.baseUrl,
               apiKey: provider.apiKey,
+              model: provider.model || undefined,
               messages,
               onDelta: (delta) => {
                 appendToStreamState(tabId, delta);
@@ -818,6 +820,7 @@ async function handle(msg, sender) {
           fullReply = await chat({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
+            model: provider.model || undefined,
             messages: messages || buildMessages({ history, userText: msg.userText, pageContext: null, withImage: false, userImages: msg.images, systemPrompt: all.systemPrompt || '' }),
             signal,
             extraHeaders

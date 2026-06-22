@@ -5,7 +5,7 @@
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
-import { parser as smdParser, parser_write as smdWrite, default_renderer as smdRenderer } from './lib/vendor/smd.bundle.js';
+// smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
 // head features we don't need. Keep it simple; DOMPurify handles XSS later.
@@ -292,7 +292,7 @@ async function init() {
   // Listen for config changes (from options page)
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === 'local') {
-      if (changes.providers || changes.activeProvider) {
+      if (changes.providers || changes.activeProvider || changes.pingStates) {
         const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
         populateProviderSelect(cfg2Res.data || cfg2Res);
       }
@@ -438,21 +438,26 @@ async function handleSelectionAction(action, text) {
 
 function populateProviderSelect(cfg) {
   const providers = Object.keys(cfg.providers || {});
+  const pingStates = cfg.pingStates || {};
   providerSel.innerHTML = '';
   for (const name of providers) {
     const opt = document.createElement('option');
     opt.value = name;
     const configured = !!(cfg.providers[name]?.baseUrl?.trim());
-    opt.textContent = prettyProviderName(name) + (configured ? '' : ' (not set)');
+    let status;
+    if (!configured)               status = 'not set';
+    else if (pingStates[name] === 'reachable')   status = '● reachable';
+    else if (pingStates[name] === 'unreachable') status = '○ unreachable';
+    else                           status = 'not pinged';
+    opt.textContent = `${prettyProviderName(name)} — ${status}`;
     if (name === cfg.activeProvider) opt.selected = true;
     providerSel.appendChild(opt);
   }
 }
 
 function prettyProviderName(name) {
-  if (name === 'hermes') return 'Hermes';
-  if (name === 'claude-code') return 'Claude Code';
-  return name;
+  const map = { hermes: 'Hermes', 'claude-code': 'Claude Code', compatible: 'OpenAI-compatible' };
+  return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -591,14 +596,16 @@ function enterEditMode(userEl) {
   const textSpan = userEl.querySelector('.msg-text');
   const actionsEl = userEl.querySelector('.msg-actions');
   const timeEl = userEl.querySelector('.msg-time');
-  if (textSpan) textSpan.hidden = true;
   if (actionsEl) actionsEl.hidden = true;
   if (timeEl) timeEl.hidden = true;
 
+  // Replace text span with textarea so the container keeps its width.
+  // (hiding the span would collapse the container, making the textarea invisible.)
   const ta = document.createElement('textarea');
   ta.className = 'msg-edit-area';
   ta.value = originalText;
-  userEl.insertBefore(ta, timeEl || actionsEl || null);
+  if (textSpan) textSpan.replaceWith(ta);
+  else userEl.insertBefore(ta, timeEl || actionsEl || null);
 
   const bar = document.createElement('div');
   bar.className = 'msg-edit-bar';
@@ -627,21 +634,23 @@ function enterEditMode(userEl) {
     if (!newText) return;
     await submitUserEdit(userEl, newText);
   });
-  cancelBtn2.addEventListener('click', () => cancelUserEdit(userEl));
+  cancelBtn2.addEventListener('click', () => cancelUserEdit(userEl, ta, textSpan));
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendBtn2.click(); }
-    if (e.key === 'Escape') cancelUserEdit(userEl);
+    if (e.key === 'Escape') cancelUserEdit(userEl, ta, textSpan);
   });
 }
 
-function cancelUserEdit(userEl) {
+function cancelUserEdit(userEl, ta, textSpan) {
   delete userEl.dataset.editing;
-  userEl.querySelector('.msg-edit-area')?.remove();
   userEl.querySelector('.msg-edit-bar')?.remove();
-  const textSpan = userEl.querySelector('.msg-text');
+  // Restore original text span
+  if (ta && ta.parentNode === userEl) {
+    if (textSpan) ta.replaceWith(textSpan);
+    else ta.remove();
+  }
   const actionsEl = userEl.querySelector('.msg-actions');
   const timeEl = userEl.querySelector('.msg-time');
-  if (textSpan) textSpan.hidden = false;
   if (actionsEl) actionsEl.hidden = false;
   if (timeEl) timeEl.hidden = false;
 }
@@ -974,9 +983,8 @@ function renderSafe(markdown) {
     const thinkBlocks = []; // extracted <think>…</think> content
 
     let md = (markdown || '')
-      // Extract complete <think>…</think> blocks before marked so they
-      // don't get mangled by markdown syntax inside them.
-      .replace(/<think>([\s\S]*?)<\/think>/gi, (_, content) => {
+      // Extract <think>/<thinking> blocks before marked (handles Claude + DeepSeek).
+      .replace(/<(?:think|thinking|antml:thinking)[^>]*>([\s\S]*?)<\/(?:think|thinking|antml:thinking)>/gi, (_, content) => {
         const i = thinkBlocks.push(content.trim()) - 1;
         return `\n\n<div data-think="${i}"></div>\n\n`;
       })
@@ -1070,21 +1078,18 @@ function decorateLinks(el) {
   }
 }
 
+// Matches <think> / <thinking> opening and closing tags (Claude, DeepSeek, etc.)
+const _THINK_OPEN_RE  = /<(think|antml:thinking)(\s[^>]*)?>|<thinking>/i;
+const _THINK_CLOSE_RE = /<\/(think|antml:thinking)>|<\/thinking>/i;
+
 // Build a streaming-render closure for a specific bubble.
 // During streaming:
-//   - <think>…</think> content is routed to a collapsible "live think" element above the bubble
-//   - Normal text is written incrementally via smd (RAF-throttled)
-// At DONE: live think element is removed; full renderSafe() handles KaTeX + final think blocks.
+//   - <think>/<thinking> content shown in a live collapsible element above the bubble
+//   - Non-think text rendered each tick via renderStreamingSafe (marked + DOMPurify)
+// At DONE: live think removed; full renderSafe() handles KaTeX + final think blocks.
 function makeStreamRenderer(el) {
-  const mainRenderer = smdRenderer(el);
-  const p = smdParser(mainRenderer);
-  let fullAccum = '';    // full accumulated text (for routing)
-  let routedUpTo = 0;   // how many chars have been routed to smd/think
+  let fullAccum = '';
   let raf = null;
-
-  // Live think block state
-  let inThink = false;
-  let thinkBuf = '';
   let thinkEl = null;
   let thinkBodyEl = null;
 
@@ -1092,7 +1097,7 @@ function makeStreamRenderer(el) {
     if (!thinkEl) {
       thinkEl = document.createElement('details');
       thinkEl.className = 'think-block live-think';
-      thinkEl.open = true; // open while streaming so user can watch
+      thinkEl.open = true;
       const sum = document.createElement('summary');
       sum.textContent = 'Thinking…';
       thinkBodyEl = document.createElement('div');
@@ -1103,55 +1108,37 @@ function makeStreamRenderer(el) {
     }
   }
 
-  function routeNewContent() {
-    // Process fullAccum[routedUpTo..], routing <think> to thinkBodyEl and normal text to smd.
-    // Hold back up to 7 chars at end to handle tags split across chunk boundaries.
-    const HOLD = 7; // len('<think>') - 1
-    let remaining = fullAccum.slice(routedUpTo);
-    let smdBuf = '';
-
-    while (remaining.length > 0) {
-      if (!inThink) {
-        const openIdx = remaining.indexOf('<think>');
-        if (openIdx === -1) {
-          // No full <think> tag — flush safe portion, hold tail
-          const safe = remaining.length > HOLD ? remaining.slice(0, -HOLD) : '';
-          smdBuf += safe;
-          routedUpTo += safe.length;
-          break;
-        }
-        smdBuf += remaining.slice(0, openIdx);
-        routedUpTo += openIdx + 7;
-        remaining = remaining.slice(openIdx + 7);
-        inThink = true;
-        ensureThinkEl();
+  // Split accumulated text into display (non-think) and think portions.
+  // Scans the full buffer each tick so partial tags across chunk boundaries are handled.
+  function splitThink(text) {
+    let display = '';
+    let think = '';
+    let rest = text;
+    let inside = false;
+    while (rest.length > 0) {
+      if (!inside) {
+        const m = _THINK_OPEN_RE.exec(rest);
+        if (!m) { display += rest; break; }
+        display += rest.slice(0, m.index);
+        rest = rest.slice(m.index + m[0].length);
+        inside = true;
       } else {
-        const closeIdx = remaining.indexOf('</think>');
-        if (closeIdx === -1) {
-          const safe = remaining.length > HOLD ? remaining.slice(0, -HOLD) : '';
-          thinkBuf += safe;
-          routedUpTo += safe.length;
-          if (thinkBodyEl) thinkBodyEl.textContent = thinkBuf;
-          break;
-        }
-        thinkBuf += remaining.slice(0, closeIdx);
-        routedUpTo += closeIdx + 8;
-        remaining = remaining.slice(closeIdx + 8);
-        inThink = false;
-        if (thinkBodyEl) thinkBodyEl.textContent = thinkBuf;
-        if (thinkEl) thinkEl.open = false; // collapse when thinking done
+        const m = _THINK_CLOSE_RE.exec(rest);
+        if (!m) { think += rest; break; }
+        think += rest.slice(0, m.index);
+        rest = rest.slice(m.index + m[0].length);
+        inside = false;
+        if (thinkEl) thinkEl.open = false; // collapse once tag closed
       }
     }
-
-    if (smdBuf) smdWrite(p, smdBuf);
+    return { display, think };
   }
 
   return function renderStream(delta, isDone) {
     if (isDone) {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      // Remove live think element — renderSafe handles think blocks properly
       if (thinkEl) { thinkEl.remove(); thinkEl = null; thinkBodyEl = null; }
-      el.innerHTML = renderSafe(delta); // full text with KaTeX + think blocks
+      el.innerHTML = renderSafe(delta);
       el.classList.add('done');
       addThinkCopyButtons(el);
       decorateLinks(el);
@@ -1163,10 +1150,12 @@ function makeStreamRenderer(el) {
     if (raf != null) return;
     raf = requestAnimationFrame(() => {
       raf = null;
-      routeNewContent();
-      // Badge the scroll button when user is scrolled up and new content arrives
+      const { display, think } = splitThink(fullAccum);
+      if (think) { ensureThinkEl(); thinkBodyEl.textContent = think; }
+      el.innerHTML = renderStreamingSafe(display);
+      el.classList.remove('done');
       if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
-      scrollToBottom(); // respects isUserScrolledUp
+      scrollToBottom();
     });
   };
 }
@@ -1353,7 +1342,7 @@ async function onSend() {
   setStreamingUI(true);
 
   // Placeholder assistant bubble
-  const assistantEl = appendAssistant('▍');
+  const assistantEl = appendAssistant('');
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
   const renderStream = makeStreamRenderer(assistantEl);
@@ -1534,14 +1523,14 @@ async function resumeInFlightStream(tabId) {
   let assistantEl = initialBubble;
   function getOrCreateAssistantBubble() {
     let el = messagesEl.querySelector('.msg.assistant:last-of-type');
-    if (!el) el = appendAssistant('▍');
+    if (!el) el = appendAssistant('');
     return el;
   }
   function ensureAssistantEl() {
     // The DOM node identity may have changed (innerHTML restore
     // replaces the whole subtree). Re-resolve on every chunk.
     let el = messagesEl.querySelector('.msg.assistant:last-of-type');
-    if (!el) el = appendAssistant('▍');
+    if (!el) el = appendAssistant('');
     if (el !== assistantEl) {
       // Switch the stream renderer's target. makeStreamRenderer
       // holds a closure over the original el — that one's renderStream

@@ -25,17 +25,30 @@ npm test             # run tests
 npm run package      # → browsa-v<version>.zip
 ```
 
+To bump the version before packaging:
+
+```bash
+npm version patch    # bug fix:   0.22.0 → 0.22.1
+npm version minor    # new features: 0.22.0 → 0.23.0
+npm run package
+```
+
+`npm version` automatically syncs the version to both `package.json` and `manifest.json`.
+
 To install from the zip: unzip, then **Load unpacked** as above.
 
 ## Configure a provider
 
-browsa works with any OpenAI-compatible endpoint. Two agent backends are pre-configured as presets: **Hermes Agent** and **Claude Code**. Both give you a full agentic experience — the AI can search the web, run code, read files, and more on the server side.
+browsa splits providers into two categories:
 
-Use the **Ping** button in Settings to verify connectivity before chatting.
+- **Agent Providers** — full agent backend with tool execution (bash, file ops, web search, etc.). The AI can actually *do* things on the server side.
+- **LLM Providers** — plain language model endpoint for conversation only.
+
+Use the **Ping** button in Settings to verify connectivity. The provider status (reachable / unreachable / not pinged) is shown in the sidebar dropdown.
 
 ---
 
-### Hermes Agent
+### 🤖 Hermes Agent
 
 Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn, Hermes stores the full conversation history server-side.
 
@@ -65,14 +78,12 @@ hermes gateway
 |---|---|
 | Base URL | `http://<server-ip>:8642` |
 | API Key | value of `API_SERVER_KEY` |
-| Default model | `hermes-agent` |
-| Responses API | ✅ auto-enabled on Ping |
 
-**5. Ping** to verify. Responses API will be auto-detected and enabled.
+**5. Ping** to verify. The Responses API is auto-detected.
 
 ---
 
-### Claude Code (via claude-code-openai-wrapper)
+### 🤖 Claude Code (via claude-code-openai-wrapper)
 
 This setup runs the real Claude Code CLI on your server — with its full tool suite (bash, file read/write, etc.) — and exposes it as a standard OpenAI-compatible HTTP API. browsa talks to the wrapper; the wrapper runs `claude` locally.
 
@@ -134,27 +145,35 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000
 # Ctrl+B D to detach (server keeps running)
 ```
 
-To reattach and view logs later:
-
-```bash
-tmux attach -t claude-wrapper
-```
-
 **5. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
 
 | Field | Value |
 |---|---|
 | Base URL | `http://<server-ip>:8000` |
 | API Key | value of `API_KEYS` |
-| Default model | `claude-sonnet-4-6` (or any model your account supports) |
-| Responses API | ☐ leave off |
-
-`enable_tools` is always on — Claude Code's bash, file, and other tools are active for every request. No extra configuration needed.
+| Model ID | `claude-sonnet-4-6` (optional — wrapper picks a default if left blank) |
 
 **6. Ping** to verify.
 
-> **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files. Leave it unset to use a temporary isolated sandbox.
+> **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files.
 
+---
+
+### 💬 OpenAI-compatible LLM
+
+Any endpoint that speaks `/v1/chat/completions` — OpenAI, Anthropic, Ollama, Groq, LLM Gateway, etc.
+
+**Configure browsa** — open ⚙ Settings, select (or configure) the **OpenAI-compatible** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | e.g. `https://api.openai.com` or your gateway URL |
+| API Key | your API key |
+| Model ID | **required** — e.g. `gpt-4o`, `claude-sonnet-4-6`, `qwen3.6-plus-anthropic` |
+
+**Ping** validates reachability and verifies the model ID is accepted by the server.
+
+---
 
 ## Context modes
 
@@ -177,7 +196,7 @@ For SPA sites where Readability fails, browsa intercepts the browser's own API c
 | **得到** | Article text |
 | **极客时间** | Article text |
 
-> **Note:** Open the article page first and let it fully load. Then send your message. The interception happens when the SPA makes its own API call — browsa just observes it.
+> **Note:** Open the article page first and let it fully load. Then send your message.
 
 ## Slash commands
 
@@ -191,6 +210,8 @@ Type these in the composer:
 | `/explain` | Explain for a beginner |
 | `/outline` | Heading-only outline |
 | `/keypoints` | Top 5 takeaways |
+| `/compact` | Summarize conversation context |
+| `/context` | Show current conversation context |
 
 ## Keyboard shortcuts
 
@@ -199,17 +220,28 @@ Type these in the composer:
 | `Ctrl+Shift+H` | Open / close side panel |
 | `Enter` | Send message |
 | `Shift+Enter` | New line |
-| `Ctrl+K` | Clear history |
+| `Ctrl+K` | Clear history (with confirmation) |
 | `Ctrl+/` | Cycle context mode |
 | `Esc` | Cancel streaming reply |
 
+## Chat features
+
+- **Timestamps** — hover over any message to see the send time
+- **Edit message** — click ✏ on a user message to edit and re-send
+- **Regenerate** — click ↺ on an assistant reply to regenerate
+- **Copy response** — click ⎘ to copy the full raw markdown
+- **Think blocks** — `<think>` / `<thinking>` content shown in a collapsible block during and after streaming
+- **Diff highlighting** — `diff`/`patch` code blocks color `+` lines green and `-` lines red
+- **Mermaid diagrams** — rendered inline (lazy-loaded)
+- **Scroll-to-bottom button** — appears when you scroll up during streaming
+
 ## How it works
 
-- **`background.js`** — MV3 service worker. Routes messages, manages per-site XHR caches, streams LLM replies via a long-lived port. Handles mid-stream tab switching via `streamState` (accumulated reply survives port disconnect).
-- **`lib/page-extractor.js`** — Injects Readability + Turndown into the page's MAIN world for reader mode. For SPA sites, uses the XHR cache first and skips DOM injection entirely.
-- **`lib/openai-client.js`** — Fetch-based SSE streaming client (OpenAI-compatible chat completions and Responses API).
-- **`sidepanel.js`** — Chat UI with 60fps blinking-caret streaming, per-tab history, Markdown rendering (marked + DOMPurify).
-- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XHR.prototype` to observe SPA API calls and forward structured data to the background.
+- **`background.js`** — MV3 service worker. Routes messages, manages per-site XHR caches, streams LLM replies via a long-lived port. Handles mid-stream tab switching via `streamState`.
+- **`lib/page-extractor.js`** — Injects Readability + Turndown into the page's MAIN world for reader mode. For SPA sites, uses the XHR cache first.
+- **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/responses` (Hermes stateful API). Ping validates connectivity without LLM inference.
+- **`sidepanel.js`** — Chat UI with streaming markdown rendering, live think-block routing, message editing, timestamps, and action buttons.
+- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XHR.prototype` to observe SPA API calls.
 
 ## Project structure
 
@@ -229,10 +261,6 @@ browsa/
 │   ├── dedao-content-script.js      # 得到 XHR interceptor
 │   ├── geektime-content-script.js   # 极客时间 XHR interceptor
 │   └── vendor/                      # bundled third-party libs
-│       ├── Readability.iife.js
-│       ├── Turndown.iife.js
-│       ├── marked.bundle.js
-│       └── purify.bundle.js
 ├── _locales/{en,zh_CN}/
 ├── icons/
 ├── build/                           # build + package scripts

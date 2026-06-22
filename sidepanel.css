@@ -1143,6 +1143,8 @@ math[display="block"] {
 
 /* ─── Edit mode ──────────────────────────────────────────────────────────────── */
 .msg-edit-area {
+  display: block;       /* override inline-block so text-align:right on .msg.user doesn't shift it */
+  text-align: left;
   width: 100%;
   min-height: 60px;
   max-height: 200px;

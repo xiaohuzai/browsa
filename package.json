@@ -1,6 +1,6 @@
 {
   "name": "browsa",
-  "version": "0.21.13",
+  "version": "0.22.0",
   "private": true,
   "description": "Hand the current page to your AI agent — side-panel chat for Hermes, Claude Code, or any OpenAI-compatible API",
   "scripts": {
@@ -8,7 +8,8 @@
     "watch": "node build/build.mjs --watch",
     "test": "node --test test/*.test.mjs",
     "compat": "bash check-compat.sh",
-    "package": "node build/package.mjs"
+    "package": "node build/package.mjs",
+    "postversion": "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json','utf8'));m.version=require('./package.json').version;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2)+'\\n');console.log('manifest.json synced to',m.version);\""
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
