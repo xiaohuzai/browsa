@@ -386,6 +386,7 @@ body {
 .tool-progress[data-tier="running"]   { color: #a78bfa; border-left-color: #a78bfa; }
 .tool-progress[data-tier="reading"]   { color: #34d399; border-left-color: #34d399; }
 .tool-progress[data-tier="writing"]   { color: var(--accent); border-left-color: var(--accent); }
+.tool-progress[data-tier="warn"]      { color: var(--warn); border-left-color: var(--warn); }
 @keyframes tool-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }

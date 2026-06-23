@@ -2153,6 +2153,7 @@ function closeSessionsDrawer() {
 }
 
 let _sessionsFilter = '';
+let _renameClickTimer = null; // debounce: distinguish single-click-load from double-click-rename
 
 async function renderSessionsList() {
   const listEl = $('sessions-list');
@@ -2185,12 +2186,20 @@ async function renderSessionsList() {
         <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
       </div>`;
 
-    // Click body → load session
-    item.querySelector('.session-item-body').addEventListener('click', () => loadSession(s.id, s.name));
-
-    // Double-click name → inline rename
+    // Click body → load session; double-click name → rename.
+    // A double-click fires two click events before dblclick — debounce
+    // the click so we can cancel it when dblclick arrives.
     const nameEl = item.querySelector('.session-item-name');
+    item.querySelector('.session-item-body').addEventListener('click', (e) => {
+      if (e.target.closest('.session-item-name')) {
+        clearTimeout(_renameClickTimer);
+        _renameClickTimer = setTimeout(() => loadSession(s.id, s.name), 220);
+      } else {
+        loadSession(s.id, s.name);
+      }
+    });
     nameEl.addEventListener('dblclick', (e) => {
+      clearTimeout(_renameClickTimer); // cancel the pending single-click load
       e.stopPropagation();
       startSessionRename(nameEl, s.id);
     });
@@ -2224,17 +2233,25 @@ function startSessionRename(nameEl, sessionId) {
   input.focus();
   input.select();
 
+  let done = false; // prevent double-commit (Enter fires blur on DOM removal)
   const commit = async () => {
+    if (done) return;
+    done = true;
     const newName = input.value.trim() || oldName;
     await sendMessage({ type: 'RENAME_SESSION', id: sessionId, name: newName });
     renderSessionsList();
     if (newName !== oldName) showToast('Session renamed', 'success');
   };
+  const cancel = () => {
+    if (done) return;
+    done = true;
+    renderSessionsList();
+  };
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { renderSessionsList(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
   });
-  input.addEventListener('blur', commit);
+  input.addEventListener('blur', commit); // normal click-away: save
 }
 
 /** Export a saved session as a Markdown file. */
