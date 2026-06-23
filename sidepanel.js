@@ -1474,6 +1474,7 @@ async function resumeInFlightStream(tabId) {
   //      onActivated replaces the whole subtree).
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
   let acc = peek.acc || '';
+  let resumedToolEvents = [];
   const initialBubble = getOrCreateAssistantBubble();
   let renderStream = makeStreamRenderer(initialBubble);
   let assistantEl = initialBubble;
@@ -1525,6 +1526,7 @@ async function resumeInFlightStream(tabId) {
       updateOutputTokenCount(m.delta);
 
     } else if (m.type === 'TOOL_PROGRESS') {
+      resumedToolEvents.push(m.text);
       showToolProgress(assistantEl, m.text);
 
     } else if (m.type === 'RETRY') {
@@ -1533,6 +1535,10 @@ async function resumeInFlightStream(tabId) {
     } else if (m.type === 'DONE') {
       const r = ensureAssistantEl();
       clearToolProgress(assistantEl);
+      if (resumedToolEvents.length > 0) {
+        renderToolHistory(assistantEl, resumedToolEvents);
+        resumedToolEvents = [];
+      }
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       r(m.full || acc, true);
       addCodeCopyButtons();
@@ -2150,6 +2156,8 @@ function closeSessionsDrawer() {
   const el = getSessionsDrawer();
   if (el) el.hidden = true;
   if (_sessionsBackdrop) _sessionsBackdrop.classList.remove('active');
+  clearTimeout(_renameClickTimer); // cancel any pending single-click load
+  _renameClickTimer = null;
 }
 
 let _sessionsFilter = '';
