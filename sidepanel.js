@@ -1524,13 +1524,21 @@ async function resumeInFlightStream(tabId) {
       r(m.delta, false); // smd: pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
 
+    } else if (m.type === 'TOOL_PROGRESS') {
+      showToolProgress(assistantEl, m.text);
+
+    } else if (m.type === 'RETRY') {
+      showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
+
     } else if (m.type === 'DONE') {
       const r = ensureAssistantEl();
+      clearToolProgress(assistantEl);
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       r(m.full || acc, true);
       addCodeCopyButtons();
       renderMermaid(assistantEl);
       outputTokens = 0;
+      if (m.usage) showTokenUsage(assistantEl, m.usage);
 
       try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
       try { port.disconnect(); } catch (_) {}
