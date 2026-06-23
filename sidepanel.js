@@ -77,6 +77,9 @@ async function init() {
   $('sessions-btn')?.addEventListener('click', openSessionsDrawer);
   document.getElementById('sessions-close')?.addEventListener('click', closeSessionsDrawer);
   $('sessions-new')?.addEventListener('click', newSession);
+  // Sessions drawer: search and clear-all wired once here to avoid stacking listeners
+  document.querySelector('.sessions-search')?.addEventListener('input', onSessionSearch);
+  $('sessions-clear-all')?.addEventListener('click', clearAllSessions);
   settingsBtn.addEventListener('click', openSettingsPage);
   clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
@@ -1798,7 +1801,7 @@ function addMsgActions(el, getRaw) {
   el.appendChild(wrap);
 }
 /** Show a faint "tool progress" line below a streaming bubble. */
-function showToolProgress(bubbleEl, text) {
+function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
   let el = bubbleEl.nextElementSibling;
   if (!el || !el.classList.contains('tool-progress')) {
@@ -1810,13 +1813,15 @@ function showToolProgress(bubbleEl, text) {
   // tell at a glance whether the agent is thinking, running a tool,
   // or waiting — mirrors personal_ai_assistant's event-type display.
   let icon = '⚙';
-  let tier = '';
-  const t = text.toLowerCase();
-  if (/think|reason|analyz|consid/.test(t))          { icon = '🤔'; tier = 'thinking'; }
-  else if (/search|fetch|web|http|url/.test(t))      { icon = '🔍'; tier = 'searching'; }
-  else if (/read|open|load|file|path/.test(t))       { icon = '📖'; tier = 'reading'; }
-  else if (/write|edit|creat|sav|updat/.test(t))     { icon = '✏️'; tier = 'writing'; }
-  else if (/run|exec|bash|shell|cmd|command/.test(t)){ icon = '💻'; tier = 'running'; }
+  let tier = tierOverride || '';
+  if (!tierOverride) {
+    const t = text.toLowerCase();
+    if (/think|reason|analyz|consid/.test(t))          { icon = '🤔'; tier = 'thinking'; }
+    else if (/search|fetch|web|http|url/.test(t))      { icon = '🔍'; tier = 'searching'; }
+    else if (/read|open|load|file|path/.test(t))       { icon = '📖'; tier = 'reading'; }
+    else if (/write|edit|creat|sav|updat/.test(t))     { icon = '✏️'; tier = 'writing'; }
+    else if (/run|exec|bash|shell|cmd|command/.test(t)){ icon = '💻'; tier = 'running'; }
+  }
   el.dataset.tier = tier;
   el.innerHTML = `<span class="tp-icon">${icon}</span><span class="tp-text">${text}</span>`;
 }
@@ -2121,11 +2126,10 @@ function openSessionsDrawer() {
   if (!el) return;
   el.hidden = false;
   getOrCreateBackdrop().classList.add('active');
+  // Reset search filter and clear the input each time drawer opens
   _sessionsFilter = '';
   const searchEl = el.querySelector('.sessions-search');
-  if (searchEl) { searchEl.value = ''; searchEl.addEventListener('input', onSessionSearch); }
-  const clearAllBtn = el.querySelector('#sessions-clear-all');
-  if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSessions);
+  if (searchEl) searchEl.value = '';
   renderSessionsList();
 }
 
