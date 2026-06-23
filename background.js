@@ -427,6 +427,30 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'BILIBILI_VIDEO': {
+      const tabId = sender?.tab?.id;
+      if (tabId) bilibiliCache.set(tabId, msg.video);
+      return { ok: true };
+    }
+
+    case 'XUEQIU_DATA': {
+      const tabId = sender?.tab?.id;
+      if (tabId) xueqiuCache.set(tabId, msg.data);
+      return { ok: true };
+    }
+
+    case 'TWITTER_TWEET': {
+      const tabId = sender?.tab?.id;
+      if (tabId) twitterCache.set(tabId, msg.tweet);
+      return { ok: true };
+    }
+
+    case 'XIAOYUZHOU_EPISODE': {
+      const tabId = sender?.tab?.id;
+      if (tabId) xiaoyuzhouCache.set(tabId, msg.episode);
+      return { ok: true };
+    }
+
     case 'SET_ACTIVE_PROVIDER': {
       await storage.setActiveProvider(msg.name);
       return { activeProvider: msg.name };
@@ -543,6 +567,26 @@ async function handle(msg, sender) {
             text: cachedText,
             truncated: { rawTextLength: cachedText.length, textLength: cachedText.length, wasCapped: false }
           };
+        } else if (mode === 'jina') {
+          // Jina Reader: fetch clean Markdown from r.jina.ai/{url}
+          // Runs in the service worker — no CORS restrictions, no cookies sent.
+          // Best for paywalled/JS-heavy pages where Readability gives poor results.
+          const tab = await chrome.tabs.get(tabId).catch(() => null);
+          if (!tab?.url) return { ok: false, error: 'Cannot get tab URL' };
+          if (!/^https?:\/\//.test(tab.url)) return { ok: false, error: 'Jina Reader only works on http/https pages' };
+          const jinaUrl = 'https://r.jina.ai/' + tab.url;
+          const resp = await fetch(jinaUrl, {
+            headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' }
+          }).catch(e => { throw new Error('Jina fetch failed: ' + e.message); });
+          if (!resp.ok) throw new Error(`Jina Reader returned ${resp.status} for this page`);
+          const markdown = await resp.text();
+          if (!markdown?.trim()) return { ok: false, error: 'Jina Reader returned empty content' };
+          ctx = {
+            meta: { url: tab.url, title: tab.title || '', favIconUrl: tab.favIconUrl || '' },
+            mode: 'jina',
+            text: markdown,
+            truncated: { rawTextLength: markdown.length, textLength: markdown.length, wasCapped: false }
+          };
         } else {
           // auto and reader modes may need Readability; dom/full don't
           if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
@@ -553,6 +597,32 @@ async function handle(msg, sender) {
             siteCache: getSiteCache(tabId)
           });
           if (!ctx) return { ok: false, error: 'extraction returned null' };
+
+          // Auto mode silent Jina fallback: if all local strategies returned
+          // very little content (< 200 chars), try r.jina.ai as last resort.
+          // Jina runs on their servers without user cookies, so it's only
+          // useful for public pages. We set autoMode='jina' so the UI label
+          // shows "auto/jina" rather than the empty/failed local mode.
+          if (mode === 'auto' && (ctx.text?.length || 0) < 200) {
+            try {
+              const tab = await chrome.tabs.get(tabId).catch(() => null);
+              if (tab?.url && /^https?:\/\//.test(tab.url)) {
+                const resp = await fetch('https://r.jina.ai/' + tab.url, {
+                  headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' }
+                });
+                if (resp.ok) {
+                  const markdown = await resp.text();
+                  if (markdown?.trim().length > (ctx.text?.length || 0)) {
+                    ctx = Object.assign({}, ctx, {
+                      autoMode: 'jina',
+                      text: markdown,
+                      truncated: { rawTextLength: markdown.length, textLength: markdown.length, wasCapped: false }
+                    });
+                  }
+                }
+              }
+            } catch (_) { /* Jina fallback is best-effort; ignore errors */ }
+          }
         }
         // Screenshot mode: don't store to history yet. The side panel shows
         // a crop UI first; once the user confirms (with or without a crop),
@@ -1085,14 +1155,22 @@ const juejinCache      = new Map(); // tabId -> Juejin article
 const zhihuCache       = new Map(); // tabId -> Zhihu article or Q&A
 const dedaoCache       = new Map(); // tabId -> Dedao article
 const geektimeCache    = new Map(); // tabId -> Geektime article
+const bilibiliCache    = new Map(); // tabId -> Bilibili video data
+const xueqiuCache      = new Map(); // tabId -> Xueqiu stock/post data
+const twitterCache     = new Map(); // tabId -> Twitter/X tweet data
+const xiaoyuzhouCache  = new Map(); // tabId -> 小宇宙 podcast episode data
 
 /** Return cached site data for a tab, regardless of which site it came from. */
 function getSiteCache(tabId) {
-  if (youtubeCache.has(tabId))  return { source: 'youtube',  data: youtubeCache.get(tabId) };
-  if (juejinCache.has(tabId))   return { source: 'juejin',   data: juejinCache.get(tabId) };
-  if (zhihuCache.has(tabId))    return { source: 'zhihu',    data: zhihuCache.get(tabId) };
-  if (dedaoCache.has(tabId))    return { source: 'dedao',    data: dedaoCache.get(tabId) };
-  if (geektimeCache.has(tabId)) return { source: 'geektime', data: geektimeCache.get(tabId) };
+  if (youtubeCache.has(tabId))    return { source: 'youtube',    data: youtubeCache.get(tabId) };
+  if (juejinCache.has(tabId))     return { source: 'juejin',     data: juejinCache.get(tabId) };
+  if (zhihuCache.has(tabId))      return { source: 'zhihu',      data: zhihuCache.get(tabId) };
+  if (dedaoCache.has(tabId))      return { source: 'dedao',      data: dedaoCache.get(tabId) };
+  if (geektimeCache.has(tabId))   return { source: 'geektime',   data: geektimeCache.get(tabId) };
+  if (bilibiliCache.has(tabId))   return { source: 'bilibili',   data: bilibiliCache.get(tabId) };
+  if (xueqiuCache.has(tabId))     return { source: 'xueqiu',     data: xueqiuCache.get(tabId) };
+  if (twitterCache.has(tabId))    return { source: 'twitter',    data: twitterCache.get(tabId) };
+  if (xiaoyuzhouCache.has(tabId)) return { source: 'xiaoyuzhou', data: xiaoyuzhouCache.get(tabId) };
   return null;
 }
 
@@ -1117,6 +1195,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   zhihuCache.delete(tabId);
   dedaoCache.delete(tabId);
   geektimeCache.delete(tabId);
+  bilibiliCache.delete(tabId);
+  xueqiuCache.delete(tabId);
+  twitterCache.delete(tabId);
+  xiaoyuzhouCache.delete(tabId);
   const set = navPorts.get(tabId);
   if (set) {
     for (const p of set) {
