@@ -11,6 +11,7 @@
   --fg-dim:       #857d72;
   --border:       #2e2b24;
   --border-soft:  #242119;
+  --border-strong:#3a3730;
   --accent:       #f97316;
   --accent-dim:   rgba(249,115,22,0.10);
   --accent-hover: rgba(249,115,22,0.16);
@@ -26,27 +27,40 @@
   --t:            0.15s ease;
   --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
   --shadow-md:    0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.50);
+  /* Semantic aliases used by sessions drawer and new UI components */
+  --surface:      var(--bg-2);
+  --err:          var(--error);
+  --muted:        var(--fg-dim);
+  --accent-bg:    var(--accent-dim);
+  --hover-bg:     rgba(128,128,128,0.08);
+  --input-bg:     var(--bg);
+  --code-bg:      rgba(128,128,128,0.08);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg:         #faf9f6;
-    --bg-2:       #ffffff;
-    --bg-3:       #f2efe8;
-    --bg-4:       #eae6de;
-    --fg:         #1a1710;
-    --fg-2:       #3d3a33;
-    --fg-dim:     #7a746c;
-    --border:     #e4e0d8;
-    --border-soft:#ece9e2;
-    --accent:     #c2410c;
-    --accent-dim: rgba(194,65,12,0.08);
+    --bg:           #faf9f6;
+    --bg-2:         #ffffff;
+    --bg-3:         #f2efe8;
+    --bg-4:         #eae6de;
+    --fg:           #1a1710;
+    --fg-2:         #3d3a33;
+    --fg-dim:       #7a746c;
+    --border:       #e4e0d8;
+    --border-soft:  #ece9e2;
+    --border-strong:#c8c4bb;
+    --accent:       #c2410c;
+    --accent-dim:   rgba(194,65,12,0.08);
     --accent-hover: rgba(194,65,12,0.13);
     --accent-glow:  rgba(194,65,12,0.18);
-    --user-bg:    #fff2eb;
-    --user-border:rgba(194,65,12,0.22);
-    --shadow-sm:  0 1px 4px rgba(0,0,0,0.08);
-    --shadow-md:  0 4px 16px rgba(0,0,0,0.10);
+    --user-bg:      #fff2eb;
+    --user-border:  rgba(194,65,12,0.22);
+    --shadow-sm:    0 1px 4px rgba(0,0,0,0.08);
+    --shadow-md:    0 4px 16px rgba(0,0,0,0.10);
+    --shadow-lg:    0 8px 32px rgba(0,0,0,0.18);
+    --hover-bg:     rgba(0,0,0,0.04);
+    --code-bg:      rgba(0,0,0,0.05);
   }
 }
 
@@ -386,6 +400,7 @@ body {
 .tool-progress[data-tier="running"]   { color: #a78bfa; border-left-color: #a78bfa; }
 .tool-progress[data-tier="reading"]   { color: #34d399; border-left-color: #34d399; }
 .tool-progress[data-tier="writing"]   { color: var(--accent); border-left-color: var(--accent); }
+.tool-progress[data-tier="warn"]      { color: var(--warn); border-left-color: var(--warn); }
 @keyframes tool-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
@@ -1141,6 +1156,22 @@ math[display="block"] {
 /* ─── User message text span ─────────────────────────────────────────────────── */
 .msg.user .msg-text { white-space: pre-wrap; }
 
+/* ─── Attached images inside user bubble ─────────────────────────────────────── */
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  justify-content: flex-end;
+}
+.msg-image {
+  max-width: 180px;
+  max-height: 140px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+}
+
 /* ─── Edit mode ──────────────────────────────────────────────────────────────── */
 .msg-edit-area {
   display: block;       /* override inline-block so text-align:right on .msg.user doesn't shift it */
@@ -1229,10 +1260,15 @@ code.language-patch {
   font-weight: 600;
   color: var(--fg);
 }
+.sessions-clear-all-btn { font-size: 12px; }
+.sessions-clear-all-btn:hover { color: var(--err) !important; }
 .sessions-drawer-actions {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .sessions-new-btn {
   width: 100%;
@@ -1247,6 +1283,18 @@ code.language-patch {
   transition: background 0.1s, color 0.1s;
 }
 .sessions-new-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.sessions-search {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--input-bg, var(--surface));
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+.sessions-search:focus { border-color: var(--accent); }
 .sessions-list {
   flex: 1;
   overflow-y: auto;
@@ -1279,6 +1327,16 @@ code.language-patch {
   color: var(--muted);
   margin-top: 1px;
 }
+.session-item-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.session-item:hover .session-item-actions { opacity: 1; }
+.session-export-btn,
 .session-del-btn {
   background: none;
   border: none;
@@ -1287,12 +1345,21 @@ code.language-patch {
   font-size: 13px;
   padding: 2px 4px;
   border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
-  flex-shrink: 0;
+  transition: color 0.1s;
 }
-.session-item:hover .session-del-btn { opacity: 1; }
+.session-export-btn:hover { color: var(--accent); }
 .session-del-btn:hover { color: var(--err); }
+.session-rename-input {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  background: var(--input-bg, var(--surface));
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
 .sessions-empty {
   text-align: center;
   color: var(--muted);
@@ -1300,6 +1367,18 @@ code.language-patch {
   padding: 32px 16px;
   line-height: 1.6;
 }
+
+/* ── Token usage chip ────────────────────────────────────────────────────── */
+.token-usage {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 6px;
+  margin: 2px 0 4px;
+  opacity: 0.75;
+  user-select: none;
+  cursor: default;
+}
+.token-usage:hover { opacity: 1; }
 
 /* ── Prompt inspector modal ──────────────────────────────────────────────── */
 .prompt-inspector-modal {

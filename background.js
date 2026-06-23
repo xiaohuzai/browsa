@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, chat, responsesApiStream, healthCheck, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { chatStream, responsesApiStream, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
 // Session management re-exported from storage for use in handle()
 const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
@@ -23,8 +23,6 @@ chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
   chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
-  // Image context menu
-  chrome.contextMenus.create({ id: 'browsa-image-ask', title: '🖼 Ask browsa about this image', contexts: ['image'] });
 
   if (details.reason === 'install' || details.reason === 'update') {
     // Best-effort: re-inject the selection toolbar into already-open tabs.
@@ -59,66 +57,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab?.id) return;
 
-  // ── Image right-click ────────────────────────────────────────────────────
-  if (info.menuItemId === 'browsa-image-ask') {
-    const srcUrl = info.srcUrl;
-    if (!srcUrl) return;
-
-    // Fetch the image inside the page's MAIN world so cookies + CORS headers
-    // are automatically applied (e.g. authenticated CDN images on XHS, etc.).
-    let dataUrl = null;
-    try {
-      const [res] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async (url) => {
-          try {
-            const r = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(8000) });
-            if (!r.ok) return null;
-            const blob = await r.blob();
-            // Resize to max 1024px and encode as JPEG to keep size reasonable
-            return await new Promise((resolve) => {
-              const img = new Image();
-              img.onload = () => {
-                const maxDim = 1024;
-                let w = img.naturalWidth, h = img.naturalHeight;
-                if (w > maxDim || h > maxDim) {
-                  const s = Math.min(maxDim / w, maxDim / h);
-                  w = Math.round(w * s); h = Math.round(h * s);
-                }
-                const c = document.createElement('canvas');
-                c.width = w; c.height = h;
-                c.getContext('2d').drawImage(img, 0, 0, w, h);
-                resolve(c.toDataURL('image/jpeg', 0.85));
-                URL.revokeObjectURL(img.src);
-              };
-              img.onerror = () => resolve(null);
-              img.src = URL.createObjectURL(blob);
-            });
-          } catch (_) { return null; }
-        },
-        args: [srcUrl],
-        world: 'MAIN'
-      });
-      dataUrl = res?.result || null;
-    } catch (_) {}
-
-    // Fall back to raw URL if fetch failed (public images, no auth needed)
-    const imagePayload = dataUrl || srcUrl;
-
-    const payload = { type: 'IMAGE_ACTION', dataUrl: imagePayload, srcUrl };
-    const set = navPorts.get(tab.id);
-    let relayed = false;
-    if (set && set.size > 0) {
-      for (const p of set) {
-        try { p.postMessage(payload); relayed = true; } catch (_) {}
-      }
-    }
-    if (!relayed) {
-      chrome.storage.session.set({ pendingImageAction: { tabId: tab.id, dataUrl: imagePayload, srcUrl } }).catch(() => {});
-      try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
-    }
-    return;
-  }
 
   // ── Text selection right-click ────────────────────────────────────────────
   // On Mac, a two-finger trackpad tap resets the visual selection to the
@@ -555,6 +493,16 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'CLEAR_ALL_SESSIONS': {
+      await storage.clearAllSessions();
+      return { ok: true };
+    }
+
+    case 'GET_SESSION_FULL': {
+      const session = await storage.getSessionFull(msg.id);
+      return { session };
+    }
+
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
       // Reset session IDs for all providers so the next conversation
@@ -767,7 +715,7 @@ async function handle(msg, sender) {
       const domainRules = all.domainRules || [];
       const matchedRule = domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
       const domainExtra = matchedRule?.prompt?.trim() || '';
-      const llmsTxt = tabUrl ? await fetchLlmsTxt(tabUrl) : null;
+      const llmsTxt = (all.llmsTxtEnabled !== false) && tabUrl ? await fetchLlmsTxt(tabUrl) : null;
       const llmsTxtExtra = llmsTxt
         ? `\n\n[Site instructions from ${(() => { try { return new URL(tabUrl).origin; } catch(_){return tabUrl;} })()}/llms.txt]\n${llmsTxt}`
         : '';
@@ -870,8 +818,14 @@ async function handle(msg, sender) {
         });
       }
 
-      // Persist user turn to global history
-      const userTurn = { role: 'user', content: msg.userText || '(no instruction)' };
+      // Persist user turn to global history (include images if present)
+      const userTurnContent = msg.images?.length
+        ? [
+            { type: 'text', text: msg.userText || '(no instruction)' },
+            ...msg.images.map(url => ({ type: 'image_url', image_url: { url } }))
+          ]
+        : msg.userText || '(no instruction)';
+      const userTurn = { role: 'user', content: userTurnContent };
       await storage.appendToHistory(userTurn);
 
       // Initialize stream state BEFORE the first onDelta. From this point
@@ -890,58 +844,77 @@ async function handle(msg, sender) {
       const timeout = setTimeout(() => controller.abort('timeout'), 60_000 * 5);
       const signal = controller.signal;
 
-      // Stream
-      let fullReply = '';
-      let aborted = false;
-      const stream = true; // always stream — better UX, no toggle needed
-      try {
-        if (stream) {
-          const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+      // Per-provider inference params
+      const temperature = (provider.temperature != null && provider.temperature !== '') ? Number(provider.temperature) : undefined;
+      const maxTokens = provider.maxTokens ? Number(provider.maxTokens) : 0;
 
-          if (useResponsesApi) {
-            // /v1/responses: stateful, server stores conversation history
-            fullReply = await responsesApiStream({
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-              input: responsesInput,
-              instructions: effectiveSystemPrompt || undefined,
-              conversation: responsesConversation,
-              onDelta: (delta) => {
-                appendToStreamState(tabId, delta);
-                pushChunk(tabId, { type: 'CHUNK', delta });
-              },
-              onToolProgress,
-              signal
-            });
-          } else {
-            // Standard stateless /v1/chat/completions
-            fullReply = await chatStream({
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-              model: provider.model || undefined,
-              messages,
-              onDelta: (delta) => {
-                appendToStreamState(tabId, delta);
-                pushChunk(tabId, { type: 'CHUNK', delta });
-              },
-              onToolProgress,
-              signal,
-              extraHeaders
-            });
-          }
+      // Stream with auto-retry on transient network / rate-limit errors
+      let fullReply = '';
+      let replyUsage = null;
+      const MAX_RETRIES = 2;
+
+      const doStream = async () => {
+        const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+
+        if (useResponsesApi) {
+          const result = await responsesApiStream({
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            input: responsesInput,
+            instructions: effectiveSystemPrompt || undefined,
+            conversation: responsesConversation,
+            onDelta: (delta) => {
+              appendToStreamState(tabId, delta);
+              pushChunk(tabId, { type: 'CHUNK', delta });
+            },
+            onToolProgress,
+            signal,
+            temperature,
+            maxTokens
+          });
+          return result;
         } else {
-          // Non-streaming fallback (responses API doesn't support non-stream well,
-          // so always fall through to chatStream for simplicity)
-          fullReply = await chat({
+          const result = await chatStream({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             model: provider.model || undefined,
-            messages: messages || buildMessages({ history, userText: msg.userText, pageContext: null, withImage: false, userImages: msg.images, systemPrompt: all.systemPrompt || '' }),
+            messages,
+            onDelta: (delta) => {
+              appendToStreamState(tabId, delta);
+              pushChunk(tabId, { type: 'CHUNK', delta });
+            },
+            onToolProgress,
             signal,
-            extraHeaders
+            extraHeaders,
+            temperature,
+            maxTokens
           });
-          appendToStreamState(tabId, fullReply);
-          pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
+          return result;
+        }
+      };
+
+      try {
+        for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+          try {
+            // Reset stream state accumulator on retry so we don't double content
+            if (attempt > 1) {
+              const st = streamState.get(tabId);
+              if (st) st.acc = '';
+              fullReply = '';
+              // Notify side panel about retry
+              pushChunk(tabId, { type: 'RETRY', attempt, maxAttempts: MAX_RETRIES + 1 });
+              await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+            const result = await doStream();
+            fullReply = result.full;
+            replyUsage = result.usage || null;
+            break; // success
+          } catch (e) {
+            if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) throw e;
+            // Only retry on network or rate-limit errors
+            const isRetryable = e?.name === 'ProviderNetworkError' || (e?.name === 'ProviderAPIError' && e?.message?.includes('429'));
+            if (!isRetryable || attempt > MAX_RETRIES) throw e;
+          }
         }
       } catch (e) {
         // Distinguish user-cancel from real errors. AbortError fires
@@ -949,7 +922,6 @@ async function handle(msg, sender) {
         // STREAM_ABORT → controller.abort() → fetch threw. We must NOT
         // append a half-finished reply to history in that case.
         if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {
-          aborted = true;
           // Tell the side panel it was a clean cancel so it can show
           // its "⚠ Stream cancelled" message and skip DONE.
           pushChunk(tabId, { type: 'ERROR', error: 'cancelled', code: 'ABORTED' });
@@ -982,7 +954,7 @@ async function handle(msg, sender) {
       // (Only reached if the stream completed naturally, not via abort.)
       await storage.appendToHistory({ role: 'assistant', content: fullReply });
 
-      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest });
+      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest, usage: replyUsage });
       clearStreamState(tabId);
       return { full: fullReply };
     }
