@@ -1229,10 +1229,15 @@ code.language-patch {
   font-weight: 600;
   color: var(--fg);
 }
+.sessions-clear-all-btn { font-size: 12px; }
+.sessions-clear-all-btn:hover { color: var(--err) !important; }
 .sessions-drawer-actions {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .sessions-new-btn {
   width: 100%;
@@ -1247,6 +1252,18 @@ code.language-patch {
   transition: background 0.1s, color 0.1s;
 }
 .sessions-new-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.sessions-search {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--input-bg, var(--surface));
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+.sessions-search:focus { border-color: var(--accent); }
 .sessions-list {
   flex: 1;
   overflow-y: auto;
@@ -1279,6 +1296,16 @@ code.language-patch {
   color: var(--muted);
   margin-top: 1px;
 }
+.session-item-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.session-item:hover .session-item-actions { opacity: 1; }
+.session-export-btn,
 .session-del-btn {
   background: none;
   border: none;
@@ -1287,12 +1314,21 @@ code.language-patch {
   font-size: 13px;
   padding: 2px 4px;
   border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
-  flex-shrink: 0;
+  transition: color 0.1s;
 }
-.session-item:hover .session-del-btn { opacity: 1; }
+.session-export-btn:hover { color: var(--accent); }
 .session-del-btn:hover { color: var(--err); }
+.session-rename-input {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  background: var(--input-bg, var(--surface));
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
 .sessions-empty {
   text-align: center;
   color: var(--muted);
@@ -1300,6 +1336,18 @@ code.language-patch {
   padding: 32px 16px;
   line-height: 1.6;
 }
+
+/* ── Token usage chip ────────────────────────────────────────────────────── */
+.token-usage {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 6px;
+  margin: 2px 0 4px;
+  opacity: 0.75;
+  user-select: none;
+  cursor: default;
+}
+.token-usage:hover { opacity: 1; }
 
 /* ── Prompt inspector modal ──────────────────────────────────────────────── */
 .prompt-inspector-modal {

@@ -24,10 +24,12 @@
     <div id="sessions-drawer" class="sessions-drawer" hidden aria-label="Session history" role="dialog">
       <div class="sessions-drawer-header">
         <span class="sessions-drawer-title">Session History</span>
+        <button id="sessions-clear-all" class="iconbtn sessions-clear-all-btn" title="Clear all sessions">🗑</button>
         <button id="sessions-close" class="iconbtn" title="Close">✕</button>
       </div>
       <div class="sessions-drawer-actions">
         <button id="sessions-new" class="sessions-new-btn">＋ New session</button>
+        <input type="search" class="sessions-search" placeholder="Search sessions…" aria-label="Search sessions" />
       </div>
       <div id="sessions-list" class="sessions-list"></div>
     </div>

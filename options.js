@@ -19,6 +19,7 @@ async function init() {
   applyContextMode(cachedCfg.contextMode || 'reader');
   applyLimits(cachedCfg);
   applyToolbarToggle();
+  applyLlmsTxt();
   applySystemPrompt();
   applyReplyLanguage();
   renderDomainRules(cachedCfg.domainRules || []);
@@ -137,6 +138,18 @@ function buildProviderCard(name, cfg) {
         <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o, qwen3.6-plus-anthropic" />
       </label>
     </div>` : ''}
+    <div class="row provider-params-row">
+      <label class="provider-param-label">Temperature
+        <input data-k="temperature" type="number" min="0" max="2" step="0.1"
+               value="${escapeAttr(cfg.temperature != null ? String(cfg.temperature) : '')}"
+               placeholder="default" style="width:72px" />
+      </label>
+      <label class="provider-param-label">Max tokens
+        <input data-k="maxTokens" type="number" min="0" step="256"
+               value="${escapeAttr(cfg.maxTokens ? String(cfg.maxTokens) : '')}"
+               placeholder="unlimited" style="width:96px" />
+      </label>
+    </div>
     <div class="row action-row">
       <button data-act="save">Save</button>
       <button data-act="ping">Ping</button>
@@ -173,8 +186,16 @@ function readCard(card) {
   const out = {};
   card.querySelectorAll('[data-k]').forEach((el) => {
     const k = el.dataset.k;
-    if (el.type === 'checkbox') out[k] = el.checked;
-    else out[k] = el.value;
+    if (el.type === 'checkbox') {
+      out[k] = el.checked;
+    } else if (el.type === 'number') {
+      const v = el.value.trim();
+      if (k === 'temperature') out[k] = v === '' ? null : parseFloat(v);
+      else if (k === 'maxTokens') out[k] = v === '' ? 0 : parseInt(v, 10);
+      else out[k] = v === '' ? null : parseFloat(v);
+    } else {
+      out[k] = el.value;
+    }
   });
   return out;
 }
@@ -300,6 +321,18 @@ function applyToolbarToggle() {
   el.addEventListener('change', () => {
     chrome.storage.local.set({ showSelectionToolbar: el.checked });
     flash('ok', el.checked ? 'Floating toolbar enabled.' : 'Floating toolbar disabled.');
+  });
+}
+
+function applyLlmsTxt() {
+  const el = $('llmsTxtEnabled');
+  if (!el) return;
+  chrome.storage.local.get('llmsTxtEnabled', ({ llmsTxtEnabled }) => {
+    el.checked = llmsTxtEnabled !== false; // default true
+  });
+  el.addEventListener('change', () => {
+    chrome.storage.local.set({ llmsTxtEnabled: el.checked });
+    flash('ok', el.checked ? 'llms.txt enabled.' : 'llms.txt disabled.');
   });
 }
 

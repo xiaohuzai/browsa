@@ -555,6 +555,16 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'CLEAR_ALL_SESSIONS': {
+      await storage.clearAllSessions();
+      return { ok: true };
+    }
+
+    case 'GET_SESSION_FULL': {
+      const session = await storage.getSessionFull(msg.id);
+      return { session };
+    }
+
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
       // Reset session IDs for all providers so the next conversation
@@ -767,7 +777,7 @@ async function handle(msg, sender) {
       const domainRules = all.domainRules || [];
       const matchedRule = domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
       const domainExtra = matchedRule?.prompt?.trim() || '';
-      const llmsTxt = tabUrl ? await fetchLlmsTxt(tabUrl) : null;
+      const llmsTxt = (all.llmsTxtEnabled !== false) && tabUrl ? await fetchLlmsTxt(tabUrl) : null;
       const llmsTxtExtra = llmsTxt
         ? `\n\n[Site instructions from ${(() => { try { return new URL(tabUrl).origin; } catch(_){return tabUrl;} })()}/llms.txt]\n${llmsTxt}`
         : '';
@@ -890,58 +900,80 @@ async function handle(msg, sender) {
       const timeout = setTimeout(() => controller.abort('timeout'), 60_000 * 5);
       const signal = controller.signal;
 
-      // Stream
-      let fullReply = '';
-      let aborted = false;
-      const stream = true; // always stream — better UX, no toggle needed
-      try {
-        if (stream) {
-          const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+      // Per-provider inference params
+      const temperature = (provider.temperature != null && provider.temperature !== '') ? Number(provider.temperature) : undefined;
+      const maxTokens = provider.maxTokens ? Number(provider.maxTokens) : 0;
 
-          if (useResponsesApi) {
-            // /v1/responses: stateful, server stores conversation history
-            fullReply = await responsesApiStream({
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-              input: responsesInput,
-              instructions: effectiveSystemPrompt || undefined,
-              conversation: responsesConversation,
-              onDelta: (delta) => {
-                appendToStreamState(tabId, delta);
-                pushChunk(tabId, { type: 'CHUNK', delta });
-              },
-              onToolProgress,
-              signal
-            });
-          } else {
-            // Standard stateless /v1/chat/completions
-            fullReply = await chatStream({
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-              model: provider.model || undefined,
-              messages,
-              onDelta: (delta) => {
-                appendToStreamState(tabId, delta);
-                pushChunk(tabId, { type: 'CHUNK', delta });
-              },
-              onToolProgress,
-              signal,
-              extraHeaders
-            });
-          }
+      // Stream with auto-retry on transient network / rate-limit errors
+      let fullReply = '';
+      let replyUsage = null;
+      let aborted = false;
+      const MAX_RETRIES = 2;
+
+      const doStream = async () => {
+        const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+
+        if (useResponsesApi) {
+          const result = await responsesApiStream({
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            input: responsesInput,
+            instructions: effectiveSystemPrompt || undefined,
+            conversation: responsesConversation,
+            onDelta: (delta) => {
+              appendToStreamState(tabId, delta);
+              pushChunk(tabId, { type: 'CHUNK', delta });
+            },
+            onToolProgress,
+            signal,
+            temperature,
+            maxTokens
+          });
+          return result;
         } else {
-          // Non-streaming fallback (responses API doesn't support non-stream well,
-          // so always fall through to chatStream for simplicity)
-          fullReply = await chat({
+          const result = await chatStream({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             model: provider.model || undefined,
-            messages: messages || buildMessages({ history, userText: msg.userText, pageContext: null, withImage: false, userImages: msg.images, systemPrompt: all.systemPrompt || '' }),
+            messages,
+            onDelta: (delta) => {
+              appendToStreamState(tabId, delta);
+              pushChunk(tabId, { type: 'CHUNK', delta });
+            },
+            onToolProgress,
             signal,
-            extraHeaders
+            extraHeaders,
+            temperature,
+            maxTokens
           });
-          appendToStreamState(tabId, fullReply);
-          pushChunk(tabId, { type: 'CHUNK', delta: fullReply });
+          return result;
+        }
+      };
+
+      try {
+        let lastError = null;
+        for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+          try {
+            // Reset stream state accumulator on retry so we don't double content
+            if (attempt > 1) {
+              const st = streamState.get(tabId);
+              if (st) st.acc = '';
+              fullReply = '';
+              // Notify side panel about retry
+              pushChunk(tabId, { type: 'RETRY', attempt, maxAttempts: MAX_RETRIES + 1 });
+              await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+            const result = await doStream();
+            fullReply = result.full;
+            replyUsage = result.usage || null;
+            break; // success
+          } catch (e) {
+            if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) throw e;
+            lastError = e;
+            // Only retry on network or rate-limit errors
+            const isRetryable = e?.name === 'ProviderNetworkError' || (e?.name === 'ProviderAPIError' && e?.message?.includes('429'));
+            if (!isRetryable || attempt > MAX_RETRIES) throw e;
+          }
         }
       } catch (e) {
         // Distinguish user-cancel from real errors. AbortError fires
@@ -982,7 +1014,7 @@ async function handle(msg, sender) {
       // (Only reached if the stream completed naturally, not via abort.)
       await storage.appendToHistory({ role: 'assistant', content: fullReply });
 
-      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest });
+      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest, usage: replyUsage });
       clearStreamState(tabId);
       return { full: fullReply };
     }

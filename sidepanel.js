@@ -510,6 +510,20 @@ function addTimestamp(el) {
   el.appendChild(span);
 }
 
+/** Human-friendly relative time: "just now", "5m ago", "2h ago", "3d ago" */
+function relativeTime(ts) {
+  const diffMs = Date.now() - ts;
+  const s = Math.floor(diffMs / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 // ─── Slash autocomplete ───────────────────────────────────────────────────────
 function updateSlashSuggest() {
   if (!slashSuggestEl) return;
@@ -1316,6 +1330,10 @@ async function onSend() {
         toolEvents.push(m.text);
         showToolProgress(assistantEl, m.text);
 
+      } else if (m.type === 'RETRY') {
+        // Background is retrying a transient network/rate-limit error
+        showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
+
       } else if (m.type === 'DONE') {
         clearToolProgress(assistantEl);
         if (toolEvents.length > 0) {
@@ -1328,6 +1346,8 @@ async function onSend() {
         addCodeCopyButtons();
         renderMermaid(assistantEl);
         outputTokens = 0;
+        // Show token usage if the provider returned it
+        if (m.usage) showTokenUsage(assistantEl, m.usage);
         if (m.choiceRequest) renderChoiceRequest(assistantEl, m.choiceRequest);
         // Detect max-turns: agent hit the tool-call ceiling and is asking
         // the user to continue. Show a one-click Continue button.
@@ -1806,6 +1826,30 @@ function clearToolProgress(bubbleEl) {
   if (el?.classList.contains('tool-progress')) el.remove();
 }
 
+/**
+ * Show a small token usage chip below the assistant bubble.
+ * usage = { prompt_tokens, completion_tokens, total_tokens }
+ * For Hermes /v1/responses: may use input_tokens / output_tokens field names.
+ */
+function showTokenUsage(bubbleEl, usage) {
+  if (!usage) return;
+  const prompt = usage.prompt_tokens ?? usage.input_tokens ?? null;
+  const completion = usage.completion_tokens ?? usage.output_tokens ?? null;
+  if (prompt == null && completion == null) return;
+
+  const el = document.createElement('div');
+  el.className = 'token-usage';
+  const fmtK = (n) => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+  const parts = [];
+  if (prompt != null) parts.push(`↑ ${fmtK(prompt)}`);
+  if (completion != null) parts.push(`↓ ${fmtK(completion)}`);
+  el.textContent = parts.join(' · ') + ' tokens';
+  el.title = `Prompt: ${prompt ?? '?'} tokens · Completion: ${completion ?? '?'} tokens` +
+             (usage.total_tokens ? ` · Total: ${usage.total_tokens}` : '');
+  // Insert after the bubble (before any msg-action-row that follows)
+  bubbleEl.insertAdjacentElement('afterend', el);
+}
+
 function appendScreenshot(dataUrl) {
   const el = document.createElement('div');
   el.className = 'msg screenshot-preview';
@@ -2077,6 +2121,16 @@ function openSessionsDrawer() {
   if (!el) return;
   el.hidden = false;
   getOrCreateBackdrop().classList.add('active');
+  _sessionsFilter = '';
+  const searchEl = el.querySelector('.sessions-search');
+  if (searchEl) { searchEl.value = ''; searchEl.addEventListener('input', onSessionSearch); }
+  const clearAllBtn = el.querySelector('#sessions-clear-all');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSessions);
+  renderSessionsList();
+}
+
+function onSessionSearch(e) {
+  _sessionsFilter = e.target.value;
   renderSessionsList();
 }
 
@@ -2086,35 +2140,144 @@ function closeSessionsDrawer() {
   if (_sessionsBackdrop) _sessionsBackdrop.classList.remove('active');
 }
 
+let _sessionsFilter = '';
+
 async function renderSessionsList() {
   const listEl = $('sessions-list');
   if (!listEl) return;
   listEl.innerHTML = '';
   const res = await sendMessage({ type: 'GET_SESSIONS' });
-  const sessions = res?.data?.sessions || [];
+  const allSessions = res?.data?.sessions || [];
+
+  // Apply search filter
+  const q = _sessionsFilter.trim().toLowerCase();
+  const sessions = q ? allSessions.filter(s => s.name.toLowerCase().includes(q)) : allSessions;
+
   if (!sessions.length) {
-    listEl.innerHTML = '<div class="sessions-empty">No saved sessions yet.<br>Start a new session to archive this conversation.</div>';
+    listEl.innerHTML = `<div class="sessions-empty">${q ? 'No sessions match your search.' : 'No saved sessions yet.<br>Start a new session to archive this conversation.'}</div>`;
     return;
   }
   for (const s of sessions) {
     const item = document.createElement('div');
     item.className = 'session-item';
-    const dateStr = new Date(s.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const relTime = relativeTime(s.createdAt);
+    const absTime = new Date(s.createdAt).toLocaleString();
+
     item.innerHTML = `
       <div class="session-item-body">
-        <div class="session-item-name" title="${escM(s.name)}">${escM(s.name)}</div>
-        <div class="session-item-date">${dateStr}</div>
+        <div class="session-item-name" title="Double-click to rename">${escM(s.name)}</div>
+        <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
       </div>
-      <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>`;
+      <div class="session-item-actions">
+        <button class="session-export-btn" title="Export session as Markdown" data-id="${s.id}" data-name="${escM(s.name)}">⬇</button>
+        <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
+      </div>`;
+
+    // Click body → load session
     item.querySelector('.session-item-body').addEventListener('click', () => loadSession(s.id, s.name));
+
+    // Double-click name → inline rename
+    const nameEl = item.querySelector('.session-item-name');
+    nameEl.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      startSessionRename(nameEl, s.id);
+    });
+
+    // Export button
+    item.querySelector('.session-export-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await exportSession(s.id, s.name);
+    });
+
+    // Delete button
     item.querySelector('.session-del-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
+      const ok = await showConfirmDialog({ title: 'Delete session', message: `Delete "${s.name}"?`, confirmLabel: 'Delete', danger: true });
+      if (!ok) return;
       await sendMessage({ type: 'DELETE_SESSION', id: s.id });
       showToast('Session deleted', 'success');
       renderSessionsList();
     });
     listEl.appendChild(item);
   }
+}
+
+/** Inline rename: replaces name text with an input field. */
+function startSessionRename(nameEl, sessionId) {
+  const oldName = nameEl.textContent;
+  const input = document.createElement('input');
+  input.className = 'session-rename-input';
+  input.value = oldName;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = async () => {
+    const newName = input.value.trim() || oldName;
+    await sendMessage({ type: 'RENAME_SESSION', id: sessionId, name: newName });
+    renderSessionsList();
+    if (newName !== oldName) showToast('Session renamed', 'success');
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { renderSessionsList(); }
+  });
+  input.addEventListener('blur', commit);
+}
+
+/** Export a saved session as a Markdown file. */
+async function exportSession(id, name) {
+  const res = await sendMessage({ type: 'GET_SESSION_FULL', id });
+  const session = res?.data?.session;
+  if (!session) { showToast('Could not load session', 'error'); return; }
+
+  const history = session.history || [];
+  const lines = [
+    `# ${session.name}`,
+    `*Exported: ${new Date().toLocaleString()}*`,
+    ''
+  ];
+  const PAGE_CTX = '[Page context attached by browsa]';
+  for (const m of history) {
+    if (m.role === 'user') {
+      const content = typeof m.content === 'string' ? m.content : null;
+      if (!content) continue;
+      if (content.startsWith(PAGE_CTX)) {
+        const urlLine = content.split('\n').find(l => l.startsWith('URL:')) || '';
+        lines.push(`---\n\n*(page context${urlLine ? ' — ' + urlLine.slice(4).trim() : ''})*\n`);
+        continue;
+      }
+      lines.push(`## User\n\n${content}\n`);
+    } else if (m.role === 'assistant') {
+      lines.push(`## Assistant\n\n${m.content}\n`);
+    }
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
+  a.download = `browsa-${slug}-${new Date().toISOString().slice(0, 10)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Session exported', 'success');
+}
+
+/** Clear all saved sessions with confirmation. */
+async function clearAllSessions() {
+  const ok = await showConfirmDialog({
+    title: 'Clear all sessions',
+    message: 'Delete all saved sessions? This cannot be undone.',
+    confirmLabel: 'Clear all',
+    danger: true
+  });
+  if (!ok) return;
+  await sendMessage({ type: 'CLEAR_ALL_SESSIONS' });
+  showToast('All sessions cleared', 'success');
+  renderSessionsList();
 }
 
 async function loadSession(id, name) {
