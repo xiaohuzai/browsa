@@ -11,6 +11,7 @@
   --fg-dim:       #857d72;
   --border:       #2e2b24;
   --border-soft:  #242119;
+  --border-strong:#3a3730;
   --accent:       #f97316;
   --accent-dim:   rgba(249,115,22,0.10);
   --accent-hover: rgba(249,115,22,0.16);
@@ -26,27 +27,40 @@
   --t:            0.15s ease;
   --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
   --shadow-md:    0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.50);
+  /* Semantic aliases used by sessions drawer and new UI components */
+  --surface:      var(--bg-2);
+  --err:          var(--error);
+  --muted:        var(--fg-dim);
+  --accent-bg:    var(--accent-dim);
+  --hover-bg:     rgba(128,128,128,0.08);
+  --input-bg:     var(--bg);
+  --code-bg:      rgba(128,128,128,0.08);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg:         #faf9f6;
-    --bg-2:       #ffffff;
-    --bg-3:       #f2efe8;
-    --bg-4:       #eae6de;
-    --fg:         #1a1710;
-    --fg-2:       #3d3a33;
-    --fg-dim:     #7a746c;
-    --border:     #e4e0d8;
-    --border-soft:#ece9e2;
-    --accent:     #c2410c;
-    --accent-dim: rgba(194,65,12,0.08);
+    --bg:           #faf9f6;
+    --bg-2:         #ffffff;
+    --bg-3:         #f2efe8;
+    --bg-4:         #eae6de;
+    --fg:           #1a1710;
+    --fg-2:         #3d3a33;
+    --fg-dim:       #7a746c;
+    --border:       #e4e0d8;
+    --border-soft:  #ece9e2;
+    --border-strong:#c8c4bb;
+    --accent:       #c2410c;
+    --accent-dim:   rgba(194,65,12,0.08);
     --accent-hover: rgba(194,65,12,0.13);
     --accent-glow:  rgba(194,65,12,0.18);
-    --user-bg:    #fff2eb;
-    --user-border:rgba(194,65,12,0.22);
-    --shadow-sm:  0 1px 4px rgba(0,0,0,0.08);
-    --shadow-md:  0 4px 16px rgba(0,0,0,0.10);
+    --user-bg:      #fff2eb;
+    --user-border:  rgba(194,65,12,0.22);
+    --shadow-sm:    0 1px 4px rgba(0,0,0,0.08);
+    --shadow-md:    0 4px 16px rgba(0,0,0,0.10);
+    --shadow-lg:    0 8px 32px rgba(0,0,0,0.18);
+    --hover-bg:     rgba(0,0,0,0.04);
+    --code-bg:      rgba(0,0,0,0.05);
   }
 }
 
@@ -1141,6 +1155,22 @@ math[display="block"] {
 
 /* ─── User message text span ─────────────────────────────────────────────────── */
 .msg.user .msg-text { white-space: pre-wrap; }
+
+/* ─── Attached images inside user bubble ─────────────────────────────────────── */
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  justify-content: flex-end;
+}
+.msg-image {
+  max-width: 180px;
+  max-height: 140px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+}
 
 /* ─── Edit mode ──────────────────────────────────────────────────────────────── */
 .msg-edit-area {

@@ -16,7 +16,7 @@ async function init() {
   cachedCfg = await storage.getAll();
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
-  applyContextMode(cachedCfg.contextMode || 'reader');
+  applyContextMode(cachedCfg.contextMode || 'auto');
   applyLimits(cachedCfg);
   applyToolbarToggle();
   applyLlmsTxt();
@@ -190,9 +190,15 @@ function readCard(card) {
       out[k] = el.checked;
     } else if (el.type === 'number') {
       const v = el.value.trim();
-      if (k === 'temperature') out[k] = v === '' ? null : parseFloat(v);
-      else if (k === 'maxTokens') out[k] = v === '' ? 0 : parseInt(v, 10);
-      else out[k] = v === '' ? null : parseFloat(v);
+      if (k === 'temperature') {
+        if (v === '') { out[k] = null; }
+        else { const f = parseFloat(v); out[k] = isNaN(f) ? null : Math.min(2, Math.max(0, f)); }
+      } else if (k === 'maxTokens') {
+        if (v === '') { out[k] = 0; }
+        else { const n = parseInt(v, 10); out[k] = (!isNaN(n) && n > 0) ? n : 0; }
+      } else {
+        out[k] = v === '' ? null : (isNaN(parseFloat(v)) ? null : parseFloat(v));
+      }
     } else {
       out[k] = el.value;
     }

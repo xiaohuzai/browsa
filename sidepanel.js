@@ -66,7 +66,7 @@ async function init() {
   const cfgRes = await sendMessage({ type: 'GET_CONFIG' });
   const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
   populateProviderSelect(cfg);
-  applyContextMode(cfg.contextMode || 'reader');
+  applyContextMode(cfg.contextMode || 'auto');
   // Load history
   await renderHistory();
 
@@ -196,10 +196,7 @@ async function init() {
       handleSelectionAction(msg.action, msg.text);
       return;
     }
-    if (msg.type === 'IMAGE_ACTION') {
-      handleImageAction(msg.dataUrl, msg.srcUrl);
-      return;
-    }
+
     if (msg.type === 'XHS_XHR_NOTE') {
       // Real XHR data from the content script. The most authoritative
       // source — the browser's own signed fetch, with cookies. We
@@ -269,16 +266,11 @@ async function init() {
       // Read session storage DIRECTLY — no SW roundtrip needed, no 1-second
       // wait. If a selection action was stored while the SW was restarting,
       // the sidepanel can read and deliver it immediately by itself.
-      chrome.storage.session.get(['pendingSelectionAction', 'pendingImageAction']).then((sess) => {
+      chrome.storage.session.get(['pendingSelectionAction']).then((sess) => {
         if (sess.pendingSelectionAction) {
           chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
           const { action, text } = sess.pendingSelectionAction;
           handleSelectionAction(action, text);
-        }
-        if (sess.pendingImageAction) {
-          chrome.storage.session.remove('pendingImageAction').catch(() => {});
-          const { dataUrl, srcUrl } = sess.pendingImageAction;
-          handleImageAction(dataUrl, srcUrl);
         }
       }).catch(() => {});
       // Also reconnect the nav port after a short delay so future events work.
@@ -323,11 +315,6 @@ async function init() {
       chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
       handleSelectionAction(action, text);
     }
-    if (area === 'session' && changes.pendingImageAction?.newValue) {
-      const { dataUrl, srcUrl } = changes.pendingImageAction.newValue;
-      chrome.storage.session.remove('pendingImageAction').catch(() => {});
-      handleImageAction(dataUrl, srcUrl);
-    }
   });
 
   // Image paste / drop / picker
@@ -368,16 +355,11 @@ async function init() {
   // Deliver any pending selection action (toolbar/right-click that opened
   // the panel). Read session storage directly — no SW roundtrip needed.
   try {
-    const sess = await chrome.storage.session.get(['pendingSelectionAction', 'pendingImageAction']);
+    const sess = await chrome.storage.session.get(['pendingSelectionAction']);
     if (sess.pendingSelectionAction) {
       chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
       const { action, text } = sess.pendingSelectionAction;
       setTimeout(() => handleSelectionAction(action, text), 150);
-    }
-    if (sess.pendingImageAction) {
-      chrome.storage.session.remove('pendingImageAction').catch(() => {});
-      const { dataUrl, srcUrl } = sess.pendingImageAction;
-      setTimeout(() => handleImageAction(dataUrl, srcUrl), 150);
     }
   } catch (_) {}
 
@@ -459,22 +441,7 @@ async function handleSelectionAction(action, text) {
   onSend();
 }
 
-/**
- * Handle an image right-clicked from a page.
- * Adds it to the image strip and pre-fills a prompt.
- */
-function handleImageAction(dataUrl, srcUrl) {
-  if (!dataUrl) return;
-  // dataUrl may be a base64 data URL or a plain https:// URL (fallback)
-  const name = (() => {
-    try { return new URL(srcUrl).pathname.split('/').pop() || 'image'; } catch (_) { return 'image'; }
-  })();
-  images.push({ dataUrl, name });
-  refreshImageStrip();
-  if (!inputEl.value.trim()) inputEl.value = 'What\'s in this image?';
-  inputEl.focus();
-  updateComposerInfo();
-}
+
 
 function populateProviderSelect(cfg) {
   const providers = Object.keys(cfg.providers || {});
@@ -745,6 +712,7 @@ async function newSession() {
   deleteLock = false;
   isUserScrolledUp = false;
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+  images.length = 0; refreshImageStrip(); // clear any pending image attachments
   closeSessionsDrawer();
   inputEl.focus();
 }
@@ -763,6 +731,7 @@ async function clearChatHistory() {
   deleteLock = false;
   isUserScrolledUp = false;
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
+  images.length = 0; refreshImageStrip();
   showToast('Conversation cleared', 'success');
 }
 
@@ -987,7 +956,7 @@ function renderSafe(markdown) {
   }
 }
 
-function escM(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escM(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // Clipboard write with execCommand fallback (works in non-secure contexts too).
 function _fallbackCopy(text) {
@@ -1193,8 +1162,17 @@ function refreshImageStrip() {
     const img = images[i];
     const div = document.createElement('div');
     div.className = 'imagepreview';
-    div.innerHTML = `<img src="${img.dataUrl}" alt="${img.name}" /><button class="rm" data-idx="${i}" title="Remove image">&times;</button>`;
-    div.querySelector('.rm').addEventListener('click', () => removeImage(i));
+    const imgEl = document.createElement('img');
+    imgEl.src = img.dataUrl;
+    imgEl.alt = img.name; // textContent-safe; avoids innerHTML attribute injection
+
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'rm';
+    rmBtn.title = 'Remove image';
+    rmBtn.textContent = '×';
+    rmBtn.addEventListener('click', () => removeImage(i));
+    div.appendChild(imgEl);
+    div.appendChild(rmBtn);
     imagePreviewsEl.appendChild(div);
   }
   imageInfoEl.textContent = images.length ? `+${images.length} image${images.length > 1 ? 's' : ''}` : '';
@@ -1286,7 +1264,8 @@ async function onSend() {
 
   // User bubble — show the original slash command, not the expanded prompt
   lastSentRaw = rawText;
-  const userBubble = appendUser(rawText || '(page only)');
+  const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
+  const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
   userBubble.dataset.hidx = nextHistoryIdx++;  // user turn stored in background CHAT handler
   inputEl.value = '';
   setStreamingUI(true);
@@ -1295,7 +1274,7 @@ async function onSend() {
   const assistantEl = appendAssistant('');
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
-  const renderStream = makeStreamRenderer(assistantEl);
+  let renderStream = makeStreamRenderer(assistantEl);
 
   // Open streaming port FIRST so the background can push CHUNKs as they
   // arrive. We pass the port's name to the background via msg.port; the
@@ -1334,7 +1313,17 @@ async function onSend() {
         showToolProgress(assistantEl, m.text);
 
       } else if (m.type === 'RETRY') {
-        // Background is retrying a transient network/rate-limit error
+        // Background is retrying. Reset accumulator and renderer so the bubble
+        // shows only the new attempt's content, not stale content from the failed one.
+        acc = '';
+        toolEvents = [];
+        outputTokens = 0;
+        // Remove any stale live-think block from the previous attempt.
+        // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
+        const prevSib = assistantEl.previousElementSibling;
+        if (prevSib?.classList.contains('live-think')) prevSib.remove();
+        assistantEl.innerHTML = '';
+        renderStream = makeStreamRenderer(assistantEl);
         showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
       } else if (m.type === 'DONE') {
@@ -1704,10 +1693,22 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
   img.src = imageDataUrl;
 }
 
-function appendUser(text) {
+function appendUser(text, imageDataUrls) {
   const el = document.createElement('div');
   el.className = 'msg user';
   el.dataset.raw = text;
+  if (imageDataUrls?.length) {
+    const strip = document.createElement('div');
+    strip.className = 'msg-images';
+    for (const url of imageDataUrls) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.className = 'msg-image';
+      img.alt = 'attached image';
+      strip.appendChild(img);
+    }
+    el.appendChild(strip);
+  }
   const span = document.createElement('span');
   span.className = 'msg-text';
   span.textContent = text;
@@ -1837,7 +1838,7 @@ function showToolProgress(bubbleEl, text, tierOverride) {
     else if (/run|exec|bash|shell|cmd|command/.test(t)){ icon = '💻'; tier = 'running'; }
   }
   el.dataset.tier = tier;
-  el.innerHTML = `<span class="tp-icon">${icon}</span><span class="tp-text">${text}</span>`;
+  el.innerHTML = `<span class="tp-icon">${icon}</span><span class="tp-text">${escM(text)}</span>`;
 }
 /** Remove the tool progress indicator once the reply is done. */
 function clearToolProgress(bubbleEl) {
@@ -1855,6 +1856,9 @@ function showTokenUsage(bubbleEl, usage) {
   const prompt = usage.prompt_tokens ?? usage.input_tokens ?? null;
   const completion = usage.completion_tokens ?? usage.output_tokens ?? null;
   if (prompt == null && completion == null) return;
+  // Deduplicate: remove any existing token-usage chip for this bubble
+  bubbleEl.nextElementSibling?.classList.contains('token-usage') &&
+    bubbleEl.nextElementSibling.remove();
 
   const el = document.createElement('div');
   el.className = 'token-usage';
@@ -2147,27 +2151,35 @@ function openSessionsDrawer() {
   renderSessionsList();
 }
 
+let _searchDebounceTimer = null;
 function onSessionSearch(e) {
   _sessionsFilter = e.target.value;
-  renderSessionsList();
+  clearTimeout(_searchDebounceTimer);
+  _searchDebounceTimer = setTimeout(renderSessionsList, 200);
 }
 
 function closeSessionsDrawer() {
   const el = getSessionsDrawer();
   if (el) el.hidden = true;
   if (_sessionsBackdrop) _sessionsBackdrop.classList.remove('active');
-  clearTimeout(_renameClickTimer); // cancel any pending single-click load
+  clearTimeout(_renameClickTimer);   // cancel any pending single-click load
   _renameClickTimer = null;
+  clearTimeout(_searchDebounceTimer); // cancel pending search render on close
+  _searchDebounceTimer = null;
 }
 
 let _sessionsFilter = '';
 let _renameClickTimer = null; // debounce: distinguish single-click-load from double-click-rename
+let _sessionsRenderGen = 0;   // generation counter: cancel stale concurrent renders
 
 async function renderSessionsList() {
   const listEl = $('sessions-list');
   if (!listEl) return;
+  const gen = ++_sessionsRenderGen;
   listEl.innerHTML = '';
   const res = await sendMessage({ type: 'GET_SESSIONS' });
+  // Bail out if a newer call has already started (prevents duplicate items from concurrent renders)
+  if (_sessionsRenderGen !== gen) return;
   const allSessions = res?.data?.sessions || [];
 
   // Apply search filter
@@ -2190,7 +2202,7 @@ async function renderSessionsList() {
         <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
       </div>
       <div class="session-item-actions">
-        <button class="session-export-btn" title="Export session as Markdown" data-id="${s.id}" data-name="${escM(s.name)}">⬇</button>
+        <button class="session-export-btn" title="Export session as Markdown" data-id="${s.id}">⬇</button>
         <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
       </div>`;
 
@@ -2203,6 +2215,9 @@ async function renderSessionsList() {
         clearTimeout(_renameClickTimer);
         _renameClickTimer = setTimeout(() => loadSession(s.id, s.name), 220);
       } else {
+        // Clear any pending name-click timer so we don't double-load
+        clearTimeout(_renameClickTimer);
+        _renameClickTimer = null;
         loadSession(s.id, s.name);
       }
     });
@@ -2246,9 +2261,11 @@ function startSessionRename(nameEl, sessionId) {
     if (done) return;
     done = true;
     const newName = input.value.trim() || oldName;
-    await sendMessage({ type: 'RENAME_SESSION', id: sessionId, name: newName });
+    if (newName !== oldName) {
+      await sendMessage({ type: 'RENAME_SESSION', id: sessionId, name: newName });
+      showToast('Session renamed', 'success');
+    }
     renderSessionsList();
-    if (newName !== oldName) showToast('Session renamed', 'success');
   };
   const cancel = () => {
     if (done) return;
@@ -2277,7 +2294,15 @@ async function exportSession(id, name) {
   const PAGE_CTX = '[Page context attached by browsa]';
   for (const m of history) {
     if (m.role === 'user') {
-      const content = typeof m.content === 'string' ? m.content : null;
+      // Normalize content: extract text from array messages (image+text combos)
+      let content;
+      if (typeof m.content === 'string') {
+        content = m.content;
+      } else if (Array.isArray(m.content)) {
+        const textPart = m.content.find(p => p.type === 'text')?.text || '';
+        const hasImage = m.content.some(p => p.type === 'image_url');
+        content = textPart || (hasImage ? '*(image)*' : null);
+      }
       if (!content) continue;
       if (content.startsWith(PAGE_CTX)) {
         const urlLine = content.split('\n').find(l => l.startsWith('URL:')) || '';
@@ -2330,6 +2355,7 @@ async function loadSession(id, name) {
   if (!res?.ok && !res?.data?.ok) { showToast('Failed to load session', 'error'); return; }
   await renderHistory();
   scrollToBottom(true);
+  images.length = 0; refreshImageStrip(); // clear any pending image attachments
   closeSessionsDrawer();
   showToast(`Loaded: "${name}"`, 'success');
 }
@@ -2357,71 +2383,58 @@ async function showEffectivePrompt() {
   overlay.className = 'confirm-overlay';
   const modal = document.createElement('div');
   modal.className = 'prompt-inspector-modal';
-  modal.innerHTML = `
-    <div class="confirm-title">Effective System Prompt</div>
-    <div class="prompt-inspector-url">${escM(tabUrl || '(no page)')}</div>
-    ${sections.length
-      ? sections.map(s => `
-          <div class="prompt-section-label">${escM(s.label)}</div>
-          <pre class="prompt-section-body">${escM(s.text)}</pre>`).join('')
-      : '<p style="color:var(--muted);font-size:13px">No system prompt configured.</p>'
+  // Build modal with safe DOM APIs (textContent) to avoid XSS from user-configured prompts
+  const titleEl = document.createElement('div');
+  titleEl.className = 'confirm-title';
+  titleEl.textContent = 'Effective System Prompt';
+  const urlEl = document.createElement('div');
+  urlEl.className = 'prompt-inspector-url';
+  urlEl.textContent = tabUrl || '(no page)';
+  modal.appendChild(titleEl);
+  modal.appendChild(urlEl);
+  if (sections.length) {
+    for (const s of sections) {
+      const labelEl = document.createElement('div');
+      labelEl.className = 'prompt-section-label';
+      labelEl.textContent = s.label;
+      const bodyEl = document.createElement('pre');
+      bodyEl.className = 'prompt-section-body';
+      bodyEl.textContent = s.text;
+      modal.appendChild(labelEl);
+      modal.appendChild(bodyEl);
     }
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button class="pi-copy">⎘ Copy full prompt</button>
-      <button class="pi-close confirm-ok">Close</button>
-    </div>`;
+  } else {
+    const emptyEl = document.createElement('p');
+    emptyEl.style.cssText = 'color:var(--muted);font-size:13px';
+    emptyEl.textContent = 'No system prompt configured.';
+    modal.appendChild(emptyEl);
+  }
+  const actionsEl = document.createElement('div');
+  actionsEl.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px';
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'pi-copy';
+  copyBtn.textContent = '⎘ Copy full prompt';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'pi-close confirm-ok';
+  closeBtn.textContent = 'Close';
+  actionsEl.appendChild(copyBtn);
+  actionsEl.appendChild(closeBtn);
+  modal.appendChild(actionsEl);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
   const fullPrompt = sections.map(s => s.text).join('\n\n');
-  modal.querySelector('.pi-copy').addEventListener('click', async () => {
+  copyBtn.addEventListener('click', async () => {
     await _copyText(fullPrompt).catch(() => {});
     showToast('Copied', 'success');
   });
   const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
-  modal.querySelector('.pi-close').addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   function onKey(e) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } }
   document.addEventListener('keydown', onKey);
 }
 
-async function exportHistory() {
-  const { history } = await chrome.storage.local.get('history');
-  const list = Array.isArray(history) ? history : [];
-  if (!list.length) { showToast('No conversation to export', 'info'); return; }
-
-  const lines = [
-    '# browsa conversation export',
-    `*Exported: ${new Date().toLocaleString()}*`,
-    ''
-  ];
-  for (const m of list) {
-    if (m.role === 'user') {
-      const content = typeof m.content === 'string' ? m.content : null;
-      if (!content) continue; // skip image-only messages
-      if (content.startsWith('[Page context attached by browsa]')) {
-        // Render page-context messages as a small divider, not a full user bubble
-        const urlLine = content.split('\n').find(l => l.startsWith('URL:')) || '';
-        lines.push(`---\n\n*(page context attached${urlLine ? ' — ' + urlLine.slice(4).trim() : ''})*\n`);
-        continue;
-      }
-      lines.push(`## User\n\n${content}\n`);
-    } else if (m.role === 'assistant') {
-      lines.push(`## Assistant\n\n${m.content}\n`);
-    }
-  }
-
-  const blob = new Blob([lines.join('\n')], { type: 'text/markdown; charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `browsa-${new Date().toISOString().slice(0, 10)}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  showToast('Conversation exported', 'success');
-}
 
 function sendMessage(msg) {
   return new Promise((resolve) => {
@@ -2449,7 +2462,18 @@ async function renderHistory() {
   for (let i = 0; i < list.length; i++) {
     const m = list[i];
     if (m.role === 'user') {
-      if (Array.isArray(m.content)) continue;
+      if (Array.isArray(m.content)) {
+        // Message with attached images: extract text part and image URLs
+        const textPart = m.content.find(p => p.type === 'text')?.text || '';
+        if (textPart.startsWith(PAGE_CONTEXT_PREFIX)) continue;
+        const imgUrls = m.content
+          .filter(p => p.type === 'image_url')
+          .map(p => p.image_url?.url || p.image_url)
+          .filter(Boolean);
+        const el = appendUser(textPart || '(image)', imgUrls.length ? imgUrls : null);
+        el.dataset.hidx = i;
+        continue;
+      }
       if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
       const el = appendUser(m.content);
       el.dataset.hidx = i;
