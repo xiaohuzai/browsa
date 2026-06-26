@@ -1525,6 +1525,10 @@ async function resumeInFlightStream(tabId) {
     // (called by onActivated / init) has shown it. Nothing to do.
     return;
   }
+  // Seed streamStartAt from the real stream origin so tokens/sec in
+  // showTokenUsage() reflects total stream duration, not just the
+  // post-resume portion.
+  streamStartAt = peek.startedAt || Date.now();
   // From here, the background is still streaming. The DOM is whatever
   // the previous panel session left behind (or just renderHistory()
   // output if the panel was opened fresh). We need to:
@@ -1957,6 +1961,10 @@ function startMsgEdit(el) {
 
     const idx = parseInt(el.dataset.hidx, 10);
     if (!isNaN(idx)) {
+      // Cancel any in-flight stream before truncating history — otherwise
+      // the old port's CHUNK/DONE events would land on the new turn and
+      // corrupt history indices.
+      if (activeController && !activeController.cancelled) cancelStream();
       // Truncate history from this point onward, then re-send
       await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
       // Remove all DOM bubbles after this one (assistant reply + any following)
