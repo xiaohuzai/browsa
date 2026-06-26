@@ -48,6 +48,13 @@ let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
+
+// ─── Feature state ────────────────────────────────────────────────────────────
+let sendShortcut = 'enter';       // 'enter' | 'ctrl-enter'
+let thoughtAutoCollapse = false;  // auto-collapse <thinking> blocks
+let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
+let lastPromptTokens = 0;         // latest prompt_tokens for context indicator
+let isMultiSelectMode = false;    // multi-select mode for bulk delete
 // Per-tab conversation DOM snapshot. When the user switches tabs, we save
 // the current messagesEl.innerHTML here and restore it when they switch back.
 // This preserves in-flight streaming replies that haven't been persisted to
@@ -68,6 +75,12 @@ async function init() {
   const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
   populateProviderSelect(cfg);
   applyContextMode(cfg.contextMode || 'auto');
+
+  // Load chat preferences
+  sendShortcut = cfg.sendShortcut || 'enter';
+  thoughtAutoCollapse = !!cfg.thoughtAutoCollapse;
+  if (cfg.fontSize) applyFontSize(cfg.fontSize);
+
   // Load history
   await renderHistory();
 
@@ -124,9 +137,15 @@ async function init() {
       }
       if (e.key === 'Escape') { hideSlashSuggest(); return; }
     }
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      onSend();
+    // Send shortcut: Enter (default) or Ctrl/Cmd+Enter
+    if (sendShortcut === 'ctrl-enter') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault(); onSend();
+      }
+    } else {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault(); onSend();
+      }
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
@@ -136,13 +155,24 @@ async function init() {
       e.preventDefault();
       cycleContextMode();
     }
+    // Ctrl+F / Cmd+F — open in-conversation search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      openMsgSearch();
+    }
   });
 
-  // Global shortcuts (Esc = cancel stream or close drawer)
+  // Global shortcuts (Esc = cancel stream or close drawer/search, Ctrl+F = search)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
+      if (isMultiSelectMode) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
       if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== inputEl) {
+      e.preventDefault();
+      openMsgSearch();
     }
   });
 
@@ -394,6 +424,24 @@ async function init() {
     isUserScrolledUp = dist > 80;
     scrollToBottomBtn.hidden = !isUserScrolledUp;
   }, { passive: true });
+
+  // Image lightbox — delegate click on all img inside messages
+  messagesEl.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (img && img.src && !img.closest('.msg-images')) {
+      showImageLightbox(img.src, img.alt);
+    }
+  });
+
+  // Wire search bar
+  initMsgSearch();
+
+  // Wire multi-select toggle
+  $('multiselect-toggle')?.addEventListener('click', () => {
+    if (isMultiSelectMode) exitMultiSelect(); else enterMultiSelect();
+  });
+  $('multiselect-delete')?.addEventListener('click', deleteSelectedMessages);
+  $('multiselect-cancel')?.addEventListener('click', exitMultiSelect);
 
   inputEl.focus();
 }
@@ -998,9 +1046,10 @@ function renderSafe(markdown) {
     // Restore think blocks as collapsible <details> elements (after sanitization
     // so DOMPurify never sees the raw inner content).
     if (thinkBlocks.length > 0) {
+      const openAttr = thoughtAutoCollapse ? '' : ' open';
       html = html.replace(/<div data-think="(\d+)"><\/div>/g, (_, idx) => {
         const inner = DOMPurify.sanitize(marked.parse(thinkBlocks[+idx]));
-        return `<details class="think-block"><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
+        return `<details class="think-block"${openAttr}><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
       });
     }
 
@@ -1067,7 +1116,7 @@ function makeStreamRenderer(el) {
     if (!thinkEl) {
       thinkEl = document.createElement('details');
       thinkEl.className = 'think-block live-think';
-      thinkEl.open = true;
+      thinkEl.open = !thoughtAutoCollapse;
       const sum = document.createElement('summary');
       sum.textContent = 'Thinking…';
       thinkBodyEl = document.createElement('div');
@@ -1266,7 +1315,6 @@ const SLASH_COMMANDS = {
   '/compact':    'Please compact our conversation: summarize what we have discussed so far into a concise context note, then confirm what you now know.',
   '/context':    'Briefly describe the conversation context and any page content you currently have. What topics have we covered?',
   '/prompt':     '__SHOW_PROMPT__',  // special: intercepted before sending to LLM
-  '/search':     '__WEB_SEARCH__',  // special: web search via Tavily
 };
 
 function expandSlash(text) {
@@ -1298,52 +1346,18 @@ async function onSend() {
     return;
   }
 
-  // /search <query> — run a Tavily web search and inject results as page context, then ask LLM
-  if (rawText.startsWith('/search ') || rawText.trim() === '/search') {
-    const query = rawText.slice('/search'.length).trim();
-    if (!query) {
-      appendSystem('Usage: /search <your question or topic>');
-      inputEl.value = '';
-      return;
-    }
-    inputEl.value = '';
-    appendUser(rawText);
-    const sysEl = appendSystem('🔍 Searching…');
-    try {
-      const res = await sendMessage({ type: 'WEB_SEARCH', query, maxResults: 5 });
-      sysEl.remove();
-      if (!res?.data?.ok) {
-        appendError(res?.data?.error || 'Search failed. Check your Tavily API key in Settings → Web Search.');
-        return;
-      }
-      const results = res.data.results || [];
-      if (!results.length) { appendSystem('No results found.'); return; }
-      // Format results as numbered list with title, URL, and snippet
-      const mdResults = results.map((r, i) =>
-        `${i + 1}. **[${r.title}](${r.url})**\n   ${r.content}`
-      ).join('\n\n');
-      const searchContext = `🔍 Web search: **${query}**\n\n${mdResults}`;
-      // Display in an assistant-style bubble so user can read the raw results
-      const resultEl = appendAssistant('', true);
-      resultEl.innerHTML = renderSafe(searchContext);
-      decorateLinks(resultEl);
-      addCodeCopyButtons();
-      renderMermaid(resultEl);
-      // Pre-fill the input with a follow-up prompt so the user can ask about results
-      inputEl.value = `Based on the above search results, please answer: ${query}`;
-      updateComposerInfo();
-      inputEl.focus();
-      inputEl.select();
-      scrollToBottom(true);
-    } catch (e) {
-      sysEl.remove();
-      appendError(e.message || 'Search error');
-    }
-    return;
+  const slashExpanded = expandSlash(rawText);
+  let expandedText = slashExpanded || rawText;
+
+  // Prompt template variables: {{varName}} — show fill-in dialog before sending
+  const tplVars = parseTemplateVars(expandedText);
+  if (tplVars.length > 0) {
+    const filled = await resolveTemplateVars(expandedText, tplVars);
+    if (filled === null) return; // user cancelled
+    expandedText = filled;
   }
 
-  const slashExpanded = expandSlash(rawText);
-  const text = slashExpanded || rawText;
+  const text = expandedText;
 
   // Re-read the active tab RIGHT before sending. This is the defense-in-depth
   // for SPA navigation: even if a webNavigation push was missed (background
@@ -1379,6 +1393,7 @@ async function onSend() {
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
   let renderStream = makeStreamRenderer(assistantEl);
+  streamStartAt = 0; // reset for tokens/sec calculation
 
   // Open streaming port FIRST so the background can push CHUNKs as they
   // arrive. We pass the port's name to the background via msg.port; the
@@ -1408,6 +1423,7 @@ async function onSend() {
   function attachChunkListener() {
     port.onMessage.addListener((m) => {
       if (m.type === 'CHUNK') {
+        if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
         acc += m.delta;
         renderStream(m.delta, false); // smd: pass delta, not accumulated text
         updateOutputTokenCount(m.delta);
@@ -2100,17 +2116,31 @@ function showTokenUsage(bubbleEl, usage) {
   bubbleEl.nextElementSibling?.classList.contains('token-usage') &&
     bubbleEl.nextElementSibling.remove();
 
+  // Tokens/sec: calculated from streamStartAt set when first CHUNK arrived
+  const durationMs = streamStartAt ? Date.now() - streamStartAt : 0;
+  const tps = (durationMs > 200 && completion > 0)
+    ? Math.round(completion / (durationMs / 1000)) : 0;
+  const durationSec = durationMs > 0 ? (durationMs / 1000).toFixed(1) : null;
+
   const el = document.createElement('div');
   el.className = 'token-usage';
   const fmtK = (n) => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
   const parts = [];
   if (prompt != null) parts.push(`↑ ${fmtK(prompt)}`);
   if (completion != null) parts.push(`↓ ${fmtK(completion)}`);
-  el.textContent = parts.join(' · ') + ' tokens';
-  el.title = `Prompt: ${prompt ?? '?'} tokens · Completion: ${completion ?? '?'} tokens` +
-             (usage.total_tokens ? ` · Total: ${usage.total_tokens}` : '');
-  // Insert after the bubble (before any msg-action-row that follows)
+  if (tps > 0) parts.push(`${tps} t/s`);
+  if (durationSec) parts.push(`${durationSec}s`);
+  el.textContent = parts.join(' · ');
+  el.title = `Prompt: ${prompt ?? '?'} · Completion: ${completion ?? '?'}` +
+             (usage.total_tokens ? ` · Total: ${usage.total_tokens}` : '') +
+             (tps ? ` · ${tps} tok/s` : '') +
+             (durationMs ? ` · ${(durationMs/1000).toFixed(2)}s` : '');
+
   bubbleEl.insertAdjacentElement('afterend', el);
+
+  // Update context indicator
+  if (prompt != null) updateContextIndicator(prompt);
+  streamStartAt = 0; // reset for next turn
 }
 
 function appendScreenshot(dataUrl) {
@@ -2757,4 +2787,306 @@ async function renderHistory() {
   }
   addCodeCopyButtons();
   scrollToBottom(true);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Font size ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function applyFontSize(px) {
+  document.documentElement.style.setProperty('--msg-font-size', px + 'px');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Context window indicator ────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function updateContextIndicator(promptTokens) {
+  lastPromptTokens = promptTokens;
+  let el = $('context-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'context-indicator';
+    el.className = 'context-indicator';
+    // Insert just above the composer
+    const composer = document.querySelector('.composer');
+    if (composer) composer.insertAdjacentElement('beforebegin', el);
+  }
+  const fmtK = (n) => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+  el.textContent = `↑ ${fmtK(promptTokens)} tokens in context`;
+  el.title = `${promptTokens.toLocaleString()} prompt tokens sent in last request`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: In-conversation search (Ctrl+F) ─────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+let _searchMatches = [];
+let _searchIdx = -1;
+let _searchHighlightEl = null;
+
+function initMsgSearch() {
+  const bar = $('msg-search-bar');
+  const input = $('msg-search-input');
+  const countEl = $('msg-search-count');
+  if (!bar || !input) return;
+
+  input.addEventListener('input', () => doMsgSearch(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) prevSearchMatch(); else nextSearchMatch();
+    }
+    if (e.key === 'Escape') closeMsgSearch();
+  });
+  $('msg-search-prev')?.addEventListener('click', prevSearchMatch);
+  $('msg-search-next')?.addEventListener('click', nextSearchMatch);
+  $('msg-search-close')?.addEventListener('click', closeMsgSearch);
+}
+
+function openMsgSearch() {
+  const bar = $('msg-search-bar');
+  if (!bar) return;
+  bar.hidden = false;
+  $('msg-search-input')?.focus();
+}
+
+function closeMsgSearch() {
+  const bar = $('msg-search-bar');
+  if (!bar) return;
+  bar.hidden = true;
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIdx = -1;
+  const input = $('msg-search-input');
+  if (input) input.value = '';
+  if ($('msg-search-count')) $('msg-search-count').textContent = '';
+}
+
+function doMsgSearch(query) {
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIdx = -1;
+  const countEl = $('msg-search-count');
+  if (!query.trim()) { if (countEl) countEl.textContent = ''; return; }
+
+  const q = query.toLowerCase();
+  // Walk text nodes in messages, wrap matches in <mark>
+  const walk = document.createTreeWalker(messagesEl, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const p = node.parentElement;
+      if (!p) return NodeFilter.FILTER_REJECT;
+      if (p.closest('.msg-actions, .token-usage, .context-indicator, .think-block summary'))
+        return NodeFilter.FILTER_REJECT;
+      return node.textContent.toLowerCase().includes(q)
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+
+  const marks = [];
+  let node;
+  while ((node = walk.nextNode())) {
+    const text = node.textContent;
+    const lower = text.toLowerCase();
+    let pos = 0;
+    const frag = document.createDocumentFragment();
+    let idx;
+    while ((idx = lower.indexOf(q, pos)) !== -1) {
+      if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
+      const mark = document.createElement('mark');
+      mark.className = 'search-highlight';
+      mark.textContent = text.slice(idx, idx + q.length);
+      frag.appendChild(mark);
+      marks.push(mark);
+      pos = idx + q.length;
+    }
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    node.parentNode.replaceChild(frag, node);
+  }
+  _searchMatches = marks;
+  if (countEl) countEl.textContent = marks.length ? `1 / ${marks.length}` : 'No results';
+  if (marks.length) { _searchIdx = 0; highlightSearchMatch(0); }
+}
+
+function highlightSearchMatch(i) {
+  _searchMatches.forEach((m, idx) => m.classList.toggle('search-highlight-active', idx === i));
+  if (_searchMatches[i]) {
+    _searchMatches[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const countEl = $('msg-search-count');
+    if (countEl) countEl.textContent = `${i + 1} / ${_searchMatches.length}`;
+  }
+}
+
+function nextSearchMatch() {
+  if (!_searchMatches.length) return;
+  _searchIdx = (_searchIdx + 1) % _searchMatches.length;
+  highlightSearchMatch(_searchIdx);
+}
+
+function prevSearchMatch() {
+  if (!_searchMatches.length) return;
+  _searchIdx = (_searchIdx - 1 + _searchMatches.length) % _searchMatches.length;
+  highlightSearchMatch(_searchIdx);
+}
+
+function clearSearchHighlights() {
+  // Unwrap all <mark class="search-highlight"> back to plain text
+  for (const mark of messagesEl.querySelectorAll('mark.search-highlight')) {
+    mark.replaceWith(document.createTextNode(mark.textContent));
+  }
+  // Merge adjacent text nodes left by replaceWith
+  messagesEl.normalize();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Image lightbox ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function showImageLightbox(src, alt) {
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  const img = document.createElement('img');
+  img.className = 'lightbox-img';
+  img.src = src;
+  img.alt = alt || '';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'lightbox-close';
+  closeBtn.textContent = '✕';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  overlay.appendChild(img);
+  overlay.appendChild(closeBtn);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  // Keyboard close
+  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Prompt template variables {{varName}} ───────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseTemplateVars(text) {
+  const matches = [...text.matchAll(/\{\{(\w+)\}\}/g)];
+  return [...new Set(matches.map(m => m[1]))];
+}
+
+/**
+ * Show a modal asking the user to fill in each template variable.
+ * Returns the substituted text, or null if cancelled.
+ */
+function resolveTemplateVars(text, vars) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'tpl-var-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'tpl-var-modal';
+    modal.innerHTML = `<h3 class="tpl-var-title">Fill in variables</h3>`;
+
+    const inputs = {};
+    for (const varName of vars) {
+      const row = document.createElement('div');
+      row.className = 'tpl-var-row';
+      const label = document.createElement('label');
+      label.className = 'tpl-var-label';
+      label.textContent = varName;
+      const inp = document.createElement('input');
+      inp.className = 'tpl-var-input';
+      inp.type = 'text';
+      inp.placeholder = `Value for {{${varName}}}`;
+      inputs[varName] = inp;
+      row.append(label, inp);
+      modal.appendChild(row);
+    }
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'tpl-var-btns';
+    const okBtn = document.createElement('button');
+    okBtn.className = 'tpl-var-ok';
+    okBtn.textContent = 'Send';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'tpl-var-cancel';
+    cancelBtn.textContent = 'Cancel';
+    btnRow.append(okBtn, cancelBtn);
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Focus first input
+    Object.values(inputs)[0]?.focus();
+
+    const finish = (ok) => {
+      overlay.remove();
+      if (!ok) { resolve(null); return; }
+      let result = text;
+      for (const [name, inp] of Object.entries(inputs)) {
+        result = result.replaceAll(`{{${name}}}`, inp.value);
+      }
+      resolve(result);
+    };
+
+    okBtn.addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) finish(false); });
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
+      if (e.key === 'Escape') finish(false);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Multi-select + batch delete ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function enterMultiSelect() {
+  isMultiSelectMode = true;
+  $('multiselect-bar').hidden = false;
+  $('multiselect-toggle')?.classList.add('active');
+  // Add checkboxes to every message bubble that has a data-hidx
+  for (const msg of messagesEl.querySelectorAll('.msg[data-hidx]')) {
+    if (msg.querySelector('.msg-select-cb')) continue;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'msg-select-cb';
+    cb.addEventListener('change', updateMultiselectCount);
+    msg.insertBefore(cb, msg.firstChild);
+  }
+  updateMultiselectCount();
+}
+
+function exitMultiSelect() {
+  isMultiSelectMode = false;
+  $('multiselect-bar').hidden = true;
+  $('multiselect-toggle')?.classList.remove('active');
+  for (const cb of messagesEl.querySelectorAll('.msg-select-cb')) cb.remove();
+}
+
+function updateMultiselectCount() {
+  const n = messagesEl.querySelectorAll('.msg-select-cb:checked').length;
+  const el = $('multiselect-count');
+  if (el) el.textContent = `${n} selected`;
+  const delBtn = $('multiselect-delete');
+  if (delBtn) delBtn.disabled = n === 0;
+}
+
+async function deleteSelectedMessages() {
+  const checked = [...messagesEl.querySelectorAll('.msg-select-cb:checked')];
+  if (!checked.length) return;
+
+  // Collect indices sorted descending — delete highest first to avoid shift
+  const indices = checked
+    .map(cb => parseInt(cb.closest('[data-hidx]')?.dataset.hidx, 10))
+    .filter(n => !isNaN(n))
+    .sort((a, b) => b - a);
+
+  for (const idx of indices) {
+    await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
+    // Shift data-hidx on remaining bubbles above this index
+    for (const el of messagesEl.querySelectorAll('[data-hidx]')) {
+      const bidx = parseInt(el.dataset.hidx, 10);
+      if (bidx > idx) el.dataset.hidx = bidx - 1;
+    }
+    nextHistoryIdx = Math.max(0, nextHistoryIdx - 1);
+  }
+
+  // Remove DOM elements
+  checked.forEach(cb => cb.closest('.msg')?.remove());
+  exitMultiSelect();
+  showToast(`Deleted ${indices.length} message${indices.length > 1 ? 's' : ''}`, 'success');
 }

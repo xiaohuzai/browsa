@@ -1029,42 +1029,6 @@ async function handle(msg, sender) {
       return { full: fullReply };
     }
 
-    case 'WEB_SEARCH': {
-      // Run a web search via Tavily API (https://app.tavily.com).
-      // The user configures their Tavily API key in Settings → Web Search.
-      // Returns { ok, results: [{title, url, content, score}], query }
-      const { query, maxResults = 5 } = msg;
-      if (!query?.trim()) return { ok: false, error: 'No query provided' };
-      const cfg2 = await storage.getAll();
-      const tavilyKey = cfg2.tavilyApiKey?.trim();
-      if (!tavilyKey) return { ok: false, error: 'Tavily API key not set. Add it in Settings → Web Search.' };
-
-      const resp = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: tavilyKey,
-          query,
-          search_depth: 'basic',
-          max_results: maxResults,
-          include_answer: false
-        })
-      }).catch(e => { throw new Error('Tavily fetch failed: ' + e.message); });
-
-      if (!resp.ok) {
-        const errText = await resp.text().catch(() => '');
-        throw new Error(`Tavily API returned ${resp.status}: ${errText.slice(0, 120)}`);
-      }
-      const data = await resp.json();
-      const results = (data.results || []).map(r => ({
-        title: r.title || '',
-        url: r.url || '',
-        content: (r.content || '').slice(0, 800),
-        score: r.score || 0
-      }));
-      return { ok: true, query, results };
-    }
-
     default:
       throw new Error(`Unknown message type: ${msg.type}`);
   }

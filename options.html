@@ -97,21 +97,32 @@
 
       <section class="card">
         <div class="card-header">
-          <h2>Web Search</h2>
+          <h2>Chat Preferences</h2>
         </div>
         <div class="card-body">
-          <p class="hint">Use <code>/search &lt;query&gt;</code> in the chat to search the web. Powered by <a href="https://tavily.com" target="_blank">Tavily</a> — get a free API key at app.tavily.com.</p>
           <div class="row">
-            <label>Tavily API Key
-              <div class="apikey-wrap">
-                <input id="tavilyApiKey" type="password" placeholder="tvly-..." style="font-family:monospace" />
-                <button type="button" class="apikey-toggle" id="tavilyKeyToggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
+            <label>Message font size
+              <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+                <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" style="flex:1" />
+                <span id="fontSizeVal" style="font-size:12px;color:var(--muted);width:36px">13.5px</span>
               </div>
             </label>
           </div>
+          <div class="row" style="margin-top:12px">
+            <label>Send shortcut
+              <select id="sendShortcut" style="margin-top:4px;width:100%">
+                <option value="enter">Enter (Shift+Enter for newline)</option>
+                <option value="ctrl-enter">Ctrl+Enter / ⌘+Enter (Enter for newline)</option>
+              </select>
+            </label>
+          </div>
+          <label class="toggle-row" style="margin-top:12px">
+            <input type="checkbox" id="thoughtAutoCollapse" />
+            <span>Auto-collapse thinking blocks</span>
+          </label>
           <div class="card-actions">
-            <button data-act="save-tavily" class="primary">Save</button>
-            <span id="tavily-status" class="card-status"></span>
+            <button data-act="save-chat-prefs" class="primary">Save</button>
+            <span id="chat-prefs-status" class="card-status"></span>
           </div>
         </div>
       </section>

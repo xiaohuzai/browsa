@@ -52,31 +52,37 @@ async function init() {
   });
   document.querySelector('button[data-act="save-mask-rules"]')?.addEventListener('click', saveMaskRules);
 
-  // Tavily API key
-  applyTavilyKey(cachedCfg);
-  document.querySelector('button[data-act="save-tavily"]')?.addEventListener('click', saveTavilyKey);
-  const tavilyToggle = $('tavilyKeyToggle');
-  const tavilyInput = $('tavilyApiKey');
-  if (tavilyToggle && tavilyInput) {
-    tavilyToggle.addEventListener('click', () => {
-      const show = tavilyInput.type === 'password';
-      tavilyInput.type = show ? 'text' : 'password';
-      tavilyToggle.textContent = show ? '🙈' : '👁';
-    });
+  // Chat preferences
+  applyChatPrefs(cachedCfg);
+  document.querySelector('button[data-act="save-chat-prefs"]')?.addEventListener('click', saveChatPrefs);
+  const fontSizeEl = $('fontSize');
+  const fontSizeVal = $('fontSizeVal');
+  if (fontSizeEl && fontSizeVal) {
+    fontSizeEl.addEventListener('input', () => { fontSizeVal.textContent = fontSizeEl.value + 'px'; });
   }
 }
 
-function applyTavilyKey(cfg) {
-  const el = $('tavilyApiKey');
-  if (el) el.value = cfg.tavilyApiKey || '';
+function applyChatPrefs(cfg) {
+  const fs = $('fontSize');
+  const fsv = $('fontSizeVal');
+  const val = cfg.fontSize ?? 13.5;
+  if (fs) fs.value = val;
+  if (fsv) fsv.textContent = val + 'px';
+  const ss = $('sendShortcut');
+  if (ss) ss.value = cfg.sendShortcut || 'enter';
+  const tac = $('thoughtAutoCollapse');
+  if (tac) tac.checked = !!(cfg.thoughtAutoCollapse);
 }
 
-async function saveTavilyKey() {
-  const el = $('tavilyApiKey');
-  const key = el?.value?.trim() || '';
-  await chrome.storage.local.set({ tavilyApiKey: key });
-  cachedCfg.tavilyApiKey = key;
-  const statusEl = $('tavily-status');
+async function saveChatPrefs() {
+  const fs = parseFloat($('fontSize')?.value || '13.5');
+  const ss = $('sendShortcut')?.value || 'enter';
+  const tac = !!$('thoughtAutoCollapse')?.checked;
+  await chrome.storage.local.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
+  cachedCfg.fontSize = fs;
+  cachedCfg.sendShortcut = ss;
+  cachedCfg.thoughtAutoCollapse = tac;
+  const statusEl = $('chat-prefs-status');
   if (statusEl) {
     statusEl.className = 'card-status ok';
     statusEl.textContent = '✓ Saved';
