@@ -95,6 +95,27 @@
         </div>
       </section>
 
+      <section class="card">
+        <div class="card-header">
+          <h2>Web Search</h2>
+        </div>
+        <div class="card-body">
+          <p class="hint">Use <code>/search &lt;query&gt;</code> in the chat to search the web. Powered by <a href="https://tavily.com" target="_blank">Tavily</a> — get a free API key at app.tavily.com.</p>
+          <div class="row">
+            <label>Tavily API Key
+              <div class="apikey-wrap">
+                <input id="tavilyApiKey" type="password" placeholder="tvly-..." style="font-family:monospace" />
+                <button type="button" class="apikey-toggle" id="tavilyKeyToggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
+              </div>
+            </label>
+          </div>
+          <div class="card-actions">
+            <button data-act="save-tavily" class="primary">Save</button>
+            <span id="tavily-status" class="card-status"></span>
+          </div>
+        </div>
+      </section>
+
       <details class="advanced-section">
         <summary class="advanced-summary">⚙ Advanced</summary>
 

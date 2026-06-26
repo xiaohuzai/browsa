@@ -65,6 +65,13 @@ const VENDORS = [
     srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'mermaid'
+  },
+  {
+    name: 'highlight',
+    srcEntry:  'highlight.js/lib/common.js',  // core + ~40 common languages
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'highlight'
   }
 ];
 
@@ -118,6 +125,11 @@ async function bundleAsESM(vendor) {
 
 console.log('browsa: building vendor bundles...');
 for (const v of VENDORS) {
+  const srcPath = join(v.srcDir, v.srcEntry);
+  if (!existsSync(srcPath)) {
+    console.log(`  ⚠ skipping ${v.name} (source not found: ${srcPath})`);
+    continue;
+  }
   if (v.cjsToIife) await bundleAsCJS(v);
   if (v.esmBundle) await bundleAsESM(v);
 }

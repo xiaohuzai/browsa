@@ -51,6 +51,37 @@ async function init() {
     renderMaskRules(rules);
   });
   document.querySelector('button[data-act="save-mask-rules"]')?.addEventListener('click', saveMaskRules);
+
+  // Tavily API key
+  applyTavilyKey(cachedCfg);
+  document.querySelector('button[data-act="save-tavily"]')?.addEventListener('click', saveTavilyKey);
+  const tavilyToggle = $('tavilyKeyToggle');
+  const tavilyInput = $('tavilyApiKey');
+  if (tavilyToggle && tavilyInput) {
+    tavilyToggle.addEventListener('click', () => {
+      const show = tavilyInput.type === 'password';
+      tavilyInput.type = show ? 'text' : 'password';
+      tavilyToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
+}
+
+function applyTavilyKey(cfg) {
+  const el = $('tavilyApiKey');
+  if (el) el.value = cfg.tavilyApiKey || '';
+}
+
+async function saveTavilyKey() {
+  const el = $('tavilyApiKey');
+  const key = el?.value?.trim() || '';
+  await chrome.storage.local.set({ tavilyApiKey: key });
+  cachedCfg.tavilyApiKey = key;
+  const statusEl = $('tavily-status');
+  if (statusEl) {
+    statusEl.className = 'card-status ok';
+    statusEl.textContent = '✓ Saved';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'card-status'; }, 3000);
+  }
 }
 
 function applyLimits(cfg) {

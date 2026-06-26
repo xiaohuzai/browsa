@@ -5,6 +5,7 @@
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
+import hljs from './lib/vendor/highlight.bundle.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
@@ -846,6 +847,42 @@ function addCodeCopyButtons() {
       const cls = code.className.match(/language-(\w+)/);
       if (cls) pre.setAttribute('data-lang', cls[1]);
     }
+
+    // Apply syntax highlighting via highlight.js (skip mermaid + diff — handled separately)
+    if (code && !code.dataset.highlighted) {
+      const lang = code.className.match(/language-(\w+)/)?.[1];
+      if (lang && lang !== 'mermaid' && lang !== 'diff' && lang !== 'patch') {
+        try {
+          const result = hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true });
+          code.innerHTML = result.value;
+          code.dataset.highlighted = '1';
+        } catch (_) {
+          // Language not supported — try auto-detect for unknown blocks
+          if (lang === 'text' || lang === 'plain' || lang === 'plaintext') {
+            // skip
+          } else {
+            try {
+              const result = hljs.highlightAuto(code.textContent, { subset: ['python','javascript','typescript','java','c','cpp','go','rust','ruby','php','swift','kotlin','sql','bash','shell','json','yaml','xml','html','css'] });
+              if (result.relevance > 5) { code.innerHTML = result.value; code.dataset.highlighted = '1'; }
+            } catch (_2) {}
+          }
+        }
+      }
+    }
+
+    // HTML preview button for code.language-html blocks
+    if (code && !pre.querySelector('.code-preview-btn')) {
+      const lang = code.className.match(/language-(\w+)/)?.[1];
+      if (lang === 'html') {
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'code-preview-btn';
+        prevBtn.textContent = '▶';
+        prevBtn.title = 'Preview HTML';
+        prevBtn.addEventListener('click', () => showHtmlPreview(code.textContent));
+        pre.appendChild(prevBtn);
+      }
+    }
+
     if (pre.querySelector('.code-copy-btn')) continue;
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
@@ -862,6 +899,28 @@ function addCodeCopyButtons() {
     pre.style.position = 'relative';
     pre.appendChild(btn);
   }
+}
+
+/** Open a sandboxed iframe overlay to preview HTML code. */
+function showHtmlPreview(htmlContent) {
+  const overlay = document.createElement('div');
+  overlay.className = 'html-preview-overlay';
+  const toolbar = document.createElement('div');
+  toolbar.className = 'html-preview-toolbar';
+  toolbar.innerHTML = '<span>HTML Preview</span>';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.className = 'html-preview-close';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  toolbar.appendChild(closeBtn);
+  const iframe = document.createElement('iframe');
+  iframe.sandbox = 'allow-scripts';
+  iframe.className = 'html-preview-iframe';
+  iframe.srcdoc = htmlContent;
+  overlay.appendChild(toolbar);
+  overlay.appendChild(iframe);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
 // Markdown -> sanitized HTML pipeline with proper LaTeX rendering.
@@ -1207,6 +1266,7 @@ const SLASH_COMMANDS = {
   '/compact':    'Please compact our conversation: summarize what we have discussed so far into a concise context note, then confirm what you now know.',
   '/context':    'Briefly describe the conversation context and any page content you currently have. What topics have we covered?',
   '/prompt':     '__SHOW_PROMPT__',  // special: intercepted before sending to LLM
+  '/search':     '__WEB_SEARCH__',  // special: web search via Tavily
 };
 
 function expandSlash(text) {
@@ -1235,6 +1295,50 @@ async function onSend() {
   if (rawText.trim() === '/prompt') {
     inputEl.value = '';
     showEffectivePrompt();
+    return;
+  }
+
+  // /search <query> — run a Tavily web search and inject results as page context, then ask LLM
+  if (rawText.startsWith('/search ') || rawText.trim() === '/search') {
+    const query = rawText.slice('/search'.length).trim();
+    if (!query) {
+      appendSystem('Usage: /search <your question or topic>');
+      inputEl.value = '';
+      return;
+    }
+    inputEl.value = '';
+    appendUser(rawText);
+    const sysEl = appendSystem('🔍 Searching…');
+    try {
+      const res = await sendMessage({ type: 'WEB_SEARCH', query, maxResults: 5 });
+      sysEl.remove();
+      if (!res?.data?.ok) {
+        appendError(res?.data?.error || 'Search failed. Check your Tavily API key in Settings → Web Search.');
+        return;
+      }
+      const results = res.data.results || [];
+      if (!results.length) { appendSystem('No results found.'); return; }
+      // Format results as numbered list with title, URL, and snippet
+      const mdResults = results.map((r, i) =>
+        `${i + 1}. **[${r.title}](${r.url})**\n   ${r.content}`
+      ).join('\n\n');
+      const searchContext = `🔍 Web search: **${query}**\n\n${mdResults}`;
+      // Display in an assistant-style bubble so user can read the raw results
+      const resultEl = appendAssistant('', true);
+      resultEl.innerHTML = renderSafe(searchContext);
+      decorateLinks(resultEl);
+      addCodeCopyButtons();
+      renderMermaid(resultEl);
+      // Pre-fill the input with a follow-up prompt so the user can ask about results
+      inputEl.value = `Based on the above search results, please answer: ${query}`;
+      updateComposerInfo();
+      inputEl.focus();
+      inputEl.select();
+      scrollToBottom(true);
+    } catch (e) {
+      sysEl.remove();
+      appendError(e.message || 'Search error');
+    }
     return;
   }
 
@@ -1790,7 +1894,20 @@ function addMsgActions(el, getRaw) {
 
   const buttons = [replyBtn, delBtn];
 
-  // ⎘ Copy — only for assistant messages
+  // ✏ Edit — only for user messages
+  if (el.classList.contains('user')) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action-icon';
+    editBtn.title = 'Edit & resend';
+    editBtn.textContent = '✏';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startMsgEdit(el);
+    });
+    buttons.push(editBtn);
+  }
+
+  // ⎘ Copy + 🔄 Regenerate — only for assistant messages
   if (el.classList.contains('assistant')) {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-icon';
@@ -1810,10 +1927,133 @@ function addMsgActions(el, getRaw) {
       }
     });
     buttons.push(copyBtn);
+
+    // 🔄 Regenerate: truncate history from this index and re-send last user message
+    const regenBtn = document.createElement('button');
+    regenBtn.className = 'msg-action-icon';
+    regenBtn.title = 'Regenerate response';
+    regenBtn.textContent = '↺';
+    regenBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await regenerateFrom(el);
+    });
+    buttons.push(regenBtn);
   }
 
   wrap.append(...buttons);
   el.appendChild(wrap);
+}
+
+/**
+ * Put a user bubble into edit mode: replace the text span with a textarea.
+ * On save: update history in background, then re-run CHAT from that point.
+ */
+function startMsgEdit(el) {
+  if (el.querySelector('.msg-edit-textarea')) return; // already editing
+  const msgText = el.querySelector('.msg-text');
+  if (!msgText) return;
+  const originalText = el.dataset.raw || msgText.textContent;
+
+  // Hide the text span (don't remove — keeps layout stable)
+  const textarea = document.createElement('textarea');
+  textarea.className = 'msg-edit-textarea';
+  textarea.value = originalText;
+
+  const bar = document.createElement('div');
+  bar.className = 'msg-edit-bar';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'msg-edit-save';
+  saveBtn.textContent = 'Send';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'msg-edit-cancel';
+  cancelBtn.textContent = 'Cancel';
+
+  bar.append(saveBtn, cancelBtn);
+
+  msgText.replaceWith(textarea);
+  el.appendChild(bar);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+  cancelBtn.addEventListener('click', () => {
+    textarea.replaceWith(msgText);
+    bar.remove();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newText = textarea.value.trim();
+    if (!newText) return;
+    // Update the bubble
+    el.dataset.raw = newText;
+    const newSpan = document.createElement('span');
+    newSpan.className = 'msg-text';
+    newSpan.textContent = newText;
+    textarea.replaceWith(newSpan);
+    bar.remove();
+
+    const idx = parseInt(el.dataset.hidx, 10);
+    if (!isNaN(idx)) {
+      // Truncate history from this point onward, then re-send
+      await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+      // Remove all DOM bubbles after this one (assistant reply + any following)
+      let sib = el.nextElementSibling;
+      while (sib) {
+        const next = sib.nextElementSibling;
+        sib.remove();
+        sib = next;
+      }
+      nextHistoryIdx = idx; // will be re-assigned when CHAT handler stores new turns
+    }
+    // Re-send as new turn
+    lastSentRaw = newText;
+    inputEl.value = newText;
+    onSend();
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveBtn.click(); }
+    if (e.key === 'Escape') cancelBtn.click();
+  });
+}
+
+/**
+ * Regenerate: truncate history from this assistant bubble onward, then re-send
+ * the preceding user message.
+ */
+async function regenerateFrom(assistantEl) {
+  const idx = parseInt(assistantEl.dataset.hidx, 10);
+  if (isNaN(idx)) return;
+
+  // Find the text of the preceding user bubble (DOM search upward)
+  let userText = '';
+  let sib = assistantEl.previousElementSibling;
+  while (sib) {
+    if (sib.classList.contains('user')) {
+      userText = sib.dataset.raw || sib.querySelector('.msg-text')?.textContent || '';
+      break;
+    }
+    sib = sib.previousElementSibling;
+  }
+  if (!userText) { showToast('Cannot find preceding user message', 'error'); return; }
+
+  // Truncate history from this assistant index onward
+  await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+
+  // Remove this bubble and all following from DOM
+  let cur = assistantEl;
+  while (cur) {
+    const next = cur.nextElementSibling;
+    cur.remove();
+    cur = next;
+  }
+  nextHistoryIdx = idx;
+
+  // Re-send
+  lastSentRaw = userText;
+  inputEl.value = userText;
+  onSend();
 }
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text, tierOverride) {
@@ -2202,7 +2442,8 @@ async function renderSessionsList() {
         <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
       </div>
       <div class="session-item-actions">
-        <button class="session-export-btn" title="Export session as Markdown" data-id="${s.id}">⬇</button>
+        <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">MD</button>
+        <button class="session-export-json-btn" title="Export as JSON" data-id="${s.id}">JSON</button>
         <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
       </div>`;
 
@@ -2227,10 +2468,14 @@ async function renderSessionsList() {
       startSessionRename(nameEl, s.id);
     });
 
-    // Export button
+    // Export buttons
     item.querySelector('.session-export-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      await exportSession(s.id, s.name);
+      await exportSession(s.id, s.name, 'markdown');
+    });
+    item.querySelector('.session-export-json-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await exportSession(s.id, s.name, 'json');
     });
 
     // Delete button
@@ -2279,12 +2524,36 @@ function startSessionRename(nameEl, sessionId) {
   input.addEventListener('blur', commit); // normal click-away: save
 }
 
-/** Export a saved session as a Markdown file. */
-async function exportSession(id, name) {
+/** Export a saved session as Markdown (default) or JSON. */
+async function exportSession(id, name, format = 'markdown') {
   const res = await sendMessage({ type: 'GET_SESSION_FULL', id });
   const session = res?.data?.session;
   if (!session) { showToast('Could not load session', 'error'); return; }
 
+  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  if (format === 'json') {
+    const payload = {
+      name: session.name,
+      exportedAt: new Date().toISOString(),
+      source: 'browsa',
+      history: session.history || []
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json; charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `browsa-${slug}-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Exported as JSON', 'success');
+    return;
+  }
+
+  // Markdown export
   const history = session.history || [];
   const lines = [
     `# ${session.name}`,
@@ -2319,8 +2588,7 @@ async function exportSession(id, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
-  a.download = `browsa-${slug}-${new Date().toISOString().slice(0, 10)}.md`;
+  a.download = `browsa-${slug}-${dateStr}.md`;
   document.body.appendChild(a);
   a.click();
   a.remove();
