@@ -51,6 +51,43 @@ async function init() {
     renderMaskRules(rules);
   });
   document.querySelector('button[data-act="save-mask-rules"]')?.addEventListener('click', saveMaskRules);
+
+  // Chat preferences
+  applyChatPrefs(cachedCfg);
+  document.querySelector('button[data-act="save-chat-prefs"]')?.addEventListener('click', saveChatPrefs);
+  const fontSizeEl = $('fontSize');
+  const fontSizeVal = $('fontSizeVal');
+  if (fontSizeEl && fontSizeVal) {
+    fontSizeEl.addEventListener('input', () => { fontSizeVal.textContent = fontSizeEl.value + 'px'; });
+  }
+}
+
+function applyChatPrefs(cfg) {
+  const fs = $('fontSize');
+  const fsv = $('fontSizeVal');
+  const val = cfg.fontSize ?? 13.5;
+  if (fs) fs.value = val;
+  if (fsv) fsv.textContent = val + 'px';
+  const ss = $('sendShortcut');
+  if (ss) ss.value = cfg.sendShortcut || 'enter';
+  const tac = $('thoughtAutoCollapse');
+  if (tac) tac.checked = !!(cfg.thoughtAutoCollapse);
+}
+
+async function saveChatPrefs() {
+  const fs = parseFloat($('fontSize')?.value || '13.5');
+  const ss = $('sendShortcut')?.value || 'enter';
+  const tac = !!$('thoughtAutoCollapse')?.checked;
+  await chrome.storage.local.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
+  cachedCfg.fontSize = fs;
+  cachedCfg.sendShortcut = ss;
+  cachedCfg.thoughtAutoCollapse = tac;
+  const statusEl = $('chat-prefs-status');
+  if (statusEl) {
+    statusEl.className = 'card-status ok';
+    statusEl.textContent = '✓ Saved';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'card-status'; }, 3000);
+  }
 }
 
 function applyLimits(cfg) {

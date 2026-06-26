@@ -5,6 +5,7 @@
 import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
+import hljs from './lib/vendor/highlight.bundle.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
@@ -47,6 +48,12 @@ let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
+
+// ─── Feature state ────────────────────────────────────────────────────────────
+let sendShortcut = 'enter';       // 'enter' | 'ctrl-enter'
+let thoughtAutoCollapse = false;  // auto-collapse <thinking> blocks
+let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
+let isMultiSelectMode = false;    // multi-select mode for bulk delete
 // Per-tab conversation DOM snapshot. When the user switches tabs, we save
 // the current messagesEl.innerHTML here and restore it when they switch back.
 // This preserves in-flight streaming replies that haven't been persisted to
@@ -67,6 +74,12 @@ async function init() {
   const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
   populateProviderSelect(cfg);
   applyContextMode(cfg.contextMode || 'auto');
+
+  // Load chat preferences
+  sendShortcut = cfg.sendShortcut || 'enter';
+  thoughtAutoCollapse = !!cfg.thoughtAutoCollapse;
+  if (cfg.fontSize) applyFontSize(cfg.fontSize);
+
   // Load history
   await renderHistory();
 
@@ -123,9 +136,15 @@ async function init() {
       }
       if (e.key === 'Escape') { hideSlashSuggest(); return; }
     }
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      onSend();
+    // Send shortcut: Enter (default) or Shift+Enter
+    if (sendShortcut === 'shift-enter') {
+      if (e.key === 'Enter' && e.shiftKey && !e.isComposing) {
+        e.preventDefault(); onSend();
+      }
+    } else {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault(); onSend();
+      }
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
@@ -135,13 +154,24 @@ async function init() {
       e.preventDefault();
       cycleContextMode();
     }
+    // Ctrl+F / Cmd+F — open in-conversation search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      openMsgSearch();
+    }
   });
 
-  // Global shortcuts (Esc = cancel stream or close drawer)
+  // Global shortcuts (Esc = cancel stream or close drawer/search, Ctrl+F = search)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
+      if (isMultiSelectMode) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
       if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== inputEl) {
+      e.preventDefault();
+      openMsgSearch();
     }
   });
 
@@ -304,6 +334,9 @@ async function init() {
         const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
         populateProviderSelect(cfg2Res.data || cfg2Res);
       }
+      if (changes.fontSize?.newValue != null) applyFontSize(changes.fontSize.newValue);
+      if (changes.sendShortcut?.newValue != null) sendShortcut = changes.sendShortcut.newValue;
+      if (changes.thoughtAutoCollapse != null) thoughtAutoCollapse = !!changes.thoughtAutoCollapse.newValue;
       return;
     }
     // Session storage: pick up pending selection actions written by the
@@ -393,6 +426,25 @@ async function init() {
     isUserScrolledUp = dist > 80;
     scrollToBottomBtn.hidden = !isUserScrolledUp;
   }, { passive: true });
+
+  // Image lightbox — delegate click on all img inside messages
+  messagesEl.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (img && img.src && !img.closest('.msg-images')) {
+      showImageLightbox(img.src, img.alt);
+    }
+  });
+
+  // Wire search bar
+  initMsgSearch();
+  $('search-btn')?.addEventListener('click', openMsgSearch);
+
+  // Wire multi-select toggle
+  $('multiselect-toggle')?.addEventListener('click', () => {
+    if (isMultiSelectMode) exitMultiSelect(); else enterMultiSelect();
+  });
+  $('multiselect-delete')?.addEventListener('click', deleteSelectedMessages);
+  $('multiselect-cancel')?.addEventListener('click', exitMultiSelect);
 
   inputEl.focus();
 }
@@ -846,6 +898,29 @@ function addCodeCopyButtons() {
       const cls = code.className.match(/language-(\w+)/);
       if (cls) pre.setAttribute('data-lang', cls[1]);
     }
+
+    // Apply syntax highlighting via highlight.js (skip mermaid + diff — handled separately)
+    if (code && !code.dataset.highlighted) {
+      const lang = code.className.match(/language-(\w+)/)?.[1];
+      if (lang && lang !== 'mermaid' && lang !== 'diff' && lang !== 'patch') {
+        try {
+          const result = hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true });
+          code.innerHTML = result.value;
+          code.dataset.highlighted = '1';
+        } catch (_) {
+          // Language not supported — try auto-detect for unknown blocks
+          if (lang === 'text' || lang === 'plain' || lang === 'plaintext') {
+            // skip
+          } else {
+            try {
+              const result = hljs.highlightAuto(code.textContent, { subset: ['python','javascript','typescript','java','c','cpp','go','rust','ruby','php','swift','kotlin','sql','bash','shell','json','yaml','xml','html','css'] });
+              if (result.relevance > 5) { code.innerHTML = result.value; code.dataset.highlighted = '1'; }
+            } catch (_2) {}
+          }
+        }
+      }
+    }
+
     if (pre.querySelector('.code-copy-btn')) continue;
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
@@ -863,6 +938,7 @@ function addCodeCopyButtons() {
     pre.appendChild(btn);
   }
 }
+
 
 // Markdown -> sanitized HTML pipeline with proper LaTeX rendering.
 //
@@ -939,9 +1015,10 @@ function renderSafe(markdown) {
     // Restore think blocks as collapsible <details> elements (after sanitization
     // so DOMPurify never sees the raw inner content).
     if (thinkBlocks.length > 0) {
+      const openAttr = thoughtAutoCollapse ? '' : ' open';
       html = html.replace(/<div data-think="(\d+)"><\/div>/g, (_, idx) => {
         const inner = DOMPurify.sanitize(marked.parse(thinkBlocks[+idx]));
-        return `<details class="think-block"><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
+        return `<details class="think-block"${openAttr}><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
       });
     }
 
@@ -1008,7 +1085,7 @@ function makeStreamRenderer(el) {
     if (!thinkEl) {
       thinkEl = document.createElement('details');
       thinkEl.className = 'think-block live-think';
-      thinkEl.open = true;
+      thinkEl.open = !thoughtAutoCollapse;
       const sum = document.createElement('summary');
       sum.textContent = 'Thinking…';
       thinkBodyEl = document.createElement('div');
@@ -1203,9 +1280,6 @@ const SLASH_COMMANDS = {
   '/explain':    'Explain the page content as if teaching a beginner. Use simple language.',
   '/outline':    'List the structure of the page as a nested outline (headings only).',
   '/keypoints':  'Extract the 5 most important takeaways from the page.',
-  // Session / context management (mirrors personal_ai_assistant)
-  '/compact':    'Please compact our conversation: summarize what we have discussed so far into a concise context note, then confirm what you now know.',
-  '/context':    'Briefly describe the conversation context and any page content you currently have. What topics have we covered?',
   '/prompt':     '__SHOW_PROMPT__',  // special: intercepted before sending to LLM
 };
 
@@ -1275,6 +1349,7 @@ async function onSend() {
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
   let renderStream = makeStreamRenderer(assistantEl);
+  streamStartAt = 0; // reset for tokens/sec calculation
 
   // Open streaming port FIRST so the background can push CHUNKs as they
   // arrive. We pass the port's name to the background via msg.port; the
@@ -1304,6 +1379,7 @@ async function onSend() {
   function attachChunkListener() {
     port.onMessage.addListener((m) => {
       if (m.type === 'CHUNK') {
+        if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
         acc += m.delta;
         renderStream(m.delta, false); // smd: pass delta, not accumulated text
         updateOutputTokenCount(m.delta);
@@ -1790,7 +1866,20 @@ function addMsgActions(el, getRaw) {
 
   const buttons = [replyBtn, delBtn];
 
-  // ⎘ Copy — only for assistant messages
+  // ✏ Edit — only for user messages
+  if (el.classList.contains('user')) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action-icon';
+    editBtn.title = 'Edit & resend';
+    editBtn.textContent = '✏';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startMsgEdit(el);
+    });
+    buttons.push(editBtn);
+  }
+
+  // ⎘ Copy + 🔄 Regenerate — only for assistant messages
   if (el.classList.contains('assistant')) {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-icon';
@@ -1810,11 +1899,87 @@ function addMsgActions(el, getRaw) {
       }
     });
     buttons.push(copyBtn);
+
   }
 
   wrap.append(...buttons);
   el.appendChild(wrap);
 }
+
+/**
+ * Put a user bubble into edit mode: replace the text span with a textarea.
+ * On save: update history in background, then re-run CHAT from that point.
+ */
+function startMsgEdit(el) {
+  if (el.querySelector('.msg-edit-textarea')) return; // already editing
+  const msgText = el.querySelector('.msg-text');
+  if (!msgText) return;
+  const originalText = el.dataset.raw || msgText.textContent;
+
+  // Hide the text span (don't remove — keeps layout stable)
+  const textarea = document.createElement('textarea');
+  textarea.className = 'msg-edit-textarea';
+  textarea.value = originalText;
+
+  const bar = document.createElement('div');
+  bar.className = 'msg-edit-bar';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'msg-edit-save';
+  saveBtn.textContent = 'Send';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'msg-edit-cancel';
+  cancelBtn.textContent = 'Cancel';
+
+  bar.append(saveBtn, cancelBtn);
+
+  msgText.replaceWith(textarea);
+  el.appendChild(bar);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+  cancelBtn.addEventListener('click', () => {
+    textarea.replaceWith(msgText);
+    bar.remove();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newText = textarea.value.trim();
+    if (!newText) return;
+    // Update the bubble
+    el.dataset.raw = newText;
+    const newSpan = document.createElement('span');
+    newSpan.className = 'msg-text';
+    newSpan.textContent = newText;
+    textarea.replaceWith(newSpan);
+    bar.remove();
+
+    const idx = parseInt(el.dataset.hidx, 10);
+    if (!isNaN(idx)) {
+      // Truncate history from this point onward, then re-send
+      await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+      // Remove all DOM bubbles after this one (assistant reply + any following)
+      let sib = el.nextElementSibling;
+      while (sib) {
+        const next = sib.nextElementSibling;
+        sib.remove();
+        sib = next;
+      }
+      nextHistoryIdx = idx; // will be re-assigned when CHAT handler stores new turns
+    }
+    // Re-send as new turn
+    lastSentRaw = newText;
+    inputEl.value = newText;
+    onSend();
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveBtn.click(); }
+    if (e.key === 'Escape') cancelBtn.click();
+  });
+}
+
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
@@ -1860,17 +2025,29 @@ function showTokenUsage(bubbleEl, usage) {
   bubbleEl.nextElementSibling?.classList.contains('token-usage') &&
     bubbleEl.nextElementSibling.remove();
 
+  // Tokens/sec: calculated from streamStartAt set when first CHUNK arrived
+  const durationMs = streamStartAt ? Date.now() - streamStartAt : 0;
+  const tps = (durationMs > 200 && completion > 0)
+    ? Math.round(completion / (durationMs / 1000)) : 0;
+  const durationSec = durationMs > 0 ? (durationMs / 1000).toFixed(1) : null;
+
   const el = document.createElement('div');
   el.className = 'token-usage';
   const fmtK = (n) => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
   const parts = [];
   if (prompt != null) parts.push(`↑ ${fmtK(prompt)}`);
   if (completion != null) parts.push(`↓ ${fmtK(completion)}`);
-  el.textContent = parts.join(' · ') + ' tokens';
-  el.title = `Prompt: ${prompt ?? '?'} tokens · Completion: ${completion ?? '?'} tokens` +
-             (usage.total_tokens ? ` · Total: ${usage.total_tokens}` : '');
-  // Insert after the bubble (before any msg-action-row that follows)
+  if (tps > 0) parts.push(`${tps} t/s`);
+  if (durationSec) parts.push(`${durationSec}s`);
+  el.textContent = parts.join(' · ');
+  el.title = `Prompt: ${prompt ?? '?'} · Completion: ${completion ?? '?'}` +
+             (usage.total_tokens ? ` · Total: ${usage.total_tokens}` : '') +
+             (tps ? ` · ${tps} tok/s` : '') +
+             (durationMs ? ` · ${(durationMs/1000).toFixed(2)}s` : '');
+
   bubbleEl.insertAdjacentElement('afterend', el);
+
+  streamStartAt = 0; // reset for next turn
 }
 
 function appendScreenshot(dataUrl) {
@@ -2202,7 +2379,7 @@ async function renderSessionsList() {
         <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
       </div>
       <div class="session-item-actions">
-        <button class="session-export-btn" title="Export session as Markdown" data-id="${s.id}">⬇</button>
+        <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">⬇</button>
         <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
       </div>`;
 
@@ -2227,7 +2404,7 @@ async function renderSessionsList() {
       startSessionRename(nameEl, s.id);
     });
 
-    // Export button
+    // Export buttons
     item.querySelector('.session-export-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
       await exportSession(s.id, s.name);
@@ -2285,6 +2462,10 @@ async function exportSession(id, name) {
   const session = res?.data?.session;
   if (!session) { showToast('Could not load session', 'error'); return; }
 
+  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  // Markdown export
   const history = session.history || [];
   const lines = [
     `# ${session.name}`,
@@ -2319,8 +2500,7 @@ async function exportSession(id, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
-  a.download = `browsa-${slug}-${new Date().toISOString().slice(0, 10)}.md`;
+  a.download = `browsa-${slug}-${dateStr}.md`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2489,4 +2669,215 @@ async function renderHistory() {
   }
   addCodeCopyButtons();
   scrollToBottom(true);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Font size ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function applyFontSize(px) {
+  document.documentElement.style.setProperty('--msg-font-size', px + 'px');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: In-conversation search (Ctrl+F) ─────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+let _searchMatches = [];
+let _searchIdx = -1;
+let _searchHighlightEl = null;
+
+function initMsgSearch() {
+  const bar = $('msg-search-bar');
+  const input = $('msg-search-input');
+  const countEl = $('msg-search-count');
+  if (!bar || !input) return;
+
+  input.addEventListener('input', () => doMsgSearch(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) prevSearchMatch(); else nextSearchMatch();
+    }
+    if (e.key === 'Escape') closeMsgSearch();
+  });
+  $('msg-search-prev')?.addEventListener('click', prevSearchMatch);
+  $('msg-search-next')?.addEventListener('click', nextSearchMatch);
+  $('msg-search-close')?.addEventListener('click', closeMsgSearch);
+}
+
+function openMsgSearch() {
+  const bar = $('msg-search-bar');
+  if (!bar) return;
+  bar.hidden = false;
+  $('msg-search-input')?.focus();
+}
+
+function closeMsgSearch() {
+  const bar = $('msg-search-bar');
+  if (!bar) return;
+  bar.hidden = true;
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIdx = -1;
+  const input = $('msg-search-input');
+  if (input) input.value = '';
+  if ($('msg-search-count')) $('msg-search-count').textContent = '';
+}
+
+function doMsgSearch(query) {
+  clearSearchHighlights();
+  _searchMatches = [];
+  _searchIdx = -1;
+  const countEl = $('msg-search-count');
+  if (!query.trim()) { if (countEl) countEl.textContent = ''; return; }
+
+  const q = query.toLowerCase();
+  // Walk text nodes in messages, wrap matches in <mark>
+  const walk = document.createTreeWalker(messagesEl, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const p = node.parentElement;
+      if (!p) return NodeFilter.FILTER_REJECT;
+      if (p.closest('.msg-actions, .token-usage, .think-block summary'))
+        return NodeFilter.FILTER_REJECT;
+      return node.textContent.toLowerCase().includes(q)
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+
+  const marks = [];
+  let node;
+  while ((node = walk.nextNode())) {
+    const text = node.textContent;
+    const lower = text.toLowerCase();
+    let pos = 0;
+    const frag = document.createDocumentFragment();
+    let idx;
+    while ((idx = lower.indexOf(q, pos)) !== -1) {
+      if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
+      const mark = document.createElement('mark');
+      mark.className = 'search-highlight';
+      mark.textContent = text.slice(idx, idx + q.length);
+      frag.appendChild(mark);
+      marks.push(mark);
+      pos = idx + q.length;
+    }
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    node.parentNode.replaceChild(frag, node);
+  }
+  _searchMatches = marks;
+  if (countEl) countEl.textContent = marks.length ? `1 / ${marks.length}` : 'No results';
+  if (marks.length) { _searchIdx = 0; highlightSearchMatch(0); }
+}
+
+function highlightSearchMatch(i) {
+  _searchMatches.forEach((m, idx) => m.classList.toggle('search-highlight-active', idx === i));
+  if (_searchMatches[i]) {
+    _searchMatches[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const countEl = $('msg-search-count');
+    if (countEl) countEl.textContent = `${i + 1} / ${_searchMatches.length}`;
+  }
+}
+
+function nextSearchMatch() {
+  if (!_searchMatches.length) return;
+  _searchIdx = (_searchIdx + 1) % _searchMatches.length;
+  highlightSearchMatch(_searchIdx);
+}
+
+function prevSearchMatch() {
+  if (!_searchMatches.length) return;
+  _searchIdx = (_searchIdx - 1 + _searchMatches.length) % _searchMatches.length;
+  highlightSearchMatch(_searchIdx);
+}
+
+function clearSearchHighlights() {
+  // Unwrap all <mark class="search-highlight"> back to plain text
+  for (const mark of messagesEl.querySelectorAll('mark.search-highlight')) {
+    mark.replaceWith(document.createTextNode(mark.textContent));
+  }
+  // Merge adjacent text nodes left by replaceWith
+  messagesEl.normalize();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Image lightbox ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function showImageLightbox(src, alt) {
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  const img = document.createElement('img');
+  img.className = 'lightbox-img';
+  img.src = src;
+  img.alt = alt || '';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'lightbox-close';
+  closeBtn.textContent = '✕';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  overlay.appendChild(img);
+  overlay.appendChild(closeBtn);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  // Keyboard close
+  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Feature: Multi-select + batch delete ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function enterMultiSelect() {
+  isMultiSelectMode = true;
+  $('multiselect-bar').hidden = false;
+  $('multiselect-toggle')?.classList.add('active');
+  // Add checkboxes to every message bubble that has a data-hidx
+  for (const msg of messagesEl.querySelectorAll('.msg[data-hidx]')) {
+    if (msg.querySelector('.msg-select-cb')) continue;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'msg-select-cb';
+    cb.addEventListener('change', updateMultiselectCount);
+    msg.insertBefore(cb, msg.firstChild);
+  }
+  updateMultiselectCount();
+}
+
+function exitMultiSelect() {
+  isMultiSelectMode = false;
+  $('multiselect-bar').hidden = true;
+  $('multiselect-toggle')?.classList.remove('active');
+  for (const cb of messagesEl.querySelectorAll('.msg-select-cb')) cb.remove();
+}
+
+function updateMultiselectCount() {
+  const n = messagesEl.querySelectorAll('.msg-select-cb:checked').length;
+  const el = $('multiselect-count');
+  if (el) el.textContent = `${n} selected`;
+  const delBtn = $('multiselect-delete');
+  if (delBtn) delBtn.disabled = n === 0;
+}
+
+async function deleteSelectedMessages() {
+  const checked = [...messagesEl.querySelectorAll('.msg-select-cb:checked')];
+  if (!checked.length) return;
+
+  // Collect indices sorted descending — delete highest first to avoid shift
+  const indices = checked
+    .map(cb => parseInt(cb.closest('[data-hidx]')?.dataset.hidx, 10))
+    .filter(n => !isNaN(n))
+    .sort((a, b) => b - a);
+
+  for (const idx of indices) {
+    await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
+    // Shift data-hidx on remaining bubbles above this index
+    for (const el of messagesEl.querySelectorAll('[data-hidx]')) {
+      const bidx = parseInt(el.dataset.hidx, 10);
+      if (bidx > idx) el.dataset.hidx = bidx - 1;
+    }
+    nextHistoryIdx = Math.max(0, nextHistoryIdx - 1);
+  }
+
+  // Remove DOM elements
+  checked.forEach(cb => cb.closest('.msg')?.remove());
+  exitMultiSelect();
+  showToast(`Deleted ${indices.length} message${indices.length > 1 ? 's' : ''}`, 'success');
 }

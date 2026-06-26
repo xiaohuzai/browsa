@@ -190,7 +190,7 @@ body {
   padding: 4px 2px;
   color: var(--fg-2);
   white-space: pre-wrap;
-  font-size: 13.5px;
+  font-size: var(--msg-font-size);
   text-align: right;
   max-width: 88%;
 }
@@ -1439,3 +1439,198 @@ code.language-patch {
   background: rgba(0,0,0,0.25);
 }
 .sessions-backdrop.active { display: block; }
+
+/* ── Syntax highlighting (highlight.js dark theme) ───────────────────────── */
+.msg.assistant pre code.hljs { background: transparent; padding: 0; }
+.hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #ff7b72; }
+.hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
+.hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #a5d6ff; }
+.hljs-deletion, .hljs-selector-pseudo { color: #ff7b72; }
+.hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #ffa657; }
+.hljs-meta { color: #d2a8ff; }
+.hljs-number { color: #79c0ff; }
+.hljs-title.class_, .hljs-class .hljs-title { color: #ffa657; }
+.hljs-function, .hljs-title.function_ { color: #d2a8ff; }
+.hljs-params { color: var(--fg); }
+.hljs-attr { color: #7ee787; }
+.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #7ee787; }
+.hljs-subst { color: var(--fg); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
+@media (prefers-color-scheme: light) {
+  .hljs-comment, .hljs-quote { color: #6e7781; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #cf222e; }
+  .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
+  .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #0a3069; }
+  .hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #953800; }
+  .hljs-meta { color: #8250df; }
+  .hljs-number { color: #0550ae; }
+  .hljs-title.class_, .hljs-class .hljs-title { color: #953800; }
+  .hljs-function, .hljs-title.function_ { color: #8250df; }
+  .hljs-attr { color: #116329; }
+  .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #116329; }
+}
+
+/* ── Message edit mode ───────────────────────────────────────────────────── */
+.msg-edit-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--bg-2);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.msg-edit-bar {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.msg-edit-save, .msg-edit-cancel {
+  padding: 3px 10px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--fg-dim);
+}
+.msg-edit-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+.msg-edit-save:hover { filter: brightness(1.1); }
+.msg-edit-cancel:hover { color: var(--fg); }
+
+
+/* ── Font size CSS variable (default 13.5px, adjustable via settings) ─────── */
+:root { --msg-font-size: 13.5px; }
+
+
+/* ── In-conversation search bar ─────────────────────────────────────────── */
+.msg-search-bar[hidden] { display: none !important; }
+.msg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.msg-search-input {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  color: var(--fg);
+  outline: none;
+}
+.msg-search-input:focus { border-color: var(--accent); }
+.msg-search-count { font-size: 11px; color: var(--fg-dim); min-width: 52px; text-align: center; }
+.msg-search-nav, .msg-search-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+.msg-search-nav:hover, .msg-search-close:hover { color: var(--fg); border-color: var(--fg-dim); }
+mark.search-highlight { background: rgba(251,191,36,0.35); color: inherit; border-radius: 2px; }
+mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px solid #fbbf24; }
+
+/* ── Multi-select bar ───────────────────────────────────────────────────── */
+.multiselect-bar[hidden] { display: none !important; }
+.multiselect-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-2));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  flex-shrink: 0;
+}
+.multiselect-count { font-size: 12px; color: var(--fg-dim); flex: 1; }
+.multiselect-delete-btn {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.1);
+  color: var(--error, #f87171);
+  cursor: pointer;
+}
+.multiselect-delete-btn:disabled { opacity: 0.4; cursor: default; }
+.multiselect-delete-btn:not(:disabled):hover { background: rgba(248,113,113,0.2); }
+.multiselect-cancel-btn {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.multiselect-cancel-btn:hover { color: var(--fg); }
+/* Checkbox on message bubbles */
+.msg-select-cb {
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.msg[data-hidx] { position: relative; }
+/* Active state for multi-select toggle button */
+#multiselect-toggle.active { color: var(--accent); }
+
+/* ── Image lightbox ──────────────────────────────────────────────────────── */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-img {
+  max-width: 95vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  cursor: zoom-out;
+}
+.lightbox-close {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.15); }
+/* Clickable images in messages */
+.msg.assistant img { cursor: zoom-in; }
+
+
