@@ -53,7 +53,6 @@ const images = [];             // { dataUrl, name } — attached for this turn
 let sendShortcut = 'enter';       // 'enter' | 'ctrl-enter'
 let thoughtAutoCollapse = false;  // auto-collapse <thinking> blocks
 let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
-let lastPromptTokens = 0;         // latest prompt_tokens for context indicator
 let isMultiSelectMode = false;    // multi-select mode for bulk delete
 // Per-tab conversation DOM snapshot. When the user switches tabs, we save
 // the current messagesEl.innerHTML here and restore it when they switch back.
@@ -137,9 +136,9 @@ async function init() {
       }
       if (e.key === 'Escape') { hideSlashSuggest(); return; }
     }
-    // Send shortcut: Enter (default) or Ctrl/Cmd+Enter
-    if (sendShortcut === 'ctrl-enter') {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.isComposing) {
+    // Send shortcut: Enter (default) or Shift+Enter
+    if (sendShortcut === 'shift-enter') {
+      if (e.key === 'Enter' && e.shiftKey && !e.isComposing) {
         e.preventDefault(); onSend();
       }
     } else {
@@ -335,6 +334,9 @@ async function init() {
         const cfg2Res = await sendMessage({ type: 'GET_CONFIG' });
         populateProviderSelect(cfg2Res.data || cfg2Res);
       }
+      if (changes.fontSize?.newValue != null) applyFontSize(changes.fontSize.newValue);
+      if (changes.sendShortcut?.newValue != null) sendShortcut = changes.sendShortcut.newValue;
+      if (changes.thoughtAutoCollapse != null) thoughtAutoCollapse = !!changes.thoughtAutoCollapse.newValue;
       return;
     }
     // Session storage: pick up pending selection actions written by the
@@ -435,6 +437,7 @@ async function init() {
 
   // Wire search bar
   initMsgSearch();
+  $('search-btn')?.addEventListener('click', openMsgSearch);
 
   // Wire multi-select toggle
   $('multiselect-toggle')?.addEventListener('click', () => {
@@ -918,19 +921,6 @@ function addCodeCopyButtons() {
       }
     }
 
-    // HTML preview button for code.language-html blocks
-    if (code && !pre.querySelector('.code-preview-btn')) {
-      const lang = code.className.match(/language-(\w+)/)?.[1];
-      if (lang === 'html') {
-        const prevBtn = document.createElement('button');
-        prevBtn.className = 'code-preview-btn';
-        prevBtn.textContent = '▶';
-        prevBtn.title = 'Preview HTML';
-        prevBtn.addEventListener('click', () => showHtmlPreview(code.textContent));
-        pre.appendChild(prevBtn);
-      }
-    }
-
     if (pre.querySelector('.code-copy-btn')) continue;
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
@@ -949,27 +939,6 @@ function addCodeCopyButtons() {
   }
 }
 
-/** Open a sandboxed iframe overlay to preview HTML code. */
-function showHtmlPreview(htmlContent) {
-  const overlay = document.createElement('div');
-  overlay.className = 'html-preview-overlay';
-  const toolbar = document.createElement('div');
-  toolbar.className = 'html-preview-toolbar';
-  toolbar.innerHTML = '<span>HTML Preview</span>';
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '✕';
-  closeBtn.className = 'html-preview-close';
-  closeBtn.addEventListener('click', () => overlay.remove());
-  toolbar.appendChild(closeBtn);
-  const iframe = document.createElement('iframe');
-  iframe.sandbox = 'allow-scripts';
-  iframe.className = 'html-preview-iframe';
-  iframe.srcdoc = htmlContent;
-  overlay.appendChild(toolbar);
-  overlay.appendChild(iframe);
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-}
 
 // Markdown -> sanitized HTML pipeline with proper LaTeX rendering.
 //
@@ -1311,9 +1280,6 @@ const SLASH_COMMANDS = {
   '/explain':    'Explain the page content as if teaching a beginner. Use simple language.',
   '/outline':    'List the structure of the page as a nested outline (headings only).',
   '/keypoints':  'Extract the 5 most important takeaways from the page.',
-  // Session / context management (mirrors personal_ai_assistant)
-  '/compact':    'Please compact our conversation: summarize what we have discussed so far into a concise context note, then confirm what you now know.',
-  '/context':    'Briefly describe the conversation context and any page content you currently have. What topics have we covered?',
   '/prompt':     '__SHOW_PROMPT__',  // special: intercepted before sending to LLM
 };
 
@@ -1347,17 +1313,7 @@ async function onSend() {
   }
 
   const slashExpanded = expandSlash(rawText);
-  let expandedText = slashExpanded || rawText;
-
-  // Prompt template variables: {{varName}} — show fill-in dialog before sending
-  const tplVars = parseTemplateVars(expandedText);
-  if (tplVars.length > 0) {
-    const filled = await resolveTemplateVars(expandedText, tplVars);
-    if (filled === null) return; // user cancelled
-    expandedText = filled;
-  }
-
-  const text = expandedText;
+  const text = slashExpanded || rawText;
 
   // Re-read the active tab RIGHT before sending. This is the defense-in-depth
   // for SPA navigation: even if a webNavigation push was missed (background
@@ -1944,16 +1900,6 @@ function addMsgActions(el, getRaw) {
     });
     buttons.push(copyBtn);
 
-    // 🔄 Regenerate: truncate history from this index and re-send last user message
-    const regenBtn = document.createElement('button');
-    regenBtn.className = 'msg-action-icon';
-    regenBtn.title = 'Regenerate response';
-    regenBtn.textContent = '↺';
-    regenBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await regenerateFrom(el);
-    });
-    buttons.push(regenBtn);
   }
 
   wrap.append(...buttons);
@@ -2034,43 +1980,6 @@ function startMsgEdit(el) {
   });
 }
 
-/**
- * Regenerate: truncate history from this assistant bubble onward, then re-send
- * the preceding user message.
- */
-async function regenerateFrom(assistantEl) {
-  const idx = parseInt(assistantEl.dataset.hidx, 10);
-  if (isNaN(idx)) return;
-
-  // Find the text of the preceding user bubble (DOM search upward)
-  let userText = '';
-  let sib = assistantEl.previousElementSibling;
-  while (sib) {
-    if (sib.classList.contains('user')) {
-      userText = sib.dataset.raw || sib.querySelector('.msg-text')?.textContent || '';
-      break;
-    }
-    sib = sib.previousElementSibling;
-  }
-  if (!userText) { showToast('Cannot find preceding user message', 'error'); return; }
-
-  // Truncate history from this assistant index onward
-  await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
-
-  // Remove this bubble and all following from DOM
-  let cur = assistantEl;
-  while (cur) {
-    const next = cur.nextElementSibling;
-    cur.remove();
-    cur = next;
-  }
-  nextHistoryIdx = idx;
-
-  // Re-send
-  lastSentRaw = userText;
-  inputEl.value = userText;
-  onSend();
-}
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
@@ -2138,8 +2047,6 @@ function showTokenUsage(bubbleEl, usage) {
 
   bubbleEl.insertAdjacentElement('afterend', el);
 
-  // Update context indicator
-  if (prompt != null) updateContextIndicator(prompt);
   streamStartAt = 0; // reset for next turn
 }
 
@@ -2472,8 +2379,7 @@ async function renderSessionsList() {
         <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
       </div>
       <div class="session-item-actions">
-        <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">MD</button>
-        <button class="session-export-json-btn" title="Export as JSON" data-id="${s.id}">JSON</button>
+        <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">⬇</button>
         <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
       </div>`;
 
@@ -2501,11 +2407,7 @@ async function renderSessionsList() {
     // Export buttons
     item.querySelector('.session-export-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
-      await exportSession(s.id, s.name, 'markdown');
-    });
-    item.querySelector('.session-export-json-btn').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await exportSession(s.id, s.name, 'json');
+      await exportSession(s.id, s.name);
     });
 
     // Delete button
@@ -2554,34 +2456,14 @@ function startSessionRename(nameEl, sessionId) {
   input.addEventListener('blur', commit); // normal click-away: save
 }
 
-/** Export a saved session as Markdown (default) or JSON. */
-async function exportSession(id, name, format = 'markdown') {
+/** Export a saved session as a Markdown file. */
+async function exportSession(id, name) {
   const res = await sendMessage({ type: 'GET_SESSION_FULL', id });
   const session = res?.data?.session;
   if (!session) { showToast('Could not load session', 'error'); return; }
 
   const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
   const dateStr = new Date().toISOString().slice(0, 10);
-
-  if (format === 'json') {
-    const payload = {
-      name: session.name,
-      exportedAt: new Date().toISOString(),
-      source: 'browsa',
-      history: session.history || []
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json; charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `browsa-${slug}-${dateStr}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast('Exported as JSON', 'success');
-    return;
-  }
 
   // Markdown export
   const history = session.history || [];
@@ -2796,24 +2678,6 @@ function applyFontSize(px) {
   document.documentElement.style.setProperty('--msg-font-size', px + 'px');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── Feature: Context window indicator ────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-function updateContextIndicator(promptTokens) {
-  lastPromptTokens = promptTokens;
-  let el = $('context-indicator');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'context-indicator';
-    el.className = 'context-indicator';
-    // Insert just above the composer
-    const composer = document.querySelector('.composer');
-    if (composer) composer.insertAdjacentElement('beforebegin', el);
-  }
-  const fmtK = (n) => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
-  el.textContent = `↑ ${fmtK(promptTokens)} tokens in context`;
-  el.title = `${promptTokens.toLocaleString()} prompt tokens sent in last request`;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── Feature: In-conversation search (Ctrl+F) ─────────────────────────────────
@@ -2873,7 +2737,7 @@ function doMsgSearch(query) {
     acceptNode: (node) => {
       const p = node.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
-      if (p.closest('.msg-actions, .token-usage, .context-indicator, .think-block summary'))
+      if (p.closest('.msg-actions, .token-usage, .think-block summary'))
         return NodeFilter.FILTER_REJECT;
       return node.textContent.toLowerCase().includes(q)
         ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
@@ -2956,79 +2820,6 @@ function showImageLightbox(src, alt) {
   // Keyboard close
   const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── Feature: Prompt template variables {{varName}} ───────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-function parseTemplateVars(text) {
-  const matches = [...text.matchAll(/\{\{(\w+)\}\}/g)];
-  return [...new Set(matches.map(m => m[1]))];
-}
-
-/**
- * Show a modal asking the user to fill in each template variable.
- * Returns the substituted text, or null if cancelled.
- */
-function resolveTemplateVars(text, vars) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'tpl-var-overlay';
-
-    const modal = document.createElement('div');
-    modal.className = 'tpl-var-modal';
-    modal.innerHTML = `<h3 class="tpl-var-title">Fill in variables</h3>`;
-
-    const inputs = {};
-    for (const varName of vars) {
-      const row = document.createElement('div');
-      row.className = 'tpl-var-row';
-      const label = document.createElement('label');
-      label.className = 'tpl-var-label';
-      label.textContent = varName;
-      const inp = document.createElement('input');
-      inp.className = 'tpl-var-input';
-      inp.type = 'text';
-      inp.placeholder = `Value for {{${varName}}}`;
-      inputs[varName] = inp;
-      row.append(label, inp);
-      modal.appendChild(row);
-    }
-
-    const btnRow = document.createElement('div');
-    btnRow.className = 'tpl-var-btns';
-    const okBtn = document.createElement('button');
-    okBtn.className = 'tpl-var-ok';
-    okBtn.textContent = 'Send';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'tpl-var-cancel';
-    cancelBtn.textContent = 'Cancel';
-    btnRow.append(okBtn, cancelBtn);
-    modal.appendChild(btnRow);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    // Focus first input
-    Object.values(inputs)[0]?.focus();
-
-    const finish = (ok) => {
-      overlay.remove();
-      if (!ok) { resolve(null); return; }
-      let result = text;
-      for (const [name, inp] of Object.entries(inputs)) {
-        result = result.replaceAll(`{{${name}}}`, inp.value);
-      }
-      resolve(result);
-    };
-
-    okBtn.addEventListener('click', () => finish(true));
-    cancelBtn.addEventListener('click', () => finish(false));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) finish(false); });
-    modal.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
-      if (e.key === 'Escape') finish(false);
-    });
-  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
