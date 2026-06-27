@@ -290,6 +290,11 @@ function gcStreamState() {
 // is idempotent when given the same name — repeated calls just update the
 // schedule, so registering on every startup is safe.
 chrome.alarms.create(GC_ALARM_NAME, { periodInMinutes: GC_ALARM_PERIOD_MINUTES });
+
+// Restore site caches from session storage on every SW startup so that
+// content-script data captured before the SW went to sleep is not lost.
+// Store the promise so message handlers can await it before checking caches.
+const siteCacheReady = restoreSiteCachesFromSession();
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === GC_ALARM_NAME) gcStreamState();
 });
@@ -399,55 +404,55 @@ async function handle(msg, sender) {
 
     case 'YOUTUBE_DATA': {
       const tabId = sender?.tab?.id;
-      if (tabId) youtubeCache.set(tabId, msg.video);
+      if (tabId) { youtubeCache.set(tabId, msg.video); persistSiteCache(tabId, 'youtube', msg.video); }
       return { ok: true };
     }
 
     case 'JUEJIN_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) juejinCache.set(tabId, msg.article);
+      if (tabId) { juejinCache.set(tabId, msg.article); persistSiteCache(tabId, 'juejin', msg.article); }
       return { ok: true };
     }
 
     case 'ZHIHU_CONTENT': {
       const tabId = sender?.tab?.id;
-      if (tabId) zhihuCache.set(tabId, msg.content);
+      if (tabId) { zhihuCache.set(tabId, msg.content); persistSiteCache(tabId, 'zhihu', msg.content); }
       return { ok: true };
     }
 
     case 'DEDAO_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) dedaoCache.set(tabId, msg.article);
+      if (tabId) { dedaoCache.set(tabId, msg.article); persistSiteCache(tabId, 'dedao', msg.article); }
       return { ok: true };
     }
 
     case 'GEEKTIME_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) geektimeCache.set(tabId, msg.article);
+      if (tabId) { geektimeCache.set(tabId, msg.article); persistSiteCache(tabId, 'geektime', msg.article); }
       return { ok: true };
     }
 
     case 'BILIBILI_VIDEO': {
       const tabId = sender?.tab?.id;
-      if (tabId) bilibiliCache.set(tabId, msg.video);
+      if (tabId) { bilibiliCache.set(tabId, msg.video); persistSiteCache(tabId, 'bilibili', msg.video); }
       return { ok: true };
     }
 
     case 'XUEQIU_DATA': {
       const tabId = sender?.tab?.id;
-      if (tabId) xueqiuCache.set(tabId, msg.data);
+      if (tabId) { xueqiuCache.set(tabId, msg.data); persistSiteCache(tabId, 'xueqiu', msg.data); }
       return { ok: true };
     }
 
     case 'TWITTER_TWEET': {
       const tabId = sender?.tab?.id;
-      if (tabId) twitterCache.set(tabId, msg.tweet);
+      if (tabId) { twitterCache.set(tabId, msg.tweet); persistSiteCache(tabId, 'twitter', msg.tweet); }
       return { ok: true };
     }
 
     case 'XIAOYUZHOU_EPISODE': {
       const tabId = sender?.tab?.id;
-      if (tabId) xiaoyuzhouCache.set(tabId, msg.episode);
+      if (tabId) { xiaoyuzhouCache.set(tabId, msg.episode); persistSiteCache(tabId, 'xiaoyuzhou', msg.episode); }
       return { ok: true };
     }
 
@@ -590,6 +595,7 @@ async function handle(msg, sender) {
         } else {
           // auto and reader modes may need Readability; dom/full don't
           if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
+          await siteCacheReady; // ensure session-storage restore finished
           ctx = await extractActiveTab({
             mode,
             maxTextChars: all.maxTextChars,
@@ -744,6 +750,7 @@ async function handle(msg, sender) {
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
       const t = tabIdOf(msg, sender);
+      await siteCacheReady; // ensure session-storage restore finished
       const ctx = await extractActiveTab({
         mode,
         maxTextChars: all.maxTextChars,
@@ -1160,6 +1167,41 @@ const xueqiuCache      = new Map(); // tabId -> Xueqiu stock/post data
 const twitterCache     = new Map(); // tabId -> Twitter/X tweet data
 const xiaoyuzhouCache  = new Map(); // tabId -> 小宇宙 podcast episode data
 
+// Site caches above are module-level Maps that are wiped on every SW restart
+// (~30s idle). Persist them to chrome.storage.session so they survive SW
+// sleep/wake cycles within a browser session.
+const SC_PREFIX = 'sc_';
+
+function persistSiteCache(tabId, source, data) {
+  chrome.storage.session.set({ [`${SC_PREFIX}${tabId}`]: { source, data } }).catch(() => {});
+}
+
+function clearSessionSiteCache(tabId) {
+  chrome.storage.session.remove(`${SC_PREFIX}${tabId}`).catch(() => {});
+}
+
+async function restoreSiteCachesFromSession() {
+  try {
+    const all = await chrome.storage.session.get(null);
+    for (const [key, val] of Object.entries(all)) {
+      if (!key.startsWith(SC_PREFIX)) continue;
+      const tabId = parseInt(key.slice(SC_PREFIX.length), 10);
+      if (isNaN(tabId) || !val?.source || !val?.data) continue;
+      switch (val.source) {
+        case 'youtube':    youtubeCache.set(tabId, val.data); break;
+        case 'juejin':     juejinCache.set(tabId, val.data); break;
+        case 'zhihu':      zhihuCache.set(tabId, val.data); break;
+        case 'dedao':      dedaoCache.set(tabId, val.data); break;
+        case 'geektime':   geektimeCache.set(tabId, val.data); break;
+        case 'bilibili':   bilibiliCache.set(tabId, val.data); break;
+        case 'xueqiu':     xueqiuCache.set(tabId, val.data); break;
+        case 'twitter':    twitterCache.set(tabId, val.data); break;
+        case 'xiaoyuzhou': xiaoyuzhouCache.set(tabId, val.data); break;
+      }
+    }
+  } catch (_) {}
+}
+
 /** Return cached site data for a tab, regardless of which site it came from. */
 function getSiteCache(tabId) {
   if (youtubeCache.has(tabId))    return { source: 'youtube',    data: youtubeCache.get(tabId) };
@@ -1199,6 +1241,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   xueqiuCache.delete(tabId);
   twitterCache.delete(tabId);
   xiaoyuzhouCache.delete(tabId);
+  clearSessionSiteCache(tabId);
   const set = navPorts.get(tabId);
   if (set) {
     for (const p of set) {
