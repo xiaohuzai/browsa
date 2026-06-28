@@ -583,9 +583,10 @@ function hideSlashSuggest() {
 async function getMermaid() {
   if (mermaidModule) return mermaidModule;
   try {
-    const mod = await import('./lib/vendor/mermaid.bundle.js');
-    mod.default.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
-    mermaidModule = mod;
+    const { default: mermaid } = await import('./lib/vendor/mermaid.bundle.js');
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' });
+    mermaidModule = mermaid;
   } catch (e) {
     console.warn('browsa: mermaid load failed', e);
   }
@@ -593,24 +594,128 @@ async function getMermaid() {
 }
 async function renderMermaid(el) {
   const blocks = el.querySelectorAll('code.language-mermaid');
-  if (!blocks.length) return;
+  if (!blocks.length) {
+    // Fallback: look for code block containing mermaid keywords without explicit class
+    console.debug('browsa: no code.language-mermaid found in', el);
+    return;
+  }
   const m = await getMermaid();
-  if (!m) return;
+  // Mermaid v10+ needs a DOM-attached container during render
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;opacity:0;pointer-events:none';
+  document.body.appendChild(host);
   for (const code of [...blocks]) {
     const pre = code.closest('pre') || code;
     const source = code.textContent;
+    const errDiv = document.createElement('div');
+    errDiv.className = 'mermaid-error';
     try {
+      if (!m) throw new Error('mermaid 模块加载失败，请检查控制台');
       const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
-      const { svg } = await m.default.render(id, source);
+      const { svg } = await m.render(id, source, host);
       const wrapper = document.createElement('div');
       wrapper.className = 'mermaid-diagram';
-      wrapper.innerHTML = svg;
+      const svgWrap = document.createElement('div');
+      svgWrap.className = 'mermaid-svg-wrap';
+      svgWrap.innerHTML = svg;
+      wrapper.appendChild(svgWrap);
+      wrapper.appendChild(_mermaidToolbar(svgWrap, source));
+      _mermaidInteractions(wrapper, svgWrap);
       pre.replaceWith(wrapper);
     } catch (e) {
       console.warn('browsa: mermaid render failed', e);
+      errDiv.textContent = `⚠ Mermaid: ${e?.message || e}`;
+      pre.replaceWith(errDiv);
     }
   }
+  document.body.removeChild(host);
 }
+
+function _mermaidToolbar(svgWrap, source) {
+  const bar = document.createElement('div');
+  bar.className = 'mermaid-toolbar';
+  const btns = [
+    { title: '放大', text: '+', action: () => _mermaidZoom(svgWrap, 0.2) },
+    { title: '缩小', text: '−', action: () => _mermaidZoom(svgWrap, -0.2) },
+    { title: '重置', text: '⊙', action: () => _mermaidReset(svgWrap) },
+    { title: '复制代码', text: '⎘', action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500); }).catch(() => {}) },
+    { title: '导出SVG', text: '↓', action: (btn) => _mermaidExportSvg(svgWrap).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '↓'; }, 1500); }).catch(() => {}) },
+  ];
+  for (const { title, text, action } of btns) {
+    const btn = document.createElement('button');
+    btn.className = 'mermaid-btn';
+    btn.title = title;
+    btn.textContent = text;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); action(btn); });
+    bar.appendChild(btn);
+  }
+  return bar;
+}
+
+function _mermaidState(svgWrap) {
+  if (!svgWrap._mstate) svgWrap._mstate = { scale: 1, tx: 0, ty: 0 };
+  return svgWrap._mstate;
+}
+
+function _mermaidApply(svgWrap) {
+  const { scale, tx, ty } = _mermaidState(svgWrap);
+  svgWrap.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  svgWrap.style.transformOrigin = 'center top';
+}
+
+function _mermaidZoom(svgWrap, delta) {
+  const s = _mermaidState(svgWrap);
+  s.scale = Math.min(4, Math.max(0.2, s.scale + delta));
+  _mermaidApply(svgWrap);
+}
+
+function _mermaidReset(svgWrap) {
+  const s = _mermaidState(svgWrap);
+  s.scale = 1; s.tx = 0; s.ty = 0;
+  _mermaidApply(svgWrap);
+}
+
+async function _mermaidExportSvg(svgWrap) {
+  const svgEl = svgWrap.querySelector('svg');
+  if (!svgEl) throw new Error('no svg');
+  const svgStr = new XMLSerializer().serializeToString(svgEl);
+  const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+  await chrome.downloads.download({ url: dataUrl, filename: 'diagram.svg', saveAs: true });
+}
+
+function _mermaidInteractions(wrapper, svgWrap) {
+  // Wheel zoom
+  wrapper.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    _mermaidZoom(svgWrap, e.deltaY < 0 ? 0.1 : -0.1);
+  }, { passive: false });
+  // Drag to pan
+  let dragging = false, startX = 0, startY = 0, startTx = 0, startTy = 0;
+  svgWrap.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    const s = _mermaidState(svgWrap);
+    startTx = s.tx; startTy = s.ty;
+    svgWrap.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const s = _mermaidState(svgWrap);
+    s.tx = startTx + (e.clientX - startX);
+    s.ty = startTy + (e.clientY - startY);
+    _mermaidApply(svgWrap);
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    svgWrap.style.cursor = 'grab';
+  });
+  svgWrap.style.cursor = 'grab';
+}
+
 
 
 // Render a yellow banner above the chat when the active page is 小红书
