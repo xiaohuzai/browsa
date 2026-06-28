@@ -653,14 +653,56 @@ math[display="block"] {
 
 /* ─── Mermaid diagrams ──────────────────────────────────────────────────────── */
 .mermaid-diagram {
+  position: relative;
   margin: 8px 0;
-  text-align: center;
   background: var(--bg-2);
   border-radius: var(--radius);
   padding: 12px;
-  overflow-x: auto;
+  overflow: hidden;
+  min-height: 60px;
 }
-.mermaid-diagram svg { max-width: 100%; height: auto; }
+.mermaid-svg-wrap {
+  display: flex;
+  justify-content: center;
+  will-change: transform;
+  user-select: none;
+}
+.mermaid-svg-wrap svg { max-width: 100%; height: auto; display: block; }
+.mermaid-toolbar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+.mermaid-diagram:hover .mermaid-toolbar { opacity: 1; }
+.mermaid-btn {
+  background: var(--bg-3, #2a2a3a);
+  color: var(--text, #cdd6f4);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.mermaid-btn:hover { background: var(--bg-hover, #3a3a4a); }
+.mermaid-error {
+  color: #f87171;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid rgba(248,113,113,0.3);
+  border-radius: 4px;
+  margin: 4px 0;
+}
 
 /* ─── Code copy button ──────────────────────────────────────────────────────── */
 .code-copy-btn {
