@@ -1,7 +1,7 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
-import { ping, getCapabilities, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { ping, getCapabilities } from './lib/openai-client.js';
 
 const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');

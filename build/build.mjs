@@ -11,7 +11,7 @@
 
 import { promises as fs } from 'node:fs';
 import { existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
@@ -72,6 +72,13 @@ const VENDORS = [
     srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'highlight'
+  },
+  {
+    name: 'katex',
+    srcEntry:  'katex/dist/katex.mjs',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'katex'
   }
 ];
 

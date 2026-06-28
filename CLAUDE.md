@@ -30,6 +30,7 @@ sidepanel.js  ←  streamPort (browsa-chat long-lived port)  ←  background.js
 - **`background.js`** is the service worker and single message router. All `chrome.runtime.onMessage` handling flows through one `handle()` switch. Exports `handle` for tests.
 - **`sidepanel.js`** connects two long-lived ports on init: `browsa-nav` (receives NAVIGATED, XHS notes, SELECTION_ACTION) and `browsa-chat` (receives streaming CHUNK/DONE/ERROR).
 - **`lib/storage.js`** wraps `chrome.storage.local`. History is a **global flat array** (not per-tab). All background responses use envelope `{ ok: true, data: result }` — unwrap with `res.data?.ok`, not `res.ok`.
+- **`lib/constants.js`** holds shared constants (e.g. `PAGE_CONTEXT_PREFIX`) imported by background, sidepanel, storage, and page-extractor. Content scripts run in MAIN world and cannot import ES modules, so they do not use this file.
 
 ### MV3 service worker gotchas
 
@@ -62,7 +63,7 @@ function connectNavPort() {
 
 ### Content scripts
 
-Site-specific interceptors (`lib/*-content-script.js`) run in **MAIN world** at `document_start` and wrap `window.fetch` / `XMLHttpRequest` to capture SPA API responses. They send messages to the background, which caches by `tabId`. `lib/selection-toolbar.js` runs in ISOLATED world at `document_idle` on all `https://` pages.
+Site-specific interceptors (`lib/*-content-script.js`) run in **MAIN world** at `document_start` and wrap `window.fetch` / `XMLHttpRequest` to capture SPA API responses. They send messages to the background, which stores results in `SITE_CACHES` (a registry object in `background.js` — one `Map` per site, keyed by `tabId`). Adding a new site only requires a single entry in `SITE_CACHES`; restore, lookup, and cleanup iterate it automatically. `lib/selection-toolbar.js` runs in ISOLATED world at `document_idle` on all `https://` pages.
 
 Extension resources used inside Shadow DOM or injected pages (e.g. `icons/icon16.png`) must be declared in `web_accessible_resources`. Use `shadow.querySelector('#id')` — `ShadowRoot` does not have `getElementById`.
 

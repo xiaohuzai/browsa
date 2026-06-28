@@ -6,7 +6,8 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, responsesApiStream, getCapabilities, ping, ProviderConfigError, ProviderAPIError, ProviderNetworkError } from './lib/openai-client.js';
+import { chatStream, responsesApiStream, getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
+import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 // Session management re-exported from storage for use in handle()
 const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
@@ -404,55 +405,55 @@ async function handle(msg, sender) {
 
     case 'YOUTUBE_DATA': {
       const tabId = sender?.tab?.id;
-      if (tabId) { youtubeCache.set(tabId, msg.video); persistSiteCache(tabId, 'youtube', msg.video); }
+      if (tabId) { SITE_CACHES.youtube.set(tabId, msg.video); persistSiteCache(tabId, 'youtube', msg.video); }
       return { ok: true };
     }
 
     case 'JUEJIN_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) { juejinCache.set(tabId, msg.article); persistSiteCache(tabId, 'juejin', msg.article); }
+      if (tabId) { SITE_CACHES.juejin.set(tabId, msg.article); persistSiteCache(tabId, 'juejin', msg.article); }
       return { ok: true };
     }
 
     case 'ZHIHU_CONTENT': {
       const tabId = sender?.tab?.id;
-      if (tabId) { zhihuCache.set(tabId, msg.content); persistSiteCache(tabId, 'zhihu', msg.content); }
+      if (tabId) { SITE_CACHES.zhihu.set(tabId, msg.content); persistSiteCache(tabId, 'zhihu', msg.content); }
       return { ok: true };
     }
 
     case 'DEDAO_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) { dedaoCache.set(tabId, msg.article); persistSiteCache(tabId, 'dedao', msg.article); }
+      if (tabId) { SITE_CACHES.dedao.set(tabId, msg.article); persistSiteCache(tabId, 'dedao', msg.article); }
       return { ok: true };
     }
 
     case 'GEEKTIME_ARTICLE': {
       const tabId = sender?.tab?.id;
-      if (tabId) { geektimeCache.set(tabId, msg.article); persistSiteCache(tabId, 'geektime', msg.article); }
+      if (tabId) { SITE_CACHES.geektime.set(tabId, msg.article); persistSiteCache(tabId, 'geektime', msg.article); }
       return { ok: true };
     }
 
     case 'BILIBILI_VIDEO': {
       const tabId = sender?.tab?.id;
-      if (tabId) { bilibiliCache.set(tabId, msg.video); persistSiteCache(tabId, 'bilibili', msg.video); }
+      if (tabId) { SITE_CACHES.bilibili.set(tabId, msg.video); persistSiteCache(tabId, 'bilibili', msg.video); }
       return { ok: true };
     }
 
     case 'XUEQIU_DATA': {
       const tabId = sender?.tab?.id;
-      if (tabId) { xueqiuCache.set(tabId, msg.data); persistSiteCache(tabId, 'xueqiu', msg.data); }
+      if (tabId) { SITE_CACHES.xueqiu.set(tabId, msg.data); persistSiteCache(tabId, 'xueqiu', msg.data); }
       return { ok: true };
     }
 
     case 'TWITTER_TWEET': {
       const tabId = sender?.tab?.id;
-      if (tabId) { twitterCache.set(tabId, msg.tweet); persistSiteCache(tabId, 'twitter', msg.tweet); }
+      if (tabId) { SITE_CACHES.twitter.set(tabId, msg.tweet); persistSiteCache(tabId, 'twitter', msg.tweet); }
       return { ok: true };
     }
 
     case 'XIAOYUZHOU_EPISODE': {
       const tabId = sender?.tab?.id;
-      if (tabId) { xiaoyuzhouCache.set(tabId, msg.episode); persistSiteCache(tabId, 'xiaoyuzhou', msg.episode); }
+      if (tabId) { SITE_CACHES.xiaoyuzhou.set(tabId, msg.episode); persistSiteCache(tabId, 'xiaoyuzhou', msg.episode); }
       return { ok: true };
     }
 
@@ -486,7 +487,7 @@ async function handle(msg, sender) {
       const { imageDataUrl, metaUrl, metaTitle } = msg;
       if (!imageDataUrl) return { ok: false, error: 'no imageDataUrl' };
       const contextText =
-        `[Page context attached by browsa]\nURL: ${metaUrl || ''}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
+        `${PAGE_CONTEXT_PREFIX}\nURL: ${metaUrl || ''}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
       await storage.appendToHistory({
         role: 'user',
         content: [
@@ -825,7 +826,7 @@ async function handle(msg, sender) {
           const lastAssistantIdx = history.map(m => m.role).lastIndexOf('assistant');
           const newPageContextMsg = history.slice(lastAssistantIdx + 1).find(m =>
             m.role === 'user' && (
-              (typeof m.content === 'string' && m.content.startsWith('[Page context attached by browsa]')) ||
+              (typeof m.content === 'string' && m.content.startsWith(PAGE_CONTEXT_PREFIX)) ||
               (Array.isArray(m.content))
             )
           );
@@ -861,7 +862,7 @@ async function handle(msg, sender) {
           // First turn: include page context from history so Hermes learns it.
           const pageContextMsg = history.find(m =>
             m.role === 'user' && (
-              (typeof m.content === 'string' && m.content.startsWith('[Page context attached by browsa]')) ||
+              (typeof m.content === 'string' && m.content.startsWith(PAGE_CONTEXT_PREFIX)) ||
               (Array.isArray(m.content))
             )
           );
@@ -1155,17 +1156,23 @@ const pendingSelectionActions = new Map(); // tabId -> { action, text }
 
 // (pageContextUrls removed — history is now global, not per-tab)
 
-const selectionCache   = new Map(); // tabId -> last selected text (from selectionchange)
-const xhsXhrCache      = new Map(); // tabId -> XHS note summary
-const youtubeCache     = new Map(); // tabId -> YouTube video data
-const juejinCache      = new Map(); // tabId -> Juejin article
-const zhihuCache       = new Map(); // tabId -> Zhihu article or Q&A
-const dedaoCache       = new Map(); // tabId -> Dedao article
-const geektimeCache    = new Map(); // tabId -> Geektime article
-const bilibiliCache    = new Map(); // tabId -> Bilibili video data
-const xueqiuCache      = new Map(); // tabId -> Xueqiu stock/post data
-const twitterCache     = new Map(); // tabId -> Twitter/X tweet data
-const xiaoyuzhouCache  = new Map(); // tabId -> 小宇宙 podcast episode data
+const selectionCache = new Map(); // tabId -> last selected text (from selectionchange)
+const xhsXhrCache    = new Map(); // tabId -> XHS note summary (has special push logic, kept separate)
+
+// Site-specific XHR intercept caches, keyed by tabId. Each entry is a Map.
+// Adding a new site requires only adding an entry here — restore, getSiteCache,
+// and onRemoved all iterate this registry automatically.
+const SITE_CACHES = {
+  youtube:    new Map(), // YouTube video data
+  juejin:     new Map(), // 掘金 article
+  zhihu:      new Map(), // 知乎 article or Q&A
+  dedao:      new Map(), // 得到 article
+  geektime:   new Map(), // 极客时间 article
+  bilibili:   new Map(), // Bilibili video data
+  xueqiu:     new Map(), // 雪球 stock/post data
+  twitter:    new Map(), // Twitter/X tweet data
+  xiaoyuzhou: new Map(), // 小宇宙 podcast episode
+};
 
 // Site caches above are module-level Maps that are wiped on every SW restart
 // (~30s idle). Persist them to chrome.storage.session so they survive SW
@@ -1187,32 +1194,16 @@ async function restoreSiteCachesFromSession() {
       if (!key.startsWith(SC_PREFIX)) continue;
       const tabId = parseInt(key.slice(SC_PREFIX.length), 10);
       if (isNaN(tabId) || !val?.source || !val?.data) continue;
-      switch (val.source) {
-        case 'youtube':    youtubeCache.set(tabId, val.data); break;
-        case 'juejin':     juejinCache.set(tabId, val.data); break;
-        case 'zhihu':      zhihuCache.set(tabId, val.data); break;
-        case 'dedao':      dedaoCache.set(tabId, val.data); break;
-        case 'geektime':   geektimeCache.set(tabId, val.data); break;
-        case 'bilibili':   bilibiliCache.set(tabId, val.data); break;
-        case 'xueqiu':     xueqiuCache.set(tabId, val.data); break;
-        case 'twitter':    twitterCache.set(tabId, val.data); break;
-        case 'xiaoyuzhou': xiaoyuzhouCache.set(tabId, val.data); break;
-      }
+      SITE_CACHES[val.source]?.set(tabId, val.data);
     }
   } catch (_) {}
 }
 
 /** Return cached site data for a tab, regardless of which site it came from. */
 function getSiteCache(tabId) {
-  if (youtubeCache.has(tabId))    return { source: 'youtube',    data: youtubeCache.get(tabId) };
-  if (juejinCache.has(tabId))     return { source: 'juejin',     data: juejinCache.get(tabId) };
-  if (zhihuCache.has(tabId))      return { source: 'zhihu',      data: zhihuCache.get(tabId) };
-  if (dedaoCache.has(tabId))      return { source: 'dedao',      data: dedaoCache.get(tabId) };
-  if (geektimeCache.has(tabId))   return { source: 'geektime',   data: geektimeCache.get(tabId) };
-  if (bilibiliCache.has(tabId))   return { source: 'bilibili',   data: bilibiliCache.get(tabId) };
-  if (xueqiuCache.has(tabId))     return { source: 'xueqiu',     data: xueqiuCache.get(tabId) };
-  if (twitterCache.has(tabId))    return { source: 'twitter',    data: twitterCache.get(tabId) };
-  if (xiaoyuzhouCache.has(tabId)) return { source: 'xiaoyuzhou', data: xiaoyuzhouCache.get(tabId) };
+  for (const [source, cache] of Object.entries(SITE_CACHES)) {
+    if (cache.has(tabId)) return { source, data: cache.get(tabId) };
+  }
   return null;
 }
 
@@ -1232,15 +1223,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   selectionCache.delete(tabId);
   pendingSelectionActions.delete(tabId);
   xhsXhrCache.delete(tabId);
-  youtubeCache.delete(tabId);
-  juejinCache.delete(tabId);
-  zhihuCache.delete(tabId);
-  dedaoCache.delete(tabId);
-  geektimeCache.delete(tabId);
-  bilibiliCache.delete(tabId);
-  xueqiuCache.delete(tabId);
-  twitterCache.delete(tabId);
-  xiaoyuzhouCache.delete(tabId);
+  for (const cache of Object.values(SITE_CACHES)) cache.delete(tabId);
   clearSessionSiteCache(tabId);
   const set = navPorts.get(tabId);
   if (set) {
