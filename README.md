@@ -5,7 +5,7 @@
 browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
 
 ```
-[Web page]  →  [browsa side panel]  →  [your LLM / agent runtime]  →  streaming reply
+[Web page]  →  [browsa side panel]  →  [your LLM / agent]  →  streaming reply
 ```
 
 ## Install (unpacked)
@@ -15,42 +15,42 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 3. Enable **Developer mode**.
 4. Click **Load unpacked** → select the `browsa/` directory.
 5. Press `Ctrl+Shift+H` (or click the toolbar icon) to open the side panel.
-6. Click **⚙ Settings** to configure providers (base URL, API key, model).
+6. Click **⚙ Settings** to configure a provider.
 
 ## Build & package
 
 ```bash
 npm install          # first time only
-npm test             # run tests
+npm test             # run 68 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
 To bump the version before packaging:
 
 ```bash
-npm version patch    # bug fix:   0.22.0 → 0.22.1
-npm version minor    # new features: 0.22.0 → 0.23.0
+npm version patch    # bug fix:      0.24.0 → 0.24.1
+npm version minor    # new feature:  0.24.0 → 0.25.0
 npm run package
 ```
 
 `npm version` automatically syncs the version to both `package.json` and `manifest.json`.
 
-To install from the zip: unzip, then **Load unpacked** as above.
+---
 
 ## Configure a provider
 
 browsa splits providers into two categories:
 
 - **Agent Providers** — full agent backend with tool execution (bash, file ops, web search, etc.). The AI can actually *do* things on the server side.
-- **LLM Providers** — plain language model endpoint for conversation only.
+- **LLM Providers** — plain language model endpoint for conversation only. Model ID is required.
 
-Use the **Ping** button in Settings to verify connectivity. The provider status (reachable / unreachable / not pinged) is shown in the sidebar dropdown.
+Use the **Ping** button in Settings to verify connectivity and auto-detect capabilities. The provider status (reachable / unreachable) is shown in the sidebar dropdown.
 
 ---
 
 ### 🤖 Hermes Agent
 
-Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn, Hermes stores the full conversation history server-side.
+Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn; Hermes stores the full conversation history server-side.
 
 **1. Install Hermes**
 
@@ -79,13 +79,13 @@ hermes gateway
 | Base URL | `http://<server-ip>:8642` |
 | API Key | value of `API_SERVER_KEY` |
 
-**5. Ping** to verify. The Responses API is auto-detected.
+**5. Ping** to verify. The Responses API is auto-detected and enabled automatically.
 
 ---
 
 ### 🤖 Claude Code (via claude-code-openai-wrapper)
 
-This setup runs the real Claude Code CLI on your server — with its full tool suite (bash, file read/write, etc.) — and exposes it as a standard OpenAI-compatible HTTP API. browsa talks to the wrapper; the wrapper runs `claude` locally.
+This setup runs the real Claude Code CLI on your server — with its full tool suite (bash, file read/write, etc.) — and exposes it as a standard OpenAI-compatible HTTP API.
 
 **Prerequisites:** `claude` CLI installed and authenticated on the server (`claude auth login` or `ANTHROPIC_API_KEY` set).
 
@@ -100,33 +100,27 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 git clone https://github.com/RichardAtCT/claude-code-openai-wrapper
 cd claude-code-openai-wrapper
-uv python install 3.11          # download Python 3.11 if not available
-uv venv --python 3.11           # create isolated venv
+uv python install 3.11
+uv venv --python 3.11
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-**3. Configure** — create `claude-code-openai-wrapper/.env` (same folder as `pyproject.toml`):
+**3. Configure** — create `claude-code-openai-wrapper/.env`:
 
 ```bash
 # Directory where Claude Code will operate (your project root)
 CLAUDE_CWD=/path/to/your/project
 
-# A password you make up — browsa will use this same value in its API Key field
-# This is NOT an Anthropic API key, just a local access token for the wrapper
+# A password you make up — browsa uses this as the API Key
 API_KEYS=make-up-any-password-here
 
 # Auth method — pick one:
-# Option A: use existing `claude auth login` session (recommended)
-CLAUDE_AUTH_METHOD=cli
-# Option B: direct Anthropic API key
-# ANTHROPIC_API_KEY=sk-ant-...
+CLAUDE_AUTH_METHOD=cli          # use existing `claude auth login` session
+# ANTHROPIC_API_KEY=sk-ant-...  # or direct API key
 
-# Required if running as root (e.g. on a server)
-IS_SANDBOX=1
-
-# Max tool-call turns per request (default 10, increase for complex tasks)
-MAX_TURNS=50
+IS_SANDBOX=1     # required if running as root
+MAX_TURNS=50     # max tool-call turns per request (default 10)
 ```
 
 **4. Start the wrapper**
@@ -134,15 +128,10 @@ MAX_TURNS=50
 ```bash
 source .venv/bin/activate
 uvicorn src.main:app --host 0.0.0.0 --port 8000
-```
 
-To keep running in background, use tmux:
-
-```bash
+# To keep running in background:
 tmux new -s claude-wrapper
-source .venv/bin/activate
-uvicorn src.main:app --host 0.0.0.0 --port 8000
-# Ctrl+B D to detach (server keeps running)
+# ... start as above, then Ctrl+B D to detach
 ```
 
 **5. Configure browsa** — open ⚙ Settings, select the **claude-code** provider:
@@ -151,137 +140,209 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000
 |---|---|
 | Base URL | `http://<server-ip>:8000` |
 | API Key | value of `API_KEYS` |
-| Model ID | `claude-sonnet-4-6` (optional — wrapper picks a default if left blank) |
+| Model ID | `claude-sonnet-4-6` (optional — wrapper picks a default if blank) |
 
-**6. Ping** to verify.
-
-> **Note on working directory:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files.
+> **Note:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files.
 
 ---
 
 ### 💬 OpenAI-compatible LLM
 
-Any endpoint that speaks `/v1/chat/completions` — OpenAI, Anthropic, Ollama, Groq, LLM Gateway, etc.
+Any endpoint that speaks `/v1/chat/completions` — OpenAI, Anthropic, Ollama, Groq, LiteLLM, etc.
 
-**Configure browsa** — open ⚙ Settings, select (or configure) the **OpenAI-compatible** provider:
+**Configure browsa** — open ⚙ Settings, configure the **OpenAI-compatible** provider:
 
 | Field | Value |
 |---|---|
-| Base URL | e.g. `https://api.openai.com` or your gateway URL |
+| Base URL | e.g. `https://api.openai.com` |
 | API Key | your API key |
-| Model ID | **required** — e.g. `gpt-4o`, `claude-sonnet-4-6`, `qwen3.6-plus-anthropic` |
+| Model ID | **required** — e.g. `gpt-4o`, `claude-sonnet-4-6` |
 
-**Ping** validates reachability and verifies the model ID is accepted by the server.
+**Ping** validates connectivity and verifies the model ID is accepted by the server.
 
 ---
 
-## Context modes
+## Attaching page context
+
+Click 📎 in the composer to attach the current page. browsa supports two attachment modes selectable in the composer footer:
 
 | Mode | What gets sent |
 |---|---|
-| **Reader** (default) | Mozilla Readability extracts the main article — clean, ~5–30 KB |
-| **Full** | Raw `body.innerText` — everything, unfiltered |
-| **Selection** | Only the text you've highlighted |
-| **Screenshot** | PNG of the visible tab (for multimodal models) |
+| **Auto** | Tries Mozilla Readability first (clean article text, ~5–30 KB), falls back to DOM tree, then full `body.innerText` |
+| **📷 Screenshot** | PNG of the visible tab — for multimodal models or visual content |
+
+For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
+
+---
 
 ## Supported sites (XHR interception)
 
-For SPA sites where Readability fails, browsa intercepts the browser's own API calls — no signing, no re-auth, just observing what the page already fetched:
+For sites where Readability produces poor results, browsa intercepts the browser's own API calls and extracts structured content — no signing, no re-auth, just observing what the page already fetched. Open the page and let it fully load before sending your first message.
 
 | Site | Content extracted |
 |---|---|
-| **小红书** | Note title, description, tags, images, stats |
-| **掘金** | Full article Markdown |
-| **知乎** | 专栏 article or top 3 question answers |
+| **YouTube** | Title, transcript, chapters, description, author, view/like counts |
+| **Bilibili** | Title, AI summary, subtitle/transcript, audio URL, video stats |
+| **小红书** | Note title, description, tags, images, top comments, stats |
+| **掘金** | Full article Markdown source |
+| **知乎** | 专栏 article or top 3 answers to a question |
+| **Twitter / X** | Tweet text, author, engagement stats |
+| **雪球** | Stock quote or post content |
+| **小宇宙** | Podcast episode title, description, show notes |
 | **得到** | Article text |
 | **极客时间** | Article text |
 
-> **Note:** Open the article page first and let it fully load. Then send your message.
+---
+
+## Features
+
+### Chat
+
+- **Streaming replies** — tokens appear as they arrive; click ✕ or press `Esc` to stop
+- **Think blocks** — `<think>` / `<thinking>` content shown in a collapsible block, auto-collapsed after streaming
+- **Markdown rendering** — full GFM: tables, code blocks, lists, inline formatting
+- **Syntax highlighting** — 40+ languages via highlight.js
+- **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX
+- **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar
+- **Diff highlighting** — `diff` code blocks color `+` green and `-` red
+- **Edit & resend** — click ✏ on any user message to edit and re-send
+- **Regenerate** — click ↺ on any assistant reply to regenerate from that point
+- **Copy response** — click ⎘ to copy the full raw Markdown
+- **Timestamps** — hover any message to see send time
+
+### History & sessions
+
+- **Session history** — save the current conversation as a named session, browse and restore past sessions from the 🕐 drawer
+- **Export** — export any session as a Markdown file
+- **In-conversation search** — `Ctrl+F` to search across all messages with prev/next navigation
+- **Multi-select** — select multiple messages for batch deletion
+- **Undo clear** — clearing history shows an undo option for 5 seconds
+
+### Input
+
+- **Image attachment** — drag-and-drop or paste images directly into the composer (for multimodal models)
+- **Slash commands** — type `/` to see completions; see list below
+- **Quick actions** — one-click Summarize / Key Points / Explain / → 中文 / Outline buttons above the composer
+- **Floating selection toolbar** — appears when you highlight text on any page: Ask · Explain · → 中文 · Summarize
+- **Right-click context menu** — browsa › Ask / Explain / Translate / Summarize on selected text
+
+### Settings
+
+- **Domain rules** — per-URL-pattern extra system prompt (e.g. always respond in English on `github.com`)
+- **Mask rules** — regex-based content redaction before sending to the LLM (e.g. strip phone numbers)
+- **Reply language** — force replies in a specific language regardless of page language
+- **Max text chars** — cap how much page content is sent per turn
+- **llms.txt** — optionally fetch `<origin>/llms.txt` before each chat for site-specific LLM instructions
+
+---
 
 ## Slash commands
 
-Type these in the composer:
+Type `/` in the composer to see autocomplete. All commands can be followed by additional instructions:
 
-| Command | Action |
+```
+/summarize focus on the methodology
+/translate keep technical terms in English
+```
+
+| Command | Prompt sent to LLM |
 |---|---|
 | `/summarize` | 3–5 bullet summary |
 | `/translate` | Translate to Chinese |
-| `/rewrite` | More concise rewrite |
-| `/explain` | Explain for a beginner |
-| `/outline` | Heading-only outline |
+| `/rewrite` | More concise rewrite, keeping all facts |
+| `/explain` | Explain for a beginner in simple language |
+| `/outline` | Nested outline of headings only |
 | `/keypoints` | Top 5 takeaways |
-| `/compact` | Summarize conversation context |
-| `/context` | Show current conversation context |
+| `/prompt` | Show the current active system prompt (not sent to LLM) |
+
+---
 
 ## Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl+Shift+H` | Open / close side panel |
-| `Enter` | Send message |
+| `Enter` | Send message (configurable in Settings) |
 | `Shift+Enter` | New line |
-| `Ctrl+K` | Clear history (with confirmation) |
-| `Ctrl+/` | Cycle context mode |
-| `Esc` | Cancel streaming reply |
+| `Ctrl+K` | Clear history (with undo) |
+| `Ctrl+/` | Cycle context mode (Auto ↔ Screenshot) |
+| `Ctrl+F` | Open in-conversation search |
+| `Esc` | Cancel stream / close search / close drawer |
 
-## Chat features
-
-- **Timestamps** — hover over any message to see the send time
-- **Edit message** — click ✏ on a user message to edit and re-send
-- **Regenerate** — click ↺ on an assistant reply to regenerate
-- **Copy response** — click ⎘ to copy the full raw markdown
-- **Think blocks** — `<think>` / `<thinking>` content shown in a collapsible block during and after streaming
-- **Diff highlighting** — `diff`/`patch` code blocks color `+` lines green and `-` lines red
-- **Mermaid diagrams** — rendered inline (lazy-loaded)
-- **Scroll-to-bottom button** — appears when you scroll up during streaming
+---
 
 ## How it works
 
-- **`background.js`** — MV3 service worker. Routes messages, manages per-site XHR caches, streams LLM replies via a long-lived port. Handles mid-stream tab switching via `streamState`.
-- **`lib/page-extractor.js`** — Injects Readability + Turndown into the page's MAIN world for reader mode. For SPA sites, uses the XHR cache first.
-- **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/responses` (Hermes stateful API). Ping validates connectivity without LLM inference.
-- **`sidepanel.js`** — Chat UI with streaming markdown rendering, live think-block routing, message editing, timestamps, and action buttons.
-- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XHR.prototype` to observe SPA API calls.
+- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages. Manages site XHR caches (keyed by `tabId`), streaming via long-lived `browsa-chat` ports, and mid-stream tab switching via `streamState`.
+- **`sidepanel.js`** — Chat UI. Streaming markdown rendering, live think-block routing, mermaid/KaTeX/hljs rendering, message editing, session drawer, in-conversation search, multi-select.
+- **`lib/page-extractor.js`** — Injects Readability + Turndown into the page MAIN world for reader mode. For SPA sites, uses the XHR cache from the matching content script.
+- **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/responses` (Hermes stateful API).
+- **`lib/storage.js`** — `chrome.storage.local` wrapper. Global flat conversation history (not per-tab), session management, mask rules.
+- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XMLHttpRequest.prototype` to observe SPA API calls and forward structured data to the background.
+
+---
 
 ## Project structure
 
 ```
 browsa/
 ├── manifest.json
-├── background.js                    # service worker
-├── sidepanel.{html,css,js}          # chat UI
-├── options.{html,css,js}            # settings page
+├── background.js                      # service worker + message router
+├── sidepanel.{html,css,js}            # chat UI
+├── options.{html,css,js}              # settings page
 ├── lib/
-│   ├── openai-client.js             # SSE streaming client
-│   ├── page-extractor.js            # content extraction + site synthesis
-│   ├── storage.js                   # chrome.storage wrapper
-│   ├── xhs-content-script.js        # 小红书 XHR interceptor
-│   ├── juejin-content-script.js     # 掘金 XHR interceptor
-│   ├── zhihu-content-script.js      # 知乎 XHR interceptor
-│   ├── dedao-content-script.js      # 得到 XHR interceptor
-│   ├── geektime-content-script.js   # 极客时间 XHR interceptor
-│   └── vendor/                      # bundled third-party libs
+│   ├── constants.js                   # shared constants (PAGE_CONTEXT_PREFIX, …)
+│   ├── openai-client.js               # SSE streaming client
+│   ├── page-extractor.js              # content extraction + site synthesizers
+│   ├── storage.js                     # chrome.storage wrapper + session mgmt
+│   ├── selection-toolbar.js           # floating toolbar (Shadow DOM)
+│   ├── xhs-content-script.js          # 小红书 XHR interceptor
+│   ├── youtube-content-script.js      # YouTube player API interceptor
+│   ├── bilibili-content-script.js     # Bilibili video API interceptor
+│   ├── juejin-content-script.js       # 掘金 article interceptor
+│   ├── zhihu-content-script.js        # 知乎 article / Q&A interceptor
+│   ├── twitter-content-script.js      # Twitter/X GraphQL interceptor
+│   ├── xueqiu-content-script.js       # 雪球 stock/post interceptor
+│   ├── xiaoyuzhou-content-script.js   # 小宇宙 podcast interceptor
+│   ├── dedao-content-script.js        # 得到 interceptor
+│   ├── geektime-content-script.js     # 极客时间 interceptor
+│   └── vendor/                        # bundled third-party libs
+│       ├── Readability.iife.js
+│       ├── Turndown.iife.js
+│       ├── marked.bundle.js
+│       ├── purify.bundle.js
+│       ├── katex.bundle.js
+│       ├── highlight.bundle.js
+│       └── mermaid.bundle.js
 ├── _locales/{en,zh_CN}/
 ├── icons/
-├── build/                           # build + package scripts
-├── test/                            # node:test unit tests
-└── check-compat.sh                  # MV3 / cross-browser lint
+├── build/
+│   ├── build.mjs                      # esbuild vendor bundler
+│   └── package.mjs                    # distribution zip builder
+├── test/                              # node:test unit tests (68 tests)
+└── check-compat.sh                    # MV3 / static compatibility check
 ```
+
+---
 
 ## Browser compatibility
 
 | Browser | Status | Notes |
 |---|---|---|
-| **Edge 114+** | ✅ Primary | Default target |
-| **Chrome 114+** | ✅ Same as Edge | Identical install |
+| **Chrome 114+** | ✅ Supported | Primary target |
+| **Edge 114+** | ✅ Supported | Identical install |
 | **Brave 1.56+** | ✅ Should work | Same Chromium surface |
 | **Firefox** | ❌ Not supported | No `side_panel` API |
+
+---
 
 ## Security
 
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
 - LLM replies are sanitized with DOMPurify before rendering.
-- Content scripts only observe requests; they never modify them.
+- Content scripts only observe network requests; they never modify or block them.
+
+---
 
 ## License
 

@@ -6,15 +6,14 @@ import marked from './lib/vendor/marked.bundle.js';
 import DOMPurify from './lib/vendor/purify.bundle.js';
 import katex from './lib/vendor/katex.bundle.js';
 import hljs from './lib/vendor/highlight.bundle.js';
+import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
-// Configure marked: GitHub-flavored breaks for line breaks, no mangle/autolink
-// head features we don't need. Keep it simple; DOMPurify handles XSS later.
+// Configure marked: GitHub-flavored breaks for line breaks.
+// DOMPurify handles XSS sanitization downstream.
 marked.setOptions({
   gfm: true,
-  breaks: true,
-  headerIds: false,
-  mangle: false
+  breaks: true
 });
 
 const $ = (id) => document.getElementById(id);
@@ -964,9 +963,9 @@ function cancelStream() {
 
 let outputTokens = 0;
 function updateOutputTokenCount(delta) {
-  const cjk = (delta.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g) || []).length;
-  const ascii = delta.length - cjk;
-  outputTokens += cjk + Math.ceil(ascii / 4);
+  const cjk = (delta.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+  const rest = delta.length - cjk;
+  outputTokens += Math.round(cjk + rest / 4);
   tokCountEl.textContent = `~${outputTokens}`;
 }
 
@@ -1486,7 +1485,7 @@ async function onSend() {
       if (m.type === 'CHUNK') {
         if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
         acc += m.delta;
-        renderStream(m.delta, false); // smd: pass delta, not accumulated text
+        renderStream(m.delta, false); // pass delta, not accumulated text
         updateOutputTokenCount(m.delta);
 
       } else if (m.type === 'TOOL_PROGRESS') {
@@ -1696,7 +1695,7 @@ async function resumeInFlightStream(tabId) {
     if (m.type === 'CHUNK') {
       const r = ensureAssistantEl();
       acc += m.delta;
-      r(m.delta, false); // smd: pass delta, not accumulated text
+      r(m.delta, false); // pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
 
     } else if (m.type === 'TOOL_PROGRESS') {
@@ -2585,7 +2584,6 @@ async function exportSession(id, name) {
     `*Exported: ${new Date().toLocaleString()}*`,
     ''
   ];
-  const PAGE_CTX = '[Page context attached by browsa]';
   for (const m of history) {
     if (m.role === 'user') {
       // Normalize content: extract text from array messages (image+text combos)
@@ -2598,7 +2596,7 @@ async function exportSession(id, name) {
         content = textPart || (hasImage ? '*(image)*' : null);
       }
       if (!content) continue;
-      if (content.startsWith(PAGE_CTX)) {
+      if (content.startsWith(PAGE_CONTEXT_PREFIX)) {
         const urlLine = content.split('\n').find(l => l.startsWith('URL:')) || '';
         lines.push(`---\n\n*(page context${urlLine ? ' — ' + urlLine.slice(4).trim() : ''})*\n`);
         continue;
@@ -2742,10 +2740,6 @@ function sendMessage(msg) {
     });
   });
 }
-
-// Prefix used to identify page-context messages saved to history.
-// These are sent to the LLM for context but should not clutter the chat UI.
-const PAGE_CONTEXT_PREFIX = '[Page context attached by browsa]';
 
 async function renderHistory() {
   messagesEl.innerHTML = '';
