@@ -38,6 +38,7 @@ let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
 let mermaidModule = null;   // lazily loaded on first mermaid block
+let echartsModule = null;   // lazily loaded on first echarts block
 let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
@@ -584,6 +585,8 @@ async function getMermaid() {
   try {
     const { default: mermaid } = await import('./lib/vendor/mermaid.bundle.js');
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Expose KaTeX globally so Mermaid v11 can render $$...$$ math in node labels
+    window.katex = katex;
     mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' });
     mermaidModule = mermaid;
   } catch (e) {
@@ -623,11 +626,90 @@ async function renderMermaid(el) {
       pre.replaceWith(wrapper);
     } catch (e) {
       console.warn('browsa: mermaid render failed', e);
-      errDiv.textContent = `⚠ Mermaid: ${e?.message || e}`;
+      errDiv.innerHTML =
+        `<span>⚠ Mermaid: ${escM(e?.message || String(e))}</span>` +
+        `<button class="mermaid-err-copy">复制代码</button>` +
+        `<details><summary>查看源码</summary><pre class="mermaid-err-src">${escM(source)}</pre></details>`;
+      errDiv.querySelector('.mermaid-err-copy').addEventListener('click', (btn) => {
+        _copyText(source).then(() => { btn.target.textContent = '✓'; setTimeout(() => { btn.target.textContent = '复制代码'; }, 1500); }).catch(() => {});
+      });
       pre.replaceWith(errDiv);
     }
   }
   document.body.removeChild(host);
+}
+
+function _echartsToolbar(source, chart, container) {
+  const ORIG_H = 380;
+  let scale = 1;
+  const bar = document.createElement('div');
+  bar.className = 'mermaid-toolbar'; // reuse same styling
+  const zoom = (delta) => {
+    scale = Math.min(3, Math.max(0.4, scale + delta));
+    const newH = Math.round(ORIG_H * scale);
+    container.style.height = newH + 'px';
+    // Pass explicit height so ECharts doesn't read stale DOM before reflow
+    chart.resize({ height: newH });
+  };
+  const btns = [
+    { title: '放大',    text: '+',  action: () => zoom(0.2) },
+    { title: '缩小',    text: '−',  action: () => zoom(-0.2) },
+    { title: '重置',    text: '⊙',  action: () => { scale = 1; container.style.height = ORIG_H + 'px'; chart.resize({ height: ORIG_H }); } },
+    { title: '复制代码', text: '⎘',  action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500); }).catch(() => {}) },
+    { title: '导出PNG', text: '↓',  action: (btn) => {
+        const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+        const a = document.createElement('a');
+        a.href = url; a.download = 'chart.png'; a.click();
+        btn.textContent = '✓'; setTimeout(() => { btn.textContent = '↓'; }, 1500);
+      }
+    },
+  ];
+  for (const { title, text, action } of btns) {
+    const btn = document.createElement('button');
+    btn.className = 'mermaid-btn';
+    btn.title = title; btn.textContent = text;
+    btn.addEventListener('click', (e) => action(e.currentTarget));
+    bar.appendChild(btn);
+  }
+  return bar;
+}
+
+async function renderEcharts(el) {
+  const blocks = el.querySelectorAll('code.language-echarts');
+  if (!blocks.length) return;
+  if (!echartsModule) {
+    try {
+      const mod = await import('./lib/vendor/echarts.bundle.js');
+      echartsModule = mod.default || mod;
+    } catch (e) {
+      console.warn('browsa: echarts load failed', e);
+      return;
+    }
+  }
+  for (const code of [...blocks]) {
+    const pre = code.closest('pre') || code;
+    const source = code.textContent.trim();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'echarts-error';
+    try {
+      const option = JSON.parse(source);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'echarts-diagram';
+      const container = document.createElement('div');
+      container.style.cssText = 'width:100%;height:380px;';
+      wrapper.appendChild(container);
+      pre.replaceWith(wrapper);
+      const chart = echartsModule.init(container);
+      chart.setOption(option);
+      wrapper.appendChild(_echartsToolbar(source, chart, container));
+      // Re-render when container width changes (e.g. panel resize)
+      new ResizeObserver(() => chart.resize()).observe(container);
+    } catch (e) {
+      console.warn('browsa: echarts render failed', e);
+      errDiv.textContent = `⚠ ECharts: ${e?.message || e}`;
+      pre.replaceWith(errDiv);
+    }
+  }
 }
 
 function _mermaidToolbar(svgWrap, source) {
@@ -1577,7 +1659,7 @@ async function onSend() {
         assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
         renderStream(finalText, true);
         addCodeCopyButtons();
-        renderMermaid(assistantEl);
+        renderMermaid(assistantEl); renderEcharts(assistantEl);
         outputTokens = 0;
         // Show token usage if the provider returned it
         if (m.usage) showTokenUsage(assistantEl, m.usage);
@@ -1783,7 +1865,7 @@ async function resumeInFlightStream(tabId) {
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       r(m.full || acc, true);
       addCodeCopyButtons();
-      renderMermaid(assistantEl);
+      renderMermaid(assistantEl); renderEcharts(assistantEl);
       outputTokens = 0;
       if (m.usage) showTokenUsage(assistantEl, m.usage);
 
@@ -2841,7 +2923,7 @@ async function renderHistory() {
       el.innerHTML = renderSafe(rawContent);
       decorateLinks(el);
       addMsgActions(el, () => rawContent);
-      renderMermaid(el);
+      renderMermaid(el); renderEcharts(el);
       el.dataset.hidx = i;
     }
   }

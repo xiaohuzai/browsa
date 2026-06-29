@@ -678,7 +678,15 @@ math[display="block"] {
   transition: opacity 0.15s;
   z-index: 10;
 }
-.mermaid-diagram:hover .mermaid-toolbar { opacity: 1; }
+.mermaid-diagram:hover .mermaid-toolbar,
+.echarts-diagram:hover .mermaid-toolbar { opacity: 1; }
+.echarts-diagram {
+  position: relative;
+  margin: 8px 0;
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  padding: 4px 4px 0;
+}
 .mermaid-btn {
   background: var(--bg-3, #2a2a3a);
   color: var(--text, #cdd6f4);
