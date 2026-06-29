@@ -79,6 +79,13 @@ const VENDORS = [
     srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'katex'
+  },
+  {
+    name: 'echarts',
+    srcEntry:  'echarts/dist/echarts.esm.min.js',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'echarts'
   }
 ];
 

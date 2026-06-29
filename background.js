@@ -804,10 +804,11 @@ async function handle(msg, sender) {
       const capabilityHints = [
         'When writing mathematical expressions or formulas, always use LaTeX notation: wrap inline math with $...$ and display/block math with $$...$$. This applies everywhere including inside Markdown table cells — never write formulas as plain text in tables.',
         'When drawing diagrams or charts, output Mermaid code blocks (```mermaid) directly in your response. The chat UI renders Mermaid natively — do not create HTML files or write files to disk for diagrams.',
-        'When generating Mermaid diagrams, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #) using double-quoted syntax: ["label text"].',
+        'When generating Mermaid diagrams, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #, ~, %) using double-quoted syntax: ["label text"].',
         'In Markdown, always place punctuation outside bold/italic delimiters: write **text**, not **text,**.',
         'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
-        'In Mermaid diagrams, use $$...$$ (KaTeX) for math formulas inside node labels, e.g. A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Plain text like T = D_vol / B_bw will not render as math.',
+        'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
+        'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
       ].join(' ');
       const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, capabilityHints]
         .map(s => s.trim()).filter(Boolean).join('\n\n');
