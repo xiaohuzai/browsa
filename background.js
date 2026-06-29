@@ -799,7 +799,17 @@ async function handle(msg, sender) {
         : '';
       const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
       const langExtra = langMap[all.replyLanguage] || '';
-      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra]
+      // Capability hints: browsa rendering rules injected automatically so
+      // users never need to configure them manually.
+      const capabilityHints = [
+        'When writing mathematical expressions or formulas, always use LaTeX notation: wrap inline math with $...$ and display/block math with $$...$$. This applies everywhere including inside Markdown table cells — never write formulas as plain text in tables.',
+        'When drawing diagrams or charts, output Mermaid code blocks (```mermaid) directly in your response. The chat UI renders Mermaid natively — do not create HTML files or write files to disk for diagrams.',
+        'When generating Mermaid diagrams, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #) using double-quoted syntax: ["label text"].',
+        'In Markdown, always place punctuation outside bold/italic delimiters: write **text**, not **text,**.',
+        'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
+        'In Mermaid diagrams, use $$...$$ (KaTeX) for math formulas inside node labels, e.g. A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Plain text like T = D_vol / B_bw will not render as math.',
+      ].join(' ');
+      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, capabilityHints]
         .map(s => s.trim()).filter(Boolean).join('\n\n');
 
       // Load global history

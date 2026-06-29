@@ -657,9 +657,56 @@ function _mermaidState(svgWrap) {
 }
 
 function _mermaidApply(svgWrap) {
-  const { scale, tx, ty } = _mermaidState(svgWrap);
-  svgWrap.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-  svgWrap.style.transformOrigin = 'center top';
+  const s = _mermaidState(svgWrap);
+  const svgEl = svgWrap.querySelector('svg');
+  if (!svgEl) return;
+
+  // Lazily capture the original viewBox and screen size on first use.
+  // We manipulate the SVG viewBox directly rather than CSS transform/dimensions:
+  // - CSS transform on a div rasterizes it → blurry at non-1x scales
+  // - Changing SVG width/height is blocked by Mermaid's inline max-width style
+  // - viewBox manipulation keeps the SVG at its natural screen size and re-renders
+  //   purely as vectors at any zoom level → always crisp
+  if (!s._origVB) {
+    const vb = svgEl.viewBox?.baseVal;
+    if (vb && vb.width > 0) {
+      s._origVB = { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
+    } else {
+      // No viewBox — synthesize one from element dimensions
+      const rect = svgEl.getBoundingClientRect();
+      const w = rect.width || parseFloat(svgEl.getAttribute('width')) || 600;
+      const h = rect.height || parseFloat(svgEl.getAttribute('height')) || 400;
+      s._origVB = { x: 0, y: 0, w, h };
+      svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    }
+    // Cache screen size (stable since we never change SVG element dimensions)
+    const r = svgEl.getBoundingClientRect();
+    s._svgW = r.width  || s._origVB.w;
+    s._svgH = r.height || s._origVB.h;
+  }
+
+  const { x: ox, y: oy, w: ow, h: oh } = s._origVB;
+
+  if (s.scale === 1 && !s.tx && !s.ty) {
+    svgEl.setAttribute('viewBox', `${ox} ${oy} ${ow} ${oh}`);
+    svgWrap.style.transform = '';
+    return;
+  }
+
+  // Zoomed viewport in viewBox units
+  const vbW = ow / s.scale;
+  const vbH = oh / s.scale;
+
+  // Convert screen-pixel pan to viewBox units
+  const panX = -s.tx * vbW / s._svgW;
+  const panY = -s.ty * vbH / s._svgH;
+
+  // Center the zoom window, then apply pan
+  const vbX = ox + (ow - vbW) / 2 + panX;
+  const vbY = oy + (oh - vbH) / 2 + panY;
+
+  svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
+  svgWrap.style.transform = '';
 }
 
 function _mermaidZoom(svgWrap, delta) {
@@ -670,8 +717,14 @@ function _mermaidZoom(svgWrap, delta) {
 
 function _mermaidReset(svgWrap) {
   const s = _mermaidState(svgWrap);
+  const svgEl = svgWrap.querySelector('svg');
+  if (svgEl && s._origVB) {
+    const { x, y, w, h } = s._origVB;
+    svgEl.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  }
   s.scale = 1; s.tx = 0; s.ty = 0;
-  _mermaidApply(svgWrap);
+  s._origVB = null; s._svgW = null; s._svgH = null;
+  svgWrap.style.transform = '';
 }
 
 async function _mermaidExportSvg(svgWrap) {
