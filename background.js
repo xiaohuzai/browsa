@@ -916,10 +916,17 @@ async function handle(msg, sender) {
       // the LLM fetch. Without this, Esc-to-cancel was visual-only —
       // the background kept streaming, a phantom assistant turn got
       // appended to history, and STREAM_RELEASE just hid it from PEEK.
-      // The 5-min hard timeout still stands as a safety net.
+      // Idle timeout: abort if no delta or tool-progress arrives for 5 min.
+      // Resets on every output event so long agent tasks with many tool
+      // calls never hit this accidentally — only truly stuck streams do.
       const controller = new AbortController();
       chatControllers.set(tabId, controller);
-      const timeout = setTimeout(() => controller.abort('timeout'), 60_000 * 5);
+      const IDLE_TIMEOUT_MS = 5 * 60_000;
+      let idleTimer = setTimeout(() => controller.abort('idle-timeout'), IDLE_TIMEOUT_MS);
+      const resetIdleTimer = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort('idle-timeout'), IDLE_TIMEOUT_MS);
+      };
       const signal = controller.signal;
 
       // Per-provider inference params
@@ -932,7 +939,7 @@ async function handle(msg, sender) {
       const MAX_RETRIES = 2;
 
       const doStream = async () => {
-        const onToolProgress = (text) => pushChunk(tabId, { type: 'TOOL_PROGRESS', text });
+        const onToolProgress = (text) => { resetIdleTimer(); pushChunk(tabId, { type: 'TOOL_PROGRESS', text }); };
 
         if (useResponsesApi) {
           const result = await responsesApiStream({
@@ -942,6 +949,7 @@ async function handle(msg, sender) {
             instructions: effectiveSystemPrompt || undefined,
             conversation: responsesConversation,
             onDelta: (delta) => {
+              resetIdleTimer();
               appendToStreamState(tabId, delta);
               pushChunk(tabId, { type: 'CHUNK', delta });
             },
@@ -958,6 +966,7 @@ async function handle(msg, sender) {
             model: provider.model || undefined,
             messages,
             onDelta: (delta) => {
+              resetIdleTimer();
               appendToStreamState(tabId, delta);
               pushChunk(tabId, { type: 'CHUNK', delta });
             },
@@ -1010,7 +1019,7 @@ async function handle(msg, sender) {
         // wrap them with a hint (network / config / API).
         throw e;
       } finally {
-        clearTimeout(timeout);
+        clearTimeout(idleTimer);
         chatControllers.delete(tabId);
       }
 

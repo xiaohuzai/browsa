@@ -1461,6 +1461,14 @@ async function onSend() {
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
   activeController = { port, cancelled: false };
 
+  // Keep the SW alive during streaming by pinging it every 20s.
+  // Chrome's MV3 SW can be killed for idleness when the SSE stream goes
+  // silent (e.g. while an agent is executing a tool call server-side),
+  // which aborts the in-flight fetch and shows _(cancelled)_.
+  let _swPingInterval = setInterval(() => {
+    try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
+  }, 20_000);
+
   // Hand the tabId to the background so it knows which port serves which tab.
   // The background stores the port in a Map keyed by tabId; when the CHAT
   // handler emits a delta, it looks up the port via this tabId.
@@ -1526,6 +1534,7 @@ async function onSend() {
         if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
           appendMsgAction(assistantEl, '→ 继续', () => { inputEl.value = '继续'; onSend(); });
         }
+        clearInterval(_swPingInterval);
         try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
         try { port.disconnect(); } catch (_) {}
         sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
@@ -1533,6 +1542,7 @@ async function onSend() {
       } else if (m.type === 'ERROR') {
         // Only ABORTED reaches here — real errors are re-thrown by background
         // and handled via the !res.ok block below (no pushChunk for real errors).
+        clearInterval(_swPingInterval);
         if (m.code === 'ABORTED') {
           renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
         }
@@ -1540,6 +1550,7 @@ async function onSend() {
     });
   }
   port.onDisconnect.addListener(() => {
+    clearInterval(_swPingInterval);
     setStreamingUI(false);
     activeController = null;
     if (acc === '' && assistantEl.textContent === '▍') {
@@ -1646,6 +1657,10 @@ async function resumeInFlightStream(tabId) {
   //      DOM node identity can change (innerHTML restore in
   //      onActivated replaces the whole subtree).
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
+  // Same SW keep-alive as the onSend path — resumed streams face identical risk.
+  let _swPingInterval = setInterval(() => {
+    try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
+  }, 20_000);
   let acc = peek.acc || '';
   let resumedToolEvents = [];
   const initialBubble = getOrCreateAssistantBubble();
@@ -1719,6 +1734,7 @@ async function resumeInFlightStream(tabId) {
       outputTokens = 0;
       if (m.usage) showTokenUsage(assistantEl, m.usage);
 
+      clearInterval(_swPingInterval);
       try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
       try { port.disconnect(); } catch (_) {}
       sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
@@ -1727,6 +1743,7 @@ async function resumeInFlightStream(tabId) {
       reconcileHistoryIdx();
     } else if (m.type === 'ERROR') {
       // Only ABORTED reaches here (same reasoning as onSend path).
+      clearInterval(_swPingInterval);
       const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
       if (m.code === 'ABORTED') {
         el.textContent = acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_';
@@ -1735,6 +1752,7 @@ async function resumeInFlightStream(tabId) {
     }
   });
   port.onDisconnect.addListener(() => {
+    clearInterval(_swPingInterval);
     setStreamingUI(false);
     // If the port died with no chunks at all, show the same hint as
     // onSend (the user has nothing to look at otherwise).
