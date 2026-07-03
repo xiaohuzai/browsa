@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 68 unit tests
+npm test             # run 168 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -140,7 +140,8 @@ tmux new -s claude-wrapper
 |---|---|
 | Base URL | `http://<server-ip>:8000` |
 | API Key | value of `API_KEYS` |
-| Model ID | `claude-sonnet-4-6` (optional — wrapper picks a default if blank) |
+
+> Claude Code is an agent provider, so there's no Model ID field to configure — the wrapper picks the model server-side.
 
 > **Note:** Claude Code operates in `CLAUDE_CWD`. Set it to your project root so Claude can read and write your actual files.
 
@@ -204,6 +205,7 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **Syntax highlighting** — 40+ languages via highlight.js
 - **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX
 - **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar
+- **ECharts charts** — ` ```echarts ` code blocks rendered inline with a resize-aware toolbar
 - **Diff highlighting** — `diff` code blocks color `+` green and `-` red
 - **Edit & resend** — click ✏ on any user message to edit and re-send
 - **Regenerate** — click ↺ on any assistant reply to regenerate from that point
@@ -313,13 +315,14 @@ browsa/
 │       ├── purify.bundle.js
 │       ├── katex.bundle.js
 │       ├── highlight.bundle.js
-│       └── mermaid.bundle.js
+│       ├── mermaid.bundle.js
+│       └── echarts.bundle.js
 ├── _locales/{en,zh_CN}/
 ├── icons/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (68 tests)
+├── test/                              # node:test unit tests (168 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 

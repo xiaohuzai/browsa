@@ -63,10 +63,12 @@ function connectNavPort() {
 
 ### Content scripts
 
-Site-specific interceptors (`lib/*-content-script.js`) run in **MAIN world** at `document_start` and wrap `window.fetch` / `XMLHttpRequest` to capture SPA API responses. They send messages to the background, which stores results in `SITE_CACHES` (a registry object in `background.js` — one `Map` per site, keyed by `tabId`). Adding a new site only requires a single entry in `SITE_CACHES`; restore, lookup, and cleanup iterate it automatically. `lib/selection-toolbar.js` runs in ISOLATED world at `document_idle` on all `https://` pages.
+Site-specific interceptors (`lib/*-content-script.js`) run in **MAIN world** at `document_start` and wrap `window.fetch` / `XMLHttpRequest` to capture SPA API responses. They send messages to the background, which stores results in `SITE_CACHES` (a registry object in `background.js` — one `Map` per site, keyed by `tabId`). Adding a new site only requires a single entry in `SITE_CACHES`; restore, lookup, and cleanup iterate it automatically. XHS is the one exception — it uses a separate `xhsXhrCache` Map with its own push logic instead of a `SITE_CACHES` entry. `lib/selection-toolbar.js` runs in ISOLATED world at `document_idle` on all `https://` pages.
 
-Extension resources used inside Shadow DOM or injected pages (e.g. `icons/icon16.png`) must be declared in `web_accessible_resources`. Use `shadow.querySelector('#id')` — `ShadowRoot` does not have `getElementById`.
+MAIN-world content scripts can't use ES module imports, so URL matchers there must resolve relative paths against the page: use `new URL(url, location.origin)`, not `new URL(url)` — a bare relative fetch/XHR path (e.g. `fetch('/api/...')`) throws and gets silently swallowed otherwise.
+
+Extension resources used inside Shadow DOM or injected pages (e.g. `icons/icon16.png`) must be declared in `web_accessible_resources`. `ShadowRoot` supports both `querySelector('#id')` and `getElementById('id')` in current Chrome — prefer `querySelector` for consistency with the rest of the codebase.
 
 ### Testing
 
-Tests use Node's built-in test runner. They mock the `chrome` global before importing extension modules. Tests are static analysis + integration tests against `handle()` — there is no browser runtime in tests. The test suite has 68 tests across 5 files.
+Tests use Node's built-in test runner. They mock the `chrome` global before importing extension modules. Tests are static analysis + integration tests against `handle()` — there is no browser runtime in tests. The test suite has 168 tests across 9 files.

@@ -553,6 +553,22 @@ test('content script: isXhsFeedUrl accepts the real XHS feed endpoint', () => {
   assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v1/feed?foo=bar'), true);
 });
 
+test('content script: isXhsFeedUrl resolves a same-origin relative path via location.origin (regression)', () => {
+  // SPAs commonly call fetch('/api/...') with a relative path rather than
+  // a full URL. `new URL(url)` with no base throws on those and the old
+  // code caught it and returned false, silently missing the interception.
+  // The content script itself always runs on xiaohongshu.com, so a global
+  // `location` is expected to be present when it's actually injected.
+  const prevLocation = globalThis.location;
+  globalThis.location = { origin: 'https://edith.xiaohongshu.com' };
+  try {
+    assert.equal(isXhsFeedUrl('/api/sns/web/v1/feed'), true, 'relative path must resolve against location.origin');
+    assert.equal(isXhsFeedUrl('/api/sns/web/v1/homefeed'), false);
+  } finally {
+    if (prevLocation === undefined) delete globalThis.location; else globalThis.location = prevLocation;
+  }
+});
+
 test('content script: isXhsFeedUrl rejects other paths and other hosts', () => {
   assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v1/homefeed'), false);
   assert.equal(isXhsFeedUrl('https://edith.xiaohongshu.com/api/sns/web/v2/feed'), false);
@@ -561,6 +577,9 @@ test('content script: isXhsFeedUrl rejects other paths and other hosts', () => {
   assert.equal(isXhsFeedUrl('not a url'), false);
   assert.equal(isXhsFeedUrl(null), false);
   assert.equal(isXhsFeedUrl(undefined), false);
+  // Relative path with no global `location` available (e.g. this Node test
+  // environment without the regression test's mock) must still fail closed.
+  assert.equal(isXhsFeedUrl('/api/sns/web/v1/feed'), false);
 });
 
 test('content script: isNoteDetailPayload accepts a real-shaped feed response', () => {

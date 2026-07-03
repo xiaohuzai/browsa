@@ -113,3 +113,28 @@ test('handle does not reference undeclared variables', () => {
   assert.match(src, /CHAT/, 'should handle CHAT');
   assert.match(src, /default:/, 'should have a default case');
 });
+
+// --------------- XHS_XHR_NOTE tabId regression --------------------------------
+// The content script never sends a tabId on XHS_XHR_NOTE — only `note`.
+// A previous version read `msg.tabId` (always undefined) instead of
+// `sender.tab.id`, so pushXhsNote() silently no-op'd and the cache was
+// never populated. This pins the fix: tabId must come from `sender`.
+test('XHS_XHR_NOTE derives tabId from sender.tab.id, not msg.tabId', async () => {
+  const note = { noteId: 'n1', title: 'test note' };
+
+  // Content script never sets msg.tabId — verify the handler still works.
+  const putRes = await handle({ type: 'XHS_XHR_NOTE', note }, { tab: { id: 7 } });
+  assert.equal(putRes.ok, true);
+
+  const getRes = await handle({ type: 'GET_XHS_NOTE', tabId: 7 }, { tab: { id: 7 } });
+  assert.deepEqual(getRes.note, note, 'note pushed via sender.tab.id=7 must be retrievable for tab 7');
+
+  // A client-supplied msg.tabId for a DIFFERENT tab must be ignored — the
+  // note must land under the sender's real tab, not an attacker-chosen one.
+  const spoofRes = await handle({ type: 'XHS_XHR_NOTE', tabId: 999, note: { noteId: 'spoofed' } }, { tab: { id: 8 } });
+  assert.equal(spoofRes.ok, true);
+  const tab999 = await handle({ type: 'GET_XHS_NOTE', tabId: 999 }, { tab: { id: 999 } });
+  assert.equal(tab999.note, null, 'msg.tabId must not be trusted — note must not appear under the spoofed tabId');
+  const tab8 = await handle({ type: 'GET_XHS_NOTE', tabId: 8 }, { tab: { id: 8 } });
+  assert.equal(tab8.note.noteId, 'spoofed', 'note must land under the real sender tab instead');
+});

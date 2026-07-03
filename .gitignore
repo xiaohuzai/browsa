@@ -30,3 +30,6 @@ config.local.json
 *.log
 coverage/
 browsa.bundle
+
+# Local tool caches (e.g. CodeGraph indexer) — machine-local, never for committing.
+.codegraph/
