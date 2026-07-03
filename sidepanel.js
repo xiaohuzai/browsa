@@ -1672,6 +1672,11 @@ async function onSend() {
         clearInterval(_swPingInterval);
         try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
         try { port.disconnect(); } catch (_) {}
+        // port.disconnect() does NOT fire this side's own onDisconnect listener
+        // (only the other end's), so activeController must be cleared here —
+        // otherwise it stays set until the async round trip settles, and a
+        // Send click in that window is misrouted to cancelStream() instead.
+        activeController = null;
         sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
         reconcileHistoryIdx(); // detect + correct auto-trim drift (fire-and-forget)
       } else if (m.type === 'ERROR') {

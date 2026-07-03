@@ -333,11 +333,13 @@ async function handle(msg, sender) {
     }
 
     case 'XHS_XHR_NOTE': {
-      // Sent by the content script. tabId is in msg.tabId, the note
-      // summary is in msg.note. We trust the content script's tabId
-      // because the sender can't be impersonated (content scripts
-      // only run in pages matching our content_scripts.matches).
-      pushXhsNote(msg.tabId, msg.note);
+      // Sent by the content script; the note summary is in msg.note.
+      // Derive tabId from sender.tab.id (like every other SITE_CACHES
+      // handler) rather than trusting a client-supplied msg.tabId — the
+      // content script never actually sent one, which made this a silent
+      // no-op, and a client-supplied tabId would let any page write into
+      // another tab's cache.
+      pushXhsNote(sender?.tab?.id, msg.note);
       return { ok: true };
     }
 
