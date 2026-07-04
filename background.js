@@ -124,11 +124,11 @@ const idleTimerResetters = new Map(); // tabId -> () => void
 // Active run IDs for Hermes /v1/runs streaming. Stored so STREAM_ABORT can
 // call POST /v1/runs/{id}/cancel to stop the server-side agent, not just the
 // local fetch.
-const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
+export const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
 
 // Pending approval/clarification requests awaiting user response.
-const pendingApprovals = new Map();      // tabId -> { runId, approvalId, baseUrl, apiKey }
-const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, baseUrl, apiKey }
+export const pendingApprovals = new Map();      // tabId -> { runId, approvalId, baseUrl, apiKey }
+export const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, baseUrl, apiKey }
 
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
@@ -560,6 +560,14 @@ async function handle(msg, sender) {
 
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
+      // Reset the Hermes session identity for every Hermes provider so the
+      // next conversation starts fresh (new X-Hermes-Session-Id / session_id).
+      const allCfg = await storage.getAll();
+      for (const name of Object.keys(allCfg.providers || {})) {
+        if (allCfg.providers[name]?.isHermes) {
+          await storage.resetHermesSessionId(name);
+        }
+      }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
     }
@@ -881,6 +889,7 @@ async function handle(msg, sender) {
         'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
         'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
         'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
+        'When you need the user to pick one of several distinct options (not free-form text), end your reply with a line in this exact format so the chat UI renders clickable buttons: CHOICE_REQUEST:{"question":"short question text","choices":["full text of option 1","full text of option 2"]}. This must be the very last thing in your reply, valid single-line JSON, with no text after it. Each choice string should be the complete message that gets sent back to you when clicked (not just a letter like "A") — write full option text, not a lettered index. Only use this when you are truly asking the user to choose between distinct paths forward, not for yes/no confirmations or open-ended questions.',
       ].join(' ');
       const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, capabilityHints]
         .map(s => s.trim()).filter(Boolean).join('\n\n');
@@ -888,18 +897,25 @@ async function handle(msg, sender) {
       // Load global history
       const history = await storage.getHistory();
 
-      // isHermes flag identifies Hermes providers. When true, use the
-      // Hermes /v1/runs API which supports approval, clarification, and richer
-      // tool events. Full conversation history is sent on every turn (the runs
-      // API is stateless, unlike the now-retired /v1/responses).
+      // isHermes flag identifies Hermes providers (affects capability hints
+      // etc. elsewhere). useRunsApi additionally decides whether to actually
+      // call Hermes /v1/runs (approval, clarification, richer tool events —
+      // but /v1/runs' async-job semantics may make Hermes treat the session
+      // as unattended and lock down dangerous tools) or fall back to plain
+      // /v1/chat/completions (matches how Open WebUI talks to Hermes with
+      // full tool access, per docs/open-webui.md — no special headers
+      // needed there). Toggle in Settings if tools get blocked on /v1/runs.
       const isHermes = !!(provider.isHermes);
+      const useRunsApi = isHermes && provider.useRunsApi !== false;
 
       let messages = null;         // chatStream (stateless OpenAI-compatible)
       let runsInput = null;        // runsApiStream: current user message
       let runsConvHistory = null;  // runsApiStream: all prior turns
+      let hermesSessionId = null;  // runsApiStream: X-Hermes-Session-Id / session_id
       let extraHeaders = undefined;
 
-      if (isHermes) {
+      if (useRunsApi) {
+        hermesSessionId = await storage.getOrCreateHermesSessionId(all.activeProvider);
         // Build current-turn input (text + optional images)
         if (msg.images?.length) {
           const parts = [{ type: 'input_text', text: msg.userText || '' }];
@@ -986,25 +1002,33 @@ async function handle(msg, sender) {
         };
         const onToolProgress = (text) => { resetIdleTimer(); pushChunk(tabId, { type: 'TOOL_PROGRESS', text }); };
 
-        if (isHermes) {
-          const onApproval = (data) => {
-            pendingApprovals.set(tabId, {
-              runId: data.runId,
-              approvalId: data.approval_id || data.approvalId || '',
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-            });
-            pushChunk(tabId, { type: 'APPROVAL', data });
-          };
-          const onClarify = (data) => {
-            pendingClarifications.set(tabId, {
-              runId: data.runId,
-              clarifyId: data.clarify_id || data.clarifyId || '',
-              baseUrl: provider.baseUrl,
-              apiKey: provider.apiKey,
-            });
-            pushChunk(tabId, { type: 'CLARIFY', data });
-          };
+        // Hermes gates dangerous tools (execute_code, terminal, ...) behind
+        // an approval flow on BOTH /v1/runs and /v1/chat/completions — not
+        // just /v1/runs. Wire onApproval/onClarify for both paths, or the
+        // tool call just hangs waiting for a response that never comes.
+        // run_id may arrive embedded in the event payload itself (chatStream)
+        // or be injected by runsApiStream (which knows it from POST /v1/runs) —
+        // check both the camelCase and snake_case field names.
+        const onApproval = (data) => {
+          pendingApprovals.set(tabId, {
+            runId: data.runId || data.run_id || '',
+            approvalId: data.approval_id || data.approvalId || '',
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+          });
+          pushChunk(tabId, { type: 'APPROVAL', data });
+        };
+        const onClarify = (data) => {
+          pendingClarifications.set(tabId, {
+            runId: data.runId || data.run_id || '',
+            clarifyId: data.clarify_id || data.clarifyId || '',
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+          });
+          pushChunk(tabId, { type: 'CLARIFY', data });
+        };
+
+        if (useRunsApi) {
           const onRunId = (runId) => {
             activeRunIds.set(tabId, { runId, baseUrl: provider.baseUrl, apiKey: provider.apiKey });
           };
@@ -1014,6 +1038,7 @@ async function handle(msg, sender) {
             input: runsInput,
             instructions: effectiveSystemPrompt || undefined,
             conversationHistory: runsConvHistory,
+            sessionId: hermesSessionId,
             onDelta,
             onToolProgress,
             onApproval,
@@ -1031,6 +1056,8 @@ async function handle(msg, sender) {
             messages,
             onDelta,
             onToolProgress,
+            onApproval,
+            onClarify,
             signal,
             extraHeaders,
             temperature,

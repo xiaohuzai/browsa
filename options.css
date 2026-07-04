@@ -341,6 +341,18 @@ details.provider-group[open] > .provider-group-header::before {
   font-size: 12px;
 }
 .provider-param-label input { font-size: 12px; }
+.provider-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  min-width: auto;
+}
+.provider-hint {
+  font-size: 12px;
+  color: var(--fg-2);
+  margin: 4px 0 0;
+}
 
 /* ── Action row ──────────────────────────────────────────────────────────── */
 .provider .row.action-row {

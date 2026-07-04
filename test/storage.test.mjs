@@ -195,6 +195,26 @@ test('removeLastPageContext returns -1 when there is no page-context message', a
   assert.equal(await storage.removeLastPageContext(), -1);
 });
 
+// --------------- Hermes session identity (chrome.storage.session) -----------
+
+test('getOrCreateHermesSessionId creates once and returns the same id on subsequent calls', async () => {
+  reset();
+  const id1 = await storage.getOrCreateHermesSessionId('hermes');
+  const id2 = await storage.getOrCreateHermesSessionId('hermes');
+  assert.equal(id1, id2, 'session id must persist across calls (survives SW restart via storage.session)');
+  const idOther = await storage.getOrCreateHermesSessionId('claude-code');
+  assert.notEqual(id1, idOther, 'different providers must get independent session ids');
+});
+
+test('resetHermesSessionId always issues a fresh id, replacing the stored one', async () => {
+  reset();
+  const before = await storage.getOrCreateHermesSessionId('hermes');
+  const after = await storage.resetHermesSessionId('hermes');
+  assert.notEqual(before, after);
+  const fetchedAfterReset = await storage.getOrCreateHermesSessionId('hermes');
+  assert.equal(fetchedAfterReset, after, 'the reset id must be the one persisted going forward');
+});
+
 // --------------- saved sessions -----------------------------------------------
 
 test('saveCurrentSession returns null when there is no history to save', async () => {

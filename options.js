@@ -187,6 +187,14 @@ function buildProviderCard(name, cfg) {
                placeholder="unlimited" style="width:96px" />
       </label>
     </div>
+    ${cfg.isHermes ? `
+    <div class="row">
+      <label class="provider-checkbox-label">
+        <input data-k="useRunsApi" type="checkbox" ${cfg.useRunsApi !== false ? 'checked' : ''} />
+        Use /v1/runs (approval, clarification, richer tool events)
+      </label>
+      <p class="provider-hint">Uncheck to fall back to plain /v1/chat/completions (same as Open WebUI) if Hermes blocks tools like execute_code on /v1/runs.</p>
+    </div>` : ''}
     <div class="row action-row">
       <button data-act="save">Save</button>
       <button data-act="ping">Ping</button>
