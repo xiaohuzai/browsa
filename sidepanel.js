@@ -1635,6 +1635,12 @@ async function onSend() {
         toolEvents.push(m.text);
         showToolProgress(assistantEl, m.text);
 
+      } else if (m.type === 'APPROVAL') {
+        showApprovalCard(assistantEl, m.data);
+
+      } else if (m.type === 'CLARIFY') {
+        showClarifyCard(assistantEl, m.data);
+
       } else if (m.type === 'RETRY') {
         // Background is retrying. Reset accumulator and renderer so the bubble
         // shows only the new attempt's content, not stale content from the failed one.
@@ -1651,6 +1657,8 @@ async function onSend() {
 
       } else if (m.type === 'DONE') {
         clearToolProgress(assistantEl);
+        _findCard(assistantEl, 'approval-card')?.remove();
+        _findCard(assistantEl, 'clarify-card')?.remove();
         if (toolEvents.length > 0) {
           renderToolHistory(assistantEl, toolEvents);
           toolEvents = [];
@@ -1857,12 +1865,20 @@ async function resumeInFlightStream(tabId) {
       resumedToolEvents.push(m.text);
       showToolProgress(assistantEl, m.text);
 
+    } else if (m.type === 'APPROVAL') {
+      showApprovalCard(assistantEl, m.data);
+
+    } else if (m.type === 'CLARIFY') {
+      showClarifyCard(assistantEl, m.data);
+
     } else if (m.type === 'RETRY') {
       showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
     } else if (m.type === 'DONE') {
       const r = ensureAssistantEl();
       clearToolProgress(assistantEl);
+      _findCard(assistantEl, 'approval-card')?.remove();
+      _findCard(assistantEl, 'clarify-card')?.remove();
       if (resumedToolEvents.length > 0) {
         renderToolHistory(assistantEl, resumedToolEvents);
         resumedToolEvents = [];
@@ -2279,6 +2295,84 @@ function showToolProgress(bubbleEl, text, tierOverride) {
 function clearToolProgress(bubbleEl) {
   const el = bubbleEl?.nextElementSibling;
   if (el?.classList.contains('tool-progress')) el.remove();
+}
+
+/** Find a named card (approval/clarify) in the next few siblings of bubbleEl. */
+function _findCard(bubbleEl, cls) {
+  let el = bubbleEl?.nextElementSibling;
+  for (let i = 0; i < 4 && el; i++, el = el.nextElementSibling) {
+    if (el.classList.contains(cls)) return el;
+  }
+  return null;
+}
+
+/** Insert a card after bubbleEl (or after its tool-progress if present). */
+function _insertCard(bubbleEl, card) {
+  const tp = bubbleEl?.nextElementSibling;
+  const ref = tp?.classList.contains('tool-progress') ? tp : bubbleEl;
+  ref?.insertAdjacentElement('afterend', card);
+}
+
+/**
+ * Show an approval request card below the streaming bubble.
+ * The agent has paused and needs the user to allow/deny a dangerous action.
+ */
+function showApprovalCard(bubbleEl, data) {
+  _findCard(bubbleEl, 'approval-card')?.remove();
+  const card = document.createElement('div');
+  card.className = 'approval-card';
+  const tool = escM(data.tool || data.function_name || 'unknown');
+  const cmd  = data.command ? `<div class="approval-cmd"><code>${escM(data.command)}</code></div>` : '';
+  const desc = data.description ? `<div class="approval-desc">${escM(data.description)}</div>` : '';
+  const risk = String(data.risk_level || 'high').toLowerCase();
+  const choices = Array.isArray(data.choices) && data.choices.length ? data.choices : ['once', 'deny'];
+  const btnLabels = { once: 'Allow once', session: 'Allow for session', always: 'Always allow', deny: 'Deny' };
+  const btns = choices.map(c => {
+    const label = btnLabels[c] || c;
+    const cls   = c === 'deny' ? 'approval-btn-deny' : 'approval-btn-allow';
+    return `<button class="approval-btn ${cls}" data-choice="${escM(c)}">${escM(label)}</button>`;
+  }).join('');
+  card.innerHTML =
+    `<div class="approval-header">` +
+      `<span class="approval-icon">⚠️</span>` +
+      `<span class="approval-title">Approval required: <strong>${tool}</strong></span>` +
+      `<span class="approval-risk approval-risk-${escM(risk)}">${escM(risk)}</span>` +
+    `</div>` +
+    cmd + desc +
+    `<div class="approval-actions">${btns}</div>`;
+  card.querySelectorAll('.approval-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sendMessage({ type: 'APPROVAL_RESPOND', tabId: currentTabId, choice: btn.dataset.choice });
+      card.remove();
+    });
+  });
+  _insertCard(bubbleEl, card);
+}
+
+/** Show an agent clarification question card below the streaming bubble. */
+function showClarifyCard(bubbleEl, data) {
+  _findCard(bubbleEl, 'clarify-card')?.remove();
+  const card = document.createElement('div');
+  card.className = 'clarify-card';
+  const question = escM(data.question || data.text || 'Please clarify:');
+  card.innerHTML =
+    `<div class="clarify-question">${question}</div>` +
+    `<div class="clarify-input-row">` +
+      `<input type="text" class="clarify-input" placeholder="Your response…" />` +
+      `<button class="clarify-submit">Send</button>` +
+    `</div>`;
+  const input  = card.querySelector('.clarify-input');
+  const submit = card.querySelector('.clarify-submit');
+  const respond = () => {
+    const response = input.value.trim();
+    if (!response) return;
+    sendMessage({ type: 'CLARIFY_RESPOND', tabId: currentTabId, response });
+    card.remove();
+  };
+  submit.addEventListener('click', respond);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') respond(); });
+  _insertCard(bubbleEl, card);
+  setTimeout(() => input.focus(), 50);
 }
 
 /**

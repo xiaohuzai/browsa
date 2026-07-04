@@ -187,6 +187,14 @@ function buildProviderCard(name, cfg) {
                placeholder="unlimited" style="width:96px" />
       </label>
     </div>
+    ${cfg.isHermes ? `
+    <div class="row">
+      <label class="provider-checkbox-label">
+        <input data-k="useRunsApi" type="checkbox" ${cfg.useRunsApi !== false ? 'checked' : ''} />
+        Use /v1/runs (approval, clarification, richer tool events)
+      </label>
+      <p class="provider-hint">Uncheck to fall back to plain /v1/chat/completions (same as Open WebUI) if Hermes blocks tools like execute_code on /v1/runs.</p>
+    </div>` : ''}
     <div class="row action-row">
       <button data-act="save">Save</button>
       <button data-act="ping">Ping</button>
@@ -278,16 +286,19 @@ async function pingCard(name, card) {
   flashCard(card, '', 'Pinging…');
   try {
     const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
-    // Auto-detect capabilities and update useResponsesApi accordingly
+    // Auto-detect capabilities and update isHermes accordingly. isHermes
+    // gates the Hermes-only /v1/runs API (approval, clarification, tool
+    // events) — so it should reflect run support, not the generic
+    // OpenAI-spec /v1/responses feature.
     const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
-      const hasResponses = !!(caps.features.responses_api);
-      if (cachedCfg.providers[name].useResponsesApi !== hasResponses) {
-        cachedCfg.providers[name].useResponsesApi = hasResponses;
+      const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
+      if (cachedCfg.providers[name].isHermes !== hasRuns) {
+        cachedCfg.providers[name].isHermes = hasRuns;
         await chrome.storage.local.set({ providers: cachedCfg.providers });
         renderProviders(); // refresh cards to reflect new checkboxes
       }
-      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [responses:${hasResponses ? '✓' : '✗'}]`);
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]`);
     } else {
       flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
     }

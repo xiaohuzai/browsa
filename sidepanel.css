@@ -1684,3 +1684,87 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
 .msg.assistant img { cursor: zoom-in; }
 
 
+
+/* ── Approval card (Hermes /v1/runs approval.request) ─────────────────── */
+.approval-card {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  font-size: 0.85em;
+}
+.approval-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.approval-title { flex: 1; }
+.approval-risk {
+  font-size: 0.75em;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.approval-risk-high   { background: rgba(248,113,113,0.18); color: #f87171; }
+.approval-risk-medium { background: rgba(251,191,36,0.18);  color: #fbbf24; }
+.approval-risk-low    { background: rgba(74,222,128,0.18);  color: #4ade80; }
+.approval-cmd {
+  background: var(--bg-3);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.approval-cmd code { font-family: monospace; }
+.approval-desc { color: var(--fg-2); margin-bottom: 6px; }
+.approval-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.approval-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity var(--t);
+}
+.approval-btn:hover { opacity: 0.85; }
+.approval-btn-allow { background: var(--accent); color: #fff; }
+.approval-btn-deny  { background: transparent; border-color: var(--border-strong); color: var(--fg-2); }
+
+/* ── Clarify card (Hermes /v1/runs clarification.request) ─────────────── */
+.clarify-card {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+}
+.clarify-question { color: var(--fg); margin-bottom: 8px; }
+.clarify-input-row { display: flex; gap: 6px; }
+.clarify-input {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85em;
+  outline: none;
+}
+.clarify-input:focus { border-color: var(--accent); }
+.clarify-submit {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85em;
+  cursor: pointer;
+  border: none;
+}
+.clarify-submit:hover { opacity: 0.85; }
