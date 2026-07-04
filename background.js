@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, responsesApiStream, getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
+import { chatStream, runsApiStream, getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 // Session management re-exported from storage for use in handle()
 const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
@@ -115,6 +115,21 @@ export const streamState = new Map(); // tabId -> { acc: string, startedAt: numb
 // notice, and a phantom assistant turn got written to history.
 export const chatControllers = new Map(); // tabId -> AbortController
 
+// Maps a tabId to the active stream's resetIdleTimer function. Allows the
+// port's SW_PING handler to reset the idle timeout from outside the CHAT
+// handler's closure. This is what makes SW_PING actually prevent the
+// idle-timeout cancel during long tool calls (e.g. sub-agent execution).
+const idleTimerResetters = new Map(); // tabId -> () => void
+
+// Active run IDs for Hermes /v1/runs streaming. Stored so STREAM_ABORT can
+// call POST /v1/runs/{id}/cancel to stop the server-side agent, not just the
+// local fetch.
+const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
+
+// Pending approval/clarification requests awaiting user response.
+const pendingApprovals = new Map();      // tabId -> { runId, approvalId, baseUrl, apiKey }
+const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, baseUrl, apiKey }
+
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
 // text into the new port as one synthetic CHUNK, then keep pushing new
@@ -170,6 +185,14 @@ chrome.runtime.onConnect.addListener((port) => {
           streamPorts.delete(claimedTabId);
         }
         console.log('browsa[bg]: stream port released for tab', claimedTabId);
+      } else if (msg && msg.type === 'SW_PING' && claimedTabId != null) {
+        // Sidepanel sends SW_PING every 20 s while a stream is in flight to
+        // keep the SW alive AND reset the idle-abort timer. Without this
+        // handler the pings arrive but resetIdleTimer never fires, so long
+        // tool calls (e.g. sub-agent execution with minutes of SSE silence)
+        // hit the 5-minute idle timeout and get falsely cancelled.
+        const reset = idleTimerResetters.get(claimedTabId);
+        if (reset) reset();
       }
     });
     port.onDisconnect.addListener(() => {
@@ -537,14 +560,6 @@ async function handle(msg, sender) {
 
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
-      // Reset session IDs for all providers so the next conversation
-      // starts a fresh Hermes session (no bleed-over from the old one).
-      const allCfg = await storage.getAll();
-      for (const name of Object.keys(allCfg.providers || {})) {
-        if (allCfg.providers[name]?.useResponsesApi) {
-          await storage.resetConversationId(name);
-        }
-      }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
     }
@@ -712,8 +727,63 @@ async function handle(msg, sender) {
       if (controller) {
         try { controller.abort('user-cancel'); } catch (_) {}
       }
+      // For Hermes /v1/runs: also cancel the server-side agent so it stops
+      // executing tools rather than continuing in the background.
+      const runInfo = activeRunIds.get(t);
+      if (runInfo) {
+        const cancelUrl = `${runInfo.baseUrl}/v1/runs/${encodeURIComponent(runInfo.runId)}/cancel`;
+        const cancelHeaders = { 'Content-Type': 'application/json' };
+        if (runInfo.apiKey) cancelHeaders['Authorization'] = `Bearer ${runInfo.apiKey}`;
+        fetch(cancelUrl, { method: 'POST', headers: cancelHeaders }).catch(() => {});
+        activeRunIds.delete(t);
+      }
       clearStreamState(t);
       return { aborted: !!controller };
+    }
+
+    case 'APPROVAL_RESPOND': {
+      // User clicked Allow/Deny on an approval card. Relay the choice to
+      // the Hermes agent via POST /v1/runs/{id}/approval so it can resume.
+      const pending = pendingApprovals.get(msg.tabId);
+      if (!pending) return { ok: false, error: 'no pending approval' };
+      try {
+        const res = await fetch(
+          `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/approval`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(pending.apiKey ? { Authorization: `Bearer ${pending.apiKey}` } : {}),
+            },
+            body: JSON.stringify({ approval_id: pending.approvalId, choice: msg.choice }),
+          },
+        );
+        return { ok: res.ok };
+      } catch (e) {
+        return { ok: false, error: e?.message };
+      }
+    }
+
+    case 'CLARIFY_RESPOND': {
+      // User submitted a clarification response. Relay to Hermes agent.
+      const pending = pendingClarifications.get(msg.tabId);
+      if (!pending) return { ok: false, error: 'no pending clarification' };
+      try {
+        const res = await fetch(
+          `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/clarifications/${encodeURIComponent(pending.clarifyId)}/respond`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(pending.apiKey ? { Authorization: `Bearer ${pending.apiKey}` } : {}),
+            },
+            body: JSON.stringify({ response: msg.response }),
+          },
+        );
+        return { ok: res.ok };
+      } catch (e) {
+        return { ok: false, error: e?.message };
+      }
     }
 
     case 'STREAM_DEBUG': {
@@ -818,85 +888,41 @@ async function handle(msg, sender) {
       // Load global history
       const history = await storage.getHistory();
 
-      // Hermes /v1/responses API: stateful, server stores conversation history.
-      // Only the current input is sent — Hermes remembers previous turns via
-      // the `conversation` UUID. The first turn includes any attached page
-      // context so Hermes learns it; subsequent turns send only the new message.
-      const useResponsesApi = !!(provider.useResponsesApi);
+      // isHermes flag identifies Hermes providers. When true, use the
+      // Hermes /v1/runs API which supports approval, clarification, and richer
+      // tool events. Full conversation history is sent on every turn (the runs
+      // API is stateless, unlike the now-retired /v1/responses).
+      const isHermes = !!(provider.isHermes);
 
-      let messages = null;       // used by chat/chatStream (stateless)
-      let responsesInput = null; // used by responsesApiStream (stateful)
-      let responsesConversation = null;
+      let messages = null;         // chatStream (stateless OpenAI-compatible)
+      let runsInput = null;        // runsApiStream: current user message
+      let runsConvHistory = null;  // runsApiStream: all prior turns
       let extraHeaders = undefined;
 
-      if (useResponsesApi) {
-        responsesConversation = await storage.getOrCreateConversationId(all.activeProvider);
-        const hasAssistantTurn = history.some(m => m.role === 'assistant');
-        if (hasAssistantTurn) {
-          // Subsequent turns: Hermes already knows previous context.
-          // BUT if the user attached a new page after the last assistant turn,
-          // we must include it — Hermes has never seen it.
-          const lastAssistantIdx = history.map(m => m.role).lastIndexOf('assistant');
-          const newPageContextMsg = history.slice(lastAssistantIdx + 1).find(m =>
-            m.role === 'user' && (
-              (typeof m.content === 'string' && m.content.startsWith(PAGE_CONTEXT_PREFIX)) ||
-              (Array.isArray(m.content))
-            )
-          );
-
-          if (newPageContextMsg) {
-            // New page was attached — include it alongside the user message.
-            const parts = [];
-            if (typeof newPageContextMsg.content === 'string') {
-              parts.push({ type: 'input_text', text: newPageContextMsg.content });
-            } else if (Array.isArray(newPageContextMsg.content)) {
-              for (const p of newPageContextMsg.content) {
-                if (p.type === 'text') parts.push({ type: 'input_text', text: p.text });
-                else if (p.type === 'image_url') parts.push({ type: 'input_image', image_url: p.image_url?.url || p.image_url });
-              }
-            }
-            parts.push({ type: 'input_text', text: msg.userText || '' });
-            if (msg.images?.length) {
-              msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
-            }
-            responsesInput = [{ role: 'user', content: parts }];
-          } else if (msg.images?.length) {
-            responsesInput = [
-              { role: 'user', content: [
-                  { type: 'input_text', text: msg.userText || '' },
-                  ...msg.images.map(url => ({ type: 'input_image', image_url: url }))
-                ]
-              }
-            ];
-          } else {
-            responsesInput = msg.userText || '';
-          }
+      if (isHermes) {
+        // Build current-turn input (text + optional images)
+        if (msg.images?.length) {
+          const parts = [{ type: 'input_text', text: msg.userText || '' }];
+          msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
+          runsInput = [{ role: 'user', content: parts }];
         } else {
-          // First turn: include page context from history so Hermes learns it.
-          const pageContextMsg = history.find(m =>
-            m.role === 'user' && (
-              (typeof m.content === 'string' && m.content.startsWith(PAGE_CONTEXT_PREFIX)) ||
-              (Array.isArray(m.content))
-            )
-          );
-          const parts = [];
-          if (pageContextMsg) {
-            if (typeof pageContextMsg.content === 'string') {
-              parts.push({ type: 'input_text', text: pageContextMsg.content });
-            } else if (Array.isArray(pageContextMsg.content)) {
-              // Multimodal (screenshot)
-              for (const p of pageContextMsg.content) {
-                if (p.type === 'text') parts.push({ type: 'input_text', text: p.text });
-                else if (p.type === 'image_url') parts.push({ type: 'input_image', image_url: p.image_url?.url || p.image_url });
-              }
-            }
-          }
-          parts.push({ type: 'input_text', text: msg.userText || '' });
-          if (msg.images?.length) {
-            msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
-          }
-          responsesInput = [{ role: 'user', content: parts }];
+          runsInput = msg.userText || '';
         }
+        // Build conversation history from local storage (all prior user+assistant turns).
+        // Page-context messages (PAGE_CONTEXT_PREFIX) are included as-is so Hermes
+        // receives the full context. Multimodal content in old turns is text-only.
+        runsConvHistory = history
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .map(m => {
+            let content = m.content;
+            if (Array.isArray(content)) {
+              content = content
+                .filter(p => p.type === 'text' || p.type === 'input_text')
+                .map(p => p.text || '').join('') || '[multimodal message]';
+            }
+            return { role: m.role, content: String(content || '') };
+          })
+          .filter(m => m.content.trim());
       } else {
         // Standard stateless mode: send full history on every turn.
         messages = buildMessages({
@@ -940,6 +966,7 @@ async function handle(msg, sender) {
         clearTimeout(idleTimer);
         idleTimer = setTimeout(() => controller.abort('idle-timeout'), IDLE_TIMEOUT_MS);
       };
+      idleTimerResetters.set(tabId, resetIdleTimer);
       const signal = controller.signal;
 
       // Per-provider inference params
@@ -952,44 +979,63 @@ async function handle(msg, sender) {
       const MAX_RETRIES = 2;
 
       const doStream = async () => {
+        const onDelta = (delta) => {
+          resetIdleTimer();
+          appendToStreamState(tabId, delta);
+          pushChunk(tabId, { type: 'CHUNK', delta });
+        };
         const onToolProgress = (text) => { resetIdleTimer(); pushChunk(tabId, { type: 'TOOL_PROGRESS', text }); };
 
-        if (useResponsesApi) {
-          const result = await responsesApiStream({
+        if (isHermes) {
+          const onApproval = (data) => {
+            pendingApprovals.set(tabId, {
+              runId: data.runId,
+              approvalId: data.approval_id || data.approvalId || '',
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+            });
+            pushChunk(tabId, { type: 'APPROVAL', data });
+          };
+          const onClarify = (data) => {
+            pendingClarifications.set(tabId, {
+              runId: data.runId,
+              clarifyId: data.clarify_id || data.clarifyId || '',
+              baseUrl: provider.baseUrl,
+              apiKey: provider.apiKey,
+            });
+            pushChunk(tabId, { type: 'CLARIFY', data });
+          };
+          const onRunId = (runId) => {
+            activeRunIds.set(tabId, { runId, baseUrl: provider.baseUrl, apiKey: provider.apiKey });
+          };
+          return await runsApiStream({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
-            input: responsesInput,
+            input: runsInput,
             instructions: effectiveSystemPrompt || undefined,
-            conversation: responsesConversation,
-            onDelta: (delta) => {
-              resetIdleTimer();
-              appendToStreamState(tabId, delta);
-              pushChunk(tabId, { type: 'CHUNK', delta });
-            },
+            conversationHistory: runsConvHistory,
+            onDelta,
             onToolProgress,
+            onApproval,
+            onClarify,
+            onRunId,
             signal,
             temperature,
-            maxTokens
+            maxTokens,
           });
-          return result;
         } else {
-          const result = await chatStream({
+          return await chatStream({
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             model: provider.model || undefined,
             messages,
-            onDelta: (delta) => {
-              resetIdleTimer();
-              appendToStreamState(tabId, delta);
-              pushChunk(tabId, { type: 'CHUNK', delta });
-            },
+            onDelta,
             onToolProgress,
             signal,
             extraHeaders,
             temperature,
-            maxTokens
+            maxTokens,
           });
-          return result;
         }
       };
 
@@ -1033,7 +1079,11 @@ async function handle(msg, sender) {
         throw e;
       } finally {
         clearTimeout(idleTimer);
+        idleTimerResetters.delete(tabId);
         chatControllers.delete(tabId);
+        activeRunIds.delete(tabId);
+        pendingApprovals.delete(tabId);
+        pendingClarifications.delete(tabId);
       }
 
       // Parse CHOICE_REQUEST: agent may embed an interactive choice at the
