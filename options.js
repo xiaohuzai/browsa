@@ -7,6 +7,10 @@ const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');
 const statusEl = $('status');
 
+// Stroke-style SVG (matches sidepanel.js's ICONS.close) used instead of the
+// "✕" emoji-range glyph so it renders identically across OS/font.
+const ICON_CLOSE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
 let cachedCfg = null;
 const _pingState = {}; // name → 'reachable' | 'unreachable', persists across re-renders
 
@@ -421,7 +425,7 @@ function renderDomainRules(rules) {
           <textarea data-field="prompt" rows="3" placeholder="e.g. Focus on code changes. Use English.">${escapeHtml(r.prompt || '')}</textarea>
         </label>
       </div>
-      <button class="del-rule-btn" title="Remove this rule">✕</button>`;
+      <button class="del-rule-btn" title="Remove this rule">${ICON_CLOSE}</button>`;
     row.querySelector('.del-rule-btn').addEventListener('click', () => {
       const cur = readDomainRules();
       cur.splice(i, 1);
@@ -464,7 +468,7 @@ function renderMaskRules(rules) {
       <td><input type="text" data-field="pattern" value="${escapeAttr(r.pattern || '')}" placeholder="e.g. 1[3-9]\\d{9}" style="width:100%" /></td>
       <td><input type="text" data-field="flags" value="${escapeAttr(r.flags || 'gi')}" placeholder="gi" style="width:48px" /></td>
       <td><input type="text" data-field="replacement" value="${escapeAttr(r.replacement ?? '***')}" placeholder="***" style="width:80px" /></td>
-      <td><button class="del-rule-btn" title="Remove">✕</button></td>`;
+      <td><button class="del-rule-btn" title="Remove">${ICON_CLOSE}</button></td>`;
     tr.querySelector('.del-rule-btn').addEventListener('click', () => {
       const cur = readMaskRules();
       cur.splice(i, 1);
