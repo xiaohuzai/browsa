@@ -12,6 +12,29 @@ import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
 import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
+// Capability hints: browsa rendering rules injected automatically so users
+// never need to configure them manually. Shared by both CHAT (full turn,
+// with page context/domain rules/history) and SUBCHAT (scoped detail-thread
+// side-conversation, see openDetailThread in sidepanel.js) — both render
+// through the same markdown/Mermaid/ECharts/KaTeX pipeline.
+const CAPABILITY_HINTS = [
+  'When writing mathematical expressions or formulas, always use LaTeX notation: wrap inline math with $...$ and display/block math with $$...$$. This applies everywhere including inside Markdown table cells — never write formulas as plain text in tables.',
+  'When drawing diagrams or charts, output Mermaid code blocks (```mermaid) directly in your response. The chat UI renders Mermaid natively — do not create HTML files or write files to disk for diagrams.',
+  'When generating Mermaid diagrams, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #, ~, %) using double-quoted syntax: ["label text"].',
+  'In Markdown, always place punctuation outside bold/italic delimiters: write **text**, not **text,**.',
+  'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
+  'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
+  'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
+].join(' ');
+
+// CHOICE_REQUEST is CHAT-only, deliberately NOT part of CAPABILITY_HINTS:
+// rendering it as clickable buttons requires background.js's CHAT case to
+// parse+strip the tail and sidepanel.js to call renderChoiceRequest() —
+// SUBCHAT's detail-thread card does neither, so including this hint there
+// would just leak the raw "CHOICE_REQUEST:{...}" JSON into the reply text.
+const CHOICE_REQUEST_HINT =
+  'When you need the user to pick one of several distinct options (not free-form text), end your reply with a line in this exact format so the chat UI renders clickable buttons: CHOICE_REQUEST:{"question":"short question text","choices":["full text of option 1","full text of option 2"]}. This must be the very last thing in your reply, valid single-line JSON, with no text after it. Each choice string should be the complete message that gets sent back to you when clicked (not just a letter like "A") — write full option text, not a lettered index. Only use this when you are truly asking the user to choose between distinct paths forward, not for yes/no confirmations or open-ended questions.';
+
 // Allow side panel to open on action click (Chrome MV3)
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
@@ -130,6 +153,12 @@ export const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
 export const pendingApprovals = new Map();      // tabId -> { runId, approvalId, baseUrl, apiKey }
 export const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, baseUrl, apiKey }
 
+// AbortControllers for "detail thread" side-conversations (SUBCHAT), keyed
+// by a client-generated subId rather than tabId — unlike the main chat,
+// several detail threads can be open (and streaming) at once for the same
+// tab, so each needs its own independent cancel handle.
+export const subChatControllers = new Map(); // subId -> AbortController
+
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
 // text into the new port as one synthetic CHUNK, then keep pushing new
@@ -145,6 +174,18 @@ export const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, 
 // like 小红书 — vanilla chrome.tabs.onUpdated does NOT fire for history-API
 // navigation.
 const navPorts = new Map(); // tabId -> Set<Port>
+
+// Detail-thread ("SUBCHAT") port: opened fresh per send (one port per
+// subId), exactly like the main chat's per-turn browsa-chat port — NOT a
+// persistent port kept alive across the panel's whole lifetime. A
+// persistent port sounds appealing but has a real failure mode: if the SW
+// went idle (30s+) while the user was reading before opening a detail
+// thread, the persistent port dies and only reconnects on a delayed timer,
+// while sendMessage({type:'SUBCHAT'}) wakes the SW almost immediately —
+// deltas can start arriving and get silently dropped before the port has
+// finished reconnecting. Opening fresh + waiting for the HELLO_ACK (like
+// onSend() does for browsa-chat) avoids that race entirely.
+export const subChatPorts = new Map(); // subId -> Port
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'browsa-chat') {
@@ -212,6 +253,29 @@ chrome.runtime.onConnect.addListener((port) => {
     return;
   }
 
+  if (port.name === 'browsa-subchat') {
+    // One port per subId (one per detail-thread send) — no FOLLOW/re-tab
+    // concept needed, since the port only ever lives for that one request.
+    let claimedSubId = null;
+    port.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'SUBCHAT_HELLO' && typeof msg.subId === 'string') {
+        claimedSubId = msg.subId;
+        const oldPort = subChatPorts.get(claimedSubId);
+        if (oldPort && oldPort !== port) {
+          try { oldPort.disconnect(); } catch (_) {}
+        }
+        subChatPorts.set(claimedSubId, port);
+        try { port.postMessage({ type: 'SUBCHAT_HELLO_ACK' }); } catch (_) {}
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (claimedSubId != null && subChatPorts.get(claimedSubId) === port) {
+        subChatPorts.delete(claimedSubId);
+      }
+    });
+    return;
+  }
+
   if (port.name === 'browsa-nav') {
     // The nav port is a firehose: the side panel sends a hello with its
     // current tabId, but the background may push NAVIGATED events for ANY
@@ -259,6 +323,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
 function pushChunk(tabId, payload) {
   const port = streamPorts.get(tabId);
+  if (port) safePost(port, payload);
+}
+
+function pushSubChatChunk(subId, payload) {
+  const port = subChatPorts.get(subId);
   if (port) safePost(port, payload);
 }
 
@@ -797,6 +866,78 @@ async function handle(msg, sender) {
       }
     }
 
+    case 'SUBCHAT': {
+      // "Detail thread" side-conversation: the user selected a piece of text
+      // inside an assistant reply and wants to drill into it without
+      // touching the main conversation. Deliberately scoped down from CHAT:
+      // - always chatStream() (/v1/chat/completions), never runsApiStream —
+      //   no tool execution/approval needed for a side Q&A, and reusing the
+      //   main chat's Hermes session id here would mix this detail question
+      //   into the server-side agent's main-task context.
+      // - never touches storage.appendToHistory — the whole point is that
+      //   the main history stays clean.
+      // - no page context/domain rules/llms.txt — sidepanel.js already
+      //   built the scoped context (quoted excerpt + the question).
+      const all = await storage.getAll();
+      const provider = all.providers[all.activeProvider];
+      if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
+      if (!provider.baseUrl?.trim()) throw ProviderConfigError('Base URL is not set. Open Settings (⚙) and configure the provider.');
+
+      const subId = msg.subId;
+      if (!subId) throw new Error('subId required');
+      const userMessages = Array.isArray(msg.messages) ? msg.messages : [];
+      if (!userMessages.length) throw new Error('messages required');
+
+      const messages = [{ role: 'system', content: CAPABILITY_HINTS }, ...userMessages];
+      const controller = new AbortController();
+      subChatControllers.set(subId, controller);
+      const temperature = (provider.temperature != null && provider.temperature !== '') ? Number(provider.temperature) : undefined;
+      const maxTokens = provider.maxTokens ? Number(provider.maxTokens) : 0;
+      console.log('[subchat][bg]', subId, 'starting chatStream, port already registered?', subChatPorts.has(subId));
+
+      // Fire-and-forget: reply to the sendMessage call immediately so the
+      // side panel doesn't block on the whole stream, and push deltas
+      // through the dedicated browsa-subchat port (opened fresh for this
+      // subId, see subChatPorts comment) as they arrive.
+      (async () => {
+        try {
+          await chatStream({
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            model: provider.model || undefined,
+            messages,
+            onDelta: (delta) => {
+              const posted = subChatPorts.has(subId);
+              if (!posted) console.warn('[subchat][bg]', subId, 'delta arrived but NO PORT registered — dropped:', delta.slice(0, 40));
+              pushSubChatChunk(subId, { type: 'SUBCHAT_CHUNK', subId, delta });
+            },
+            signal: controller.signal,
+            temperature,
+            maxTokens,
+          });
+          console.log('[subchat][bg]', subId, 'chatStream done, port still registered?', subChatPorts.has(subId));
+          pushSubChatChunk(subId, { type: 'SUBCHAT_DONE', subId });
+        } catch (e) {
+          console.error('[subchat][bg]', subId, 'chatStream threw', e);
+          if (e?.name !== 'AbortError') {
+            pushSubChatChunk(subId, { type: 'SUBCHAT_ERROR', subId, message: e?.message || String(e) });
+          }
+        } finally {
+          subChatControllers.delete(subId);
+        }
+      })();
+      return { started: true };
+    }
+
+    case 'SUBCHAT_ABORT': {
+      const c = subChatControllers.get(msg.subId);
+      if (c) {
+        try { c.abort('user-cancel'); } catch (_) {}
+        subChatControllers.delete(msg.subId);
+      }
+      return { aborted: !!c };
+    }
+
     case 'STREAM_DEBUG': {
       // Observability endpoint for the side panel. Returns the full
       // state of streamState, streamPorts, and chatControllers so we
@@ -882,19 +1023,7 @@ async function handle(msg, sender) {
         : '';
       const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
       const langExtra = langMap[all.replyLanguage] || '';
-      // Capability hints: browsa rendering rules injected automatically so
-      // users never need to configure them manually.
-      const capabilityHints = [
-        'When writing mathematical expressions or formulas, always use LaTeX notation: wrap inline math with $...$ and display/block math with $$...$$. This applies everywhere including inside Markdown table cells — never write formulas as plain text in tables.',
-        'When drawing diagrams or charts, output Mermaid code blocks (```mermaid) directly in your response. The chat UI renders Mermaid natively — do not create HTML files or write files to disk for diagrams.',
-        'When generating Mermaid diagrams, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #, ~, %) using double-quoted syntax: ["label text"].',
-        'In Markdown, always place punctuation outside bold/italic delimiters: write **text**, not **text,**.',
-        'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
-        'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
-        'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
-        'When you need the user to pick one of several distinct options (not free-form text), end your reply with a line in this exact format so the chat UI renders clickable buttons: CHOICE_REQUEST:{"question":"short question text","choices":["full text of option 1","full text of option 2"]}. This must be the very last thing in your reply, valid single-line JSON, with no text after it. Each choice string should be the complete message that gets sent back to you when clicked (not just a letter like "A") — write full option text, not a lettered index. Only use this when you are truly asking the user to choose between distinct paths forward, not for yes/no confirmations or open-ended questions.',
-      ].join(' ');
-      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, capabilityHints]
+      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, CAPABILITY_HINTS, CHOICE_REQUEST_HINT]
         .map(s => s.trim()).filter(Boolean).join('\n\n');
 
       // Load global history
