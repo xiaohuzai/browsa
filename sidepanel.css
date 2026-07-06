@@ -471,7 +471,7 @@ body {
 
 /* ─── Markdown inside assistant ─────────────────────────────────────────────── */
 .msg.assistant {
-  font-size: 14px;
+  font-size: var(--msg-font-size);
   line-height: 1.72;
 }
 .msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 {
@@ -1768,3 +1768,132 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
   border: none;
 }
 .clarify-submit:hover { opacity: 0.85; }
+
+/* ── Detail thread card (select text in a reply -> scoped follow-up) ──── */
+.detail-thread-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+  /* User-resizable via .detail-thread-resize-handle (custom drag, not the
+     native CSS resize property — its grip gets visually clipped by
+     border-radius + the overflow:hidden it requires, making it an
+     unreliable affordance). overflow:hidden here just keeps content from
+     visually overflowing the explicit height set by the drag handler. */
+  overflow: hidden;
+  /* No min-height here — the JS drag handler already floors at 140px
+     while resizing (Math.max(140, ...)). A CSS min-height would force
+     the card taller than its natural content before the first message
+     is sent (.detail-thread-messages is display:none while empty, so
+     nothing has flex-grow to absorb the extra forced space), leaving
+     the resize handle stranded mid-card instead of flush at the bottom. */
+  max-height: 80vh;
+  /* .detail-thread-card is itself a flex item inside .messages (a flex
+     column) — without this, the parent's default flex-shrink:1 could
+     squeeze it back down to fit the visible viewport, fighting the
+     explicit height the drag handler just set. */
+  flex-shrink: 0;
+}
+.detail-thread-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  font-size: 0.9em;
+  line-height: 1;
+  padding: 2px;
+}
+.detail-thread-close:hover { color: var(--fg); }
+.detail-thread-quote {
+  padding: 4px 8px;
+  margin: 0 20px 8px 0;
+  border-left: 2px solid var(--accent);
+  color: var(--fg-2);
+  font-style: italic;
+  font-size: 0.92em;
+  white-space: pre-wrap;
+  max-height: 4.5em;
+  overflow-y: auto;
+}
+.detail-thread-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 40px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.detail-thread-messages:empty { display: none; margin-bottom: 0; }
+/* User/AI messages inside the card reuse .msg.user/.msg.assistant directly
+   (see openDetailThread in sidepanel.js) — no parallel bubble styling here,
+   so they can never drift out of sync with the main chat's look. */
+.subchat-error { color: #f87171; }
+.detail-thread-input-row { display: flex; gap: 6px; }
+.detail-thread-input {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85em;
+  outline: none;
+}
+.detail-thread-input:focus { border-color: var(--accent); }
+.detail-thread-input:disabled { opacity: 0.6; }
+.detail-thread-send {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85em;
+  cursor: pointer;
+  border: none;
+}
+.detail-thread-send:hover { opacity: 0.85; }
+.detail-thread-send:disabled { opacity: 0.5; cursor: default; }
+.detail-thread-resize-handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px -12px -10px;
+  height: 18px;
+  cursor: ns-resize;
+  user-select: none;
+  background: var(--bg-3);
+  border-top: 1px solid var(--border);
+}
+.detail-thread-resize-handle::before {
+  content: '';
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fg-dim);
+}
+.detail-thread-resize-handle:hover { background: var(--accent-dim); }
+.detail-thread-resize-handle:hover::before { background: var(--accent); }
+
+/* Floating "💬 细聊" button shown near a text selection inside a reply */
+.selection-ask-btn {
+  position: fixed;
+  z-index: 1000;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg);
+  font-size: 0.8em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.selection-ask-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
