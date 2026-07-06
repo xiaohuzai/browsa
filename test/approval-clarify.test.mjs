@@ -1,6 +1,6 @@
 // test/approval-clarify.test.mjs
 // Tests for the Hermes /v1/runs approval/clarification relay added to
-// background.js: STREAM_ABORT now also cancels the server-side run,
+// background.js: STREAM_ABORT now also stops the server-side run,
 // APPROVAL_RESPOND and CLARIFY_RESPOND relay the user's choice back to
 // Hermes, and the new activeRunIds/pendingApprovals/pendingClarifications
 // maps must not leak across turns.
@@ -64,9 +64,9 @@ Object.defineProperty(globalThis, 'chrome', {
 const bg = await import('../background.js');
 const { handle, chatControllers, activeRunIds, pendingApprovals, pendingClarifications } = bg;
 
-// --------------- STREAM_ABORT also cancels the server-side run --------------
+// --------------- STREAM_ABORT also stops the server-side run --------------
 
-test('STREAM_ABORT calls POST /v1/runs/{id}/cancel when a run is active for the tab', async () => {
+test('STREAM_ABORT calls POST /v1/runs/{id}/stop when a run is active for the tab', async () => {
   chatControllers.clear();
   activeRunIds.clear();
 
@@ -77,11 +77,14 @@ test('STREAM_ABORT calls POST /v1/runs/{id}/cancel when a run is active for the 
 
   await handle({ type: 'STREAM_ABORT', tabId: 11 });
 
-  assert.equal(calls.length, 1, 'exactly one cancel request must be sent');
-  assert.equal(calls[0].url, 'http://hermes.test/v1/runs/run_abc/cancel');
+  assert.equal(calls.length, 1, 'exactly one stop request must be sent');
+  // The Hermes API server only registers POST /v1/runs/{run_id}/stop — there
+  // is no /cancel route (verified against gateway/platforms/api_server.py's
+  // route table). Calling /cancel 404s silently and leaves the run going.
+  assert.equal(calls[0].url, 'http://hermes.test/v1/runs/run_abc/stop');
   assert.equal(calls[0].opts.method, 'POST');
   assert.equal(calls[0].opts.headers.Authorization, 'Bearer sk-1');
-  assert.equal(activeRunIds.has(11), false, 'activeRunIds entry must be cleared after cancel');
+  assert.equal(activeRunIds.has(11), false, 'activeRunIds entry must be cleared after stop');
 });
 
 test('STREAM_ABORT does not call fetch when no run is active for the tab', async () => {
@@ -93,7 +96,7 @@ test('STREAM_ABORT does not call fetch when no run is active for the tab', async
 
   await handle({ type: 'STREAM_ABORT', tabId: 12 });
 
-  assert.equal(fetchCalled, false, 'no /v1/runs/{id}/cancel request should be made without an active run');
+  assert.equal(fetchCalled, false, 'no /v1/runs/{id}/stop request should be made without an active run');
 });
 
 // --------------- APPROVAL_RESPOND ---------------------------------------------
@@ -170,32 +173,34 @@ test('activeRunIds/pendingApprovals/pendingClarifications are cleared in the CHA
   assert.match(finallyBlock, /pendingClarifications\.delete\(tabId\)/, 'pendingClarifications must be cleared in finally');
 });
 
-// --------------- useRunsApi routing --------------------------------------------
+// --------------- isHermes routing -----------------------------------------------
 
-test('CHAT handler routes to runsApiStream when useRunsApi, chatStream otherwise', async () => {
+test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise', async () => {
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
 
-  // isHermes gates useRunsApi (a per-provider toggle for falling back to
-  // /v1/chat/completions when Hermes blocks tools on /v1/runs — see
-  // docs/open-webui.md, which shows /v1/chat/completions with full tool
-  // access and no special session handling required).
-  assert.match(src, /const useRunsApi = isHermes && provider\.useRunsApi !== false/,
-    'useRunsApi must default to true for Hermes providers unless explicitly disabled');
+  // isHermes is auto-detected via ping (options.js probes run_submission /
+  // run_events_sse). Whenever it's true we always prefer Hermes's richer
+  // /v1/runs API over plain /v1/chat/completions — no separate per-provider
+  // toggle exists (a provider that doesn't support /v1/runs is simply not
+  // flagged isHermes).
+  assert.match(src, /const isHermes = !!\(provider\.isHermes\)/,
+    'isHermes must be read directly from the provider config');
+  assert.doesNotMatch(src, /useRunsApi/, 'the retired useRunsApi toggle must not reappear');
 
-  // The doStream() closure must branch on useRunsApi to pick the API client.
+  // The doStream() closure must branch on isHermes to pick the API client.
   const doStreamIdx = src.indexOf('const doStream = async () => {');
   assert.ok(doStreamIdx > 0, 'doStream must be defined');
   const doStreamEnd = src.indexOf('\n      };', doStreamIdx);
   const doStreamSrc = src.slice(doStreamIdx, doStreamEnd);
 
-  assert.match(doStreamSrc, /if \(useRunsApi\)/, 'doStream must branch on useRunsApi');
-  assert.match(doStreamSrc, /await runsApiStream\(/, 'the useRunsApi branch must call runsApiStream');
+  assert.match(doStreamSrc, /if \(isHermes\)/, 'doStream must branch on isHermes');
+  assert.match(doStreamSrc, /await runsApiStream\(/, 'the isHermes branch must call runsApiStream');
   assert.match(doStreamSrc, /await chatStream\(/, 'the fallback branch must call chatStream');
 
-  // runsApiStream's call must come before chatStream's in the useRunsApi-true branch.
+  // runsApiStream's call must come before chatStream's in the isHermes-true branch.
   const runsIdx = doStreamSrc.indexOf('await runsApiStream(');
   const chatIdx = doStreamSrc.indexOf('await chatStream(');
   assert.ok(runsIdx > 0 && chatIdx > 0 && runsIdx < chatIdx,
-    'runsApiStream must be reachable from the useRunsApi branch, chatStream from the else branch');
+    'runsApiStream must be reachable from the isHermes branch, chatStream from the else branch');
 });

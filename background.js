@@ -122,7 +122,7 @@ export const chatControllers = new Map(); // tabId -> AbortController
 const idleTimerResetters = new Map(); // tabId -> () => void
 
 // Active run IDs for Hermes /v1/runs streaming. Stored so STREAM_ABORT can
-// call POST /v1/runs/{id}/cancel to stop the server-side agent, not just the
+// call POST /v1/runs/{id}/stop to stop the server-side agent, not just the
 // local fetch.
 export const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
 
@@ -735,14 +735,17 @@ async function handle(msg, sender) {
       if (controller) {
         try { controller.abort('user-cancel'); } catch (_) {}
       }
-      // For Hermes /v1/runs: also cancel the server-side agent so it stops
-      // executing tools rather than continuing in the background.
+      // For Hermes /v1/runs: also stop the server-side agent so it stops
+      // executing tools rather than continuing in the background. The
+      // registered route is /stop, not /cancel — there is no /cancel route
+      // on the Hermes API server (confirmed via /v1/capabilities' endpoints
+      // map and gateway/platforms/api_server.py's route table).
       const runInfo = activeRunIds.get(t);
       if (runInfo) {
-        const cancelUrl = `${runInfo.baseUrl}/v1/runs/${encodeURIComponent(runInfo.runId)}/cancel`;
-        const cancelHeaders = { 'Content-Type': 'application/json' };
-        if (runInfo.apiKey) cancelHeaders['Authorization'] = `Bearer ${runInfo.apiKey}`;
-        fetch(cancelUrl, { method: 'POST', headers: cancelHeaders }).catch(() => {});
+        const stopUrl = `${runInfo.baseUrl}/v1/runs/${encodeURIComponent(runInfo.runId)}/stop`;
+        const stopHeaders = { 'Content-Type': 'application/json' };
+        if (runInfo.apiKey) stopHeaders['Authorization'] = `Bearer ${runInfo.apiKey}`;
+        fetch(stopUrl, { method: 'POST', headers: stopHeaders }).catch(() => {});
         activeRunIds.delete(t);
       }
       clearStreamState(t);
@@ -897,16 +900,12 @@ async function handle(msg, sender) {
       // Load global history
       const history = await storage.getHistory();
 
-      // isHermes flag identifies Hermes providers (affects capability hints
-      // etc. elsewhere). useRunsApi additionally decides whether to actually
-      // call Hermes /v1/runs (approval, clarification, richer tool events —
-      // but /v1/runs' async-job semantics may make Hermes treat the session
-      // as unattended and lock down dangerous tools) or fall back to plain
-      // /v1/chat/completions (matches how Open WebUI talks to Hermes with
-      // full tool access, per docs/open-webui.md — no special headers
-      // needed there). Toggle in Settings if tools get blocked on /v1/runs.
+      // isHermes flag identifies Hermes providers (auto-detected via ping —
+      // options.js probes run_submission/run_events_sse capabilities). When
+      // true we always use Hermes's richer /v1/runs API (approval,
+      // clarification, tool.started/tool.completed, visible thinking)
+      // instead of plain /v1/chat/completions.
       const isHermes = !!(provider.isHermes);
-      const useRunsApi = isHermes && provider.useRunsApi !== false;
 
       let messages = null;         // chatStream (stateless OpenAI-compatible)
       let runsInput = null;        // runsApiStream: current user message
@@ -914,7 +913,7 @@ async function handle(msg, sender) {
       let hermesSessionId = null;  // runsApiStream: X-Hermes-Session-Id / session_id
       let extraHeaders = undefined;
 
-      if (useRunsApi) {
+      if (isHermes) {
         hermesSessionId = await storage.getOrCreateHermesSessionId(all.activeProvider);
         // Build current-turn input (text + optional images)
         if (msg.images?.length) {
@@ -1028,7 +1027,7 @@ async function handle(msg, sender) {
           pushChunk(tabId, { type: 'CLARIFY', data });
         };
 
-        if (useRunsApi) {
+        if (isHermes) {
           const onRunId = (runId) => {
             activeRunIds.set(tabId, { runId, baseUrl: provider.baseUrl, apiKey: provider.apiKey });
           };
