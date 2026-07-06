@@ -16,6 +16,29 @@ marked.setOptions({
   breaks: true
 });
 
+// ─── Shared icon set ────────────────────────────────────────────────────────
+// Stroke-style SVGs (viewBox 24x24, currentColor, matches the attach/send
+// buttons already in sidepanel.html) so control icons render identically
+// across OS/font — unlike emoji glyphs, which differ across Apple/Google/
+// Microsoft/Noto emoji sets and clash with the app's own SVG icon language.
+const ICONS = {
+  reply: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 015.5 5.5V20"/></svg>',
+  trash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/><path d="M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>',
+  edit: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+  copy: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
+  retry: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.34 5.66"/><path d="M20 4v7h-7"/></svg>',
+  close: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  chat: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
+  gear: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  think: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2a5.5 5.5 0 00-5.4 6.5A5 5 0 006 18h9a4.5 4.5 0 001-8.9 5.5 5.5 0 00-6.5-6.6z"/></svg>',
+  search: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+  book: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
+  terminal: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5"/><path d="M12 19h8"/></svg>',
+  // Points up by default ("click to collapse"); .fold-btn svg is rotated
+  // 180deg via CSS when the bubble has .collapsed ("click to expand").
+  chevron: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>',
+};
+
 const $ = (id) => document.getElementById(id);
 const messagesEl = $('messages');
 const inputEl = $('input');
@@ -655,7 +678,7 @@ function _echartsToolbar(source, chart, container) {
     { title: '放大',    text: '+',  action: () => zoom(0.2) },
     { title: '缩小',    text: '−',  action: () => zoom(-0.2) },
     { title: '重置',    text: '⊙',  action: () => { scale = 1; container.style.height = ORIG_H + 'px'; chart.resize({ height: ORIG_H }); } },
-    { title: '复制代码', text: '⎘',  action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500); }).catch(() => {}) },
+    { title: '复制代码', html: ICONS.copy, action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500); }).catch(() => {}) },
     { title: '导出PNG', text: '↓',  action: (btn) => {
         const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
         const a = document.createElement('a');
@@ -664,10 +687,11 @@ function _echartsToolbar(source, chart, container) {
       }
     },
   ];
-  for (const { title, text, action } of btns) {
+  for (const { title, text, html, action } of btns) {
     const btn = document.createElement('button');
     btn.className = 'mermaid-btn';
-    btn.title = title; btn.textContent = text;
+    btn.title = title;
+    if (html) btn.innerHTML = html; else btn.textContent = text;
     btn.addEventListener('click', (e) => action(e.currentTarget));
     bar.appendChild(btn);
   }
@@ -719,14 +743,14 @@ function _mermaidToolbar(svgWrap, source) {
     { title: '放大', text: '+', action: () => _mermaidZoom(svgWrap, 0.2) },
     { title: '缩小', text: '−', action: () => _mermaidZoom(svgWrap, -0.2) },
     { title: '重置', text: '⊙', action: () => _mermaidReset(svgWrap) },
-    { title: '复制代码', text: '⎘', action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '⎘'; }, 1500); }).catch(() => {}) },
+    { title: '复制代码', html: ICONS.copy, action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500); }).catch(() => {}) },
     { title: '导出SVG', text: '↓', action: (btn) => _mermaidExportSvg(svgWrap).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '↓'; }, 1500); }).catch(() => {}) },
   ];
-  for (const { title, text, action } of btns) {
+  for (const { title, text, html, action } of btns) {
     const btn = document.createElement('button');
     btn.className = 'mermaid-btn';
     btn.title = title;
-    btn.textContent = text;
+    if (html) btn.innerHTML = html; else btn.textContent = text;
     btn.addEventListener('click', (e) => { e.stopPropagation(); action(btn); });
     bar.appendChild(btn);
   }
@@ -1113,14 +1137,14 @@ function addThinkCopyButtons(el) {
     const btn = document.createElement('button');
     btn.className = 'think-copy-btn';
     btn.title = 'Copy thinking';
-    btn.textContent = '⎘';
+    btn.innerHTML = ICONS.copy;
     btn.addEventListener('click', async (e) => {
       e.stopPropagation(); // don't toggle the details
       const body = details.querySelector('.think-body');
       try {
         await _copyText(body?.textContent || '');
         btn.textContent = '✓';
-        setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+        setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500);
       } catch (_) {}
     });
     summary.appendChild(btn);
@@ -1738,9 +1762,9 @@ async function onSend() {
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
-      appendMsgAction(assistantEl, '↺ 重试', () => {
+      appendMsgAction(assistantEl, '重试', () => {
         if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
-      });
+      }, ICONS.retry);
       if (res.hint) appendSystem(res.hint);
       // Resync counter — user turn may or may not have been stored.
       reconcileHistoryIdx();
@@ -1753,9 +1777,9 @@ async function onSend() {
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
-    appendMsgAction(assistantEl, '↺ 重试', () => {
+    appendMsgAction(assistantEl, '重试', () => {
       if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
-    });
+    }, ICONS.retry);
     reconcileHistoryIdx();
   } finally {
     setStreamingUI(false);
@@ -2104,11 +2128,11 @@ function addMsgActions(el, getRaw) {
   const wrap = document.createElement('div');
   wrap.className = 'msg-actions';
 
-  // ↩ Reply / quote
+  // Reply / quote
   const replyBtn = document.createElement('button');
   replyBtn.className = 'msg-action-icon';
   replyBtn.title = 'Quote';
-  replyBtn.textContent = '↩';
+  replyBtn.innerHTML = ICONS.reply;
   replyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const raw = (getRaw() || '').trim();
@@ -2120,11 +2144,11 @@ function addMsgActions(el, getRaw) {
     inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
   });
 
-  // 🗑 Delete
+  // Delete
   const delBtn = document.createElement('button');
   delBtn.className = 'msg-action-icon delete-icon';
   delBtn.title = 'Delete message';
-  delBtn.textContent = '🗑';
+  delBtn.innerHTML = ICONS.trash;
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
     // Serialise: ignore rapid concurrent clicks to prevent index races.
@@ -2154,12 +2178,12 @@ function addMsgActions(el, getRaw) {
 
   const buttons = [replyBtn, delBtn];
 
-  // ✏ Edit — only for user messages
+  // Edit — only for user messages
   if (el.classList.contains('user')) {
     const editBtn = document.createElement('button');
     editBtn.className = 'msg-action-icon';
     editBtn.title = 'Edit & resend';
-    editBtn.textContent = '✏';
+    editBtn.innerHTML = ICONS.edit;
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       startMsgEdit(el);
@@ -2167,12 +2191,12 @@ function addMsgActions(el, getRaw) {
     buttons.push(editBtn);
   }
 
-  // ⎘ Copy + 🔄 Regenerate — only for assistant messages
+  // Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-icon';
     copyBtn.title = 'Copy response';
-    copyBtn.textContent = '⎘';
+    copyBtn.innerHTML = ICONS.copy;
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const text = getRaw() || el.innerText || '';
@@ -2180,14 +2204,28 @@ function addMsgActions(el, getRaw) {
         await _copyText(text);
         copyBtn.textContent = '✓';
         showToast('Copied', 'success');
-        setTimeout(() => { copyBtn.textContent = '⎘'; }, 2000);
+        setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 2000);
       } catch (_) {
         copyBtn.textContent = '✗';
-        setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+        setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 1500);
       }
     });
     buttons.push(copyBtn);
 
+    // Collapse/expand — manual, per-message, purely visual (never persisted
+    // to history/storage; resets on reload/session-switch since renderHistory
+    // rebuilds the DOM fresh each time). No auto-length heuristic: the user
+    // decides which long replies to fold, so there's no "how long is long"
+    // guessing to get wrong.
+    const foldBtn = document.createElement('button');
+    foldBtn.className = 'msg-action-icon fold-btn';
+    foldBtn.title = 'Collapse/expand';
+    foldBtn.innerHTML = ICONS.chevron;
+    foldBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.classList.toggle('collapsed');
+    });
+    buttons.push(foldBtn);
   }
 
   wrap.append(...buttons);
@@ -2272,6 +2310,21 @@ function startMsgEdit(el) {
   });
 }
 
+// Classify tool-progress text into a visual tier (icon + CSS hook) so the
+// user can tell at a glance whether the agent is thinking, running a tool,
+// or waiting — mirrors personal_ai_assistant's event-type display. Shared by
+// showToolProgress (live) and renderToolHistory (folded, post-hoc) so the
+// classification regexes only live in one place.
+function classifyToolTier(text) {
+  const t = text.toLowerCase();
+  if (/think|reason|analyz|consid/.test(t))           return { tier: 'thinking',  icon: ICONS.think };
+  if (/search|fetch|web|http|url/.test(t))            return { tier: 'searching', icon: ICONS.search };
+  if (/read|open|load|file|path/.test(t))             return { tier: 'reading',   icon: ICONS.book };
+  if (/write|edit|creat|sav|updat/.test(t))           return { tier: 'writing',   icon: ICONS.edit };
+  if (/run|exec|bash|shell|cmd|command/.test(t))      return { tier: 'running',   icon: ICONS.terminal };
+  return { tier: '', icon: ICONS.gear };
+}
+
 /** Show a faint "tool progress" line below a streaming bubble. */
 function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
@@ -2281,19 +2334,7 @@ function showToolProgress(bubbleEl, text, tierOverride) {
     el.className = 'tool-progress';
     bubbleEl.insertAdjacentElement('afterend', el);
   }
-  // Classify the progress text into a visual tier so the user can
-  // tell at a glance whether the agent is thinking, running a tool,
-  // or waiting — mirrors personal_ai_assistant's event-type display.
-  let icon = '⚙';
-  let tier = tierOverride || '';
-  if (!tierOverride) {
-    const t = text.toLowerCase();
-    if (/think|reason|analyz|consid/.test(t))          { icon = '🤔'; tier = 'thinking'; }
-    else if (/search|fetch|web|http|url/.test(t))      { icon = '🔍'; tier = 'searching'; }
-    else if (/read|open|load|file|path/.test(t))       { icon = '📖'; tier = 'reading'; }
-    else if (/write|edit|creat|sav|updat/.test(t))     { icon = '✏️'; tier = 'writing'; }
-    else if (/run|exec|bash|shell|cmd|command/.test(t)){ icon = '💻'; tier = 'running'; }
-  }
+  const { tier, icon } = tierOverride ? { tier: tierOverride, icon: ICONS.gear } : classifyToolTier(text);
   el.dataset.tier = tier;
   el.innerHTML = `<span class="tp-icon">${icon}</span><span class="tp-text">${escM(text)}</span>`;
 }
@@ -2425,7 +2466,7 @@ function handleAssistantTextSelection() {
   if (!selectionAskBtn) {
     selectionAskBtn = document.createElement('button');
     selectionAskBtn.className = 'selection-ask-btn';
-    selectionAskBtn.textContent = '💬 细聊';
+    selectionAskBtn.innerHTML = `${ICONS.chat}<span>细聊</span>`;
     // mousedown (not click): fires before the browser clears the selection
     // on the subsequent click, so window.getSelection() below is still valid.
     selectionAskBtn.addEventListener('mousedown', (e) => {
@@ -2470,7 +2511,7 @@ function openDetailThread(bubbleEl, quotedText, anchorEl) {
   const card = document.createElement('div');
   card.className = 'detail-thread-card';
   card.innerHTML =
-    `<button class="detail-thread-close" title="Close">✕</button>` +
+    `<button class="detail-thread-close" title="Close">${ICONS.close}</button>` +
     `<div class="detail-thread-quote">${escM(quotedText)}</div>` +
     `<div class="detail-thread-messages"></div>` +
     `<div class="detail-thread-input-row">` +
@@ -2784,20 +2825,14 @@ function renderToolHistory(bubbleEl, events) {
   const details = document.createElement('details');
   details.className = 'tool-history';
   const summary = document.createElement('summary');
-  summary.textContent = `⚙ ${events.length} step${events.length > 1 ? 's' : ''}`;
+  summary.innerHTML = `${ICONS.gear} ${events.length} step${events.length > 1 ? 's' : ''}`;
   details.appendChild(summary);
   const ul = document.createElement('ul');
   for (const ev of events) {
     const li = document.createElement('li');
     // Re-use the same icon classification as showToolProgress
-    let icon = '⚙';
-    const t = ev.toLowerCase();
-    if (/think|reason|analyz|consid/.test(t))           icon = '🤔';
-    else if (/search|fetch|web|http|url/.test(t))       icon = '🔍';
-    else if (/read|open|load|file|path/.test(t))        icon = '📖';
-    else if (/write|edit|creat|sav|updat/.test(t))      icon = '✏️';
-    else if (/run|exec|bash|shell|cmd|command/.test(t)) icon = '💻';
-    li.textContent = `${icon} ${ev}`;
+    const { icon } = classifyToolTier(ev);
+    li.innerHTML = `${icon} ${escM(ev)}`;
     ul.appendChild(li);
   }
   details.appendChild(ul);
@@ -2837,7 +2872,7 @@ function renderChoiceRequest(bubbleEl, req) {
 }
 
 /** Append a small action button row directly after a message bubble. */
-function appendMsgAction(bubbleEl, label, onClick) {
+function appendMsgAction(bubbleEl, label, onClick, icon) {
   // Remove any existing action row on this bubble first (avoid stacking).
   bubbleEl.nextElementSibling?.classList.contains('msg-action-row') &&
     bubbleEl.nextElementSibling.remove();
@@ -2845,7 +2880,7 @@ function appendMsgAction(bubbleEl, label, onClick) {
   row.className = 'msg-action-row';
   const btn = document.createElement('button');
   btn.className = 'msg-action-btn';
-  btn.textContent = label;
+  btn.innerHTML = (icon || '') + `<span>${escM(label)}</span>`;
   btn.addEventListener('click', () => { row.remove(); onClick(); });
   row.appendChild(btn);
   bubbleEl.insertAdjacentElement('afterend', row);
@@ -3049,7 +3084,7 @@ async function renderSessionsList() {
       </div>
       <div class="session-item-actions">
         <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">⬇</button>
-        <button class="session-del-btn" title="Delete session" data-id="${s.id}">🗑</button>
+        <button class="session-del-btn" title="Delete session" data-id="${s.id}">${ICONS.trash}</button>
       </div>`;
 
     // Click body → load session; double-click name → rename.
@@ -3261,7 +3296,7 @@ async function showEffectivePrompt() {
   actionsEl.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px';
   const copyBtn = document.createElement('button');
   copyBtn.className = 'pi-copy';
-  copyBtn.textContent = '⎘ Copy full prompt';
+  copyBtn.innerHTML = `${ICONS.copy}<span>Copy full prompt</span>`;
   const closeBtn = document.createElement('button');
   closeBtn.className = 'pi-close confirm-ok';
   closeBtn.textContent = 'Close';
@@ -3476,7 +3511,7 @@ function showImageLightbox(src, alt) {
   img.alt = alt || '';
   const closeBtn = document.createElement('button');
   closeBtn.className = 'lightbox-close';
-  closeBtn.textContent = '✕';
+  closeBtn.innerHTML = ICONS.close;
   closeBtn.addEventListener('click', () => overlay.remove());
   overlay.appendChild(img);
   overlay.appendChild(closeBtn);

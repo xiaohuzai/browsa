@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>browsa</title>
+    <link rel="stylesheet" href="lib/theme.css" />
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
@@ -30,8 +31,12 @@
     <div id="sessions-drawer" class="sessions-drawer" hidden role="dialog" aria-labelledby="sessions-drawer-title">
       <div class="sessions-drawer-header">
         <span id="sessions-drawer-title" class="sessions-drawer-title">Session History</span>
-        <button id="sessions-clear-all" class="iconbtn sessions-clear-all-btn" title="Clear all sessions">🗑</button>
-        <button id="sessions-close" class="iconbtn" title="Close">✕</button>
+        <button id="sessions-clear-all" class="iconbtn sessions-clear-all-btn" title="Clear all sessions">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482 41.03 41.03 0 00-2.365-.298V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
+        </button>
+        <button id="sessions-close" class="iconbtn" title="Close">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+        </button>
       </div>
       <div class="sessions-drawer-actions">
         <button id="sessions-new" class="sessions-new-btn">＋ New session</button>
@@ -49,7 +54,9 @@
       <span id="msg-search-count" class="msg-search-count"></span>
       <button id="msg-search-prev" class="msg-search-nav" title="Previous (Shift+Enter)">↑</button>
       <button id="msg-search-next" class="msg-search-nav" title="Next (Enter)">↓</button>
-      <button id="msg-search-close" class="msg-search-close" title="Close (Esc)">✕</button>
+      <button id="msg-search-close" class="msg-search-close" title="Close (Esc)">
+        <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
     </div>
 
     <!-- Multi-select action bar (shown when multi-select active) -->
@@ -99,7 +106,7 @@
       <div class="composer-footer">
         <div class="ctx-group" role="group" aria-label="Context mode">
           <label class="ctx-pill" title="Auto: Reader → DOM → Full (smart cascade)"><input type="radio" name="ctx" value="auto" />Auto</label>
-          <label class="ctx-pill" title="Capture screenshot"><input type="radio" name="ctx" value="screenshot" />📷</label>
+          <label class="ctx-pill" title="Capture screenshot"><input type="radio" name="ctx" value="screenshot" /><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></label>
         </div>
         <a id="pagemeta" class="pagemeta" target="_blank" title=""></a>
       </div>

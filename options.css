@@ -1,42 +1,25 @@
 /* options.css */
 
+/* Design tokens (--bg, --surface, --fg, --muted, --accent, --radius,
+   --shadow, ...) now come from the shared lib/theme.css, <link>-ed before
+   this file in options.html — same palette as sidepanel.html instead of a
+   separately-invented (and previously light-first, inverted-default) one.
+   --ok/--err below have no equivalent in theme.css (--success/--error there
+   are single fixed hex values used only for dark-background toasts/diffs in
+   sidepanel.css, not remapped per color-scheme) — this page's status badges
+   sit on a light --surface background in light mode, so they need their own
+   darker light-mode text color to stay legible, same as options.css always
+   did before token unification. */
 :root {
-  --bg: #f7f6f3;
-  --surface: #ffffff;
-  --fg: #18160f;
-  --fg-2: #44403a;
-  --muted: #78716c;
-  --border: #e6e3dc;
-  --border-strong: #c8c4bb;
-  --accent: #c2410c;
-  --accent-bg: rgba(194, 65, 12, 0.07);
-  --accent-hover: #9a3409;
-  --ok: #166534;
-  --ok-bg: rgba(22, 101, 52, 0.07);
-  --err: #991b1b;
-  --err-bg: rgba(153, 27, 27, 0.07);
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --ok:     var(--success);
+  --err:    var(--error);
+  --ok-bg:  rgba(74, 222, 128, 0.08);
+  --err-bg: rgba(248, 113, 113, 0.08);
 }
-
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --bg: #111008;
-    --surface: #1a1811;
-    --fg: #ede8dc;
-    --fg-2: #c4bdb0;
-    --muted: #78716c;
-    --border: #2c2820;
-    --border-strong: #3d3830;
-    --accent: #f97316;
-    --accent-bg: rgba(249, 115, 22, 0.08);
-    --accent-hover: #fb923c;
-    --ok: #4ade80;
-    --ok-bg: rgba(74, 222, 128, 0.07);
-    --err: #f87171;
-    --err-bg: rgba(248, 113, 113, 0.07);
-    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --ok:  #166534;
+    --err: #991b1b;
   }
 }
 
@@ -77,9 +60,10 @@ main {
   box-shadow: var(--shadow);
 }
 .page-header h1 {
-  font-size: 18px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.5px;
   line-height: 1.2;
 }
 .page-header .subtitle {
@@ -113,7 +97,8 @@ main {
 }
 
 .card h2 {
-  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -395,9 +380,7 @@ button.primary {
   border-color: var(--accent);
 }
 button.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  color: #fff;
+  filter: brightness(1.1);
 }
 
 /* Active radio on label */
@@ -533,6 +516,9 @@ input[type="radio"] { accent-color: var(--accent); }
   font-size: 13px;
 }
 .del-rule-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--muted);

@@ -1,68 +1,11 @@
 /* sidepanel.css */
 
-/* ─── Color system ─────────────────────────────────────────────────────────── */
-:root {
-  --bg:           #0f0e0b;
-  --bg-2:         #161410;
-  --bg-3:         #1e1c17;
-  --bg-4:         #252219;
-  --fg:           #ede8df;
-  --fg-2:         #ccc5ba;
-  --fg-dim:       #857d72;
-  --border:       #2e2b24;
-  --border-soft:  #242119;
-  --border-strong:#3a3730;
-  --accent:       #f97316;
-  --accent-dim:   rgba(249,115,22,0.10);
-  --accent-hover: rgba(249,115,22,0.16);
-  --accent-glow:  rgba(249,115,22,0.22);
-  --user-bg:      #2a1f14;
-  --user-border:  rgba(249,115,22,0.30);
-  --error:        #f87171;
-  --warn:         #fbbf24;
-  --success:      #4ade80;
-  --radius-sm:    5px;
-  --radius:       10px;
-  --radius-lg:    16px;
-  --t:            0.15s ease;
-  --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
-  --shadow-md:    0 4px 16px rgba(0,0,0,0.35);
-  --shadow-lg:    0 8px 32px rgba(0,0,0,0.50);
-  /* Semantic aliases used by sessions drawer and new UI components */
-  --surface:      var(--bg-2);
-  --err:          var(--error);
-  --muted:        var(--fg-dim);
-  --accent-bg:    var(--accent-dim);
-  --hover-bg:     rgba(128,128,128,0.08);
-  --input-bg:     var(--bg);
-  --code-bg:      rgba(128,128,128,0.08);
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg:           #faf9f6;
-    --bg-2:         #ffffff;
-    --bg-3:         #f2efe8;
-    --bg-4:         #eae6de;
-    --fg:           #1a1710;
-    --fg-2:         #3d3a33;
-    --fg-dim:       #7a746c;
-    --border:       #e4e0d8;
-    --border-soft:  #ece9e2;
-    --border-strong:#c8c4bb;
-    --accent:       #c2410c;
-    --accent-dim:   rgba(194,65,12,0.08);
-    --accent-hover: rgba(194,65,12,0.13);
-    --accent-glow:  rgba(194,65,12,0.18);
-    --user-bg:      #fff2eb;
-    --user-border:  rgba(194,65,12,0.22);
-    --shadow-sm:    0 1px 4px rgba(0,0,0,0.08);
-    --shadow-md:    0 4px 16px rgba(0,0,0,0.10);
-    --shadow-lg:    0 8px 32px rgba(0,0,0,0.18);
-    --hover-bg:     rgba(0,0,0,0.04);
-    --code-bg:      rgba(0,0,0,0.05);
-  }
-}
+/* ─── Color system ──────────────────────────────────────────────────────────
+   Design tokens (--bg, --fg, --accent, radii, shadows, ...) now live in the
+   shared lib/theme.css, <link>-ed before this file in sidepanel.html so
+   options.html can draw from the exact same palette instead of a separate,
+   independently-invented one. Nothing below this comment needs to change —
+   the custom properties are still available globally on :root. */
 
 /* ─── Reset ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
@@ -159,7 +102,20 @@ body {
   justify-content: center;
 }
 .messages:not(:has(.msg))::before {
+  content: 'browsa';
+  display: block;
+  color: var(--accent);
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: center;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+.messages:not(:has(.msg))::after {
   content: 'Ask anything about the current page';
+  display: block;
   color: var(--fg-dim);
   font-size: 13px;
   text-align: center;
@@ -200,7 +156,12 @@ body {
   align-self: flex-start;
   background: transparent;
   border: none;
-  padding: 4px 2px;
+  /* Hairline scan anchor: assistant replies have no bubble/background, so
+     without this the only "who said this" signal is text color + alignment.
+     Kept deliberately faint (--border-soft, not accent) to stay a quiet
+     guide rather than turning this back into a bubble. */
+  border-left: 2px solid var(--border-soft);
+  padding: 4px 2px 4px 10px;
   max-width: 96%;
 }
 .msg.assistant::after {
@@ -242,9 +203,14 @@ body {
   pointer-events: auto;
 }
 .msg-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   font-size: 11px;
   line-height: 1;
-  padding: 3px 6px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-2);
@@ -255,6 +221,27 @@ body {
 }
 .msg-action-icon:hover { background: var(--bg-4); border-color: var(--fg-dim); color: var(--fg); }
 .msg-action-icon.delete-icon:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: var(--error); }
+
+/* ─── Collapse/expand a long assistant reply (manual, ephemeral) ────────── */
+.fold-btn svg { transition: transform var(--t); }
+.msg.assistant.collapsed .fold-btn svg { transform: rotate(180deg); }
+.msg.assistant.collapsed {
+  max-height: 150px;
+  overflow: hidden;
+}
+/* .msg already has position:relative — reuse ::after here since the
+   blink-cursor rule that also targets ::after is only active pre-.done
+   (.msg.assistant.done::after{display:none} above), and the fold button
+   only ever exists on already-.done bubbles, so the two never collide. */
+.msg.assistant.collapsed::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
 
 /* ─── Tool history panel ─────────────────────────────────────────────────── */
 .tool-history {
@@ -290,7 +277,7 @@ body {
   flex-direction: column;
   gap: 3px;
 }
-.tool-history li { font-size: 11px; color: var(--fg-dim); }
+.tool-history li { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--fg-dim); }
 
 /* ─── CHOICE_REQUEST buttons ─────────────────────────────────────────────── */
 .choice-request {
@@ -335,6 +322,9 @@ body {
   padding-left: 4px;
 }
 .msg-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font: inherit;
   font-size: 11px;
   color: var(--accent);
@@ -479,6 +469,12 @@ body {
   line-height: 1.3;
   font-weight: 600;
   color: var(--fg);
+  /* Monospace treatment gives headings their own visual register instead of
+     just a bolder weight of the same body font — and echoes the product's
+     own identity (talking to an agent that runs code/tools), same family
+     already used for inline code/pre blocks below. */
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  letter-spacing: -0.01em;
 }
 .msg.assistant h1 { font-size: 1.18em; border-bottom: 1px solid var(--border); padding-bottom: 0.25em; }
 .msg.assistant h2 { font-size: 1.08em; }
@@ -1188,6 +1184,8 @@ math[display="block"] {
 
 /* ─── Think block: copy button in summary ────────────────────────────────────── */
 .think-copy-btn {
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   cursor: pointer;
@@ -1388,6 +1386,9 @@ code.language-patch {
 .session-item:hover .session-item-actions { opacity: 1; }
 .session-export-btn,
 .session-del-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--muted);
@@ -1585,6 +1586,9 @@ code.language-patch {
 .msg-search-input:focus { border-color: var(--accent); }
 .msg-search-count { font-size: 11px; color: var(--fg-dim); min-width: 52px; text-align: center; }
 .msg-search-nav, .msg-search-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -1803,6 +1807,9 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
   position: absolute;
   top: 6px;
   right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--fg-2);
@@ -1883,10 +1890,13 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
 .detail-thread-resize-handle:hover { background: var(--accent-dim); }
 .detail-thread-resize-handle:hover::before { background: var(--accent); }
 
-/* Floating "💬 细聊" button shown near a text selection inside a reply */
+/* Floating "chat" button shown near a text selection inside a reply */
 .selection-ask-btn {
   position: fixed;
   z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
