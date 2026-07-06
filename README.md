@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 168 unit tests
+npm test             # run 205 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -50,7 +50,7 @@ Use the **Ping** button in Settings to verify connectivity and auto-detect capab
 
 ### 🤖 Hermes Agent
 
-Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/responses` stateful API — only the new message is sent each turn; Hermes stores the full conversation history server-side.
+Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/runs` API — richer than plain chat completions (tool progress, approval/clarification prompts for dangerous actions) — with a stable `X-Hermes-Session-Id` per conversation so Hermes can maintain session continuity server-side. Falls back to plain `/v1/chat/completions` automatically if a Hermes deployment doesn't advertise `/v1/runs` support.
 
 **1. Install Hermes**
 
@@ -79,7 +79,7 @@ hermes gateway
 | Base URL | `http://<server-ip>:8642` |
 | API Key | value of `API_SERVER_KEY` |
 
-**5. Ping** to verify. The Responses API is auto-detected and enabled automatically.
+**5. Ping** to verify. `/v1/runs` support is auto-detected and enabled automatically.
 
 ---
 
@@ -207,8 +207,8 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar
 - **ECharts charts** — ` ```echarts ` code blocks rendered inline with a resize-aware toolbar
 - **Diff highlighting** — `diff` code blocks color `+` green and `-` red
+- **Detail thread ("细聊")** — select any text inside a reply to open a scoped side conversation about just that excerpt, without touching the main history. Fully resizable, closes and discards everything on ✕
 - **Edit & resend** — click ✏ on any user message to edit and re-send
-- **Regenerate** — click ↺ on any assistant reply to regenerate from that point
 - **Copy response** — click ⎘ to copy the full raw Markdown
 - **Timestamps** — hover any message to see send time
 
@@ -275,10 +275,10 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 
 ## How it works
 
-- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages. Manages site XHR caches (keyed by `tabId`), streaming via long-lived `browsa-chat` ports, and mid-stream tab switching via `streamState`.
+- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages. Manages site XHR caches (keyed by `tabId`), streaming via per-turn `browsa-chat`/`browsa-subchat` ports, and mid-stream tab switching via `streamState`.
 - **`sidepanel.js`** — Chat UI. Streaming markdown rendering, live think-block routing, mermaid/KaTeX/hljs rendering, message editing, session drawer, in-conversation search, multi-select.
 - **`lib/page-extractor.js`** — Injects Readability + Turndown into the page MAIN world for reader mode. For SPA sites, uses the XHR cache from the matching content script.
-- **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/responses` (Hermes stateful API).
+- **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/runs` (Hermes — approval/clarification/tool-progress events, auto-detected).
 - **`lib/storage.js`** — `chrome.storage.local` wrapper. Global flat conversation history (not per-tab), session management, mask rules.
 - **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XMLHttpRequest.prototype` to observe SPA API calls and forward structured data to the background.
 
@@ -322,7 +322,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (168 tests)
+├── test/                              # node:test unit tests (205 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
