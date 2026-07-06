@@ -227,15 +227,25 @@ body {
 .msg.assistant.collapsed .fold-btn svg { transform: rotate(180deg); }
 .msg.assistant.collapsed {
   max-height: 150px;
-  overflow: hidden;
+  /* overflow-y only — the shorthand overflow:hidden also sets overflow-x,
+     which changes the flex item's automatic-minimum-width calculation on
+     the cross axis (relevant when the reply contains a wide, non-wrapping
+     child like a <pre> code block) and made the bubble render at a
+     different width each time collapse was toggled. */
+  overflow-y: hidden;
 }
 /* .msg already has position:relative — reuse ::after here since the
    blink-cursor rule that also targets ::after is only active pre-.done
    (.msg.assistant.done::after{display:none} above), and the fold button
-   only ever exists on already-.done bubbles, so the two never collide. */
+   only ever exists on already-.done bubbles, so the two never collide on
+   content/display. animation is a SEPARATE cascading property though —
+   neither the .done nor this rule reset it, so without the explicit
+   `animation: none` below, the base rule's blink keyframes kept running
+   and made this gradient overlay flicker. */
 .msg.assistant.collapsed::after {
   content: '';
   display: block;
+  animation: none;
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 48px;
