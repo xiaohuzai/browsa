@@ -1220,10 +1220,78 @@ function addCodeCopyButtons(root) {
 //
 // Chrome 114+ supports MathML Core natively, so output:'mathml' works with
 // zero extra CSS or font files.
+
+// ─── CJK + emphasis-delimiter spacing fix ──────────────────────────────────
+// Two distinct model quirks break CommonMark's emphasis flanking rule for
+// **bold** spans, both fixed in one pass over matched **...** pairs (not
+// independent regexes each scanning for a local pattern — see below for why
+// that combination actively fought itself):
+//
+// 1. CJK-adjacent punctuation: a ** delimiter can't open/close when it
+//    directly touches a CJK character on one side AND punctuation (e.g. a
+//    quote mark) on the other, with no space — marked.js then renders it as
+//    literal asterisks instead of <strong>. Verified directly against this
+//    project's marked bundle: 用一个**"x"**因子 fails to bold, 用一个 **"x"**
+//    因子 (space added) and 用一个**x**因子 (no punctuation inside) both work.
+// 2. Internal padding: models sometimes pad spans with whitespace just
+//    inside the delimiters (e.g. "** text **" or "**text **"), presumably
+//    overcorrecting for quirk #1. A delimiter run must NOT be followed
+//    (opening) / preceded (closing) by whitespace to flank — so "** text **"
+//    also renders as literal asterisks.
+//
+// CAPABILITY_HINTS in background.js already asks the model to avoid both,
+// but models don't always comply — this is a deterministic backstop.
+//
+// An earlier version fixed these independently: a trim pass for #2, then
+// two local-window regexes for #1 (CJK char + ** + punctuation-lookahead,
+// fired unconditionally wherever that 3-character pattern appeared). That
+// regex can't tell whether the ** it's looking at is an *opening* or a
+// *closing* delimiter of some other bold span — so for ordinary
+// "**bold内容**：" (a valid closing ** immediately preceded by CJK content
+// and followed by punctuation, needing no fix), it fired anyway and
+// inserted a space between the CJK content and the closing **, which
+// *reintroduced* a broken whitespace-preceded closing delimiter — undoing
+// the trim pass for the single most common shape of this bug. Matching
+// **...** as pairs first and checking only the true boundary chars (before
+// the opening delimiter / after the closing one, vs. the first/last char of
+// the trimmed inner content) avoids that ambiguity entirely.
+const CJK_RE = /[一-鿿㐀-䶿豈-﫿]/;
+const PUNCT_RE = /\p{P}/u;
+const BOLD_SPAN_RE = /\*\*([^\n*]*?)\*\*/g;
+function fixBoldSpans(text) {
+  let result = '';
+  let last = 0;
+  let m;
+  BOLD_SPAN_RE.lastIndex = 0;
+  while ((m = BOLD_SPAN_RE.exec(text))) {
+    const start = m.index, end = start + m[0].length;
+    const inner = m[1].replace(/^[ \t]+/, '').replace(/[ \t]+$/, '');
+    if (!inner) { result += text.slice(last, end); last = end; continue; }
+    const before = text[start - 1] || '';
+    const after = text[end] || '';
+    const openPad = (CJK_RE.test(before) && PUNCT_RE.test(inner[0])) ? ' ' : '';
+    const closePad = (CJK_RE.test(after) && PUNCT_RE.test(inner[inner.length - 1])) ? ' ' : '';
+    result += text.slice(last, start) + openPad + '**' + inner + '**' + closePad;
+    last = end;
+  }
+  return result + text.slice(last);
+}
+
+function fixCjkEmphasisSpacing(text) {
+  if (!text) return text;
+  // Split on fenced code blocks and inline code spans first so real code
+  // (e.g. Python's x**2) is never touched — only the prose segments in
+  // between (even indices) get the fix applied.
+  return text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, i) => {
+    if (i % 2 === 1) return part;
+    return fixBoldSpans(part);
+  }).join('');
+}
+
 // Lightweight markdown render used during streaming (skips KaTeX + think blocks).
 function renderStreamingSafe(text) {
   try {
-    return DOMPurify.sanitize(marked.parse(text || ''), {
+    return DOMPurify.sanitize(marked.parse(fixCjkEmphasisSpacing(text || '')), {
       ADD_ATTR: ['target', 'rel'],
       ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
     });
@@ -1237,7 +1305,7 @@ function renderSafe(markdown) {
     const mathParts = []; // { displayMode: bool, formula: string }
     const thinkBlocks = []; // extracted <think>…</think> content
 
-    let md = (markdown || '')
+    let md = fixCjkEmphasisSpacing(markdown || '')
       // Extract <think>/<thinking> blocks before marked (handles Claude + DeepSeek).
       .replace(/<(?:think|thinking|antml:thinking)[^>]*>([\s\S]*?)<\/(?:think|thinking|antml:thinking)>/gi, (_, content) => {
         const i = thinkBlocks.push(content.trim()) - 1;
@@ -1285,7 +1353,7 @@ function renderSafe(markdown) {
     if (thinkBlocks.length > 0) {
       const openAttr = thoughtAutoCollapse ? '' : ' open';
       html = html.replace(/<div data-think="(\d+)"><\/div>/g, (_, idx) => {
-        const inner = DOMPurify.sanitize(marked.parse(thinkBlocks[+idx]));
+        const inner = DOMPurify.sanitize(marked.parse(fixCjkEmphasisSpacing(thinkBlocks[+idx])));
         return `<details class="think-block"${openAttr}><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
       });
     }
