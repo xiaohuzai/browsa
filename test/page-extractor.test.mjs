@@ -544,7 +544,7 @@ test('end-to-end: empty INITIAL_STATE desc flags degraded', async () => {
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const xhsContentPath = fileURLToPath(new URL('../lib/xhs-content-script.js', import.meta.url));
+const xhsContentPath = fileURLToPath(new URL('../lib/content-scripts/xhs-content-script.js', import.meta.url));
 const xhsContent = require(xhsContentPath);
 const { isXhsFeedUrl, isNoteDetailPayload, extractNoteSummary, maybeExtract } = xhsContent;
 

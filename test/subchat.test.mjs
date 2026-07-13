@@ -82,6 +82,14 @@ async function readBackgroundSrc() {
   return fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
 }
 
+// SUBCHAT/SUBCHAT_ABORT bodies live in lib/handlers/subchat-handler.js
+// (extracted from background.js's case bodies — see Phase 2 of the
+// sidepanel/background modularization refactor).
+async function readSubchatHandlerSrc() {
+  const fs = await import('fs/promises');
+  return fs.readFile(new URL('../lib/handlers/subchat-handler.js', import.meta.url), 'utf8');
+}
+
 // A minimal fake chrome.runtime.Port: captures its own onMessage listener so
 // tests can simulate SUBCHAT_HELLO/SUBCHAT_FOLLOW messages arriving on it.
 function makeFakePort(name) {
@@ -97,27 +105,17 @@ function makeFakePort(name) {
   return port;
 }
 
-function extractCase(src, caseLabel, nextCaseLabel) {
-  const start = src.indexOf(`case '${caseLabel}': {`);
-  assert.ok(start > 0, `case '${caseLabel}' must exist`);
-  const end = src.indexOf(`case '${nextCaseLabel}':`, start);
-  assert.ok(end > start, `case '${nextCaseLabel}' must exist after '${caseLabel}'`);
-  return src.slice(start, end);
-}
-
 // --------------- SUBCHAT: never touches main history ------------------------
 
 test('SUBCHAT never calls storage.appendToHistory', async () => {
-  const src = await readBackgroundSrc();
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
+  const subchatSrc = await readSubchatHandlerSrc();
   assert.doesNotMatch(subchatSrc, /appendToHistory\(/, 'SUBCHAT must never write to the main history');
 });
 
 // --------------- SUBCHAT: always chatStream, never runsApiStream ------------
 
 test('SUBCHAT always uses chatStream, never runsApiStream, regardless of isHermes', async () => {
-  const src = await readBackgroundSrc();
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
+  const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /await chatStream\(/, 'SUBCHAT must call chatStream');
   assert.doesNotMatch(subchatSrc, /runsApiStream\(/, 'SUBCHAT must never call runsApiStream — no tool/approval flow for a side question');
   assert.doesNotMatch(subchatSrc, /\bisHermes\b/, 'SUBCHAT must not branch on isHermes — always the simple chatStream path');
@@ -130,11 +128,16 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
   const defCount = (src.match(/const CAPABILITY_HINTS = \[/g) || []).length;
   assert.equal(defCount, 1, 'CAPABILITY_HINTS must be defined exactly once (shared by CHAT and SUBCHAT)');
 
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
-  assert.match(subchatSrc, /role: 'system', content: CAPABILITY_HINTS/, 'SUBCHAT must prepend CAPABILITY_HINTS as a system message');
+  const subchatSrc = await readSubchatHandlerSrc();
+  assert.match(subchatSrc, /role: 'system', content: capabilityHints/, 'SUBCHAT must prepend the capabilityHints param (background.js\'s CAPABILITY_HINTS) as a system message');
 
-  // CHAT still builds effectiveSystemPrompt from the same constant.
-  assert.match(src, /effectiveSystemPrompt = \[[^\]]*CAPABILITY_HINTS/, 'CHAT must still reference CAPABILITY_HINTS');
+  // CHAT still builds effectiveSystemPrompt from the same constant (passed
+  // in as the capabilityHints param from background.js's CAPABILITY_HINTS).
+  const chatHandlerSrc = await (async () => {
+    const fs = await import('fs/promises');
+    return fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  })();
+  assert.match(chatHandlerSrc, /effectiveSystemPrompt = \[[^\]]*capabilityHints/, 'CHAT must still reference capabilityHints');
 });
 
 // --------------- SUBCHAT: must not leak CHOICE_REQUEST into plain text -----
@@ -154,10 +157,12 @@ test('CHOICE_REQUEST instruction is CHAT-only, never included in SUBCHAT', async
   assert.match(src, /const CHOICE_REQUEST_HINT =/, 'CHOICE_REQUEST_HINT must be its own constant');
   assert.doesNotMatch(CAPABILITY_HINTS_SRC(src), /CHOICE_REQUEST/, 'CAPABILITY_HINTS itself must not mention CHOICE_REQUEST');
 
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
+  const subchatSrc = await readSubchatHandlerSrc();
   assert.doesNotMatch(subchatSrc, /CHOICE_REQUEST/, 'SUBCHAT must never reference CHOICE_REQUEST_HINT or the literal string');
 
-  assert.match(src, /effectiveSystemPrompt = \[[^\]]*CHOICE_REQUEST_HINT/, 'CHAT must append CHOICE_REQUEST_HINT to effectiveSystemPrompt');
+  const fs = await import('fs/promises');
+  const chatHandlerSrc = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  assert.match(chatHandlerSrc, /effectiveSystemPrompt = \[[^\]]*choiceRequestHint/, 'CHAT must append choiceRequestHint (background.js\'s CHOICE_REQUEST_HINT) to effectiveSystemPrompt');
 });
 
 function CAPABILITY_HINTS_SRC(src) {
@@ -218,8 +223,7 @@ test('two concurrent detail threads (different subIds) get independent ports, no
 // --------------- SUBCHAT: validates its own required fields -----------------
 
 test('SUBCHAT requires subId and a non-empty messages array (no tabId dependency)', async () => {
-  const src = await readBackgroundSrc();
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
+  const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /if \(!subId\) throw/, 'must validate subId is present');
   assert.match(subchatSrc, /!userMessages\.length/, 'must validate messages is non-empty');
   // Routing no longer depends on tabId at all — confirms the fix didn't
@@ -230,8 +234,7 @@ test('SUBCHAT requires subId and a non-empty messages array (no tabId dependency
 // --------------- SUBCHAT: streams over the dedicated subchat port -----------
 
 test('SUBCHAT pushes chunks via pushSubChatChunk keyed by subId, not the main pushChunk', async () => {
-  const src = await readBackgroundSrc();
-  const subchatSrc = extractCase(src, 'SUBCHAT', 'SUBCHAT_ABORT');
+  const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CHUNK', subId, delta \}\)/);
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_DONE', subId \}\)/);
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_ERROR', subId, message:/);
@@ -265,6 +268,9 @@ test('SUBCHAT_ABORT is a safe no-op when no matching subId is pending', async ()
 
 test('subChatControllers is keyed by subId, not tabId, and is exported for testability', async () => {
   assert.ok(subChatControllers instanceof Map, 'subChatControllers must be exported as a Map');
-  const src = await readBackgroundSrc();
+  // Defined in lib/state.js now (background.js re-exports the same binding —
+  // see the import/export block at the top of background.js).
+  const fs = await import('fs/promises');
+  const src = await fs.readFile(new URL('../lib/state.js', import.meta.url), 'utf8');
   assert.match(src, /export const subChatControllers = new Map\(\);/);
 });

@@ -22,7 +22,7 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 //
 // We anchor the relative path against ROOT (the browsa/ project dir), not
 // against its parent, so files inside the zip are stored as
-// `manifest.json`, `sidepanel.js`, `lib/xhs-content-script.js`, etc.
+// `manifest.json`, `sidepanel.js`, `lib/content-scripts/xhs-content-script.js`, etc.
 // — NOT as `browsa/manifest.json`. Edge and Chrome both require
 // manifest.json at the root of the extension directory; if the zip
 // is unzipped and the user points at the parent, the extension

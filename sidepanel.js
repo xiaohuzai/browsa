@@ -2,44 +2,40 @@
 // Talks to background.js via chrome.runtime messages. Streaming responses come back
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
-import marked from './lib/vendor/marked.bundle.js';
-import DOMPurify from './lib/vendor/purify.bundle.js';
-import katex from './lib/vendor/katex.bundle.js';
-import hljs from './lib/vendor/highlight.bundle.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
+import { ICONS } from './lib/sidepanel/icons.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
+import {
+  renderSafe, renderMermaid, renderEcharts,
+  addCodeCopyButtons, decorateLinks,
+  makeStreamRenderer, setThoughtAutoCollapse
+} from './lib/sidepanel/render.js';
+import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
+import {
+  initSessionsUI, getSessionsDrawer, openSessionsDrawer, onSessionSearch,
+  closeSessionsDrawer, clearAllSessions
+} from './lib/sidepanel/sessions-ui.js';
+import {
+  initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
+  deleteSelectedMessages
+} from './lib/sidepanel/multiselect.js';
+import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
-// Configure marked: GitHub-flavored breaks for line breaks.
-// DOMPurify handles XSS sanitization downstream.
-marked.setOptions({
-  gfm: true,
-  breaks: true
-});
-
-// ─── Shared icon set ────────────────────────────────────────────────────────
-// Stroke-style SVGs (viewBox 24x24, currentColor, matches the attach/send
-// buttons already in sidepanel.html) so control icons render identically
-// across OS/font — unlike emoji glyphs, which differ across Apple/Google/
-// Microsoft/Noto emoji sets and clash with the app's own SVG icon language.
-const ICONS = {
-  reply: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 015.5 5.5V20"/></svg>',
-  trash: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/><path d="M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>',
-  edit: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
-  copy: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
-  retry: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.34 5.66"/><path d="M20 4v7h-7"/></svg>',
-  close: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
-  chat: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>',
-  gear: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
-  think: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2a5.5 5.5 0 00-5.4 6.5A5 5 0 006 18h9a4.5 4.5 0 001-8.9 5.5 5.5 0 00-6.5-6.6z"/></svg>',
-  search: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
-  book: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
-  terminal: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5"/><path d="M12 19h8"/></svg>',
-  // Points up by default ("click to collapse"); .fold-btn svg is rotated
-  // 180deg via CSS when the bubble has .collapsed ("click to expand").
-  chevron: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>',
+// Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
+// sidepanel.js-owned UI concerns that lib/render.js deliberately doesn't
+// import (would create a cross-module cycle) — passed in per call instead.
+const streamRendererOpts = {
+  onTick: () => {
+    if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
+    scrollToBottom();
+  },
+  onDone: (el, delta) => {
+    addMsgActions(el, () => delta);
+    scrollToBottom(true);
+  }
 };
 
-const $ = (id) => document.getElementById(id);
 const messagesEl = $('messages');
 const inputEl = $('input');
 const sendBtn = $('send');
@@ -60,8 +56,6 @@ const imagePicker = $('imagepicker');
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let lastPageMeta = null;
-let mermaidModule = null;   // lazily loaded on first mermaid block
-let echartsModule = null;   // lazily loaded on first echarts block
 let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
 let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
@@ -74,9 +68,7 @@ const images = [];             // { dataUrl, name } — attached for this turn
 
 // ─── Feature state ────────────────────────────────────────────────────────────
 let sendShortcut = 'enter';       // 'enter' | 'ctrl-enter'
-let thoughtAutoCollapse = false;  // auto-collapse <thinking> blocks
 let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
-let isMultiSelectMode = false;    // multi-select mode for bulk delete
 // Per-tab conversation DOM snapshot. When the user switches tabs, we save
 // the current messagesEl.innerHTML here and restore it when they switch back.
 // This preserves in-flight streaming replies that haven't been persisted to
@@ -92,6 +84,16 @@ async function init() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   currentTabId = tab?.id;
 
+  initSessionsUI({
+    cancelActiveStream: () => { if (activeController && !activeController.cancelled) cancelStream(); },
+    renderHistory,
+    scrollToBottom,
+    clearPendingImages: () => { images.length = 0; refreshImageStrip(); }
+  });
+  initMultiselect({
+    decrementNextHistoryIdx: () => { nextHistoryIdx = Math.max(0, nextHistoryIdx - 1); }
+  });
+
   // Load config
   const cfgRes = await sendMessage({ type: 'GET_CONFIG' });
   const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
@@ -100,7 +102,7 @@ async function init() {
 
   // Load chat preferences
   sendShortcut = cfg.sendShortcut || 'enter';
-  thoughtAutoCollapse = !!cfg.thoughtAutoCollapse;
+  setThoughtAutoCollapse(cfg.thoughtAutoCollapse);
   if (cfg.fontSize) applyFontSize(cfg.fontSize);
 
   // Load history
@@ -188,7 +190,7 @@ async function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
-      if (isMultiSelectMode) { exitMultiSelect(); return; }
+      if (isInMultiSelectMode()) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
       if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
     }
@@ -359,7 +361,7 @@ async function init() {
       }
       if (changes.fontSize?.newValue != null) applyFontSize(changes.fontSize.newValue);
       if (changes.sendShortcut?.newValue != null) sendShortcut = changes.sendShortcut.newValue;
-      if (changes.thoughtAutoCollapse != null) thoughtAutoCollapse = !!changes.thoughtAutoCollapse.newValue;
+      if (changes.thoughtAutoCollapse != null) setThoughtAutoCollapse(changes.thoughtAutoCollapse.newValue);
       return;
     }
     // Session storage: pick up pending selection actions written by the
@@ -464,7 +466,7 @@ async function init() {
 
   // Wire multi-select toggle
   $('multiselect-toggle')?.addEventListener('click', () => {
-    if (isMultiSelectMode) exitMultiSelect(); else enterMultiSelect();
+    if (isInMultiSelectMode()) exitMultiSelect(); else enterMultiSelect();
   });
   $('multiselect-delete')?.addEventListener('click', deleteSelectedMessages);
   $('multiselect-cancel')?.addEventListener('click', exitMultiSelect);
@@ -555,20 +557,6 @@ function addTimestamp(el) {
   el.appendChild(span);
 }
 
-/** Human-friendly relative time: "just now", "5m ago", "2h ago", "3d ago" */
-function relativeTime(ts) {
-  const diffMs = Date.now() - ts;
-  const s = Math.floor(diffMs / 1000);
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
 // ─── Slash autocomplete ───────────────────────────────────────────────────────
 function updateSlashSuggest() {
   if (!slashSuggestEl) return;
@@ -601,280 +589,6 @@ function hideSlashSuggest() {
   if (slashSuggestEl) slashSuggestEl.hidden = true;
   slashSuggestIdx = -1;
 }
-
-// ─── Mermaid (lazy-loaded) ────────────────────────────────────────────────────
-async function getMermaid() {
-  if (mermaidModule) return mermaidModule;
-  try {
-    const { default: mermaid } = await import('./lib/vendor/mermaid.bundle.js');
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    // Expose KaTeX globally so Mermaid v11 can render $$...$$ math in node labels
-    window.katex = katex;
-    mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' });
-    mermaidModule = mermaid;
-  } catch (e) {
-    console.warn('browsa: mermaid load failed', e);
-  }
-  return mermaidModule;
-}
-async function renderMermaid(el) {
-  const blocks = el.querySelectorAll('code.language-mermaid');
-  if (!blocks.length) {
-    // Fallback: look for code block containing mermaid keywords without explicit class
-    console.debug('browsa: no code.language-mermaid found in', el);
-    return;
-  }
-  const m = await getMermaid();
-  // Mermaid v10+ needs a DOM-attached container during render
-  const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;opacity:0;pointer-events:none';
-  document.body.appendChild(host);
-  for (const code of [...blocks]) {
-    const pre = code.closest('pre') || code;
-    const source = code.textContent;
-    const errDiv = document.createElement('div');
-    errDiv.className = 'mermaid-error';
-    try {
-      if (!m) throw new Error('mermaid 模块加载失败，请检查控制台');
-      const id = 'mermaid-' + Math.random().toString(36).slice(2, 10);
-      const { svg } = await m.render(id, source, host);
-      const wrapper = document.createElement('div');
-      wrapper.className = 'mermaid-diagram';
-      const svgWrap = document.createElement('div');
-      svgWrap.className = 'mermaid-svg-wrap';
-      svgWrap.innerHTML = svg;
-      wrapper.appendChild(svgWrap);
-      wrapper.appendChild(_mermaidToolbar(svgWrap, source));
-      _mermaidInteractions(wrapper, svgWrap);
-      pre.replaceWith(wrapper);
-    } catch (e) {
-      console.warn('browsa: mermaid render failed', e);
-      errDiv.innerHTML =
-        `<span>⚠ Mermaid: ${escM(e?.message || String(e))}</span>` +
-        `<button class="mermaid-err-copy">复制代码</button>` +
-        `<details><summary>查看源码</summary><pre class="mermaid-err-src">${escM(source)}</pre></details>`;
-      errDiv.querySelector('.mermaid-err-copy').addEventListener('click', (btn) => {
-        _copyText(source).then(() => { btn.target.textContent = '✓'; setTimeout(() => { btn.target.textContent = '复制代码'; }, 1500); }).catch(() => {});
-      });
-      pre.replaceWith(errDiv);
-    }
-  }
-  document.body.removeChild(host);
-}
-
-function _echartsToolbar(source, chart, container) {
-  const ORIG_H = 380;
-  let scale = 1;
-  const bar = document.createElement('div');
-  bar.className = 'mermaid-toolbar'; // reuse same styling
-  const zoom = (delta) => {
-    scale = Math.min(3, Math.max(0.4, scale + delta));
-    const newH = Math.round(ORIG_H * scale);
-    container.style.height = newH + 'px';
-    // Pass explicit height so ECharts doesn't read stale DOM before reflow
-    chart.resize({ height: newH });
-  };
-  const btns = [
-    { title: '放大',    text: '+',  action: () => zoom(0.2) },
-    { title: '缩小',    text: '−',  action: () => zoom(-0.2) },
-    { title: '重置',    text: '⊙',  action: () => { scale = 1; container.style.height = ORIG_H + 'px'; chart.resize({ height: ORIG_H }); } },
-    { title: '复制代码', html: ICONS.copy, action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500); }).catch(() => {}) },
-    { title: '导出PNG', text: '↓',  action: (btn) => {
-        const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
-        const a = document.createElement('a');
-        a.href = url; a.download = 'chart.png'; a.click();
-        btn.textContent = '✓'; setTimeout(() => { btn.textContent = '↓'; }, 1500);
-      }
-    },
-  ];
-  for (const { title, text, html, action } of btns) {
-    const btn = document.createElement('button');
-    btn.className = 'mermaid-btn';
-    btn.title = title;
-    if (html) btn.innerHTML = html; else btn.textContent = text;
-    btn.addEventListener('click', (e) => action(e.currentTarget));
-    bar.appendChild(btn);
-  }
-  return bar;
-}
-
-async function renderEcharts(el) {
-  const blocks = el.querySelectorAll('code.language-echarts');
-  if (!blocks.length) return;
-  if (!echartsModule) {
-    try {
-      const mod = await import('./lib/vendor/echarts.bundle.js');
-      echartsModule = mod.default || mod;
-    } catch (e) {
-      console.warn('browsa: echarts load failed', e);
-      return;
-    }
-  }
-  for (const code of [...blocks]) {
-    const pre = code.closest('pre') || code;
-    const source = code.textContent.trim();
-    const errDiv = document.createElement('div');
-    errDiv.className = 'echarts-error';
-    try {
-      const option = JSON.parse(source);
-      const wrapper = document.createElement('div');
-      wrapper.className = 'echarts-diagram';
-      const container = document.createElement('div');
-      container.style.cssText = 'width:100%;height:380px;';
-      wrapper.appendChild(container);
-      pre.replaceWith(wrapper);
-      const chart = echartsModule.init(container);
-      chart.setOption(option);
-      wrapper.appendChild(_echartsToolbar(source, chart, container));
-      // Re-render when container width changes (e.g. panel resize)
-      new ResizeObserver(() => chart.resize()).observe(container);
-    } catch (e) {
-      console.warn('browsa: echarts render failed', e);
-      errDiv.textContent = `⚠ ECharts: ${e?.message || e}`;
-      pre.replaceWith(errDiv);
-    }
-  }
-}
-
-function _mermaidToolbar(svgWrap, source) {
-  const bar = document.createElement('div');
-  bar.className = 'mermaid-toolbar';
-  const btns = [
-    { title: '放大', text: '+', action: () => _mermaidZoom(svgWrap, 0.2) },
-    { title: '缩小', text: '−', action: () => _mermaidZoom(svgWrap, -0.2) },
-    { title: '重置', text: '⊙', action: () => _mermaidReset(svgWrap) },
-    { title: '复制代码', html: ICONS.copy, action: (btn) => _copyText(source).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500); }).catch(() => {}) },
-    { title: '导出SVG', text: '↓', action: (btn) => _mermaidExportSvg(svgWrap).then(() => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '↓'; }, 1500); }).catch(() => {}) },
-  ];
-  for (const { title, text, html, action } of btns) {
-    const btn = document.createElement('button');
-    btn.className = 'mermaid-btn';
-    btn.title = title;
-    if (html) btn.innerHTML = html; else btn.textContent = text;
-    btn.addEventListener('click', (e) => { e.stopPropagation(); action(btn); });
-    bar.appendChild(btn);
-  }
-  return bar;
-}
-
-function _mermaidState(svgWrap) {
-  if (!svgWrap._mstate) svgWrap._mstate = { scale: 1, tx: 0, ty: 0 };
-  return svgWrap._mstate;
-}
-
-function _mermaidApply(svgWrap) {
-  const s = _mermaidState(svgWrap);
-  const svgEl = svgWrap.querySelector('svg');
-  if (!svgEl) return;
-
-  // Lazily capture the original viewBox and screen size on first use.
-  // We manipulate the SVG viewBox directly rather than CSS transform/dimensions:
-  // - CSS transform on a div rasterizes it → blurry at non-1x scales
-  // - Changing SVG width/height is blocked by Mermaid's inline max-width style
-  // - viewBox manipulation keeps the SVG at its natural screen size and re-renders
-  //   purely as vectors at any zoom level → always crisp
-  if (!s._origVB) {
-    const vb = svgEl.viewBox?.baseVal;
-    if (vb && vb.width > 0) {
-      s._origVB = { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
-    } else {
-      // No viewBox — synthesize one from element dimensions
-      const rect = svgEl.getBoundingClientRect();
-      const w = rect.width || parseFloat(svgEl.getAttribute('width')) || 600;
-      const h = rect.height || parseFloat(svgEl.getAttribute('height')) || 400;
-      s._origVB = { x: 0, y: 0, w, h };
-      svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    }
-    // Cache screen size (stable since we never change SVG element dimensions)
-    const r = svgEl.getBoundingClientRect();
-    s._svgW = r.width  || s._origVB.w;
-    s._svgH = r.height || s._origVB.h;
-  }
-
-  const { x: ox, y: oy, w: ow, h: oh } = s._origVB;
-
-  if (s.scale === 1 && !s.tx && !s.ty) {
-    svgEl.setAttribute('viewBox', `${ox} ${oy} ${ow} ${oh}`);
-    svgWrap.style.transform = '';
-    return;
-  }
-
-  // Zoomed viewport in viewBox units
-  const vbW = ow / s.scale;
-  const vbH = oh / s.scale;
-
-  // Convert screen-pixel pan to viewBox units
-  const panX = -s.tx * vbW / s._svgW;
-  const panY = -s.ty * vbH / s._svgH;
-
-  // Center the zoom window, then apply pan
-  const vbX = ox + (ow - vbW) / 2 + panX;
-  const vbY = oy + (oh - vbH) / 2 + panY;
-
-  svgEl.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
-  svgWrap.style.transform = '';
-}
-
-function _mermaidZoom(svgWrap, delta) {
-  const s = _mermaidState(svgWrap);
-  s.scale = Math.min(4, Math.max(0.2, s.scale + delta));
-  _mermaidApply(svgWrap);
-}
-
-function _mermaidReset(svgWrap) {
-  const s = _mermaidState(svgWrap);
-  const svgEl = svgWrap.querySelector('svg');
-  if (svgEl && s._origVB) {
-    const { x, y, w, h } = s._origVB;
-    svgEl.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
-  }
-  s.scale = 1; s.tx = 0; s.ty = 0;
-  s._origVB = null; s._svgW = null; s._svgH = null;
-  svgWrap.style.transform = '';
-}
-
-async function _mermaidExportSvg(svgWrap) {
-  const svgEl = svgWrap.querySelector('svg');
-  if (!svgEl) throw new Error('no svg');
-  const svgStr = new XMLSerializer().serializeToString(svgEl);
-  const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
-  await chrome.downloads.download({ url: dataUrl, filename: 'diagram.svg', saveAs: true });
-}
-
-function _mermaidInteractions(wrapper, svgWrap) {
-  // Wheel zoom
-  wrapper.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    _mermaidZoom(svgWrap, e.deltaY < 0 ? 0.1 : -0.1);
-  }, { passive: false });
-  // Drag to pan
-  let dragging = false, startX = 0, startY = 0, startTx = 0, startTy = 0;
-  svgWrap.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    dragging = true;
-    startX = e.clientX; startY = e.clientY;
-    const s = _mermaidState(svgWrap);
-    startTx = s.tx; startTy = s.ty;
-    svgWrap.style.cursor = 'grabbing';
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    const s = _mermaidState(svgWrap);
-    s.tx = startTx + (e.clientX - startX);
-    s.ty = startTy + (e.clientY - startY);
-    _mermaidApply(svgWrap);
-  });
-  window.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    svgWrap.style.cursor = 'grab';
-  });
-  svgWrap.style.cursor = 'grab';
-}
-
-
 
 // Render a yellow banner above the chat when the active page is 小红书
 // and the extraction result looks suspicious (too-short desc, no images,
@@ -1128,363 +842,6 @@ function updateOutputTokenCount(delta) {
   tokCountEl.textContent = `~${outputTokens}`;
 }
 
-// Add a copy button to each think-block <summary> (idempotent).
-function addThinkCopyButtons(el) {
-  for (const details of (el || messagesEl).querySelectorAll('.think-block:not([data-copy-added])')) {
-    details.dataset.copyAdded = '1';
-    const summary = details.querySelector('summary');
-    if (!summary) continue;
-    const btn = document.createElement('button');
-    btn.className = 'think-copy-btn';
-    btn.title = 'Copy thinking';
-    btn.innerHTML = ICONS.copy;
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation(); // don't toggle the details
-      const body = details.querySelector('.think-body');
-      try {
-        await _copyText(body?.textContent || '');
-        btn.textContent = '✓';
-        setTimeout(() => { btn.innerHTML = ICONS.copy; }, 1500);
-      } catch (_) {}
-    });
-    summary.appendChild(btn);
-  }
-}
-
-// root defaults to messagesEl (main chat: only .msg.assistant bubbles get
-// copy buttons). Pass an explicit element (e.g. a detail-thread card's AI
-// bubble) to scope everything to just that element instead.
-function addCodeCopyButtons(root) {
-  const scoped = root != null;
-  highlightDiffBlocks(scoped ? root : messagesEl);
-  addThinkCopyButtons(scoped ? root : messagesEl);
-  const pres = scoped ? root.querySelectorAll('pre') : messagesEl.querySelectorAll('.msg.assistant pre');
-  for (const pre of pres) {
-    // Add language label (from code[class*="language-xxx"])
-    const code = pre.querySelector('code[class*="language-"]');
-    if (code && !pre.hasAttribute('data-lang')) {
-      const cls = code.className.match(/language-(\w+)/);
-      if (cls) pre.setAttribute('data-lang', cls[1]);
-    }
-
-    // Apply syntax highlighting via highlight.js (skip mermaid + diff — handled separately)
-    if (code && !code.dataset.highlighted) {
-      const lang = code.className.match(/language-(\w+)/)?.[1];
-      if (lang && lang !== 'mermaid' && lang !== 'diff' && lang !== 'patch') {
-        try {
-          const result = hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true });
-          code.innerHTML = result.value;
-          code.dataset.highlighted = '1';
-        } catch (_) {
-          // Language not supported — try auto-detect for unknown blocks
-          if (lang === 'text' || lang === 'plain' || lang === 'plaintext') {
-            // skip
-          } else {
-            try {
-              const result = hljs.highlightAuto(code.textContent, { subset: ['python','javascript','typescript','java','c','cpp','go','rust','ruby','php','swift','kotlin','sql','bash','shell','json','yaml','xml','html','css'] });
-              if (result.relevance > 5) { code.innerHTML = result.value; code.dataset.highlighted = '1'; }
-            } catch (_2) {}
-          }
-        }
-      }
-    }
-
-    if (pre.querySelector('.code-copy-btn')) continue;
-    const btn = document.createElement('button');
-    btn.className = 'code-copy-btn';
-    btn.textContent = 'Copy';
-    btn.addEventListener('click', async () => {
-      const text = code?.textContent || pre.textContent || '';
-      try {
-        await _copyText(text);
-        btn.textContent = '✓';
-        showToast('Copied', 'success');
-        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-      } catch (_) {}
-    });
-    pre.style.position = 'relative';
-    pre.appendChild(btn);
-  }
-}
-
-
-// Markdown -> sanitized HTML pipeline with proper LaTeX rendering.
-//
-// Order of operations matters:
-//   1. Extract $...$ and $$...$$ BEFORE marked so markdown syntax (_, *, etc.)
-//      inside formulas doesn't get mangled.
-//   2. Parse the placeholder-substituted markdown with marked.
-//   3. Sanitize with DOMPurify (placeholders are plain text — safe, survive).
-//   4. Replace placeholders with KaTeX MathML output AFTER sanitization so
-//      DOMPurify never sees (or strips) MathML attributes.
-//
-// Chrome 114+ supports MathML Core natively, so output:'mathml' works with
-// zero extra CSS or font files.
-
-// ─── CJK + emphasis-delimiter spacing fix ──────────────────────────────────
-// Two distinct model quirks break CommonMark's emphasis flanking rule for
-// **bold** spans, both fixed in one pass over matched **...** pairs (not
-// independent regexes each scanning for a local pattern — see below for why
-// that combination actively fought itself):
-//
-// 1. CJK-adjacent punctuation: a ** delimiter can't open/close when it
-//    directly touches a CJK character on one side AND punctuation (e.g. a
-//    quote mark) on the other, with no space — marked.js then renders it as
-//    literal asterisks instead of <strong>. Verified directly against this
-//    project's marked bundle: 用一个**"x"**因子 fails to bold, 用一个 **"x"**
-//    因子 (space added) and 用一个**x**因子 (no punctuation inside) both work.
-// 2. Internal padding: models sometimes pad spans with whitespace just
-//    inside the delimiters (e.g. "** text **" or "**text **"), presumably
-//    overcorrecting for quirk #1. A delimiter run must NOT be followed
-//    (opening) / preceded (closing) by whitespace to flank — so "** text **"
-//    also renders as literal asterisks.
-//
-// CAPABILITY_HINTS in background.js already asks the model to avoid both,
-// but models don't always comply — this is a deterministic backstop.
-//
-// An earlier version fixed these independently: a trim pass for #2, then
-// two local-window regexes for #1 (CJK char + ** + punctuation-lookahead,
-// fired unconditionally wherever that 3-character pattern appeared). That
-// regex can't tell whether the ** it's looking at is an *opening* or a
-// *closing* delimiter of some other bold span — so for ordinary
-// "**bold内容**：" (a valid closing ** immediately preceded by CJK content
-// and followed by punctuation, needing no fix), it fired anyway and
-// inserted a space between the CJK content and the closing **, which
-// *reintroduced* a broken whitespace-preceded closing delimiter — undoing
-// the trim pass for the single most common shape of this bug. Matching
-// **...** as pairs first and checking only the true boundary chars (before
-// the opening delimiter / after the closing one, vs. the first/last char of
-// the trimmed inner content) avoids that ambiguity entirely.
-const CJK_RE = /[一-鿿㐀-䶿豈-﫿]/;
-const PUNCT_RE = /\p{P}/u;
-const BOLD_SPAN_RE = /\*\*([^\n*]*?)\*\*/g;
-function fixBoldSpans(text) {
-  let result = '';
-  let last = 0;
-  let m;
-  BOLD_SPAN_RE.lastIndex = 0;
-  while ((m = BOLD_SPAN_RE.exec(text))) {
-    const start = m.index, end = start + m[0].length;
-    const inner = m[1].replace(/^[ \t]+/, '').replace(/[ \t]+$/, '');
-    if (!inner) { result += text.slice(last, end); last = end; continue; }
-    const before = text[start - 1] || '';
-    const after = text[end] || '';
-    const openPad = (CJK_RE.test(before) && PUNCT_RE.test(inner[0])) ? ' ' : '';
-    const closePad = (CJK_RE.test(after) && PUNCT_RE.test(inner[inner.length - 1])) ? ' ' : '';
-    result += text.slice(last, start) + openPad + '**' + inner + '**' + closePad;
-    last = end;
-  }
-  return result + text.slice(last);
-}
-
-function fixCjkEmphasisSpacing(text) {
-  if (!text) return text;
-  // Split on fenced code blocks and inline code spans first so real code
-  // (e.g. Python's x**2) is never touched — only the prose segments in
-  // between (even indices) get the fix applied.
-  return text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, i) => {
-    if (i % 2 === 1) return part;
-    return fixBoldSpans(part);
-  }).join('');
-}
-
-// Lightweight markdown render used during streaming (skips KaTeX + think blocks).
-function renderStreamingSafe(text) {
-  try {
-    return DOMPurify.sanitize(marked.parse(fixCjkEmphasisSpacing(text || '')), {
-      ADD_ATTR: ['target', 'rel'],
-      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
-    });
-  } catch (_) {
-    return DOMPurify.sanitize(text || '');
-  }
-}
-
-function renderSafe(markdown) {
-  try {
-    const mathParts = []; // { displayMode: bool, formula: string }
-    const thinkBlocks = []; // extracted <think>…</think> content
-
-    let md = fixCjkEmphasisSpacing(markdown || '')
-      // Extract <think>/<thinking> blocks before marked (handles Claude + DeepSeek).
-      .replace(/<(?:think|thinking|antml:thinking)[^>]*>([\s\S]*?)<\/(?:think|thinking|antml:thinking)>/gi, (_, content) => {
-        const i = thinkBlocks.push(content.trim()) - 1;
-        return `\n\n<div data-think="${i}"></div>\n\n`;
-      })
-      // Block math: $$...$$ or \[...\]
-      .replace(/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]/g, (_, a, b) => {
-        const i = mathParts.push({ displayMode: true,  formula: (a ?? b).trim() }) - 1;
-        return `\n\nBROWSAMATH${i}END\n\n`;
-      })
-      // Inline math: $...$ or \(...\)
-      .replace(/\$([^$\n]+?)\$|\\\(([^)]+?)\\\)/g, (_, a, b) => {
-        const i = mathParts.push({ displayMode: false, formula: (a ?? b).trim() }) - 1;
-        return `BROWSAMATH${i}END`;
-      });
-
-    let html = marked.parse(md);
-
-    html = DOMPurify.sanitize(html, {
-      ADD_ATTR: ['target', 'rel', 'data-think'],
-      ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|data:image\/|#)/
-    });
-
-    // Restore rendered math after sanitization — KaTeX output is trusted.
-    if (mathParts.length > 0) {
-      html = html.replace(/BROWSAMATH(\d+)END/g, (_, idx) => {
-        const { displayMode, formula } = mathParts[+idx];
-        try {
-          return katex.renderToString(formula, {
-            output: 'mathml',
-            throwOnError: false,
-            displayMode,
-            strict: false
-          });
-        } catch (_e) {
-          return displayMode
-            ? `<div class="math-block">${escM(formula)}</div>`
-            : `<code>${escM(formula)}</code>`;
-        }
-      });
-    }
-
-    // Restore think blocks as collapsible <details> elements (after sanitization
-    // so DOMPurify never sees the raw inner content).
-    if (thinkBlocks.length > 0) {
-      const openAttr = thoughtAutoCollapse ? '' : ' open';
-      html = html.replace(/<div data-think="(\d+)"><\/div>/g, (_, idx) => {
-        const inner = DOMPurify.sanitize(marked.parse(fixCjkEmphasisSpacing(thinkBlocks[+idx])));
-        return `<details class="think-block"${openAttr}><summary>Thinking…</summary><div class="think-body">${inner}</div></details>`;
-      });
-    }
-
-    return html;
-  } catch (e) {
-    return DOMPurify.sanitize(
-      (markdown || '').replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;',
-        '"': '&quot;', "'": '&#39;'
-      }[c]))
-    );
-  }
-}
-
-function escM(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// Clipboard write with execCommand fallback (works in non-secure contexts too).
-function _fallbackCopy(text) {
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-    return Promise.resolve();
-  } catch (e) { return Promise.reject(e); }
-}
-function _copyText(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(text).catch(() => _fallbackCopy(text));
-  }
-  return _fallbackCopy(text);
-}
-
-// After every innerHTML update, ensure external links open in new tab with
-// rel="noopener noreferrer". Cheap (runs on the bubble subtree only).
-function decorateLinks(el) {
-  for (const a of el.querySelectorAll('a[href]')) {
-    if (a.host && a.host !== location.host) {
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-    }
-  }
-}
-
-// Matches <think> / <thinking> opening and closing tags (Claude, DeepSeek, etc.)
-const _THINK_OPEN_RE  = /<(think|antml:thinking)(\s[^>]*)?>|<thinking>/i;
-const _THINK_CLOSE_RE = /<\/(think|antml:thinking)>|<\/thinking>/i;
-
-// Build a streaming-render closure for a specific bubble.
-// During streaming:
-//   - <think>/<thinking> content shown in a live collapsible element above the bubble
-//   - Non-think text rendered each tick via renderStreamingSafe (marked + DOMPurify)
-// At DONE: live think removed; full renderSafe() handles KaTeX + final think blocks.
-function makeStreamRenderer(el) {
-  let fullAccum = '';
-  let raf = null;
-  let thinkEl = null;
-  let thinkBodyEl = null;
-
-  function ensureThinkEl() {
-    if (!thinkEl) {
-      thinkEl = document.createElement('details');
-      thinkEl.className = 'think-block live-think';
-      thinkEl.open = !thoughtAutoCollapse;
-      const sum = document.createElement('summary');
-      sum.textContent = 'Thinking…';
-      thinkBodyEl = document.createElement('div');
-      thinkBodyEl.className = 'think-body';
-      thinkEl.appendChild(sum);
-      thinkEl.appendChild(thinkBodyEl);
-      el.parentNode.insertBefore(thinkEl, el);
-    }
-  }
-
-  // Split accumulated text into display (non-think) and think portions.
-  // Scans the full buffer each tick so partial tags across chunk boundaries are handled.
-  function splitThink(text) {
-    let display = '';
-    let think = '';
-    let rest = text;
-    let inside = false;
-    while (rest.length > 0) {
-      if (!inside) {
-        const m = _THINK_OPEN_RE.exec(rest);
-        if (!m) { display += rest; break; }
-        display += rest.slice(0, m.index);
-        rest = rest.slice(m.index + m[0].length);
-        inside = true;
-      } else {
-        const m = _THINK_CLOSE_RE.exec(rest);
-        if (!m) { think += rest; break; }
-        think += rest.slice(0, m.index);
-        rest = rest.slice(m.index + m[0].length);
-        inside = false;
-        if (thinkEl) thinkEl.open = false; // collapse once tag closed
-      }
-    }
-    return { display, think };
-  }
-
-  return function renderStream(delta, isDone) {
-    if (isDone) {
-      if (raf) { cancelAnimationFrame(raf); raf = null; }
-      if (thinkEl) { thinkEl.remove(); thinkEl = null; thinkBodyEl = null; }
-      el.innerHTML = renderSafe(delta);
-      el.classList.add('done');
-      el.dataset.raw = delta; // raw markdown, mirrors appendUser's dataset.raw — read by openDetailThread
-      addThinkCopyButtons(el);
-      decorateLinks(el);
-      addMsgActions(el, () => delta);
-      scrollToBottom(true);
-      return;
-    }
-    fullAccum += delta;
-    if (raf != null) return;
-    raf = requestAnimationFrame(() => {
-      raf = null;
-      const { display, think } = splitThink(fullAccum);
-      if (think) { ensureThinkEl(); thinkBodyEl.textContent = think; }
-      el.innerHTML = renderStreamingSafe(display);
-      el.classList.remove('done');
-      if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
-      scrollToBottom();
-    });
-  };
-}
-
 // Approximate character / token counter. We avoid bundling gpt-tokenizer
 // (~1MB BPE table) because:
 //   1. The exact count is non-critical — users just need a sense of size.
@@ -1685,7 +1042,7 @@ async function onSend() {
   const assistantEl = appendAssistant('');
   let acc = '';
   let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
-  let renderStream = makeStreamRenderer(assistantEl);
+  let renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
   streamStartAt = 0; // reset for tokens/sec calculation
 
   // Open streaming port FIRST so the background can push CHUNKs as they
@@ -1750,7 +1107,7 @@ async function onSend() {
         const prevSib = assistantEl.previousElementSibling;
         if (prevSib?.classList.contains('live-think')) prevSib.remove();
         assistantEl.innerHTML = '';
-        renderStream = makeStreamRenderer(assistantEl);
+        renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
         showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
       } else if (m.type === 'DONE') {
@@ -1910,7 +1267,7 @@ async function resumeInFlightStream(tabId) {
   let acc = peek.acc || '';
   let resumedToolEvents = [];
   const initialBubble = getOrCreateAssistantBubble();
-  let renderStream = makeStreamRenderer(initialBubble);
+  let renderStream = makeStreamRenderer(initialBubble, streamRendererOpts);
   let assistantEl = initialBubble;
   function getOrCreateAssistantBubble() {
     let el = messagesEl.querySelector('.msg.assistant:last-of-type');
@@ -1927,7 +1284,7 @@ async function resumeInFlightStream(tabId) {
       // holds a closure over the original el — that one's renderStream
       // function is now stale. Build a new renderer for the fresh el.
       assistantEl = el;
-      renderStream = makeStreamRenderer(el);
+      renderStream = makeStreamRenderer(el, streamRendererOpts);
     }
     return renderStream;
   }
@@ -2412,22 +1769,6 @@ function clearToolProgress(bubbleEl) {
   if (el?.classList.contains('tool-progress')) el.remove();
 }
 
-/** Find a named card (approval/clarify) in the next few siblings of bubbleEl. */
-function _findCard(bubbleEl, cls) {
-  let el = bubbleEl?.nextElementSibling;
-  for (let i = 0; i < 4 && el; i++, el = el.nextElementSibling) {
-    if (el.classList.contains(cls)) return el;
-  }
-  return null;
-}
-
-/** Insert a card after bubbleEl (or after its tool-progress if present). */
-function _insertCard(bubbleEl, card) {
-  const tp = bubbleEl?.nextElementSibling;
-  const ref = tp?.classList.contains('tool-progress') ? tp : bubbleEl;
-  ref?.insertAdjacentElement('afterend', card);
-}
-
 /**
  * Show an approval request card below the streaming bubble.
  * The agent has paused and needs the user to allow/deny a dangerous action.
@@ -2487,305 +1828,6 @@ function showClarifyCard(bubbleEl, data) {
   submit.addEventListener('click', respond);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') respond(); });
   _insertCard(bubbleEl, card);
-  setTimeout(() => input.focus(), 50);
-}
-
-// ─── Detail thread: select text in an assistant reply → scoped follow-up ──
-//
-// Ephemeral by design: closing the card discards everything in it — nothing
-// here is written to chrome.storage or the main history array. Context sent
-// to the LLM is deliberately narrow (the selected excerpt + the full reply
-// it came from), not the whole main conversation — this is a focused side
-// question, not a branch of the main thread.
-
-let selectionAskBtn = null;
-
-function hideSelectionAskBtn() {
-  if (selectionAskBtn) { selectionAskBtn.remove(); selectionAskBtn = null; }
-}
-
-/**
- * Walk up from `node` to the nearest ancestor that is a direct (top-level)
- * child of `bubbleEl` — i.e. the specific paragraph/list/heading/etc. block
- * the selection ends in, not the whole reply. Used so the detail-thread
- * card gets inserted right after the selected part, not after the entire
- * (possibly much longer) reply.
- */
-function findBlockAnchor(node, bubbleEl) {
-  if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-  while (node && node !== bubbleEl && node.parentElement !== bubbleEl) {
-    node = node.parentElement;
-  }
-  return (node && node !== bubbleEl) ? node : bubbleEl;
-}
-
-function handleAssistantTextSelection() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.toString().trim()) { hideSelectionAskBtn(); return; }
-  let node = sel.anchorNode;
-  if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-  const bubbleEl = node?.closest?.('.msg.assistant');
-  if (!bubbleEl || !messagesEl.contains(bubbleEl)) { hideSelectionAskBtn(); return; }
-
-  const range = sel.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
-  if (!rect || (!rect.width && !rect.height)) { hideSelectionAskBtn(); return; }
-
-  if (!selectionAskBtn) {
-    selectionAskBtn = document.createElement('button');
-    selectionAskBtn.className = 'selection-ask-btn';
-    selectionAskBtn.innerHTML = `${ICONS.chat}<span>细聊</span>`;
-    // mousedown (not click): fires before the browser clears the selection
-    // on the subsequent click, so window.getSelection() below is still valid.
-    selectionAskBtn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      const text = sel.toString().trim();
-      // Anchor on the selection's END (reading-order last point) so the
-      // card appears right after what was selected, not before it.
-      const anchorEl = findBlockAnchor(range.endContainer, bubbleEl);
-      hideSelectionAskBtn();
-      openDetailThread(bubbleEl, text, anchorEl);
-    });
-    document.body.appendChild(selectionAskBtn);
-  }
-  selectionAskBtn.style.top = (rect.bottom + 6) + 'px';
-  selectionAskBtn.style.left = rect.left + 'px';
-}
-
-messagesEl.addEventListener('mouseup', () => setTimeout(handleAssistantTextSelection, 0));
-messagesEl.addEventListener('scroll', hideSelectionAskBtn);
-document.addEventListener('mousedown', (e) => {
-  if (selectionAskBtn && e.target !== selectionAskBtn) hideSelectionAskBtn();
-});
-
-/**
- * Open (or focus, if already open) an inline "detail thread" card right
- * after the specific block (paragraph/list/heading/etc.) the selection
- * ended in — not after the whole (possibly much longer) reply — scoped to
- * a quoted excerpt from that reply. anchorEl defaults to bubbleEl itself
- * if the caller doesn't have a more specific block element.
- */
-function openDetailThread(bubbleEl, quotedText, anchorEl) {
-  anchorEl = anchorEl || bubbleEl;
-  const existing = _findCard(anchorEl, 'detail-thread-card');
-  if (existing) {
-    existing.querySelector('.detail-thread-input')?.focus();
-    return;
-  }
-
-  const subId = 'sub-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-  const anchorRaw = bubbleEl.dataset.raw || bubbleEl.innerText || '';
-
-  const card = document.createElement('div');
-  card.className = 'detail-thread-card';
-  card.innerHTML =
-    `<button class="detail-thread-close" title="Close">${ICONS.close}</button>` +
-    `<div class="detail-thread-quote">${escM(quotedText)}</div>` +
-    `<div class="detail-thread-messages"></div>` +
-    `<div class="detail-thread-input-row">` +
-      `<input type="text" class="detail-thread-input" placeholder="针对这段细聊…" />` +
-      `<button class="detail-thread-send">发送</button>` +
-    `</div>` +
-    `<div class="detail-thread-resize-handle" title="拖拽调整高度">⋯</div>`;
-
-  const messagesWrap = card.querySelector('.detail-thread-messages');
-  const input = card.querySelector('.detail-thread-input');
-  const sendBtnEl = card.querySelector('.detail-thread-send');
-  const closeBtn = card.querySelector('.detail-thread-close');
-  const resizeHandle = card.querySelector('.detail-thread-resize-handle');
-
-  // Custom drag-to-resize: native CSS `resize` exists but its grip is easy
-  // to miss (gets visually clipped by the card's border-radius + the
-  // overflow:hidden that `resize` itself requires). Mirrors the exact
-  // pattern already proven to work for Mermaid pan-drag elsewhere in this
-  // file (persistent flag + listeners bound once on window, not
-  // dynamically added/removed per-gesture, not Pointer Events).
-  let resizing = false, resizeStartY = 0, resizeStartHeight = 0;
-  resizeHandle.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    resizing = true;
-    resizeStartY = e.clientY;
-    resizeStartHeight = card.getBoundingClientRect().height;
-    console.log('[resize] mousedown, startHeight=', resizeStartHeight);
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!resizing) return;
-    const next = resizeStartHeight + (e.clientY - resizeStartY);
-    const applied = Math.max(140, Math.min(next, window.innerHeight * 0.8));
-    card.style.height = applied + 'px';
-    console.log('[resize] mousemove, next=', next, 'applied=', applied,
-      'card.style.height=', card.style.height,
-      'actual rendered height=', card.getBoundingClientRect().height);
-  });
-  window.addEventListener('mouseup', () => {
-    resizing = false;
-  });
-
-  let subMessages = []; // sent to the LLM only — never touches storage/history
-  let liveAiEl = null;
-  let liveAiText = '';
-  let turnPort = null;      // this turn's dedicated browsa-subchat port
-  let swPingInterval = null;
-  let inFlight = false;     // true from send() until finalize()/fail()
-
-  function setBusy(busy) {
-    input.disabled = busy;
-    sendBtnEl.disabled = busy;
-  }
-
-  function stopTurnPort() {
-    if (swPingInterval) { clearInterval(swPingInterval); swPingInterval = null; }
-    if (turnPort) { try { turnPort.disconnect(); } catch (_) {} turnPort = null; }
-  }
-
-  function appendDelta(delta) {
-    if (!liveAiEl) return;
-    liveAiText += delta;
-    // Same as the main chat's live-streaming render (renderStreamingSafe) —
-    // markdown/KaTeX render progressively as text arrives, not just once
-    // the reply is fully done. finalize() re-renders with the full
-    // renderSafe() pipeline (Mermaid/ECharts/code-copy) once streaming ends.
-    liveAiEl.innerHTML = renderStreamingSafe(liveAiText);
-    messagesWrap.scrollTop = messagesWrap.scrollHeight;
-  }
-
-  function finalize() {
-    const el = liveAiEl;
-    if (el) {
-      // Same post-render pipeline as the main chat's DONE handler
-      // (renderSafe -> link decoration -> code copy/highlight -> Mermaid/ECharts),
-      // just scoped to this card's AI bubble instead of the whole panel.
-      el.innerHTML = renderSafe(liveAiText);
-      el.classList.add('done'); // stops the .msg.assistant::after blinking cursor
-      decorateLinks(el);
-      addCodeCopyButtons(el);
-      renderMermaid(el);
-      renderEcharts(el);
-    }
-    subMessages.push({ role: 'assistant', content: liveAiText });
-    liveAiEl = null; liveAiText = '';
-    inFlight = false;
-    stopTurnPort();
-    setBusy(false);
-    input.focus();
-  }
-
-  function fail(message) {
-    if (liveAiEl) {
-      liveAiEl.classList.add('done', 'subchat-error'); // stop the blinking cursor too
-      liveAiEl.textContent = '⚠ ' + (message || 'Request failed');
-    }
-    // Undo the user turn send() optimistically pushed — it never got an
-    // assistant reply, so leaving it in would break the user/assistant
-    // alternation subMessages relies on. Without this, retrying after a
-    // failure sends two consecutive "user" messages (the failed wrapped
-    // first-turn content, then the retry's raw question) with no reply in
-    // between, which most chat APIs reject or mishandle.
-    if (subMessages.length && subMessages[subMessages.length - 1].role === 'user') {
-      subMessages.pop();
-    }
-    liveAiEl = null; liveAiText = '';
-    inFlight = false;
-    stopTurnPort();
-    setBusy(false);
-  }
-
-  async function send() {
-    const q = input.value.trim();
-    if (!q) return;
-    input.value = '';
-    setBusy(true);
-    inFlight = true;
-
-    try {
-      // Reuse the main chat's own .msg.user/.msg.assistant classes directly
-      // (not a parallel copy) so bubble styling never drifts out of sync —
-      // any future change to the main chat's message look applies here too.
-      const userEl = document.createElement('div');
-      userEl.className = 'msg user';
-      userEl.textContent = q;
-      messagesWrap.appendChild(userEl);
-
-      liveAiEl = document.createElement('div');
-      liveAiEl.className = 'msg assistant'; // .done added in finalize()/fail()
-      messagesWrap.appendChild(liveAiEl);
-      liveAiText = '';
-      messagesWrap.scrollTop = messagesWrap.scrollHeight;
-
-      if (subMessages.length === 0) {
-        // First turn: give the model the full reply (for grounding) plus the
-        // specific excerpt the user is asking about, using the same "> "
-        // blockquote convention as the existing ↩ Quote-to-main-input action.
-        const quoted = quotedText.split('\n').map(l => '> ' + l).join('\n');
-        subMessages.push({
-          role: 'user',
-          content:
-            'The user has a follow-up question about part of your previous reply below.\n\n' +
-            '--- Full previous reply ---\n' + anchorRaw + '\n--- End of previous reply ---\n\n' +
-            'The user is specifically asking about this part:\n' + quoted + '\n\n' +
-            'User\'s question: ' + q,
-        });
-      } else {
-        subMessages.push({ role: 'user', content: q });
-      }
-
-      // Open a FRESH port for this turn and wait for its HELLO_ACK before
-      // sending SUBCHAT — mirrors onSend()'s browsa-chat handshake exactly.
-      // A persistent port connected once at panel-init sounds appealing but
-      // has a real race: if the SW went idle while the user was reading
-      // before opening this card, sendMessage({type:'SUBCHAT'}) wakes the SW
-      // almost immediately, while a stale/reconnecting port can still be
-      // mid-reconnect — the first deltas would silently go nowhere.
-      console.log('[subchat]', subId, 'connecting port');
-      turnPort = chrome.runtime.connect({ name: 'browsa-subchat' });
-      turnPort.onMessage.addListener((m) => console.log('[subchat]', subId, 'port message', m));
-      turnPort.onDisconnect.addListener(() => console.log('[subchat]', subId, 'port disconnected', chrome.runtime.lastError));
-      swPingInterval = setInterval(() => {
-        try { turnPort.postMessage({ type: 'SW_PING' }); } catch (_) {}
-      }, 20_000);
-
-      const ackOk = await new Promise((resolve) => {
-        const ackTimeout = setTimeout(() => resolve(false), 500); // safety net
-        turnPort.onMessage.addListener(function once(m) {
-          if (m.type === 'SUBCHAT_HELLO_ACK') {
-            clearTimeout(ackTimeout);
-            turnPort.onMessage.removeListener(once);
-            resolve(true);
-          }
-        });
-        turnPort.postMessage({ type: 'SUBCHAT_HELLO', subId });
-      });
-      console.log('[subchat]', subId, 'HELLO_ACK received before sending?', ackOk);
-
-      turnPort.onMessage.addListener((m) => {
-        if (m.type === 'SUBCHAT_CHUNK') appendDelta(m.delta);
-        else if (m.type === 'SUBCHAT_DONE') finalize();
-        else if (m.type === 'SUBCHAT_ERROR') fail(m.message);
-      });
-
-      console.log('[subchat]', subId, 'sending SUBCHAT', subMessages);
-      const res = await sendMessage({ type: 'SUBCHAT', subId, messages: subMessages });
-      console.log('[subchat]', subId, 'SUBCHAT response', res);
-      if (!res?.ok) fail(res?.error || 'Failed to start');
-    } catch (e) {
-      console.error('[subchat]', subId, 'send() threw', e);
-      fail(e?.message || String(e));
-    }
-  }
-
-  sendBtnEl.addEventListener('click', send);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
-  closeBtn.addEventListener('click', () => {
-    if (inFlight) {
-      sendMessage({ type: 'SUBCHAT_ABORT', subId });
-      inFlight = false;
-    }
-    stopTurnPort();
-    card.remove();
-  });
-
-  _insertCard(anchorEl, card);
   setTimeout(() => input.focus(), 50);
 }
 
@@ -2972,345 +2014,6 @@ function scrollToBottom(force = false) {
   }
 }
 
-// ─── Toast notifications ──────────────────────────────────────────────────────
-let _toastContainer = null;
-function showToast(msg, type) {
-  if (!_toastContainer) {
-    _toastContainer = document.createElement('div');
-    _toastContainer.className = 'toast-container';
-    document.body.appendChild(_toastContainer);
-  }
-  if (!type) {
-    const low = String(msg).toLowerCase();
-    if (/fail|error|denied|invalid|❌/.test(low)) type = 'error';
-    else if (/warn|⚠/.test(low)) type = 'warn';
-    else if (/cleared|copied|switched|saved|✓/.test(low)) type = 'success';
-    else type = 'info';
-  }
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  const msgEl = document.createElement('span');
-  msgEl.textContent = msg;
-  toast.appendChild(msgEl);
-
-  if (type === 'error') {
-    // Error toasts: Copy + Dismiss, no auto-dismiss
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'toast-copy';
-    copyBtn.textContent = 'Copy';
-    copyBtn.addEventListener('click', () => _copyText(msg).catch(() => {}));
-    const dismissBtn = document.createElement('button');
-    dismissBtn.className = 'toast-x';
-    dismissBtn.textContent = 'Dismiss';
-    dismissBtn.addEventListener('click', () => toast.remove());
-    toast.appendChild(copyBtn);
-    toast.appendChild(dismissBtn);
-  } else {
-    const x = document.createElement('button');
-    x.className = 'toast-x';
-    x.textContent = '×';
-    x.addEventListener('click', () => toast.remove());
-    toast.appendChild(x);
-    // Auto-dismiss, paused on hover
-    const duration = type === 'success' ? 2000 : 3500;
-    let timer = setTimeout(() => toast.remove(), duration);
-    toast.addEventListener('mouseenter', () => clearTimeout(timer));
-    toast.addEventListener('mouseleave', () => { timer = setTimeout(() => toast.remove(), duration); });
-  }
-  _toastContainer.appendChild(toast);
-}
-
-// ─── Confirm dialog ───────────────────────────────────────────────────────────
-function showConfirmDialog({ title = '', message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay';
-    const modal = document.createElement('div');
-    modal.className = 'confirm-modal' + (danger ? ' danger' : '');
-    modal.innerHTML = `
-      <div class="confirm-title">${escM(title)}</div>
-      <div class="confirm-msg">${escM(message)}</div>
-      <div class="confirm-btns">
-        <button class="confirm-cancel">${escM(cancelLabel)}</button>
-        <button class="confirm-ok${danger ? ' danger' : ''}">${escM(confirmLabel)}</button>
-      </div>`;
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-    function done(v) {
-      overlay.remove();
-      document.removeEventListener('keydown', onKey);
-      resolve(v);
-    }
-    function onKey(e) {
-      if (e.key === 'Escape') done(false);
-      else if (e.key === 'Enter') done(true);
-    }
-    modal.querySelector('.confirm-cancel').addEventListener('click', () => done(false));
-    modal.querySelector('.confirm-ok').addEventListener('click', () => done(true));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
-    document.addEventListener('keydown', onKey);
-    modal.querySelector('.confirm-ok').focus();
-  });
-}
-
-// ─── Diff syntax highlighting ─────────────────────────────────────────────────
-function highlightDiffBlocks(el) {
-  for (const code of el.querySelectorAll('code.language-diff, code.language-patch')) {
-    if (code.dataset.diffDone) continue;
-    code.dataset.diffDone = '1';
-    const lines = code.textContent.split('\n');
-    code.textContent = '';
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const span = document.createElement('span');
-      if (/^@@/.test(line))       span.className = 'diff-hunk';
-      else if (line.startsWith('+')) span.className = 'diff-add';
-      else if (line.startsWith('-')) span.className = 'diff-del';
-      span.textContent = line;
-      code.appendChild(span);
-      if (i < lines.length - 1) code.appendChild(document.createTextNode('\n'));
-    }
-  }
-}
-
-// ─── Sessions drawer ──────────────────────────────────────────────────────────
-// Lazily resolved so we're guaranteed the DOM is ready when first used.
-function getSessionsDrawer() { return document.getElementById('sessions-drawer'); }
-
-let _sessionsBackdrop = null;
-function getOrCreateBackdrop() {
-  if (!_sessionsBackdrop) {
-    _sessionsBackdrop = document.createElement('div');
-    _sessionsBackdrop.className = 'sessions-backdrop';
-    _sessionsBackdrop.addEventListener('click', closeSessionsDrawer);
-    document.body.appendChild(_sessionsBackdrop);
-  }
-  return _sessionsBackdrop;
-}
-
-function openSessionsDrawer() {
-  const el = getSessionsDrawer();
-  if (!el) return;
-  el.hidden = false;
-  getOrCreateBackdrop().classList.add('active');
-  // Reset search filter and clear the input each time drawer opens
-  _sessionsFilter = '';
-  const searchEl = el.querySelector('.sessions-search');
-  if (searchEl) searchEl.value = '';
-  renderSessionsList();
-}
-
-let _searchDebounceTimer = null;
-function onSessionSearch(e) {
-  _sessionsFilter = e.target.value;
-  clearTimeout(_searchDebounceTimer);
-  _searchDebounceTimer = setTimeout(renderSessionsList, 200);
-}
-
-function closeSessionsDrawer() {
-  const el = getSessionsDrawer();
-  if (el) el.hidden = true;
-  if (_sessionsBackdrop) _sessionsBackdrop.classList.remove('active');
-  clearTimeout(_renameClickTimer);   // cancel any pending single-click load
-  _renameClickTimer = null;
-  clearTimeout(_searchDebounceTimer); // cancel pending search render on close
-  _searchDebounceTimer = null;
-}
-
-let _sessionsFilter = '';
-let _renameClickTimer = null; // debounce: distinguish single-click-load from double-click-rename
-let _sessionsRenderGen = 0;   // generation counter: cancel stale concurrent renders
-
-async function renderSessionsList() {
-  const listEl = $('sessions-list');
-  if (!listEl) return;
-  const gen = ++_sessionsRenderGen;
-  listEl.innerHTML = '';
-  const res = await sendMessage({ type: 'GET_SESSIONS' });
-  // Bail out if a newer call has already started (prevents duplicate items from concurrent renders)
-  if (_sessionsRenderGen !== gen) return;
-  const allSessions = res?.data?.sessions || [];
-
-  // Apply search filter
-  const q = _sessionsFilter.trim().toLowerCase();
-  const sessions = q ? allSessions.filter(s => s.name.toLowerCase().includes(q)) : allSessions;
-
-  if (!sessions.length) {
-    listEl.innerHTML = `<div class="sessions-empty">${q ? 'No sessions match your search.' : 'No saved sessions yet.<br>Start a new session to archive this conversation.'}</div>`;
-    return;
-  }
-  for (const s of sessions) {
-    const item = document.createElement('div');
-    item.className = 'session-item';
-    const relTime = relativeTime(s.createdAt);
-    const absTime = new Date(s.createdAt).toLocaleString();
-
-    item.innerHTML = `
-      <div class="session-item-body">
-        <div class="session-item-name" title="Double-click to rename">${escM(s.name)}</div>
-        <div class="session-item-date" title="${escM(absTime)}">${relTime}</div>
-      </div>
-      <div class="session-item-actions">
-        <button class="session-export-btn" title="Export as Markdown" data-id="${s.id}">⬇</button>
-        <button class="session-del-btn" title="Delete session" data-id="${s.id}">${ICONS.trash}</button>
-      </div>`;
-
-    // Click body → load session; double-click name → rename.
-    // A double-click fires two click events before dblclick — debounce
-    // the click so we can cancel it when dblclick arrives.
-    const nameEl = item.querySelector('.session-item-name');
-    item.querySelector('.session-item-body').addEventListener('click', (e) => {
-      if (e.target.closest('.session-item-name')) {
-        clearTimeout(_renameClickTimer);
-        _renameClickTimer = setTimeout(() => loadSession(s.id, s.name), 220);
-      } else {
-        // Clear any pending name-click timer so we don't double-load
-        clearTimeout(_renameClickTimer);
-        _renameClickTimer = null;
-        loadSession(s.id, s.name);
-      }
-    });
-    nameEl.addEventListener('dblclick', (e) => {
-      clearTimeout(_renameClickTimer); // cancel the pending single-click load
-      e.stopPropagation();
-      startSessionRename(nameEl, s.id);
-    });
-
-    // Export buttons
-    item.querySelector('.session-export-btn').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await exportSession(s.id, s.name);
-    });
-
-    // Delete button
-    item.querySelector('.session-del-btn').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const ok = await showConfirmDialog({ title: 'Delete session', message: `Delete "${s.name}"?`, confirmLabel: 'Delete', danger: true });
-      if (!ok) return;
-      await sendMessage({ type: 'DELETE_SESSION', id: s.id });
-      showToast('Session deleted', 'success');
-      renderSessionsList();
-    });
-    listEl.appendChild(item);
-  }
-}
-
-/** Inline rename: replaces name text with an input field. */
-function startSessionRename(nameEl, sessionId) {
-  const oldName = nameEl.textContent;
-  const input = document.createElement('input');
-  input.className = 'session-rename-input';
-  input.value = oldName;
-  nameEl.replaceWith(input);
-  input.focus();
-  input.select();
-
-  let done = false; // prevent double-commit (Enter fires blur on DOM removal)
-  const commit = async () => {
-    if (done) return;
-    done = true;
-    const newName = input.value.trim() || oldName;
-    if (newName !== oldName) {
-      await sendMessage({ type: 'RENAME_SESSION', id: sessionId, name: newName });
-      showToast('Session renamed', 'success');
-    }
-    renderSessionsList();
-  };
-  const cancel = () => {
-    if (done) return;
-    done = true;
-    renderSessionsList();
-  };
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-  });
-  input.addEventListener('blur', commit); // normal click-away: save
-}
-
-/** Export a saved session as a Markdown file. */
-async function exportSession(id, name) {
-  const res = await sendMessage({ type: 'GET_SESSION_FULL', id });
-  const session = res?.data?.session;
-  if (!session) { showToast('Could not load session', 'error'); return; }
-
-  const slug = (name || 'session').replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 40);
-  const dateStr = new Date().toISOString().slice(0, 10);
-
-  // Markdown export
-  const history = session.history || [];
-  const lines = [
-    `# ${session.name}`,
-    `*Exported: ${new Date().toLocaleString()}*`,
-    ''
-  ];
-  for (const m of history) {
-    if (m.role === 'user') {
-      // Normalize content: extract text from array messages (image+text combos)
-      let content;
-      if (typeof m.content === 'string') {
-        content = m.content;
-      } else if (Array.isArray(m.content)) {
-        const textPart = m.content.find(p => p.type === 'text')?.text || '';
-        const hasImage = m.content.some(p => p.type === 'image_url');
-        content = textPart || (hasImage ? '*(image)*' : null);
-      }
-      if (!content) continue;
-      if (content.startsWith(PAGE_CONTEXT_PREFIX)) {
-        const urlLine = content.split('\n').find(l => l.startsWith('URL:')) || '';
-        lines.push(`---\n\n*(page context${urlLine ? ' — ' + urlLine.slice(4).trim() : ''})*\n`);
-        continue;
-      }
-      lines.push(`## User\n\n${content}\n`);
-    } else if (m.role === 'assistant') {
-      lines.push(`## Assistant\n\n${m.content}\n`);
-    }
-  }
-
-  const blob = new Blob([lines.join('\n')], { type: 'text/markdown; charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `browsa-${slug}-${dateStr}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  showToast('Session exported', 'success');
-}
-
-/** Clear all saved sessions with confirmation. */
-async function clearAllSessions() {
-  const ok = await showConfirmDialog({
-    title: 'Clear all sessions',
-    message: 'Delete all saved sessions? This cannot be undone.',
-    confirmLabel: 'Clear all',
-    danger: true
-  });
-  if (!ok) return;
-  await sendMessage({ type: 'CLEAR_ALL_SESSIONS' });
-  showToast('All sessions cleared', 'success');
-  renderSessionsList();
-}
-
-async function loadSession(id, name) {
-  // Cancel any in-progress stream before switching sessions.
-  if (activeController && !activeController.cancelled) cancelStream();
-  // Auto-save current conversation before switching
-  const { history } = await chrome.storage.local.get('history');
-  const hasMessages = Array.isArray(history) && history.some(m => m.role === 'user' || m.role === 'assistant');
-  if (hasMessages) {
-    await sendMessage({ type: 'SAVE_SESSION' });
-  }
-  const res = await sendMessage({ type: 'LOAD_SESSION', id });
-  if (!res?.ok && !res?.data?.ok) { showToast('Failed to load session', 'error'); return; }
-  await renderHistory();
-  scrollToBottom(true);
-  images.length = 0; refreshImageStrip(); // clear any pending image attachments
-  closeSessionsDrawer();
-  showToast(`Loaded: "${name}"`, 'success');
-}
-
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────
 async function showEffectivePrompt() {
   const cfg = await chrome.storage.local.get(null);
@@ -3387,20 +2090,6 @@ async function showEffectivePrompt() {
 }
 
 
-function sendMessage(msg) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage(msg, (res) => {
-      // Wrap in try/catch — when there's no receiver (e.g. service worker restarting),
-      // chrome.runtime.lastError is set; resolve with a structured error.
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message, code: 'NoReceiver' });
-      } else {
-        resolve(res || { ok: false, error: 'no response', code: 'NoResponse' });
-      }
-    });
-  });
-}
-
 async function renderHistory() {
   messagesEl.innerHTML = '';
   const { history } = await chrome.storage.local.get('history');
@@ -3448,126 +2137,6 @@ function applyFontSize(px) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ─── Feature: In-conversation search (Ctrl+F) ─────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-let _searchMatches = [];
-let _searchIdx = -1;
-let _searchHighlightEl = null;
-
-function initMsgSearch() {
-  const bar = $('msg-search-bar');
-  const input = $('msg-search-input');
-  const countEl = $('msg-search-count');
-  if (!bar || !input) return;
-
-  input.addEventListener('input', () => doMsgSearch(input.value));
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (e.shiftKey) prevSearchMatch(); else nextSearchMatch();
-    }
-    if (e.key === 'Escape') closeMsgSearch();
-  });
-  $('msg-search-prev')?.addEventListener('click', prevSearchMatch);
-  $('msg-search-next')?.addEventListener('click', nextSearchMatch);
-  $('msg-search-close')?.addEventListener('click', closeMsgSearch);
-}
-
-function openMsgSearch() {
-  const bar = $('msg-search-bar');
-  if (!bar) return;
-  bar.hidden = false;
-  $('msg-search-input')?.focus();
-}
-
-function closeMsgSearch() {
-  const bar = $('msg-search-bar');
-  if (!bar) return;
-  bar.hidden = true;
-  clearSearchHighlights();
-  _searchMatches = [];
-  _searchIdx = -1;
-  const input = $('msg-search-input');
-  if (input) input.value = '';
-  if ($('msg-search-count')) $('msg-search-count').textContent = '';
-}
-
-function doMsgSearch(query) {
-  clearSearchHighlights();
-  _searchMatches = [];
-  _searchIdx = -1;
-  const countEl = $('msg-search-count');
-  if (!query.trim()) { if (countEl) countEl.textContent = ''; return; }
-
-  const q = query.toLowerCase();
-  // Walk text nodes in messages, wrap matches in <mark>
-  const walk = document.createTreeWalker(messagesEl, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      const p = node.parentElement;
-      if (!p) return NodeFilter.FILTER_REJECT;
-      if (p.closest('.msg-actions, .token-usage, .think-block summary'))
-        return NodeFilter.FILTER_REJECT;
-      return node.textContent.toLowerCase().includes(q)
-        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-    }
-  });
-
-  const marks = [];
-  let node;
-  while ((node = walk.nextNode())) {
-    const text = node.textContent;
-    const lower = text.toLowerCase();
-    let pos = 0;
-    const frag = document.createDocumentFragment();
-    let idx;
-    while ((idx = lower.indexOf(q, pos)) !== -1) {
-      if (idx > pos) frag.appendChild(document.createTextNode(text.slice(pos, idx)));
-      const mark = document.createElement('mark');
-      mark.className = 'search-highlight';
-      mark.textContent = text.slice(idx, idx + q.length);
-      frag.appendChild(mark);
-      marks.push(mark);
-      pos = idx + q.length;
-    }
-    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
-    node.parentNode.replaceChild(frag, node);
-  }
-  _searchMatches = marks;
-  if (countEl) countEl.textContent = marks.length ? `1 / ${marks.length}` : 'No results';
-  if (marks.length) { _searchIdx = 0; highlightSearchMatch(0); }
-}
-
-function highlightSearchMatch(i) {
-  _searchMatches.forEach((m, idx) => m.classList.toggle('search-highlight-active', idx === i));
-  if (_searchMatches[i]) {
-    _searchMatches[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const countEl = $('msg-search-count');
-    if (countEl) countEl.textContent = `${i + 1} / ${_searchMatches.length}`;
-  }
-}
-
-function nextSearchMatch() {
-  if (!_searchMatches.length) return;
-  _searchIdx = (_searchIdx + 1) % _searchMatches.length;
-  highlightSearchMatch(_searchIdx);
-}
-
-function prevSearchMatch() {
-  if (!_searchMatches.length) return;
-  _searchIdx = (_searchIdx - 1 + _searchMatches.length) % _searchMatches.length;
-  highlightSearchMatch(_searchIdx);
-}
-
-function clearSearchHighlights() {
-  // Unwrap all <mark class="search-highlight"> back to plain text
-  for (const mark of messagesEl.querySelectorAll('mark.search-highlight')) {
-    mark.replaceWith(document.createTextNode(mark.textContent));
-  }
-  // Merge adjacent text nodes left by replaceWith
-  messagesEl.normalize();
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // ─── Feature: Image lightbox ──────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 function showImageLightbox(src, alt) {
@@ -3590,62 +2159,3 @@ function showImageLightbox(src, alt) {
   document.addEventListener('keydown', onKey);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── Feature: Multi-select + batch delete ─────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-function enterMultiSelect() {
-  isMultiSelectMode = true;
-  $('multiselect-bar').hidden = false;
-  $('multiselect-toggle')?.classList.add('active');
-  // Add checkboxes to every message bubble that has a data-hidx
-  for (const msg of messagesEl.querySelectorAll('.msg[data-hidx]')) {
-    if (msg.querySelector('.msg-select-cb')) continue;
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'msg-select-cb';
-    cb.addEventListener('change', updateMultiselectCount);
-    msg.insertBefore(cb, msg.firstChild);
-  }
-  updateMultiselectCount();
-}
-
-function exitMultiSelect() {
-  isMultiSelectMode = false;
-  $('multiselect-bar').hidden = true;
-  $('multiselect-toggle')?.classList.remove('active');
-  for (const cb of messagesEl.querySelectorAll('.msg-select-cb')) cb.remove();
-}
-
-function updateMultiselectCount() {
-  const n = messagesEl.querySelectorAll('.msg-select-cb:checked').length;
-  const el = $('multiselect-count');
-  if (el) el.textContent = `${n} selected`;
-  const delBtn = $('multiselect-delete');
-  if (delBtn) delBtn.disabled = n === 0;
-}
-
-async function deleteSelectedMessages() {
-  const checked = [...messagesEl.querySelectorAll('.msg-select-cb:checked')];
-  if (!checked.length) return;
-
-  // Collect indices sorted descending — delete highest first to avoid shift
-  const indices = checked
-    .map(cb => parseInt(cb.closest('[data-hidx]')?.dataset.hidx, 10))
-    .filter(n => !isNaN(n))
-    .sort((a, b) => b - a);
-
-  for (const idx of indices) {
-    await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
-    // Shift data-hidx on remaining bubbles above this index
-    for (const el of messagesEl.querySelectorAll('[data-hidx]')) {
-      const bidx = parseInt(el.dataset.hidx, 10);
-      if (bidx > idx) el.dataset.hidx = bidx - 1;
-    }
-    nextHistoryIdx = Math.max(0, nextHistoryIdx - 1);
-  }
-
-  // Remove DOM elements
-  checked.forEach(cb => cb.closest('.msg')?.remove());
-  exitMultiSelect();
-  showToast(`Deleted ${indices.length} message${indices.length > 1 ? 's' : ''}`, 'success');
-}

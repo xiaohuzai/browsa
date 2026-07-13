@@ -6,11 +6,26 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { chatStream, runsApiStream, getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
+import { getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
+import {
+  streamPorts, streamState, chatControllers, idleTimerResetters,
+  activeRunIds, pendingApprovals, pendingClarifications,
+  subChatControllers, subChatPorts,
+  initStreamState, appendToStreamState, clearStreamState
+} from './lib/state.js';
+import { handleChat } from './lib/handlers/chat-handler.js';
+import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
+// Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
+export {
+  streamPorts, streamState, chatControllers,
+  activeRunIds, pendingApprovals, pendingClarifications,
+  subChatControllers, subChatPorts,
+  initStreamState, appendToStreamState, clearStreamState
+};
 // Session management re-exported from storage for use in handle()
 const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
-import { extractActiveTab, buildMessages, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
+import { extractActiveTab, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Capability hints: browsa rendering rules injected automatically so users
 // never need to configure them manually. Shared by both CHAT (full turn,
@@ -28,6 +43,7 @@ const CAPABILITY_HINTS = [
   'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
   'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
   'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
+  'In ECharts option JSON, NEVER put HTML tags like <b>, <br/>, or <span> inside title/legend/axis/label text fields (e.g. title.text) — unlike Mermaid node labels, ECharts text fields render as plain text, so HTML tags show up as literal characters instead of being interpreted. Use \\n for line breaks in text fields. If you need mixed styling within one text field, use ECharts\' own rich-text syntax (a "rich" object in textStyle keyed by style name, referenced as {styleName|text} in the text string) — never raw HTML.',
 ].join(' ');
 
 // CHOICE_REQUEST is CHAT-only, deliberately NOT part of CAPABILITY_HINTS:
@@ -65,7 +81,7 @@ chrome.runtime.onInstalled.addListener((details) => {
           }
         }).then(() => chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['lib/selection-toolbar.js']
+          files: ['lib/content-scripts/selection-toolbar.js']
         })).catch(() => {});
       }
     });
@@ -119,48 +135,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-// Streaming port: the side panel opens a long-lived port named 'browsa-chat'
-// before sending the CHAT message. As soon as the background's CHAT handler
-// has the first delta from the LLM, it pushes it back through this port.
-// We keep a registry keyed by tabId so multiple tabs (each with their own
-// side panel) can stream independently.
-export const streamPorts = new Map(); // tabId -> Port
-
-// Stream state survives port churn. When the side panel is torn down (the
-// user switches tabs and Chrome destroys the panel), the streaming port
-// disconnects, but the LLM request keeps running on the background. We
-// stash the accumulated reply here so a freshly-opened side panel can
-// peek + resume from where the old panel left off — fixes the
-// "switch tab mid-stream → reply appears stuck" bug.
-export const streamState = new Map(); // tabId -> { acc: string, startedAt: number, lastDeltaAt: number }
-
-// AbortControllers per in-flight chat, keyed by tabId. The side panel
-// sends STREAM_ABORT to cancel — the controller kills the HTTP fetch
-// AND the SSE read loop (see openai-client.js). Without this, cancel
-// was a no-op: the LLM kept streaming, the user saw a "cancelled"
-// notice, and a phantom assistant turn got written to history.
-export const chatControllers = new Map(); // tabId -> AbortController
-
-// Maps a tabId to the active stream's resetIdleTimer function. Allows the
-// port's SW_PING handler to reset the idle timeout from outside the CHAT
-// handler's closure. This is what makes SW_PING actually prevent the
-// idle-timeout cancel during long tool calls (e.g. sub-agent execution).
-const idleTimerResetters = new Map(); // tabId -> () => void
-
-// Active run IDs for Hermes /v1/runs streaming. Stored so STREAM_ABORT can
-// call POST /v1/runs/{id}/stop to stop the server-side agent, not just the
-// local fetch.
-export const activeRunIds = new Map(); // tabId -> { runId, baseUrl, apiKey }
-
-// Pending approval/clarification requests awaiting user response.
-export const pendingApprovals = new Map();      // tabId -> { runId, approvalId, baseUrl, apiKey }
-export const pendingClarifications = new Map(); // tabId -> { runId, clarifyId, baseUrl, apiKey }
-
-// AbortControllers for "detail thread" side-conversations (SUBCHAT), keyed
-// by a client-generated subId rather than tabId — unlike the main chat,
-// several detail threads can be open (and streaming) at once for the same
-// tab, so each needs its own independent cancel handle.
-export const subChatControllers = new Map(); // subId -> AbortController
+// Streaming port/stream-state/controller Maps (streamPorts, streamState,
+// chatControllers, idleTimerResetters, activeRunIds, pendingApprovals,
+// pendingClarifications, subChatControllers, subChatPorts) live in
+// lib/state.js — imported above — since the extracted CHAT/SUBCHAT handlers
+// in lib/handlers/*.js need the same Map instances.
 
 // If a brand-new side panel arrives mid-stream (via STREAM_HELLO while
 // streamState has a non-empty acc for that tab), we drain the accumulated
@@ -188,8 +167,6 @@ const navPorts = new Map(); // tabId -> Set<Port>
 // deltas can start arriving and get silently dropped before the port has
 // finished reconnecting. Opening fresh + waiting for the HELLO_ACK (like
 // onSend() does for browsa-chat) avoids that race entirely.
-export const subChatPorts = new Map(); // subId -> Port
-
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'browsa-chat') {
     // The side panel sends a "hello" with its tabId so we know which tab this
@@ -324,42 +301,6 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
-function pushChunk(tabId, payload) {
-  const port = streamPorts.get(tabId);
-  if (port) safePost(port, payload);
-}
-
-function pushSubChatChunk(subId, payload) {
-  const port = subChatPorts.get(subId);
-  if (port) safePost(port, payload);
-}
-
-// Initialize a streamState record for a tab when CHAT starts. Called by
-// the CHAT handler before the first onDelta arrives. This is what lets a
-// mid-stream tab switch survive the port disconnect.
-export function initStreamState(tabId) {
-  streamState.set(tabId, { acc: '', startedAt: Date.now(), lastDeltaAt: 0 });
-}
-
-// Update streamState.acc as deltas stream in. Cheap — runs on every chunk
-// (typically dozens to hundreds per second). The acc is what the next
-// side panel session will render as its "starting point" via STREAM_PEEK.
-export function appendToStreamState(tabId, delta) {
-  const st = streamState.get(tabId);
-  if (st) {
-    st.acc += delta;
-    st.lastDeltaAt = Date.now();
-  }
-}
-
-// Drop the streamState once the reply is fully persisted to history and
-// the active side panel has acknowledged. Called by the CHAT handler
-// right after appendToHistory (so the persisted reply is the same as
-// streamState.acc — single source of truth for "what the user sees").
-export function clearStreamState(tabId) {
-  streamState.delete(tabId);
-}
-
 // GC for stale streamState entries. A stream can be orphaned when a tab
 // is closed (or crashes) mid-stream before the CHAT handler's finally{} runs.
 // Entries older than STREAM_STATE_TTL_MS are safe to drop — the side panel
@@ -454,7 +395,7 @@ async function handle(msg, sender) {
     }
 
     case 'SELECTION_ACTION': {
-      // Sent by lib/selection-toolbar.js when user clicks a toolbar button.
+      // Sent by lib/content-scripts/selection-toolbar.js when user clicks a toolbar button.
       const tabId = sender?.tab?.id;
       if (!tabId) return { ok: false };
       const { action, text } = msg;
@@ -869,77 +810,11 @@ async function handle(msg, sender) {
       }
     }
 
-    case 'SUBCHAT': {
-      // "Detail thread" side-conversation: the user selected a piece of text
-      // inside an assistant reply and wants to drill into it without
-      // touching the main conversation. Deliberately scoped down from CHAT:
-      // - always chatStream() (/v1/chat/completions), never runsApiStream —
-      //   no tool execution/approval needed for a side Q&A, and reusing the
-      //   main chat's Hermes session id here would mix this detail question
-      //   into the server-side agent's main-task context.
-      // - never touches storage.appendToHistory — the whole point is that
-      //   the main history stays clean.
-      // - no page context/domain rules/llms.txt — sidepanel.js already
-      //   built the scoped context (quoted excerpt + the question).
-      const all = await storage.getAll();
-      const provider = all.providers[all.activeProvider];
-      if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
-      if (!provider.baseUrl?.trim()) throw ProviderConfigError('Base URL is not set. Open Settings (⚙) and configure the provider.');
+    case 'SUBCHAT':
+      return handleSubchat(msg, CAPABILITY_HINTS);
 
-      const subId = msg.subId;
-      if (!subId) throw new Error('subId required');
-      const userMessages = Array.isArray(msg.messages) ? msg.messages : [];
-      if (!userMessages.length) throw new Error('messages required');
-
-      const messages = [{ role: 'system', content: CAPABILITY_HINTS }, ...userMessages];
-      const controller = new AbortController();
-      subChatControllers.set(subId, controller);
-      const temperature = (provider.temperature != null && provider.temperature !== '') ? Number(provider.temperature) : undefined;
-      const maxTokens = provider.maxTokens ? Number(provider.maxTokens) : 0;
-      console.log('[subchat][bg]', subId, 'starting chatStream, port already registered?', subChatPorts.has(subId));
-
-      // Fire-and-forget: reply to the sendMessage call immediately so the
-      // side panel doesn't block on the whole stream, and push deltas
-      // through the dedicated browsa-subchat port (opened fresh for this
-      // subId, see subChatPorts comment) as they arrive.
-      (async () => {
-        try {
-          await chatStream({
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-            model: provider.model || undefined,
-            messages,
-            onDelta: (delta) => {
-              const posted = subChatPorts.has(subId);
-              if (!posted) console.warn('[subchat][bg]', subId, 'delta arrived but NO PORT registered — dropped:', delta.slice(0, 40));
-              pushSubChatChunk(subId, { type: 'SUBCHAT_CHUNK', subId, delta });
-            },
-            signal: controller.signal,
-            temperature,
-            maxTokens,
-          });
-          console.log('[subchat][bg]', subId, 'chatStream done, port still registered?', subChatPorts.has(subId));
-          pushSubChatChunk(subId, { type: 'SUBCHAT_DONE', subId });
-        } catch (e) {
-          console.error('[subchat][bg]', subId, 'chatStream threw', e);
-          if (e?.name !== 'AbortError') {
-            pushSubChatChunk(subId, { type: 'SUBCHAT_ERROR', subId, message: e?.message || String(e) });
-          }
-        } finally {
-          subChatControllers.delete(subId);
-        }
-      })();
-      return { started: true };
-    }
-
-    case 'SUBCHAT_ABORT': {
-      const c = subChatControllers.get(msg.subId);
-      if (c) {
-        try { c.abort('user-cancel'); } catch (_) {}
-        subChatControllers.delete(msg.subId);
-      }
-      return { aborted: !!c };
-    }
+    case 'SUBCHAT_ABORT':
+      return handleSubchatAbort(msg);
 
     case 'STREAM_DEBUG': {
       // Observability endpoint for the side panel. Returns the full
@@ -1002,281 +877,11 @@ async function handle(msg, sender) {
       return { reply };
     }
 
-    case 'CHAT': {
-      // Stream a chat turn. Page context is NOT extracted here — the user
-      // explicitly attaches it via ATTACH_PAGE before asking questions.
-      // History is now global (single session across all tabs).
-      const all = await storage.getAll();
-      const provider = all.providers[all.activeProvider];
-      if (!provider) throw ProviderConfigError(`Provider "${all.activeProvider}" not configured`);
-      if (!provider.baseUrl?.trim()) throw ProviderConfigError('Base URL is not set. Open Settings (⚙) and configure the provider.');
-
-      const tabId = msg.tabId;
-      if (tabId == null) throw new Error('tabId required');
-
-      // Build effective system prompt: base + per-domain rule + llms.txt
-      const tab = await chrome.tabs.get(tabId).catch(() => null);
-      const tabUrl = tab?.url || '';
-      const domainRules = all.domainRules || [];
-      const matchedRule = domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
-      const domainExtra = matchedRule?.prompt?.trim() || '';
-      const llmsTxt = (all.llmsTxtEnabled !== false) && tabUrl ? await fetchLlmsTxt(tabUrl) : null;
-      const llmsTxtExtra = llmsTxt
-        ? `\n\n[Site instructions from ${(() => { try { return new URL(tabUrl).origin; } catch(_){return tabUrl;} })()}/llms.txt]\n${llmsTxt}`
-        : '';
-      const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
-      const langExtra = langMap[all.replyLanguage] || '';
-      const effectiveSystemPrompt = [all.systemPrompt || '', domainExtra, llmsTxtExtra, langExtra, CAPABILITY_HINTS, CHOICE_REQUEST_HINT]
-        .map(s => s.trim()).filter(Boolean).join('\n\n');
-
-      // Load global history
-      const history = await storage.getHistory();
-
-      // isHermes flag identifies Hermes providers (auto-detected via ping —
-      // options.js probes run_submission/run_events_sse capabilities). When
-      // true we always use Hermes's richer /v1/runs API (approval,
-      // clarification, tool.started/tool.completed, visible thinking)
-      // instead of plain /v1/chat/completions.
-      const isHermes = !!(provider.isHermes);
-
-      let messages = null;         // chatStream (stateless OpenAI-compatible)
-      let runsInput = null;        // runsApiStream: current user message
-      let runsConvHistory = null;  // runsApiStream: all prior turns
-      let hermesSessionId = null;  // runsApiStream: X-Hermes-Session-Id / session_id
-      let extraHeaders = undefined;
-
-      if (isHermes) {
-        hermesSessionId = await storage.getOrCreateHermesSessionId(all.activeProvider);
-        // Build current-turn input (text + optional images)
-        if (msg.images?.length) {
-          const parts = [{ type: 'input_text', text: msg.userText || '' }];
-          msg.images.forEach(url => parts.push({ type: 'input_image', image_url: url }));
-          runsInput = [{ role: 'user', content: parts }];
-        } else {
-          runsInput = msg.userText || '';
-        }
-        // Build conversation history from local storage (all prior user+assistant turns).
-        // Page-context messages (PAGE_CONTEXT_PREFIX) are included as-is so Hermes
-        // receives the full context. Multimodal content in old turns is text-only.
-        runsConvHistory = history
-          .filter(m => m.role === 'user' || m.role === 'assistant')
-          .map(m => {
-            let content = m.content;
-            if (Array.isArray(content)) {
-              content = content
-                .filter(p => p.type === 'text' || p.type === 'input_text')
-                .map(p => p.text || '').join('') || '[multimodal message]';
-            }
-            return { role: m.role, content: String(content || '') };
-          })
-          .filter(m => m.content.trim());
-      } else {
-        // Standard stateless mode: send full history on every turn.
-        messages = buildMessages({
-          history,
-          userText: msg.userText,
-          pageContext: null,
-          withImage: false,
-          userImages: msg.images,
-          systemPrompt: effectiveSystemPrompt
-        });
-      }
-
-      // Persist user turn to global history (include images if present)
-      const userTurnContent = msg.images?.length
-        ? [
-            { type: 'text', text: msg.userText || '(no instruction)' },
-            ...msg.images.map(url => ({ type: 'image_url', image_url: { url } }))
-          ]
-        : msg.userText || '(no instruction)';
-      const userTurn = { role: 'user', content: userTurnContent };
-      await storage.appendToHistory(userTurn);
-
-      // Initialize stream state BEFORE the first onDelta. From this point
-      // on, every delta both pushes to the port and accumulates into
-      // streamState.acc — so a mid-stream tab switch (which kills the
-      // port but not the LLM request) can be recovered via STREAM_PEEK.
-      initStreamState(tabId);
-
-      // Wire an AbortController so the side panel can actually cancel
-      // the LLM fetch. Without this, Esc-to-cancel was visual-only —
-      // the background kept streaming, a phantom assistant turn got
-      // appended to history, and STREAM_RELEASE just hid it from PEEK.
-      // Idle timeout: abort if no delta or tool-progress arrives for 5 min.
-      // Resets on every output event so long agent tasks with many tool
-      // calls never hit this accidentally — only truly stuck streams do.
-      const controller = new AbortController();
-      chatControllers.set(tabId, controller);
-      const IDLE_TIMEOUT_MS = 5 * 60_000;
-      let idleTimer = setTimeout(() => controller.abort('idle-timeout'), IDLE_TIMEOUT_MS);
-      const resetIdleTimer = () => {
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => controller.abort('idle-timeout'), IDLE_TIMEOUT_MS);
-      };
-      idleTimerResetters.set(tabId, resetIdleTimer);
-      const signal = controller.signal;
-
-      // Per-provider inference params
-      const temperature = (provider.temperature != null && provider.temperature !== '') ? Number(provider.temperature) : undefined;
-      const maxTokens = provider.maxTokens ? Number(provider.maxTokens) : 0;
-
-      // Stream with auto-retry on transient network / rate-limit errors
-      let fullReply = '';
-      let replyUsage = null;
-      const MAX_RETRIES = 2;
-
-      const doStream = async () => {
-        const onDelta = (delta) => {
-          resetIdleTimer();
-          appendToStreamState(tabId, delta);
-          pushChunk(tabId, { type: 'CHUNK', delta });
-        };
-        const onToolProgress = (text) => { resetIdleTimer(); pushChunk(tabId, { type: 'TOOL_PROGRESS', text }); };
-
-        // Hermes gates dangerous tools (execute_code, terminal, ...) behind
-        // an approval flow on BOTH /v1/runs and /v1/chat/completions — not
-        // just /v1/runs. Wire onApproval/onClarify for both paths, or the
-        // tool call just hangs waiting for a response that never comes.
-        // run_id may arrive embedded in the event payload itself (chatStream)
-        // or be injected by runsApiStream (which knows it from POST /v1/runs) —
-        // check both the camelCase and snake_case field names.
-        const onApproval = (data) => {
-          pendingApprovals.set(tabId, {
-            runId: data.runId || data.run_id || '',
-            approvalId: data.approval_id || data.approvalId || '',
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-          });
-          pushChunk(tabId, { type: 'APPROVAL', data });
-        };
-        const onClarify = (data) => {
-          pendingClarifications.set(tabId, {
-            runId: data.runId || data.run_id || '',
-            clarifyId: data.clarify_id || data.clarifyId || '',
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-          });
-          pushChunk(tabId, { type: 'CLARIFY', data });
-        };
-
-        if (isHermes) {
-          const onRunId = (runId) => {
-            activeRunIds.set(tabId, { runId, baseUrl: provider.baseUrl, apiKey: provider.apiKey });
-          };
-          return await runsApiStream({
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-            input: runsInput,
-            instructions: effectiveSystemPrompt || undefined,
-            conversationHistory: runsConvHistory,
-            sessionId: hermesSessionId,
-            onDelta,
-            onToolProgress,
-            onApproval,
-            onClarify,
-            onRunId,
-            signal,
-            temperature,
-            maxTokens,
-          });
-        } else {
-          return await chatStream({
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-            model: provider.model || undefined,
-            messages,
-            onDelta,
-            onToolProgress,
-            onApproval,
-            onClarify,
-            signal,
-            extraHeaders,
-            temperature,
-            maxTokens,
-          });
-        }
-      };
-
-      try {
-        for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-          try {
-            // Reset stream state accumulator on retry so we don't double content
-            if (attempt > 1) {
-              const st = streamState.get(tabId);
-              if (st) st.acc = '';
-              fullReply = '';
-              // Notify side panel about retry
-              pushChunk(tabId, { type: 'RETRY', attempt, maxAttempts: MAX_RETRIES + 1 });
-              await new Promise(r => setTimeout(r, 1000 * attempt));
-            }
-            const result = await doStream();
-            fullReply = result.full;
-            replyUsage = result.usage || null;
-            break; // success
-          } catch (e) {
-            if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) throw e;
-            // Only retry on network or rate-limit errors
-            const isRetryable = e?.name === 'ProviderNetworkError' || (e?.name === 'ProviderAPIError' && e?.message?.includes('429'));
-            if (!isRetryable || attempt > MAX_RETRIES) throw e;
-          }
-        }
-      } catch (e) {
-        // Distinguish user-cancel from real errors. AbortError fires
-        // when the side panel's cancelStream() called
-        // STREAM_ABORT → controller.abort() → fetch threw. We must NOT
-        // append a half-finished reply to history in that case.
-        if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {
-          // Tell the side panel it was a clean cancel so it can show
-          // its "⚠ Stream cancelled" message and skip DONE.
-          pushChunk(tabId, { type: 'ERROR', error: 'cancelled', code: 'ABORTED' });
-          clearStreamState(tabId);
-          return { ok: true, cancelled: true };
-        }
-        // Re-throw real errors so the generic onMessage handler can
-        // wrap them with a hint (network / config / API).
-        throw e;
-      } finally {
-        clearTimeout(idleTimer);
-        idleTimerResetters.delete(tabId);
-        chatControllers.delete(tabId);
-        activeRunIds.delete(tabId);
-        pendingApprovals.delete(tabId);
-        pendingClarifications.delete(tabId);
-      }
-
-      // Parse CHOICE_REQUEST: agent may embed an interactive choice at the
-      // end of its reply. Strip it from the stored text so history stays
-      // clean, but forward the parsed data to the side panel so it can
-      // render clickable buttons. Format (from personal_ai_assistant):
-      //   CHOICE_REQUEST:{"question":"...","choices":["A","B"]}
-      let choiceRequest = null;
-      const choiceMatch = fullReply.match(/CHOICE_REQUEST:(\{[\s\S]*?\})\s*$/);
-      if (choiceMatch) {
-        try {
-          choiceRequest = JSON.parse(choiceMatch[1]);
-          fullReply = fullReply.slice(0, choiceMatch.index).trimEnd();
-        } catch (_) { /* malformed JSON — leave as-is */ }
-      }
-
-      // Persist assistant turn — this is the durable source of truth.
-      // (Only reached if the stream completed naturally, not via abort.)
-      await storage.appendToHistory({ role: 'assistant', content: fullReply });
-
-      pushChunk(tabId, { type: 'DONE', full: fullReply, choiceRequest, usage: replyUsage });
-      clearStreamState(tabId);
-      return { full: fullReply };
-    }
+    case 'CHAT':
+      return handleChat(msg, CAPABILITY_HINTS, CHOICE_REQUEST_HINT);
 
     default:
       throw new Error(`Unknown message type: ${msg.type}`);
-  }
-}
-
-function safePost(port, payload) {
-  try {
-    port.postMessage(payload);
-  } catch {
-    // Port closed (user closed panel). Swallow.
   }
 }
 
@@ -1286,32 +891,6 @@ function tabIdOf(msg, sender) {
   if (msg?.tabId != null) return msg.tabId;
   if (sender?.tab?.id != null) return sender.tab.id;
   return null;
-}
-
-// llms.txt cache: origin → { content: string|null, fetchedAt: number }
-// Persists across message handling within a SW lifetime (not durable).
-const llmsTxtCache = new Map();
-const LLMS_TXT_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-async function fetchLlmsTxt(tabUrl) {
-  if (!tabUrl) return null;
-  let origin;
-  try { origin = new URL(tabUrl).origin; } catch (_) { return null; }
-  const cached = llmsTxtCache.get(origin);
-  if (cached && Date.now() - cached.fetchedAt < LLMS_TXT_TTL_MS) return cached.content;
-  try {
-    const res = await fetch(`${origin}/llms.txt`, {
-      signal: AbortSignal.timeout(3000),
-      headers: { 'Accept': 'text/plain' }
-    });
-    if (!res.ok) { llmsTxtCache.set(origin, { content: null, fetchedAt: Date.now() }); return null; }
-    const text = (await res.text()).trim().slice(0, 8000); // cap at 8 KB
-    llmsTxtCache.set(origin, { content: text || null, fetchedAt: Date.now() });
-    return text || null;
-  } catch (_) {
-    llmsTxtCache.set(origin, { content: null, fetchedAt: Date.now() });
-    return null;
-  }
 }
 
 // SPA navigation watch.

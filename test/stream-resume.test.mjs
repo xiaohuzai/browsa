@@ -208,20 +208,20 @@ test('CHAT handler initializes streamState BEFORE first delta (no lost window)',
   // before streamState existed, and PEEK would return inFlight:false
   // for that one chunk. (Real bug class — easy to regress.)
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // Find the chatStream call and check that initStreamState(tabId)
   // appears earlier in the file.
   const chatIdx = src.indexOf('chatStream({');
   const initIdx = src.lastIndexOf('initStreamState(tabId)', chatIdx);
-  assert.ok(chatIdx > 0, 'background.js should call chatStream');
+  assert.ok(chatIdx > 0, 'chat-handler.js should call chatStream');
   assert.ok(initIdx > 0 && initIdx < chatIdx,
     'initStreamState(tabId) must be called before chatStream() in the CHAT handler');
 });
 
 test('CHAT handler clears streamState after appendToHistory (no leaks)', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // Find the chatStream call and check that clearStreamState(tabId)
   // appears AFTER appendToHistory in the CHAT handler.
