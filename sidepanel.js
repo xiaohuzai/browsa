@@ -1079,7 +1079,7 @@ async function onSend() {
   });
 
   function attachChunkListener() {
-    port.onMessage.addListener((m) => {
+    port.onMessage.addListener(async (m) => {
       if (m.type === 'CHUNK') {
         if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
         acc += m.delta;
@@ -1107,6 +1107,7 @@ async function onSend() {
         const prevSib = assistantEl.previousElementSibling;
         if (prevSib?.classList.contains('live-think')) prevSib.remove();
         assistantEl.innerHTML = '';
+        renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
         renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
         showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
@@ -1120,7 +1121,7 @@ async function onSend() {
         }
         const finalText = m.full || acc;
         assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
-        renderStream(finalText, true);
+        await renderStream(finalText, true);
         addCodeCopyButtons();
         renderMermaid(assistantEl); renderEcharts(assistantEl);
         outputTokens = 0;
@@ -1147,7 +1148,7 @@ async function onSend() {
         // and handled via the !res.ok block below (no pushChunk for real errors).
         clearInterval(_swPingInterval);
         if (m.code === 'ABORTED') {
-          renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
+          await renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
         }
       }
     });
@@ -1183,7 +1184,7 @@ async function onSend() {
       // Preserve any partial streaming content; append the error inline.
       const errMsg = res.error || 'Unknown error';
       if (acc) {
-        renderStream(acc + `\n\n---\n❌ **${errMsg}**`, true);
+        await renderStream(acc + `\n\n---\n❌ **${errMsg}**`, true);
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
@@ -1198,7 +1199,7 @@ async function onSend() {
     // sendMessage itself threw (SW restart, no receiver, etc.).
     // The CHAT handler never ran, so the user turn was likely NOT stored.
     if (acc) {
-      renderStream(acc + `\n\n---\n❌ **${e.message}**`, true);
+      await renderStream(acc + `\n\n---\n❌ **${e.message}**`, true);
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
@@ -1284,6 +1285,7 @@ async function resumeInFlightStream(tabId) {
       // holds a closure over the original el — that one's renderStream
       // function is now stale. Build a new renderer for the fresh el.
       assistantEl = el;
+      renderStream.destroy?.(); // stop the stale-el renderer's paced reveal
       renderStream = makeStreamRenderer(el, streamRendererOpts);
     }
     return renderStream;
@@ -1309,7 +1311,7 @@ async function resumeInFlightStream(tabId) {
     });
     port.postMessage({ type: 'STREAM_HELLO', tabId });
   });
-  port.onMessage.addListener((m) => {
+  port.onMessage.addListener(async (m) => {
     if (m.type === 'CHUNK') {
       const r = ensureAssistantEl();
       acc += m.delta;
@@ -1339,7 +1341,7 @@ async function resumeInFlightStream(tabId) {
         resumedToolEvents = [];
       }
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
-      r(m.full || acc, true);
+      await r(m.full || acc, true);
       addCodeCopyButtons();
       renderMermaid(assistantEl); renderEcharts(assistantEl);
       outputTokens = 0;
@@ -2116,7 +2118,7 @@ async function renderHistory() {
     } else if (m.role === 'assistant') {
       const rawContent = m.content;
       const el = appendAssistant('', true);
-      el.innerHTML = renderSafe(rawContent);
+      el.innerHTML = await renderSafe(rawContent);
       el.dataset.raw = rawContent; // mirrors appendUser's dataset.raw — read by openDetailThread
       decorateLinks(el);
       addMsgActions(el, () => rawContent);

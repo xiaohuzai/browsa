@@ -86,6 +86,20 @@ const VENDORS = [
     srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'echarts'
+  },
+  {
+    name: 'markstream-core',
+    srcEntry:  'markstream-core/dist/index.js',
+    srcDir:    join(DEPS, 'node_modules'),
+    esmBundle: true,
+    outName:   'markstream-core'
+  },
+  {
+    name: 'stream-markdown-parser',
+    srcEntry:  'stream-markdown-parser/dist/index.js',
+    srcDir:    join(DEPS, 'node_modules'),
+    esmBundle: true,
+    outName:   'stream-markdown-parser'
   }
 ];
 

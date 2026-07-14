@@ -6,7 +6,7 @@
 //   - CLEAR_HISTORY: clear per-tab history
 
 import * as storage from './lib/storage.js';
-import { getCapabilities, ping, ProviderConfigError } from './lib/openai-client.js';
+import { ping, ProviderConfigError } from './lib/openai-client.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import {
   streamPorts, streamState, chatControllers, idleTimerResetters,

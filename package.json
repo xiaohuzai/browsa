@@ -20,7 +20,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "echarts": "^6.1.0",
-    "temml": "^0.13.3"
+    "echarts": "^6.1.0"
   }
 }
