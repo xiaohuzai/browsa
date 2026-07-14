@@ -130,20 +130,23 @@ test('_findCard finds a card of the given class within the next 4 siblings', () 
   assert.equal(_findCard(bubble, 'clarify-card'), null);
 });
 
-test('_insertCard inserts after the tool-progress line when present, else after the bubble itself', () => {
+test('_insertCard always inserts directly after the bubble — tool-progress lives before the bubble now, not after', () => {
   const bubble = document.createElement('div');
+  // A tool-progress element positioned BEFORE the bubble (its actual position
+  // now — see sidepanel.js's showToolProgress) must not affect where the
+  // card lands relative to the bubble.
   const tp = document.createElement('div'); tp.className = 'tool-progress';
   const parent = document.createElement('div');
-  parent.append(bubble, tp);
+  parent.append(tp, bubble);
   document.body.appendChild(parent);
 
   const card = document.createElement('div'); card.className = 'clarify-card';
   _insertCard(bubble, card);
-  assert.equal(tp.nextElementSibling, card, 'card must land right after tool-progress, not right after bubble');
+  assert.equal(bubble.nextElementSibling, card, 'card must land right after the bubble');
 
   const bubble2 = document.createElement('div');
   parent.appendChild(bubble2);
   const card2 = document.createElement('div'); card2.className = 'approval-card';
   _insertCard(bubble2, card2);
-  assert.equal(bubble2.nextElementSibling, card2, 'with no tool-progress sibling, card lands right after the bubble');
+  assert.equal(bubble2.nextElementSibling, card2, 'with no following sibling, card lands right after the bubble');
 });

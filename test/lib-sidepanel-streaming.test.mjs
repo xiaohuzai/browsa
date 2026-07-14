@@ -185,3 +185,66 @@ test('onSend(): a RETRY message destroys the abandoned pacer before building a f
   assert.match(assistantEl.textContent, /second attempt final text/);
   assert.doesNotMatch(assistantEl.textContent, /first attempt text/, 'RETRY must have cleared the failed attempt\'s content');
 });
+
+test('clicking Stop mid-stream marks the abandoned bubble .done so its blinking cursor stops', async () => {
+  // Regression test: cancelStream() used to disconnect the port without
+  // ever touching the in-progress bubble. The background's ERROR/ABORTED
+  // message (which normally finalizes a bubble via renderStream(..., true))
+  // never arrives once the port is gone client-side, so nothing else was
+  // ever going to add .done — the cancelled bubble's ::after blinking
+  // cursor kept animating forever, even after a brand new message was sent.
+  inputEl.value = 'first message, will be cancelled';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(lastChatPort, 'onSend() must open a browsa-chat port');
+
+  lastChatPort.emit({ type: 'CHUNK', delta: 'partial before cancel' });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const cancelledEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  assert.ok(!cancelledEl.classList.contains('done'), 'sanity check: not done yet while streaming');
+
+  // sendBtn doubles as Stop while a stream is active (is-stopping state).
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.ok(cancelledEl.classList.contains('done'),
+    'the cancelled bubble must be marked .done so its blinking cursor (.msg.assistant::after) stops');
+
+  // Send a second message — its own bubble must be the ONLY one still
+  // blinking (i.e. the only .msg.assistant without .done).
+  inputEl.value = 'second message';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  lastChatPort.emit({ type: 'DONE', full: 'second message reply' });
+  await new Promise((r) => setTimeout(r, 50));
+
+  const stillBlinking = [...messagesEl.querySelectorAll('.msg.assistant')].filter((el) => !el.classList.contains('done'));
+  assert.equal(stillBlinking.length, 0, 'after the second message completes, no assistant bubble should still be missing .done');
+});
+
+test('TOOL_PROGRESS renders before the bubble (grouped with thinking), not after', async () => {
+  inputEl.value = 'use a tool please';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(lastChatPort);
+
+  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  lastChatPort.emit({ type: 'TOOL_PROGRESS', text: 'Reading file foo.js' });
+  await new Promise((r) => setTimeout(r, 10));
+
+  const tp = assistantEl.previousElementSibling;
+  assert.ok(tp?.classList.contains('tool-progress'), 'tool-progress must be the bubble\'s PREVIOUS sibling, not its next one');
+  assert.match(tp.textContent, /Reading file foo\.js/);
+
+  // A second TOOL_PROGRESS event must update the same element in place,
+  // not create a duplicate — same "overwrite" contract as before the move.
+  lastChatPort.emit({ type: 'TOOL_PROGRESS', text: 'Running tests' });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(assistantEl.previousElementSibling, tp, 'must reuse the same element, not insert a second one');
+  assert.match(tp.textContent, /Running tests/);
+  assert.doesNotMatch(tp.textContent, /Reading file/, 'old tool-progress text must be replaced, not appended');
+
+  lastChatPort.emit({ type: 'DONE', full: 'done with tools' });
+  await new Promise((r) => setTimeout(r, 50));
+});

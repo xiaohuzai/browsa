@@ -37,7 +37,7 @@
             <button data-act="save-system-prompt" class="primary">Save</button>
             <button data-act="reset-system-prompt">Reset to default</button>
           </div>
-          <div class="inline-field" style="margin-top:12px">
+          <div class="inline-field mt-12">
             <label for="replyLanguage">Reply language</label>
             <select id="replyLanguage">
               <option value="">Auto (follow system prompt)</option>
@@ -79,57 +79,57 @@
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-header">
-          <h2>Floating selection toolbar</h2>
-        </div>
-        <div class="card-body">
-          <p class="hint">A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.</p>
-          <label class="toggle-row">
-            <input type="checkbox" id="showSelectionToolbar" />
-            <span>Show floating toolbar on text selection</span>
-          </label>
-          <label class="toggle-row" style="margin-top:8px">
-            <input type="checkbox" id="llmsTxtEnabled" checked />
-            <span>Fetch <code>llms.txt</code> from page origin and include as context</span>
-          </label>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-header">
-          <h2>Chat Preferences</h2>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <label>Message font size
-              <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-                <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" style="flex:1" />
-                <span id="fontSizeVal" style="font-size:12px;color:var(--muted);width:36px">13.5px</span>
-              </div>
-            </label>
-          </div>
-          <div class="row" style="margin-top:12px">
-            <label>Send shortcut
-              <select id="sendShortcut" style="margin-top:4px;width:100%">
-                <option value="enter">Enter (Shift+Enter for newline)</option>
-                <option value="shift-enter">Shift+Enter (Enter for newline)</option>
-              </select>
-            </label>
-          </div>
-          <label class="toggle-row" style="margin-top:12px">
-            <input type="checkbox" id="thoughtAutoCollapse" />
-            <span>Auto-collapse thinking blocks</span>
-          </label>
-          <div class="card-actions">
-            <button data-act="save-chat-prefs" class="primary">Save</button>
-            <span id="chat-prefs-status" class="card-status"></span>
-          </div>
-        </div>
-      </section>
-
       <details class="advanced-section">
         <summary class="advanced-summary">⚙ Advanced</summary>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Floating selection toolbar</h2>
+          </div>
+          <div class="card-body">
+            <p class="hint">A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.</p>
+            <label class="toggle-row">
+              <input type="checkbox" id="showSelectionToolbar" />
+              <span>Show floating toolbar on text selection</span>
+            </label>
+            <label class="toggle-row mt-8">
+              <input type="checkbox" id="llmsTxtEnabled" checked />
+              <span>Fetch <code>llms.txt</code> from page origin and include as context</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Chat Preferences</h2>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <label>Message font size
+                <div class="range-row mt-4">
+                  <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" />
+                  <span id="fontSizeVal" class="range-val">13.5px</span>
+                </div>
+              </label>
+            </div>
+            <div class="row mt-12">
+              <label>Send shortcut
+                <select id="sendShortcut" class="mt-4">
+                  <option value="enter">Enter (Shift+Enter for newline)</option>
+                  <option value="shift-enter">Shift+Enter (Enter for newline)</option>
+                </select>
+              </label>
+            </div>
+            <label class="toggle-row mt-12">
+              <input type="checkbox" id="thoughtAutoCollapse" />
+              <span>Auto-collapse thinking blocks</span>
+            </label>
+            <div class="card-actions">
+              <button data-act="save-chat-prefs" class="primary">Save</button>
+              <span id="chat-prefs-status" class="card-status"></span>
+            </div>
+          </div>
+        </section>
 
         <section class="card">
           <div class="card-header">

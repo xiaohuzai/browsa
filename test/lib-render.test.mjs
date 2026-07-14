@@ -97,6 +97,41 @@ test('renderStreamingSafe/renderSafe strip data:image/svg+xml (can carry its own
   }
 });
 
+test('renderSafe/renderStreamingSafe preserve non-URI attributes marked can emit (ol start=, td colspan=, input type=)', async () => {
+  // Regression test: DOMPurify's ALLOWED_URI_REGEXP option (previously
+  // passed straight into sanitize()) validates the VALUE of every allowed
+  // attribute that isn't on DOMPurify's own internal "safe" list, not just
+  // href/src -- so a strict custom regex silently stripped <ol start="N">
+  // (a bare number fails an https?:/mailto:/tel:/data:image:/# allowlist),
+  // <td colspan="N">, and <input type="checkbox">. Confirmed a real user
+  // report: a second numbered list continuing from "2." rendered as "1."
+  // instead, because <ol start="2"> lost its start attribute silently.
+  // A blank-line gap alone isn't enough to reproduce this -- marked merges
+  // it into one loose <ol>. A sub-bullet list breaking the two numbered
+  // items (as real replies commonly have: "1. reason: - a - b") forces
+  // marked to emit two separate <ol> blocks, the second needing start="2".
+  const md = `1. first list item, with reasons:
+- a
+- b
+
+2. second list item continuing the same numbering
+- c
+`;
+  for (const render of [renderStreamingSafe, renderSafe]) {
+    const html = await render(md);
+    assert.match(html, /<ol start="2">/, `${render.name} must preserve <ol start="N"> so the second list continues numbering instead of restarting at 1`);
+  }
+});
+
+test('renderSafe/renderStreamingSafe still strip javascript: URIs from real href/src attributes', async () => {
+  for (const render of [renderStreamingSafe, renderSafe]) {
+    const html = await render('[click me](javascript:alert(1))');
+    assert.doesNotMatch(html, /href="javascript:/, `${render.name} must still block javascript: hrefs`);
+    const okHtml = await render('[click me](https://example.com)');
+    assert.match(okHtml, /href="https:\/\/example\.com"/, `${render.name} must still allow safe https hrefs`);
+  }
+});
+
 test('renderSafe renders $...$ LaTeX via KaTeX', async () => {
   const html = await renderSafe('inline $x^2$ math');
   assert.match(html, /<math/, 'must produce MathML output, not a literal dollar-sign string');
@@ -230,6 +265,28 @@ test('makeStreamRenderer: splits <think>...</think> into a live collapsible elem
   const live = document.querySelector('.think-block.live-think');
   assert.ok(live, 'a live think block must appear while inside an unclosed <think> tag');
   assert.match(live.querySelector('.think-body').textContent, /reasoning in progress/);
+});
+
+test('makeStreamRenderer: live <think> content is rendered as markdown, not dumped as raw textContent', async () => {
+  // Regression test: thinkBodyEl used to be set via .textContent, so a
+  // thinking block containing markdown (lists, bold, code) showed as
+  // literal "- **item**" syntax while streaming, then snapped to properly
+  // rendered HTML the instant the stream finished and renderSafe()'s
+  // separate think-block markdown pass took over.
+  const el = document.createElement('div');
+  document.body.appendChild(el);
+  const render = makeStreamRenderer(el, {});
+  render('<think>a **bold** point', false);
+  await new Promise((r) => setTimeout(r, 950));
+  // thinkEl is inserted as el's immediately preceding sibling (not queried
+  // globally) — other tests in this file leave their own stale
+  // .think-block.live-think nodes in document.body, and a global
+  // querySelector would grab the first (wrong, earlier) one instead of
+  // this test's.
+  const live = el.previousElementSibling;
+  assert.ok(live?.classList.contains('live-think'), 'a live think block must appear while inside an unclosed <think> tag');
+  const body = live.querySelector('.think-body');
+  assert.match(body.innerHTML, /<strong>bold<\/strong>/, 'live thinking markdown must be rendered, not shown as literal ** characters');
 });
 
 test('makeStreamRenderer: a bursty non-final delta is paced, not revealed all at once', async () => {
