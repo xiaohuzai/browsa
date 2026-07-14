@@ -1927,6 +1927,7 @@ function appendAttachSystem(text) {
   messagesEl.appendChild(el);
   scrollToBottom(true);
 }
+
 /**
  * After streaming ends, render accumulated tool-call events as a collapsible
  * <details> panel *above* the assistant bubble — mirrors personal_ai_assistant's
