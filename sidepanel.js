@@ -99,6 +99,9 @@ async function init() {
   const cfg = cfgRes.data || cfgRes; // unwrap { ok, data } envelope
   populateProviderSelect(cfg);
   applyContextMode(cfg.contextMode || 'auto');
+  // Quickbar collapse: purely a user preference, no auto-hide heuristic —
+  // same "user decides, we don't guess" principle as the message fold button.
+  $('quickbar')?.classList.toggle('collapsed', !!cfg.quickbarCollapsed);
 
   // Load chat preferences
   sendShortcut = cfg.sendShortcut || 'enter';
@@ -132,6 +135,10 @@ async function init() {
       inputEl.focus();
       onSend();
     });
+  });
+  $('quickbar-toggle')?.addEventListener('click', () => {
+    const collapsed = $('quickbar').classList.toggle('collapsed');
+    chrome.storage.local.set({ quickbarCollapsed: collapsed });
   });
   inputEl.addEventListener('input', () => { updateComposerInfo(); updateSlashSuggest(); });
   inputEl.addEventListener('blur', () => setTimeout(() => hideSlashSuggest(), 150));
@@ -810,6 +817,15 @@ function cancelStream() {
   if (!activeController) return;
   activeController.cancelled = true;
   const wasResumed = activeController.resumed === true;
+  const port = activeController.port;
+  // Capture these BEFORE touching the port below — port.disconnect() can
+  // synchronously fire this same port's onDisconnect listener (jsdom's fake
+  // port does; real chrome.runtime.Port normally fires it on a later tick,
+  // but nothing guarantees that), and that listener sets activeController
+  // to null. Reading activeController.el/.renderStream after disconnect()
+  // would then throw.
+  const cancelledEl = activeController.el;
+  const cancelledRenderStream = activeController.renderStream;
   // Send STREAM_ABORT first (best-effort). The background's CHAT handler
   // is awaiting chatStream() with the matching AbortController; calling
   // .abort() throws AbortError on the next read(), which the catch
@@ -821,9 +837,21 @@ function cancelStream() {
   if (currentTabId != null) {
     sendMessage({ type: 'STREAM_ABORT', tabId: currentTabId }).catch(() => {});
   }
-  if (activeController.port) {
-    try { activeController.port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
-    try { activeController.port.disconnect(); } catch (_) {}
+  if (port) {
+    try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+    try { port.disconnect(); } catch (_) {}
+  }
+  // Disconnecting the port above means the background's ERROR/ABORTED
+  // message (which normally finalizes the bubble via renderStream(..., true)
+  // — see the ERROR handlers elsewhere in onSend/resumeInFlightStream) will
+  // never arrive for a user-initiated cancel. Without this, the cancelled
+  // bubble's ::after blinking-cursor pseudo-element keeps animating forever,
+  // since nothing else ever adds .done to it — a real bug: cancel, then send
+  // a new message, and the OLD bubble's cursor is still blinking alongside
+  // the new one's.
+  if (cancelledEl) {
+    cancelledEl.classList.add('done');
+    cancelledRenderStream?.destroy?.();
   }
   activeController = null;
   setStreamingUI(false);
@@ -1049,7 +1077,7 @@ async function onSend() {
   // arrive. We pass the port's name to the background via msg.port; the
   // background matches it to the connected port and pushes deltas back.
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
-  activeController = { port, cancelled: false };
+  activeController = { port, cancelled: false, el: assistantEl, renderStream };
 
   // Keep the SW alive during streaming by pinging it every 20s.
   // Chrome's MV3 SW can be killed for idleness when the SSE stream goes
@@ -1109,6 +1137,7 @@ async function onSend() {
         assistantEl.innerHTML = '';
         renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
         renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
+        if (activeController) activeController.renderStream = renderStream;
         showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
       } else if (m.type === 'DONE') {
@@ -1287,6 +1316,7 @@ async function resumeInFlightStream(tabId) {
       assistantEl = el;
       renderStream.destroy?.(); // stop the stale-el renderer's paced reveal
       renderStream = makeStreamRenderer(el, streamRendererOpts);
+      if (activeController) { activeController.el = assistantEl; activeController.renderStream = renderStream; }
     }
     return renderStream;
   }
@@ -1381,7 +1411,7 @@ async function resumeInFlightStream(tabId) {
   // sends STREAM_RELEASE; the background keeps streaming but no chunks
   // reach us, and PEEK stops returning in-flight. Reasonable trade-off
   // for v0.20.4; v0.20.5 will plumb an AbortController through.
-  activeController = { port, cancelled: false, tabId, resumed: true };
+  activeController = { port, cancelled: false, tabId, resumed: true, el: assistantEl, renderStream };
 }
 
 /**
@@ -1621,7 +1651,7 @@ function addMsgActions(el, getRaw) {
   // Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'msg-action-icon';
+    copyBtn.className = 'msg-action-icon copy-icon';
     copyBtn.title = 'Copy response';
     copyBtn.innerHTML = ICONS.copy;
     copyBtn.addEventListener('click', async (e) => {
@@ -1752,14 +1782,23 @@ function classifyToolTier(text) {
   return { tier: '', icon: ICONS.gear };
 }
 
-/** Show a faint "tool progress" line below a streaming bubble. */
+/** Show a faint "tool progress" line above a streaming bubble, alongside thinking. */
 function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
-  let el = bubbleEl.nextElementSibling;
+  // Positioned before the bubble (grouped with the live-think box, which
+  // uses the same insertBefore pattern in render.js's ensureThinkEl()) so
+  // "process" indicators (thinking, tool calls) sit together above the
+  // final answer, instead of thinking above and tool-progress below.
+  // Whichever of {thinkEl, tool-progress} was most recently created/updated
+  // ends up closest to the bubble — not a full arrival-order timeline, but
+  // a reasonable approximation without redesigning the streaming DOM
+  // structure (tool-progress events have no position info the way <think>
+  // tags carry their own position in the reply markdown).
+  let el = bubbleEl.previousElementSibling;
   if (!el || !el.classList.contains('tool-progress')) {
     el = document.createElement('div');
     el.className = 'tool-progress';
-    bubbleEl.insertAdjacentElement('afterend', el);
+    bubbleEl.parentNode.insertBefore(el, bubbleEl);
   }
   const { tier, icon } = tierOverride ? { tier: tierOverride, icon: ICONS.gear } : classifyToolTier(text);
   el.dataset.tier = tier;
@@ -1767,7 +1806,7 @@ function showToolProgress(bubbleEl, text, tierOverride) {
 }
 /** Remove the tool progress indicator once the reply is done. */
 function clearToolProgress(bubbleEl) {
-  const el = bubbleEl?.nextElementSibling;
+  const el = bubbleEl?.previousElementSibling;
   if (el?.classList.contains('tool-progress')) el.remove();
 }
 

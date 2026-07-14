@@ -194,11 +194,21 @@ body {
   right: 6px;
   display: flex;
   gap: 2px;
+}
+/* Every action fades in on hover except copy — copy is the highest-frequency
+   action on an assistant reply, so it stays visible without requiring a
+   hover-to-discover step first. opacity lives per-icon (not on the .msg-actions
+   wrapper) so copy-icon's opacity:1 isn't multiplied down by a parent opacity:0. */
+.msg-actions .msg-action-icon {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
 }
-.msg:hover .msg-actions {
+.msg-actions .msg-action-icon.copy-icon {
+  opacity: 1;
+  pointer-events: auto;
+}
+.msg:hover .msg-actions .msg-action-icon {
   opacity: 1;
   pointer-events: auto;
 }
@@ -796,6 +806,26 @@ math[display="block"] {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--accent);
 }
+/* Collapse toggle: purely a user preference (persisted, no auto-hide
+   heuristic) — the toggle itself always stays visible so it can bring the
+   pills back; only the .qa-btn pills hide when collapsed. */
+.quickbar-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.quickbar-toggle svg { transition: transform var(--t); }
+.quickbar-toggle:hover { color: var(--fg); }
+.quickbar.collapsed .qa-btn { display: none; }
+.quickbar.collapsed .quickbar-toggle svg { transform: rotate(180deg); }
 
 /* ─── Composer ──────────────────────────────────────────────────────────────── */
 .composer {
@@ -1001,6 +1031,16 @@ math[display="block"] {
 }
 
 /* ─── Accessibility ─────────────────────────────────────────────────────────── */
+/* The typing-cursor blink, tool-progress pulse, and stop-button pulse all
+   loop indefinitely — collapse them to a single frame for users who've
+   asked the OS for reduced motion, instead of running three different
+   infinite animations at once in an always-visible panel. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
 *:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
