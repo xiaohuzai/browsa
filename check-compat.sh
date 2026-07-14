@@ -54,8 +54,12 @@ if grep -lq "browser_specific_settings" manifest.json 2>/dev/null; then
 fi
 echo "OK  no Firefox-specific manifest keys"
 
-# 5. No Firefox-specific runtime APIs in source
-if grep -rnE "browser\.[a-zA-Z]+" --include="*.js" lib/ background.js sidepanel.js options.js 2>/dev/null; then
+# 5. No Firefox-specific runtime APIs in source. lib/vendor/ is excluded —
+# it's third-party bundles, not browsa's own code, and minified bundles
+# have tripped this before on coincidental substring matches (e.g. a
+# bundled module path literal like "browser.js", not an actual browser.*
+# API call).
+if grep -rnE "browser\.[a-zA-Z]+" --include="*.js" --exclude-dir=vendor lib/ background.js sidepanel.js options.js 2>/dev/null; then
   echo "FAIL: source code uses browser.* (Firefox) APIs"
   exit 1
 fi

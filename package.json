@@ -1,6 +1,6 @@
 {
   "name": "browsa",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "private": true,
   "description": "Hand the current page to your AI agent — side-panel chat for Hermes, Claude Code, or any OpenAI-compatible API",
   "scripts": {
@@ -20,7 +20,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "echarts": "^6.1.0",
-    "temml": "^0.13.3"
+    "echarts": "^6.1.0"
   }
 }

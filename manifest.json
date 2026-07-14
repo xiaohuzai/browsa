@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
@@ -30,7 +30,7 @@
         "https://xiaohongshu.com/*"
       ],
       "js": [
-        "lib/xhs-content-script.js"
+        "lib/content-scripts/xhs-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -41,7 +41,7 @@
         "https://*/*"
       ],
       "js": [
-        "lib/selection-toolbar.js"
+        "lib/content-scripts/selection-toolbar.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -51,7 +51,7 @@
         "https://juejin.cn/*"
       ],
       "js": [
-        "lib/juejin-content-script.js"
+        "lib/content-scripts/juejin-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -63,7 +63,7 @@
         "https://youtube.com/*"
       ],
       "js": [
-        "lib/youtube-content-script.js"
+        "lib/content-scripts/youtube-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -75,7 +75,7 @@
         "https://zhuanlan.zhihu.com/*"
       ],
       "js": [
-        "lib/zhihu-content-script.js"
+        "lib/content-scripts/zhihu-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -86,7 +86,7 @@
         "https://www.dedao.cn/*"
       ],
       "js": [
-        "lib/dedao-content-script.js"
+        "lib/content-scripts/dedao-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -97,7 +97,7 @@
         "https://time.geekbang.org/*"
       ],
       "js": [
-        "lib/geektime-content-script.js"
+        "lib/content-scripts/geektime-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -109,7 +109,7 @@
         "https://bilibili.com/*"
       ],
       "js": [
-        "lib/bilibili-content-script.js"
+        "lib/content-scripts/bilibili-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -121,7 +121,7 @@
         "https://www.xueqiu.com/*"
       ],
       "js": [
-        "lib/xueqiu-content-script.js"
+        "lib/content-scripts/xueqiu-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -133,7 +133,7 @@
         "https://x.com/*"
       ],
       "js": [
-        "lib/twitter-content-script.js"
+        "lib/content-scripts/twitter-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,
@@ -145,7 +145,7 @@
         "https://xiaoyuzhoufm.com/*"
       ],
       "js": [
-        "lib/xiaoyuzhou-content-script.js"
+        "lib/content-scripts/xiaoyuzhou-content-script.js"
       ],
       "run_at": "document_start",
       "all_frames": false,

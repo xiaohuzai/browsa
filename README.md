@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 205 unit tests
+npm test             # run 300+ unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -203,8 +203,8 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **Think blocks** — `<think>` / `<thinking>` content shown in a collapsible block, auto-collapsed after streaming
 - **Markdown rendering** — full GFM: tables, code blocks, lists, inline formatting
 - **Syntax highlighting** — 40+ languages via highlight.js
-- **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX
-- **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar
+- **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX, offloaded to a Web Worker for formula-heavy messages so the panel doesn't jank
+- **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar; sequence diagrams with a semicolon in dialogue text (e.g. embedded SQL) render correctly via an automatic escape-and-retry
 - **ECharts charts** — ` ```echarts ` code blocks rendered inline with a resize-aware toolbar
 - **Diff highlighting** — `diff` code blocks color `+` green and `-` red
 - **Detail thread ("细聊")** — select any text inside a reply to open a scoped side conversation about just that excerpt, without touching the main history. Fully resizable, closes and discards everything on ✕
@@ -275,12 +275,13 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 
 ## How it works
 
-- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages. Manages site XHR caches (keyed by `tabId`), streaming via per-turn `browsa-chat`/`browsa-subchat` ports, and mid-stream tab switching via `streamState`.
-- **`sidepanel.js`** — Chat UI. Streaming markdown rendering, live think-block routing, mermaid/KaTeX/hljs rendering, message editing, session drawer, in-conversation search, multi-select.
+- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages — still the single dispatcher, but the two biggest cases (`CHAT`, `SUBCHAT`) delegate to `lib/handlers/`. Manages site XHR caches (keyed by `tabId`), streaming via per-turn `browsa-chat`/`browsa-subchat` ports, and mid-stream tab switching via `streamState` (`lib/state.js`).
+- **`sidepanel.js`** — Chat UI orchestrator: init/send/history/approval-clarify cards/screenshot crop. The Markdown/Mermaid/KaTeX/ECharts rendering pipeline, sessions drawer, in-conversation search, multi-select, and detail-thread ("细聊") side conversations are each their own module under `lib/sidepanel/`.
+- **`lib/sidepanel/render.js`** — marked + DOMPurify + KaTeX + Mermaid + ECharts + highlight.js pipeline. Streaming deltas are smoothed via `reveal-pacer.js` (a thin wrapper around the vendored `markstream-core` package); KaTeX rendering for the final per-message render offloads formula-heavy messages to a Web Worker (`katex-worker-client.js`/`katex.worker.js`), falling back to synchronous rendering below a small-batch threshold or on worker failure; Mermaid's SVG output is sanitized (`sanitizeMermaidSvg`, from the vendored `stream-markdown-parser` package) and sequence-diagram parse failures auto-retry with problem semicolons escaped (`mermaid-utils.js`).
 - **`lib/page-extractor.js`** — Injects Readability + Turndown into the page MAIN world for reader mode. For SPA sites, uses the XHR cache from the matching content script.
 - **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/runs` (Hermes — approval/clarification/tool-progress events, auto-detected).
 - **`lib/storage.js`** — `chrome.storage.local` wrapper. Global flat conversation history (not per-tab), session management, mask rules.
-- **Content scripts** — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XMLHttpRequest.prototype` to observe SPA API calls and forward structured data to the background.
+- **Content scripts** (`lib/content-scripts/`) — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XMLHttpRequest.prototype` to observe SPA API calls and forward structured data to the background.
 
 ---
 
@@ -289,25 +290,43 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 ```
 browsa/
 ├── manifest.json
-├── background.js                      # service worker + message router
-├── sidepanel.{html,css,js}            # chat UI
+├── background.js                      # service worker + message router (dispatcher only)
+├── sidepanel.{html,css,js}            # chat UI orchestrator
 ├── options.{html,css,js}              # settings page
 ├── lib/
 │   ├── constants.js                   # shared constants (PAGE_CONTEXT_PREFIX, …)
+│   ├── state.js                       # shared stream/approval state Maps (used by background.js)
 │   ├── openai-client.js               # SSE streaming client
 │   ├── page-extractor.js              # content extraction + site synthesizers
 │   ├── storage.js                     # chrome.storage wrapper + session mgmt
-│   ├── selection-toolbar.js           # floating toolbar (Shadow DOM)
-│   ├── xhs-content-script.js          # 小红书 XHR interceptor
-│   ├── youtube-content-script.js      # YouTube player API interceptor
-│   ├── bilibili-content-script.js     # Bilibili video API interceptor
-│   ├── juejin-content-script.js       # 掘金 article interceptor
-│   ├── zhihu-content-script.js        # 知乎 article / Q&A interceptor
-│   ├── twitter-content-script.js      # Twitter/X GraphQL interceptor
-│   ├── xueqiu-content-script.js       # 雪球 stock/post interceptor
-│   ├── xiaoyuzhou-content-script.js   # 小宇宙 podcast interceptor
-│   ├── dedao-content-script.js        # 得到 interceptor
-│   ├── geektime-content-script.js     # 极客时间 interceptor
+│   ├── handlers/
+│   │   ├── chat-handler.js            # CHAT case body
+│   │   └── subchat-handler.js         # SUBCHAT / SUBCHAT_ABORT case bodies
+│   ├── sidepanel/                     # sidepanel.js's feature modules
+│   │   ├── render.js                  # marked+DOMPurify+KaTeX+Mermaid+ECharts pipeline
+│   │   ├── reveal-pacer.js            # smooth-reveal wrapper around vendored markstream-core
+│   │   ├── katex-threshold.js         # "worth offloading to a worker?" heuristic
+│   │   ├── katex-worker-client.js     # batches formulas to katex.worker.js, sync fallback
+│   │   ├── katex.worker.js            # dedicated KaTeX rendering Worker
+│   │   ├── mermaid-utils.js           # sequence-diagram semicolon fix + preview-height estimate
+│   │   ├── sessions-ui.js             # sessions drawer
+│   │   ├── multiselect.js             # bulk-delete mode
+│   │   ├── msg-search.js              # Ctrl+F in-conversation search
+│   │   ├── detail-thread.js           # "select text → 细聊" side conversation
+│   │   ├── icons.js                   # ICONS SVG map
+│   │   └── ui-utils.js                # $, escM, sendMessage, toast/confirm, card helpers
+│   ├── content-scripts/               # MAIN-world XHR interceptors + ISOLATED-world toolbar
+│   │   ├── selection-toolbar.js       # floating toolbar (Shadow DOM)
+│   │   ├── xhs-content-script.js      # 小红书 XHR interceptor
+│   │   ├── youtube-content-script.js  # YouTube player API interceptor
+│   │   ├── bilibili-content-script.js # Bilibili video API interceptor
+│   │   ├── juejin-content-script.js   # 掘金 article interceptor
+│   │   ├── zhihu-content-script.js    # 知乎 article / Q&A interceptor
+│   │   ├── twitter-content-script.js  # Twitter/X GraphQL interceptor
+│   │   ├── xueqiu-content-script.js   # 雪球 stock/post interceptor
+│   │   ├── xiaoyuzhou-content-script.js # 小宇宙 podcast interceptor
+│   │   ├── dedao-content-script.js    # 得到 interceptor
+│   │   └── geektime-content-script.js # 极客时间 interceptor
 │   └── vendor/                        # bundled third-party libs
 │       ├── Readability.iife.js
 │       ├── Turndown.iife.js
@@ -316,13 +335,15 @@ browsa/
 │       ├── katex.bundle.js
 │       ├── highlight.bundle.js
 │       ├── mermaid.bundle.js
-│       └── echarts.bundle.js
+│       ├── echarts.bundle.js
+│       ├── markstream-core.bundle.js   # streaming-reveal pacing controller
+│       └── stream-markdown-parser.bundle.js # Mermaid SVG sanitizer
 ├── _locales/{en,zh_CN}/
 ├── icons/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (205 tests)
+├── test/                              # node:test unit tests (300+ tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
@@ -342,7 +363,8 @@ browsa/
 ## Security
 
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
-- LLM replies are sanitized with DOMPurify before rendering.
+- LLM replies are sanitized with DOMPurify before rendering, including a hook that blocks `data:image/svg+xml` sources (which can carry their own `<script>`/event handlers) while still allowing normal bitmap `data:` images.
+- Mermaid diagram SVG output is sanitized before insertion (strips `<script>`, event-handler attributes, and dangerous URLs) — needed because Mermaid's `securityLevel:'loose'` mode, required for KaTeX math inside diagram labels, otherwise permits arbitrary HTML through.
 - Content scripts only observe network requests; they never modify or block them.
 
 ---

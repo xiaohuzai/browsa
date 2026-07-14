@@ -1854,7 +1854,20 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
    (see openDetailThread in sidepanel.js) — no parallel bubble styling here,
    so they can never drift out of sync with the main chat's look. */
 .subchat-error { color: #f87171; }
-.detail-thread-input-row { display: flex; gap: 6px; }
+.detail-thread-input-row {
+  display: flex;
+  gap: 6px;
+  /* margin-top:auto consumes all remaining free space above this row in
+     the flex column, pinning it (and everything after it — the resize
+     handle) to the true bottom of the card, regardless of whether
+     .detail-thread-messages (the only flex-grow sibling) is present or
+     display:none (":empty" rule above, before any message exists). Real
+     bug this fixes: putting margin-top:auto on the resize handle instead
+     pinned only the handle to the bottom — dragging the card taller left
+     the input row stranded near the top with a growing blank gap between
+     it and the handle, since nothing pushed the input row itself down. */
+  margin-top: auto;
+}
 .detail-thread-input {
   flex: 1;
   padding: 5px 8px;
@@ -1883,6 +1896,13 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Top margin is a small fixed gap, NOT auto — margin-top:auto belongs on
+     .detail-thread-input-row instead (see its rule below). Putting it here
+     pinned the handle to the bottom correctly, but left the input row
+     stranded near the top with a growing gap between the input row and the
+     handle whenever the card was dragged taller before any message
+     existed — the input row must always sit immediately above the handle,
+     at the true bottom of the card, not just the handle by itself. */
   margin: 4px -12px -10px;
   height: 18px;
   cursor: ns-resize;

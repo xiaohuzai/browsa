@@ -120,7 +120,7 @@ test('STREAM_ABORT with no live controller is a safe no-op', async () => {
 
 test('CHAT handler stores AbortController in chatControllers before stream', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // The order must be: controller created → set in chatControllers →
   // passed as signal to chatStream. If the set happens AFTER chatStream
@@ -134,7 +134,7 @@ test('CHAT handler stores AbortController in chatControllers before stream', asy
 
 test('CHAT handler clears chatControllers in finally (no leaks)', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // chatControllers.delete(tabId) must appear inside a finally block
   // to avoid leaks when the LLM throws a real error.
@@ -153,7 +153,7 @@ test('CHAT handler catches AbortError and does NOT append to history', async () 
   // AbortError and returns early without reaching the
   // `appendToHistory(tabId, { role: 'assistant'...})` line.
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // The AbortError catch block must (a) detect the abort, (b) push
   // an ERROR {code: 'ABORTED'} chunk, (c) clearStreamState, (d) return

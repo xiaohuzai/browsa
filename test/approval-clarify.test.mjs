@@ -161,11 +161,11 @@ test('CLARIFY_RESPOND posts the response to /v1/runs/{id}/clarifications/{id}/re
 
 test('activeRunIds/pendingApprovals/pendingClarifications are cleared in the CHAT finally block', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   const finallyIdx = src.lastIndexOf('finally {', src.indexOf('chatControllers.delete(tabId)'));
   assert.ok(finallyIdx > 0, 'must find the finally block that cleans up chatControllers');
-  const finallyBlockEnd = src.indexOf('\n      }', finallyIdx);
+  const finallyBlockEnd = src.indexOf('\n  }', finallyIdx);
   const finallyBlock = src.slice(finallyIdx, finallyBlockEnd);
 
   assert.match(finallyBlock, /activeRunIds\.delete\(tabId\)/, 'activeRunIds must be cleared in finally');
@@ -177,7 +177,7 @@ test('activeRunIds/pendingApprovals/pendingClarifications are cleared in the CHA
 
 test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // isHermes is auto-detected via ping (options.js probes run_submission /
   // run_events_sse). Whenever it's true we always prefer Hermes's richer
@@ -191,7 +191,7 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
   // The doStream() closure must branch on isHermes to pick the API client.
   const doStreamIdx = src.indexOf('const doStream = async () => {');
   assert.ok(doStreamIdx > 0, 'doStream must be defined');
-  const doStreamEnd = src.indexOf('\n      };', doStreamIdx);
+  const doStreamEnd = src.indexOf('\n  };', doStreamIdx);
   const doStreamSrc = src.slice(doStreamIdx, doStreamEnd);
 
   assert.match(doStreamSrc, /if \(isHermes\)/, 'doStream must branch on isHermes');

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 function loadContentScript(name) {
-  return require(fileURLToPath(new URL(`../lib/${name}`, import.meta.url)));
+  return require(fileURLToPath(new URL(`../lib/content-scripts/${name}`, import.meta.url)));
 }
 
 // ============================================================================
