@@ -1065,6 +1065,185 @@ test('extractFullInPageWorld strips zero-width/control chars from raw textConten
   assert.ok(out.text.includes('HelloWorld'), 'surrounding text must be preserved');
 });
 
+// --- Same-origin iframe / open shadow-DOM extraction ------------------------
+// All three MAIN-world extraction paths used to treat <iframe> as pure noise
+// and never traversed shadow DOM, silently dropping any page content
+// embedded that way. Ported idea from auditing page-agent's extension.
+
+async function runExtractInPageWorldOnLiveDoc(doc, win) {
+  const fnBody = await loadSiblingFn('extractInPageWorld');
+  const countImagesBody = await loadSiblingFn('countImages');
+  const rSrc = await readFile(join(ROOT, 'lib/vendor/Readability.iife.js'), 'utf8');
+  const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
+  // jsdom has no layout engine, so offsetWidth/offsetHeight are always 0 for
+  // every element (documented elsewhere in this file). Production's
+  // CSS-hidden check treats (offsetWidth===0 && offsetHeight===0) as hidden,
+  // which would otherwise mark all real content as hidden and strip it here
+  // -- unlike a real browser, where visible elements report real dimensions.
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 100 });
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 20 });
+  const ctx = vm.createContext({
+    document: doc, window: win, Node: win.Node, NodeFilter: win.NodeFilter, DOMParser: win.DOMParser, console
+  });
+  vm.runInContext(rSrc, ctx);
+  vm.runInContext(tSrc, ctx);
+  return vm.runInContext(`${countImagesBody}\n${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 100000 });`, ctx);
+}
+
+// Same-origin iframe content is a real, separate Document in a real browser
+// (iframe.contentDocument) -- represented here with a fully independent
+// nested JSDOM instance rather than a plain stub object, so production code
+// that treats the body as a real Element (walk()'s recursion in
+// extractDomTreeInPageWorld) works exactly as it would in Chrome.
+function makeIframeContentDoc(bodyHtml) {
+  return new JSDOM(`<!doctype html><html><body>${bodyHtml}</body></html>`).window.document;
+}
+
+test('extractDomTreeInPageWorld descends into an open shadow root', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body><div id="host"></div></body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const host = doc.getElementById('host');
+  const root = host.attachShadow({ mode: 'open' });
+  const p = doc.createElement('p');
+  p.textContent = 'Shadow content that is definitely long enough to pass the threshold.';
+  root.appendChild(p);
+  const ctx = vm.createContext({ document: doc, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /Shadow content that is definitely long enough/, 'shadow-root text must be included');
+});
+
+test('extractDomTreeInPageWorld descends into a same-origin iframe body', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body><div id="wrap"></div></body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const iframe = doc.createElement('iframe');
+  Object.defineProperty(iframe, 'contentDocument', {
+    get: () => makeIframeContentDoc('<p>Iframe body text long enough to pass the forty char threshold.</p>')
+  });
+  doc.getElementById('wrap').appendChild(iframe);
+  const ctx = vm.createContext({ document: doc, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /Iframe body text long enough/, 'same-origin iframe text must be included');
+});
+
+test('extractDomTreeInPageWorld does not crash when iframe.contentDocument access throws (cross-origin)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body><div id="wrap"></div></body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const iframe = doc.createElement('iframe');
+  Object.defineProperty(iframe, 'contentDocument', {
+    get: () => { throw new Error('SecurityError: cross-origin'); }
+  });
+  doc.getElementById('wrap').appendChild(iframe);
+  const ctx = vm.createContext({ document: doc, window: dom.window, Node: dom.window.Node });
+  assert.doesNotThrow(() => {
+    vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  });
+});
+
+test('extractDomTreeInPageWorld ignores trivial shadow/iframe content below the 40-char threshold', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body><div id="host"></div></body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const host = doc.getElementById('host');
+  const root = host.attachShadow({ mode: 'open' });
+  const span = doc.createElement('span');
+  span.textContent = 'x';
+  root.appendChild(span);
+  const ctx = vm.createContext({ document: doc, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.ok(!out.text.includes('x'), 'trivial (<40 char) shadow content must be skipped');
+});
+
+test('extractFullInPageWorld includes shadow-root and same-origin iframe text', async () => {
+  const fnBody = await loadSiblingFn('extractFullInPageWorld');
+  const html = `<!doctype html><html><body>
+    <p>Some visible body text that is long enough to extract on its own merits.</p>
+    <div id="host"></div>
+    <div id="wrap"></div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const root = doc.getElementById('host').attachShadow({ mode: 'open' });
+  const p = doc.createElement('p');
+  p.textContent = 'Shadow root text that is definitely long enough to clear the threshold.';
+  root.appendChild(p);
+  const iframe = doc.createElement('iframe');
+  Object.defineProperty(iframe, 'contentDocument', {
+    get: () => ({ body: { textContent: 'Iframe text that is definitely long enough to clear the threshold.' } })
+  });
+  doc.getElementById('wrap').appendChild(iframe);
+  const ctx = vm.createContext({ document: doc, window: dom.window, NodeFilter: dom.window.NodeFilter });
+  const out = vm.runInContext(`${fnBody}\nextractFullInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /Shadow root text that is definitely long enough/, 'shadow-root text must be included');
+  assert.match(out.text, /Iframe text that is definitely long enough/, 'iframe text must be included');
+});
+
+test('extractInPageWorld: shadow-root content survives into the final markdown', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <div id="host"></div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const root = doc.getElementById('host').attachShadow({ mode: 'open' });
+  const p = doc.createElement('p');
+  p.textContent = 'Shadow-embedded content that must survive into the final markdown output.';
+  root.appendChild(p);
+  const result = await runExtractInPageWorldOnLiveDoc(doc, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /Shadow-embedded content that must survive/, 'shadow content must reach the final markdown');
+});
+
+test('extractInPageWorld: same-origin iframe content survives, iframe tag itself is gone', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <div id="wrap"></div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const iframe = doc.createElement('iframe');
+  Object.defineProperty(iframe, 'contentDocument', {
+    get: () => ({ body: { textContent: 'Iframe-embedded content that must survive into the final markdown.', innerHTML: '<p>Iframe-embedded content that must survive into the final markdown.</p>' } })
+  });
+  doc.getElementById('wrap').appendChild(iframe);
+  const result = await runExtractInPageWorldOnLiveDoc(doc, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /Iframe-embedded content that must survive/, 'iframe content must reach the final markdown');
+});
+
+test('extractInPageWorld: trivial shadow content below the 40-char threshold is not captured, no leftover marker attrs', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <div id="host"></div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const host = doc.getElementById('host');
+  const root = host.attachShadow({ mode: 'open' });
+  const span = doc.createElement('span');
+  span.textContent = 'tiny';
+  root.appendChild(span);
+  const result = await runExtractInPageWorldOnLiveDoc(doc, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(!result.text.includes('tiny'), 'trivial shadow content must not be captured');
+  assert.equal(host.getAttribute('data-browsa-embed'), null, 'live host element must not retain a leftover marker attribute');
+});
+
 // --- Repeated-structure detection (list item boundary markers) -------------
 // extractDomTreeInPageWorld now detects when a container has >=3 structurally
 // similar children (e.g. .product-card, .comment-row) and wraps each item in
