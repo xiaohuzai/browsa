@@ -270,6 +270,13 @@ async function saveCard(name, card) {
 }
 
 async function pingCard(name, card) {
+  // "Configured" for the purposes of auto-switching the active provider
+  // means reachable, not just "has some baseUrl filled in" (Hermes ships
+  // with a non-empty default baseUrl, so a naive baseUrl check would never
+  // let you notice you'd forgotten to switch away from it). Capture the
+  // prior state before saveCard() below unconditionally clears it.
+  const wasReachable = _pingState[name] === 'reachable';
+
   await saveCard(name, card);
   const cfg = cachedCfg.providers[name];
 
@@ -282,6 +289,22 @@ async function pingCard(name, card) {
   flashCard(card, '', 'Pinging…');
   try {
     const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+
+    // First time this provider goes from not-reachable to reachable, make
+    // it the active one -- otherwise it's easy to ping-verify e.g.
+    // OpenAI-compatible and forget the dropdown is still pointed at
+    // whatever was active before. Re-pinging an already-reachable provider
+    // (e.g. after tweaking temperature) does not re-trigger this, so it
+    // won't clobber a deliberate switch between multiple reachable providers.
+    let activeNote = '';
+    if (!wasReachable && cachedCfg.activeProvider !== name) {
+      cachedCfg.activeProvider = name;
+      await chrome.storage.local.set({ activeProvider: name });
+      document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
+      card.classList.add('active');
+      activeNote = ' — set as active provider';
+    }
+
     // Auto-detect capabilities and update isHermes accordingly. isHermes
     // gates the Hermes-only /v1/runs API (approval, clarification, tool
     // events) — so it should reflect run support, not the generic
@@ -293,9 +316,9 @@ async function pingCard(name, card) {
         cachedCfg.providers[name].isHermes = hasRuns;
         await chrome.storage.local.set({ providers: cachedCfg.providers });
       }
-      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]`);
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]${activeNote}`);
     } else {
-      flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}`);
+      flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}${activeNote}`);
     }
     setBadge(card, 'reachable', name);
   } catch (e) {

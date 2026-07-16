@@ -528,8 +528,21 @@ async function handleSelectionAction(action, text) {
 
 
 function populateProviderSelect(cfg) {
-  const providers = Object.keys(cfg.providers || {});
   const pingStates = cfg.pingStates || {};
+  // Reachable providers first (stable sort — ties keep their original
+  // relative order), so a provider you've actually verified works doesn't
+  // get buried below ones that are merely configured-but-unverified or
+  // unconfigured. "Configured" (has a baseUrl) isn't a strong enough signal
+  // on its own — Hermes ships with a non-empty default baseUrl, so it would
+  // always sort first even if you never intended to use it.
+  const providers = Object.keys(cfg.providers || {})
+    .map((name, i) => ({ name, i }))
+    .sort((a, b) => {
+      const ar = pingStates[a.name] === 'reachable' ? 0 : 1;
+      const br = pingStates[b.name] === 'reachable' ? 0 : 1;
+      return ar - br || a.i - b.i;
+    })
+    .map(({ name }) => name);
   providerSel.innerHTML = '';
   for (const name of providers) {
     const opt = document.createElement('option');
@@ -711,8 +724,8 @@ async function onAttachPage() {
           metaUrl: ctx.meta?.url || '',
           metaTitle: title }).catch(() => null);
         if (res?.ok) nextHistoryIdx++;
-        appendAttachSystem(`📎 已附加截图："${title}"`);
-        appendScreenshot(finalDataUrl);
+        const screenshotEl = appendScreenshot(finalDataUrl);
+        appendAttachSystem(`📎 已附加截图："${title}"`, screenshotEl);
       });
       return; // crop UI takes over; nothing else to do here
     }
@@ -1922,6 +1935,7 @@ function appendScreenshot(dataUrl) {
   el.appendChild(img);
   messagesEl.appendChild(el);
   scrollToBottom(true);
+  return el;
 }
 function appendSystem(text) {
   const el = document.createElement('div');
@@ -1932,7 +1946,7 @@ function appendSystem(text) {
   return el;
 }
 
-function appendAttachSystem(text) {
+function appendAttachSystem(text, relatedEl) {
   const el = document.createElement('div');
   el.className = 'msg system attach-msg';
   const span = document.createElement('span');
@@ -1957,6 +1971,10 @@ function appendAttachSystem(text) {
       span.textContent = text + '（已撤销）';
       span.style.opacity = '0.45';
       btn.remove();
+      // The undone attachment (e.g. the screenshot preview bubble) must
+      // disappear too — leaving it visible after "撤销" reads as if the
+      // undo only touched the label text, not the actual attached content.
+      relatedEl?.remove();
     } else {
       btn.disabled = false;
     }

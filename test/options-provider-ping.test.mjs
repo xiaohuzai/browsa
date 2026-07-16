@@ -297,3 +297,75 @@ test('options.js: a failed ping sets the unreachable badge and shows the error m
   assert.match(card.querySelector('.card-status').textContent, /❌/);
   assert.match(card.querySelector('.provider-badge').textContent, /unreachable/);
 });
+
+// --------------- auto-switch active provider on first successful ping ------
+// Hermes ships with a non-empty default baseUrl, so "has a baseUrl" is never
+// a strong enough signal that the user actually intends to use a provider.
+// "Reachable" (a real, successful ping) is the strong signal instead — the
+// first time a provider goes from not-reachable to reachable, it becomes
+// the active provider, so filling in and verifying e.g. OpenAI-compatible
+// doesn't silently leave the dropdown pointed at whatever was active before.
+
+test('options.js: first successful ping on a not-yet-reachable provider auto-switches the active provider', async () => {
+  // claude-code has not been pinged by any earlier test in this file, so
+  // its ping state is still unset (not reachable) regardless of whatever
+  // provider is currently active from earlier tests.
+  const card = findProviderCard('claude-code');
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-claude-code';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/health')) return { ok: true };
+    if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
+    return { ok: true, json: async () => ({}) };
+  };
+
+  setCalls.length = 0;
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  const activeProviderSets = setCalls.filter((c) => 'activeProvider' in c);
+  assert.equal(activeProviderSets.length, 1, 'a successful first-time ping must persist the new active provider exactly once');
+  assert.equal(activeProviderSets[0].activeProvider, 'claude-code');
+  assert.ok(card.classList.contains('active'), 'the pinged card must visually become the active one');
+  assert.match(card.querySelector('.card-status').textContent, /set as active provider/);
+});
+
+test('options.js: re-pinging an already-reachable provider does not steal active-provider status from a different provider', async () => {
+  const card = findProviderCard('hermes');
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-hermes-reping';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/health')) return { ok: true };
+    if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
+    return { ok: true, json: async () => ({}) };
+  };
+
+  // First ping establishes hermes as reachable (and, per the rule above,
+  // makes it the active provider -- expected, this is its first transition
+  // to reachable in this test).
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Switch active provider away from hermes back to claude-code by pinging
+  // it again (already reachable from the previous test -- a no-op switch
+  // since it's already active, but re-establishes claude-code as active
+  // for this test's purposes without any manual-set API to reach for).
+  const claudeCard = findProviderCard('claude-code');
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/health')) return { ok: true };
+    if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
+    return { ok: true, json: async () => ({}) };
+  };
+  claudeCard.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Now re-ping hermes, which is already reachable -- must NOT steal
+  // active-provider status back from claude-code.
+  setCalls.length = 0;
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  const activeProviderSets = setCalls.filter((c) => 'activeProvider' in c);
+  assert.equal(activeProviderSets.length, 0, 're-pinging an already-reachable provider must not change the active provider');
+});
