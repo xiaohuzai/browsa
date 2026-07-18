@@ -29,7 +29,8 @@ globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 const {
   fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks,
-  makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse
+  makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
+  linkifyTimestamps
 } = await import('../lib/sidepanel/render.js');
 
 // ─── CJK/bold regression suite ──────────────────────────────────────────────
@@ -445,4 +446,69 @@ test('render.js sanitizes the parsed ECharts option before chart.setOption(), bu
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
   assert.match(src, /const option = sanitizeEchartsText\(JSON\.parse\(source\)\)/);
   assert.match(src, /_echartsToolbar\(source, chart, container\)/, 'the toolbar must still get the original unsanitized source (for copy/export)');
+});
+
+// ─── linkifyTimestamps: [mm:ss] -> clickable seek markers ────────────────────
+// These exercise the video-note timestamp linker (TreeWalker over text nodes).
+// Must wrap bracketed timestamps, support hour form, strip BiliNote's
+// *Content- prefix, and leave non-timestamp text + timestamps inside <a> alone.
+
+test('linkifyTimestamps: wraps [mm:ss] into a span.browsa-ts with data-s seconds', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>see [01:23] for details</p>';
+  linkifyTimestamps(el);
+  const ts = el.querySelector('.browsa-ts');
+  assert.ok(ts, 'a timestamp span was created');
+  assert.equal(ts.dataset.s, String(1 * 60 + 23));
+  assert.equal(ts.textContent, '[01:23]');
+});
+
+test('linkifyTimestamps: supports [h:mm:ss] hour form', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>chapter [1:02:03]</p>';
+  linkifyTimestamps(el);
+  const ts = el.querySelector('.browsa-ts');
+  assert.ok(ts);
+  assert.equal(ts.dataset.s, String(1 * 3600 + 2 * 60 + 3));
+  assert.equal(ts.textContent, '[1:02:03]');
+});
+
+test('linkifyTimestamps: strips BiliNote *Content- prefix in display but keeps the time', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>Intro *Content-[00:10]</p>';
+  linkifyTimestamps(el);
+  const ts = el.querySelector('.browsa-ts');
+  assert.ok(ts);
+  assert.equal(ts.textContent, '[00:10]');
+  assert.equal(ts.dataset.s, '10');
+  assert.ok(!/Content/.test(el.textContent), 'no leftover *Content- artifact');
+});
+
+test('linkifyTimestamps: leaves bare mm:ss (no brackets) and non-timestamps untouched', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>ratio 12:00 and version 1.2:3 and [not-a-time]</p>';
+  linkifyTimestamps(el);
+  assert.equal(el.querySelectorAll('.browsa-ts').length, 0, 'no false-positive links');
+});
+
+test('linkifyTimestamps: skips timestamps already inside an &lt;a&gt;', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p><a href="x">[00:05]</a> and [00:10]</p>';
+  linkifyTimestamps(el);
+  const spans = el.querySelectorAll('.browsa-ts');
+  assert.equal(spans.length, 1, 'only the non-link timestamp is wrapped');
+  assert.equal(spans[0].dataset.s, '10');
+});
+
+test('linkifyTimestamps: wraps multiple timestamps in one text node, preserving surrounding text', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>[00:01] first [00:02] second</p>';
+  linkifyTimestamps(el);
+  const spans = el.querySelectorAll('.browsa-ts');
+  assert.equal(spans.length, 2);
+  assert.equal(spans[0].dataset.s, '1');
+  assert.equal(spans[1].dataset.s, '2');
+  // surrounding words survive
+  assert.match(el.textContent, /first/);
+  assert.match(el.textContent, /second/);
 });

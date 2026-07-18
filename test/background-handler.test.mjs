@@ -138,3 +138,41 @@ test('XHS_XHR_NOTE derives tabId from sender.tab.id, not msg.tabId', async () =>
   const tab8 = await handle({ type: 'GET_XHS_NOTE', tabId: 8 }, { tab: { id: 8 } });
   assert.equal(tab8.note.noteId, 'spoofed', 'note must land under the real sender tab instead');
 });
+
+// ─── SEEK_VIDEO: in-place video seek dispatch ───────────────────────────────
+// Verifies the [mm:ss] click handler's backend: it must call
+// chrome.scripting.executeScript with the target tabId + seconds arg and
+// relay the injected function's {ok} result back to the side panel.
+
+test('SEEK_VIDEO calls executeScript on the target tab and relays {ok:true}', async () => {
+  let called = null;
+  globalThis.chrome.scripting.executeScript = async (opts) => {
+    called = opts;
+    return [{ result: { ok: true } }];
+  };
+  const res = await handle({ type: 'SEEK_VIDEO', tabId: 42, seconds: 83 }, { tab: { id: 42 } });
+  assert.equal(res.ok, true);
+  assert.ok(called, 'executeScript was invoked');
+  assert.deepEqual(called.target, { tabId: 42 }, 'targets the requested tab');
+  assert.deepEqual(called.args, [83], 'passes seconds as a number arg');
+  assert.equal(called.world, 'MAIN', 'runs in MAIN world so YouTube seekTo is reachable');
+  assert.equal(typeof called.func, 'function', 'injects a seek function');
+});
+
+test('SEEK_VIDEO relays {ok:false} when the page has no <video>', async () => {
+  globalThis.chrome.scripting.executeScript = async () => [{ result: { ok: false } }];
+  const res = await handle({ type: 'SEEK_VIDEO', tabId: 7, seconds: 5 }, { tab: { id: 7 } });
+  assert.equal(res.ok, false);
+});
+
+test('SEEK_VIDEO returns {ok:false} without tabId', async () => {
+  globalThis.chrome.scripting.executeScript = async () => [{ result: { ok: true } }];
+  const res = await handle({ type: 'SEEK_VIDEO', seconds: 5 }, { tab: { id: 7 } });
+  assert.equal(res.ok, false);
+});
+
+test('SEEK_VIDEO swallows executeScript errors as {ok:false} (tab closed/gone)', async () => {
+  globalThis.chrome.scripting.executeScript = async () => { throw new Error('No tab with id 99'); };
+  const res = await handle({ type: 'SEEK_VIDEO', tabId: 99, seconds: 5 }, { tab: { id: 99 } });
+  assert.equal(res.ok, false);
+});

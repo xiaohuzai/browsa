@@ -291,3 +291,77 @@ test('SW_PING for a tab with no registered resetIdleTimer is a safe no-op', asyn
 
   assert.doesNotThrow(() => port._messageListener({ type: 'SW_PING' }));
 });
+
+// --------------- auto timestamp-rewrite (video notes) ----------------------
+// When the user asks for video notes/summary but the model's first reply
+// has no [mm:ss] timestamps, the background silently asks it ONCE to
+// reformat with them (deltas swallowed; v2 delivered as the DONE chunk's
+// `full`, which the side panel re-renders the bubble from). The gate must
+// be conservative: a specific question on a video page ("作者是谁") must
+// NOT trigger a rewrite, and a reply that already has [mm:ss] must not be
+// rewritten. Replicated here in lockstep with chat-handler.js's source.
+
+const TS_PRESENT_RE = /\[(?:\d+:)?\d{1,2}:\d{2}\]/;
+const NOTES_REQUEST_RE = /总结|笔记|纪要|要点|大纲|概要|梳理|summary|summarize|notes?|outline|takeaways?|key points/i;
+function shouldRewriteTimestamps({ videoSrc, fullReply, userText }) {
+  return !!videoSrc
+    && !TS_PRESENT_RE.test(fullReply)
+    && NOTES_REQUEST_RE.test(userText || '')
+    && fullReply.length > 50;
+}
+
+test('chat-handler.js source defines the timestamp-rewrite gate (stay in lockstep)', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  // _NOTES_REQUEST_RE has no backslashes - pin it exactly.
+  assert.ok(src.includes('_NOTES_REQUEST_RE = /总结|笔记|纪要|要点|大纲|概要|梳理|summary|summarize|notes?|outline|takeaways?|key points/i'),
+    '_NOTES_REQUEST_RE literal must match the replicated one');
+  assert.ok(src.includes('_TS_PRESENT_RE = /'), 'defines _TS_PRESENT_RE as a regex');
+  // Gate-condition components (backslash-free substrings of the source).
+  assert.ok(src.includes('videoSrc && !_TS_PRESENT_RE.test(fullReply)'),
+    'gate requires videoSrc AND absence of bracketed timestamps');
+  assert.ok(src.includes('_NOTES_REQUEST_RE.test(msg.userText'),
+    'gate requires the user message to look like a notes/summary request');
+  assert.ok(src.includes('fullReply.length > 50'), 'gate requires a non-trivial reply');
+});
+
+test('chat-handler.js wires the silent rewrite + TS_STATUS + v1 fallback (stay in lockstep)', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  assert.ok(src.includes('const doStream = async (opts = {}) =>'),
+    'doStream must accept an opts arg so it can run silently');
+  assert.ok(src.includes('await doStream({ silent: true })'),
+    'the rewrite must invoke doStream silently (deltas swallowed, not pushed to UI)');
+  assert.ok(src.includes("type: 'TS_STATUS'"),
+    'the rewrite must push a TS_STATUS chunk so the side panel shows a transient status');
+  assert.ok(src.includes('keeping original reply'),
+    'on abort/error during the rewrite, v1 must be kept (not discarded)');
+});
+
+test('shouldRewriteTimestamps: triggers on a notes request whose reply lacks timestamps', () => {
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '# 概述\n'.repeat(12), userText: '总结一下这个视频' }), true);
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'bilibili' }, fullReply: 'a'.repeat(80), userText: 'please summarize' }), true);
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'bilibili' }, fullReply: 'a'.repeat(80), userText: '帮我做个笔记' }), true);
+});
+
+test('shouldRewriteTimestamps: skips when the reply already has bracketed [mm:ss]', () => {
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '章节一 [12:34]\n内容'.repeat(12), userText: '总结' }), false);
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: 'see [1:23:45] here ' + 'x'.repeat(60), userText: 'summary' }), false);
+});
+
+test('shouldRewriteTimestamps: skips a specific question on a video page (no notes keyword)', () => {
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'bilibili' }, fullReply: '作者是张三，视频讲的是基础知识。'.repeat(3), userText: '这个视频作者是谁？' }), false);
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'bilibili' }, fullReply: 'a'.repeat(80), userText: '视频里提到的工具叫什么' }), false);
+});
+
+test('shouldRewriteTimestamps: skips when there is no videoSrc (non-video page)', () => {
+  assert.equal(shouldRewriteTimestamps({ videoSrc: null, fullReply: 'a'.repeat(80), userText: '总结一下' }), false);
+});
+
+test('shouldRewriteTimestamps: skips a trivially short reply', () => {
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '简短回答', userText: '总结' }), false);
+});
+
+test('shouldRewriteTimestamps: bare mm:ss without brackets does NOT count as present', () => {
+  // linkifyTimestamps only matches bracketed [mm:ss]; a bare 1:23 wouldn't
+  // be linkified, so the rewrite should still fire to fix it.
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: 'see 1:23 for the demo ' + 'x'.repeat(60), userText: '总结' }), true);
+});

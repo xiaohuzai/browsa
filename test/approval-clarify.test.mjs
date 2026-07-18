@@ -189,7 +189,9 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
   assert.doesNotMatch(src, /useRunsApi/, 'the retired useRunsApi toggle must not reappear');
 
   // The doStream() closure must branch on isHermes to pick the API client.
-  const doStreamIdx = src.indexOf('const doStream = async () => {');
+  // (doStream takes an opts arg so the auto timestamp-rewrite can run it
+  // silently - opts.silent swallows deltas instead of pushing CHUNKs.)
+  const doStreamIdx = src.indexOf('const doStream = async (opts = {}) => {');
   assert.ok(doStreamIdx > 0, 'doStream must be defined');
   const doStreamEnd = src.indexOf('\n  };', doStreamIdx);
   const doStreamSrc = src.slice(doStreamIdx, doStreamEnd);
