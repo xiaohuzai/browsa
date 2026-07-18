@@ -97,6 +97,10 @@ async function saveChatPrefs() {
 function applyLimits(cfg) {
   const textEl = document.getElementById('maxTextChars');
   if (textEl) textEl.value = cfg.maxTextChars ?? 1_000_000;
+  const autoSumEl = document.getElementById('autoSummarizeAttachments');
+  if (autoSumEl) autoSumEl.checked = cfg.autoSummarizeAttachments !== false;
+  const thresholdEl = document.getElementById('summarizeThresholdChars');
+  if (thresholdEl) thresholdEl.value = cfg.summarizeThresholdChars ?? 0;
 }
 
 async function saveLimits() {
@@ -106,9 +110,23 @@ async function saveLimits() {
     flash('err', 'Limit must be ≥ 1000 chars.');
     return;
   }
+  const thresholdEl = document.getElementById('summarizeThresholdChars');
+  const threshold = parseInt(thresholdEl?.value, 10);
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    flash('err', 'Summarize threshold must be ≥ 0 chars.');
+    return;
+  }
+  const autoSumEl = document.getElementById('autoSummarizeAttachments');
+  const autoSummarize = !!autoSumEl?.checked;
   cachedCfg.maxTextChars = text;
-  await chrome.storage.local.set({ maxTextChars: text });
-  flash('ok', `Saved: max text ${text.toLocaleString()} chars.`);
+  cachedCfg.autoSummarizeAttachments = autoSummarize;
+  cachedCfg.summarizeThresholdChars = threshold;
+  await chrome.storage.local.set({
+    maxTextChars: text,
+    autoSummarizeAttachments: autoSummarize,
+    summarizeThresholdChars: threshold
+  });
+  flash('ok', `Saved: max text ${text.toLocaleString()} chars, auto-summarize ${autoSummarize ? 'on' : 'off'}.`);
 }
 
 function renderProviders() {

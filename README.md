@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 300+ unit tests
+npm test             # run 460+ unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -206,6 +206,7 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX, offloaded to a Web Worker for formula-heavy messages so the panel doesn't jank
 - **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar; sequence diagrams with a semicolon in dialogue text (e.g. embedded SQL) render correctly via an automatic escape-and-retry
 - **ECharts charts** — ` ```echarts ` code blocks rendered inline with a resize-aware toolbar
+- **Markmap mind maps** — ` ```markmap ` code blocks (a plain Markdown heading/list outline) rendered inline as an interactive, zoomable mind map with the same zoom/reset/copy/export toolbar as Mermaid/ECharts; no dedicated button needed — just ask for a mind map/outline and the model knows the format
 - **Diff highlighting** — `diff` code blocks color `+` green and `-` red
 - **Detail thread ("细聊")** — select any text inside a reply to open a scoped side conversation about just that excerpt, without touching the main history. Fully resizable, closes and discards everything on ✕
 - **Edit & resend** — click ✏ on any user message to edit and re-send
@@ -234,6 +235,7 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **Mask rules** — regex-based content redaction before sending to the LLM (e.g. strip phone numbers)
 - **Reply language** — force replies in a specific language regardless of page language
 - **Max text chars** — cap how much page content is sent per turn
+- **Auto-summarize long attachments** — when an attached page or video transcript exceeds the threshold (default: 40,000 chars), browsa chunks it, summarizes each chunk in parallel using the configured provider, and merges the result once in the background — the attachment response returns immediately with no latency, and subsequent turns use the compressed version instead of re-sending the full text every time. Timestamp markers in video transcripts (`[mm:ss]`) are explicitly preserved so clickable seek links keep working. Fails open: any error silently keeps the original text.
 - **llms.txt** — optionally fetch `<origin>/llms.txt` before each chat for site-specific LLM instructions
 
 ---
@@ -275,9 +277,9 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 
 ## How it works
 
-- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages — still the single dispatcher, but the two biggest cases (`CHAT`, `SUBCHAT`) delegate to `lib/handlers/`. Manages site XHR caches (keyed by `tabId`), streaming via per-turn `browsa-chat`/`browsa-subchat` ports, and mid-stream tab switching via `streamState` (`lib/state.js`).
-- **`sidepanel.js`** — Chat UI orchestrator: init/send/history/approval-clarify cards/screenshot crop. The Markdown/Mermaid/KaTeX/ECharts rendering pipeline, sessions drawer, in-conversation search, multi-select, and detail-thread ("细聊") side conversations are each their own module under `lib/sidepanel/`.
-- **`lib/sidepanel/render.js`** — marked + DOMPurify + KaTeX + Mermaid + ECharts + highlight.js pipeline. Streaming deltas are smoothed via `reveal-pacer.js` (a thin wrapper around the vendored `markstream-core` package); KaTeX rendering for the final per-message render offloads formula-heavy messages to a Web Worker (`katex-worker-client.js`/`katex.worker.js`), falling back to synchronous rendering below a small-batch threshold or on worker failure; Mermaid's SVG output is sanitized (`sanitizeMermaidSvg`, from the vendored `stream-markdown-parser` package) and sequence-diagram parse failures auto-retry with problem semicolons escaped (`mermaid-utils.js`).
+- **`background.js`** — MV3 service worker. Single `handle()` message router for all extension messages — still the single dispatcher, but the two biggest cases (`CHAT`, `SUBCHAT`) delegate to `lib/handlers/`. Manages site XHR caches (keyed by `tabId`), streaming via per-turn `browsa-chat`/`browsa-subchat` ports, mid-stream tab switching via `streamState` (`lib/state.js`), and fires off a fire-and-forget attachment auto-summarize pass (`lib/handlers/attach-summarizer.js`) when a page/video attachment exceeds the configured length threshold.
+- **`sidepanel.js`** — Chat UI orchestrator: init/send/history/approval-clarify cards/screenshot crop. The Markdown/Mermaid/Markmap/KaTeX/ECharts rendering pipeline, sessions drawer, in-conversation search, multi-select, and detail-thread ("细聊") side conversations are each their own module under `lib/sidepanel/`.
+- **`lib/sidepanel/render.js`** — marked + DOMPurify + KaTeX + Mermaid + ECharts + Markmap + highlight.js pipeline. Streaming deltas are smoothed via `reveal-pacer.js` (a thin wrapper around the vendored `markstream-core` package); KaTeX rendering for the final per-message render offloads formula-heavy messages to a Web Worker (`katex-worker-client.js`/`katex.worker.js`), falling back to synchronous rendering below a small-batch threshold or on worker failure; Mermaid's SVG output is sanitized (`sanitizeMermaidSvg`, from the vendored `stream-markdown-parser` package) and sequence-diagram parse failures auto-retry with problem semicolons escaped (`mermaid-utils.js`). All three diagram vendor bundles (Mermaid/ECharts/Markmap) are speculatively preloaded (`preloadChartVendors()`) the moment a turn starts, so the first diagram in a session doesn't pay a multi-MB cold-load penalty right when it needs to render.
 - **`lib/page-extractor.js`** — Injects Readability + Turndown into the page MAIN world for reader mode. For SPA sites, uses the XHR cache from the matching content script.
 - **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/runs` (Hermes — approval/clarification/tool-progress events, auto-detected).
 - **`lib/storage.js`** — `chrome.storage.local` wrapper. Global flat conversation history (not per-tab), session management, mask rules.
@@ -301,7 +303,8 @@ browsa/
 │   ├── storage.js                     # chrome.storage wrapper + session mgmt
 │   ├── handlers/
 │   │   ├── chat-handler.js            # CHAT case body
-│   │   └── subchat-handler.js         # SUBCHAT / SUBCHAT_ABORT case bodies
+│   │   ├── subchat-handler.js         # SUBCHAT / SUBCHAT_ABORT case bodies
+│   │   └── attach-summarizer.js       # auto-compress long page/video attachments
 │   ├── sidepanel/                     # sidepanel.js's feature modules
 │   │   ├── render.js                  # marked+DOMPurify+KaTeX+Mermaid+ECharts pipeline
 │   │   ├── reveal-pacer.js            # smooth-reveal wrapper around vendored markstream-core
@@ -336,6 +339,8 @@ browsa/
 │       ├── highlight.bundle.js
 │       ├── mermaid.bundle.js
 │       ├── echarts.bundle.js
+│       ├── markmap-lib.bundle.js       # Markdown → mind map tree transformer
+│       ├── markmap-view.bundle.js      # d3-zoom mind map SVG renderer
 │       ├── markstream-core.bundle.js   # streaming-reveal pacing controller
 │       └── stream-markdown-parser.bundle.js # Mermaid SVG sanitizer
 ├── _locales/{en,zh_CN}/
@@ -343,7 +348,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (300+ tests)
+├── test/                              # node:test unit tests (460+ tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 

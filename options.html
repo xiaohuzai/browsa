@@ -164,13 +164,22 @@
 
         <section class="card">
           <div class="card-header">
-            <h2>Page size limit</h2>
+            <h2>Content limits</h2>
           </div>
           <div class="card-body">
             <p class="hint">Hard cap on extracted text sent to the model (characters). Readability typically yields 5–30K. Default 1M is safe for any modern LLM.</p>
             <div class="inline-field">
               <label for="maxTextChars">Max chars</label>
               <input id="maxTextChars" type="number" min="1000" step="1000" />
+            </div>
+            <p class="hint">Very long attachments (e.g. a multi-hour video's transcript) get resent in full on every turn. When one exceeds the threshold below, browsa chunks it, summarizes each chunk, and merges the result once — before it ever enters history.</p>
+            <div class="inline-field">
+              <label for="autoSummarizeAttachments">Auto-summarize long attachments</label>
+              <input id="autoSummarizeAttachments" type="checkbox" />
+            </div>
+            <div class="inline-field">
+              <label for="summarizeThresholdChars">Threshold (chars)</label>
+              <input id="summarizeThresholdChars" type="number" min="0" step="1000" placeholder="0 = default (40,000)" />
               <button data-act="save-limits" class="primary">Save</button>
             </div>
           </div>
