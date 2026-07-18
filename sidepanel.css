@@ -508,6 +508,25 @@ body {
 .msg.assistant li > p { margin: 0; }
 .msg.assistant a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .msg.assistant a:hover { opacity: 0.8; }
+/* Clickable [mm:ss] timestamp markers in video-note replies - click seeks
+   the source video in place. Styled as a small accent chip to read as a
+   control, not body text. */
+.msg.assistant .browsa-ts {
+  display: inline-block;
+  padding: 0 0.32em;
+  margin: 0 0.1em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 5px;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  vertical-align: baseline;
+}
+.msg.assistant .browsa-ts:hover { opacity: 0.8; }
+.msg.assistant .browsa-ts:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .msg.assistant blockquote {
   margin: 0.5em 0;
   padding: 0.5em 1em;

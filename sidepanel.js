@@ -7,7 +7,7 @@ import { ICONS } from './lib/sidepanel/icons.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
   renderSafe, renderMermaid, renderEcharts,
-  addCodeCopyButtons, decorateLinks,
+  addCodeCopyButtons, decorateLinks, linkifyTimestamps,
   makeStreamRenderer, setThoughtAutoCollapse
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
@@ -461,6 +461,8 @@ async function init() {
 
   // Image lightbox — delegate click on all img inside messages
   messagesEl.addEventListener('click', (e) => {
+    const ts = e.target.closest('.browsa-ts');
+    if (ts) { onTimestampClick(ts); return; }
     const img = e.target.closest('img');
     if (img && img.src && !img.closest('.msg-images')) {
       showImageLightbox(img.src, img.alt);
@@ -864,6 +866,10 @@ function cancelStream() {
   // the new one's.
   if (cancelledEl) {
     cancelledEl.classList.add('done');
+    // Clear any transient tool-progress / TS_STATUS indicator so a cancel
+    // mid-rewrite (or mid-tool-call) doesn't leave the status lingering
+    // above the now-finalized bubble.
+    clearToolProgress(cancelledEl);
     cancelledRenderStream?.destroy?.();
   }
   activeController = null;
@@ -1131,6 +1137,14 @@ async function onSend() {
         toolEvents.push(m.text);
         showToolProgress(assistantEl, m.text);
 
+      } else if (m.type === 'TS_STATUS') {
+        // Transient status from the background's auto timestamp-rewrite
+        // (video notes whose first reply lacked [mm:ss]). Shown like
+        // tool-progress but NOT recorded into toolEvents, so DONE's
+        // renderToolHistory won't render it as a tool event; DONE's
+        // existing clearToolProgress removes it.
+        showToolProgress(assistantEl, m.text, 'warn');
+
       } else if (m.type === 'APPROVAL') {
         showApprovalCard(assistantEl, m.data);
 
@@ -1164,6 +1178,10 @@ async function onSend() {
         const finalText = m.full || acc;
         assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
         await renderStream(finalText, true);
+        // linkifyTimestamps already ran inside renderStream's isDone path;
+        // stamp the video source (carried in the DONE chunk by the chat
+        // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
+        if (m.videoSrc) assistantEl.dataset.videoSrc = JSON.stringify(m.videoSrc);
         addCodeCopyButtons();
         renderMermaid(assistantEl); renderEcharts(assistantEl);
         outputTokens = 0;
@@ -1364,6 +1382,11 @@ async function resumeInFlightStream(tabId) {
     } else if (m.type === 'TOOL_PROGRESS') {
       resumedToolEvents.push(m.text);
       showToolProgress(assistantEl, m.text);
+
+    } else if (m.type === 'TS_STATUS') {
+      // Mirrors the onSend listener: transient timestamp-rewrite status,
+      // shown but not recorded into resumedToolEvents.
+      showToolProgress(assistantEl, m.text, 'warn');
 
     } else if (m.type === 'APPROVAL') {
       showApprovalCard(assistantEl, m.data);
@@ -1577,6 +1600,40 @@ function appendUser(text, imageDataUrls) {
   scrollToBottom(true);
   return el;
 }
+// Click a [mm:ss] marker in a video-note reply -> seek the source video tab's
+// <video> in place; fall back to opening the original video at ?t=N when the
+// tab is gone or has no <video> (user closed/navigated away from it).
+async function onTimestampClick(ts) {
+  const seconds = Number(ts.dataset.s) || 0;
+  const msgEl = ts.closest('.msg');
+  let vs = null;
+  try { vs = msgEl ? JSON.parse(msgEl.dataset.videoSrc || 'null') : null; } catch (_) {}
+  if (vs?.tabId) {
+    try {
+      const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds });
+      if (res?.ok) return;
+    } catch (_) {}
+  }
+  if (vs?.url) {
+    chrome.tabs.create({ url: appendTimeParam(vs.url, seconds) });
+  } else {
+    showToast('视频源已失效，无法跳转');
+  }
+}
+
+// Append/replace a seek-to-time param on a video URL. YouTube (watch?v=…&t=N)
+// and Bilibili (video/BV…?t=N) both accept a bare integer seconds value.
+function appendTimeParam(url, seconds) {
+  try {
+    const u = new URL(url);
+    u.searchParams.set('t', String(seconds));
+    return u.toString();
+  } catch (_) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}t=${seconds}`;
+  }
+}
+
 function appendAssistant(initial, done = false) {
   const el = document.createElement('div');
   el.className = 'msg assistant' + (done ? ' done' : '');
@@ -2179,6 +2236,8 @@ async function renderHistory() {
       el.innerHTML = await renderSafe(rawContent);
       el.dataset.raw = rawContent; // mirrors appendUser's dataset.raw — read by openDetailThread
       decorateLinks(el);
+      linkifyTimestamps(el);
+      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc); // enables [mm:ss] seek links
       addMsgActions(el, () => rawContent);
       renderMermaid(el); renderEcharts(el);
       el.dataset.hidx = i;

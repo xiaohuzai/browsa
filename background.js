@@ -495,6 +495,45 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'SEEK_VIDEO': {
+      // In-place seek a video tab's <video> to a timestamp. Fired by
+      // clickable [mm:ss] markers in video-note replies. The side panel
+      // falls back to opening the source URL with ?t= when this returns
+      // ok:false (tab closed, navigated away, or no <video> on the page).
+      const tabId = msg.tabId;
+      if (!tabId) return { ok: false, error: 'no tabId' };
+      try {
+        const [res] = await chrome.scripting.executeScript({
+          target: { tabId },
+          // MAIN world so YouTube's #movie_player.seekTo (a method the page
+          // attaches to the element) is reachable - page-set custom props
+          // aren't visible from the ISOLATED world's DOM wrappers.
+          world: 'MAIN',
+          func: (seconds) => {
+            const v = document.querySelector('#movie_player video, #bilibili-player video, video');
+            if (!v) return { ok: false };
+            // YouTube exposes seekTo on #movie_player - its custom progress
+            // bar / chapters sync cleanly via the official API. Bilibili and
+            // others fall back to currentTime + nudge events so their custom
+            // UIs (danmaku, progress bar) follow.
+            const yt = document.querySelector('#movie_player');
+            if (yt && typeof yt.seekTo === 'function') {
+              yt.seekTo(seconds, true);
+            } else {
+              v.currentTime = seconds;
+              v.dispatchEvent(new Event('seeking'));
+              v.dispatchEvent(new Event('timeupdate'));
+            }
+            return { ok: true };
+          },
+          args: [Number(msg.seconds) || 0],
+        });
+        return res?.result || { ok: false };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
+
     case 'SET_ACTIVE_PROVIDER': {
       await storage.setActiveProvider(msg.name);
       return { activeProvider: msg.name };
@@ -692,6 +731,16 @@ async function handle(msg, sender) {
         // All other modes: save to global history immediately.
         const contextText = buildPageContextText(ctx);
         const historyEntry = { role: 'user', content: contextText };
+        // Stamp the video source on video page-contexts (youtube/bilibili)
+        // so video-note replies can turn their [mm:ss] markers into clickable
+        // seek links. Other pages have no seekable <video> target.
+        if (ctx.mode === 'youtube' || ctx.mode === 'bilibili') {
+          historyEntry.videoSrc = {
+            platform: ctx.mode,
+            url: ctx.meta?.url || '',
+            tabId,
+          };
+        }
         await storage.appendToHistory(historyEntry);
         console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
         return { ok: true, ctx };

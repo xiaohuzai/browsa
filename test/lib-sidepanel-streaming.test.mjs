@@ -248,3 +248,34 @@ test('TOOL_PROGRESS renders before the bubble (grouped with thinking), not after
   lastChatPort.emit({ type: 'DONE', full: 'done with tools' });
   await new Promise((r) => setTimeout(r, 50));
 });
+
+test('TS_STATUS (auto timestamp-rewrite) shows a transient status before the bubble and is cleared on DONE', async () => {
+  inputEl.value = '总结一下这个视频';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(lastChatPort);
+
+  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  // The background emits TS_STATUS after v1 finishes streaming, asking the
+  // model to reformat with [mm:ss]. It must surface as a tool-progress-style
+  // indicator above the bubble - but, unlike TOOL_PROGRESS, it must NOT be
+  // recorded into toolEvents (or DONE would render it as a tool-history row).
+  lastChatPort.emit({ type: 'TS_STATUS', text: '⏱ 正在补充时间戳…' });
+  await new Promise((r) => setTimeout(r, 10));
+
+  const tp = assistantEl.previousElementSibling;
+  assert.ok(tp?.classList.contains('tool-progress'), 'TS_STATUS must render a tool-progress indicator before the bubble');
+  assert.match(tp.textContent, /正在补充时间戳/);
+
+  // DONE swaps the bubble to the rewritten text (v2) and must clear the
+  // transient status indicator - it should not linger as a tool-history row.
+  lastChatPort.emit({ type: 'DONE', full: '## 概述 [00:00]\n内容…' });
+  await new Promise((r) => setTimeout(r, 50));
+
+  const tpAfter = assistantEl.previousElementSibling;
+  assert.ok(!tpAfter || !tpAfter.classList.contains('tool-progress'),
+    'TS_STATUS indicator must be cleared on DONE');
+  // And no tool-history block should have been rendered for it.
+  assert.doesNotMatch(assistantEl.innerHTML, /正在补充时间戳/,
+    'TS_STATUS must not leak into the bubble as rendered tool history');
+});
