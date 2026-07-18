@@ -15,15 +15,31 @@ html{scroll-behavior:smooth}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;overflow-x:hidden}
 .container{max-width:1080px;margin:0 auto;padding:0 24px}
 
+/* Sticky nav */
+.nav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav .container{display:flex;align-items:center;justify-content:space-between;padding:12px 24px}
+.nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;text-decoration:none;color:var(--fg)}
+.nav-brand img{width:24px;height:24px;border-radius:6px}
+.nav-links{display:flex;gap:24px;flex-wrap:wrap}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:0.9rem;transition:color 0.2s}
+.nav-links a:hover{color:var(--accent)}
+
 /* Hero */
-.hero{padding:80px 0 60px;text-align:center;position:relative}
+.hero{padding:72px 0 56px;text-align:center;position:relative}
 .hero::before{content:"";position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(88,166,255,0.08) 0%,transparent 70%);pointer-events:none}
-.logo{width:96px;height:96px;border-radius:22px;box-shadow:0 8px 32px rgba(88,166,255,0.3);margin-bottom:24px}
-.hero h1{font-size:3.2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:12px;background:linear-gradient(135deg,#fff 0%,#58a6ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.tagline{font-size:1.25rem;color:var(--muted);margin-bottom:8px}
-.tagline strong{color:var(--accent);font-weight:600}
-.subtitle{font-size:1rem;color:var(--muted);max-width:560px;margin:0 auto 32px}
+.logo{width:88px;height:88px;border-radius:20px;box-shadow:0 8px 32px rgba(88,166,255,0.3);margin-bottom:20px}
+.hero h1{font-size:3rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:14px;background:linear-gradient(135deg,#fff 0%,#58a6ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-lead{font-size:1.35rem;font-weight:600;color:var(--fg);max-width:640px;margin:0 auto 10px;line-height:1.4}
+.hero-lead em{color:var(--accent);font-style:normal}
+.hero-sub{font-size:1rem;color:var(--muted);max-width:560px;margin:0 auto 28px}
 .cta-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* Screenshot placeholder */
+.shot-frame{margin:48px auto 0;max-width:880px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(135deg,var(--card) 0%,var(--code) 100%);padding:0;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.4)}
+.shot-frame .shot-img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover}
+.shot-frame .shot-placeholder{width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:0.9rem}
+.shot-frame .shot-placeholder .big{font-size:3rem;opacity:0.4}
+.shot-caption{text-align:center;color:var(--muted);font-size:0.85rem;margin-top:12px}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-size:0.95rem;font-weight:600;text-decoration:none;transition:all 0.2s;border:1px solid transparent}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#79b8ff;transform:translateY(-1px);box-shadow:0 4px 16px rgba(88,166,255,0.4)}
@@ -103,31 +119,74 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
 @media(max-width:768px){
   .hero{padding:60px 0 40px}
   .hero h1{font-size:2.2rem}
-  .tagline{font-size:1.05rem}
+  .hero-lead{font-size:1.05rem}
   .flow{flex-direction:column}
   .flow-arrow{transform:rotate(90deg)}
+  .nav-links{gap:16px}
+  .nav-links a{font-size:0.85rem}
+}
+
+/* Changelog */
+.changelog{max-width:760px;margin:32px auto 0}
+.cl-item{display:grid;grid-template-columns:90px 60px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);align-items:start}
+.cl-item:last-child{border-bottom:none}
+.cl-version{font-family:"SF Mono",Consolas,monospace;font-size:0.95rem;font-weight:700;color:var(--accent)}
+.cl-date{font-size:0.8rem;color:var(--muted);padding-top:2px}
+.cl-body{font-size:0.9rem;color:var(--fg);line-height:1.5}
+.cl-tag{display:inline-block;font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:8px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.05em}
+.cl-tag.feat{background:rgba(63,185,80,0.15);color:var(--accent2)}
+.cl-tag.fix{background:rgba(88,166,255,0.15);color:var(--accent)}
+.cl-body code{background:var(--code);padding:1px 5px;border-radius:3px;font-size:0.85rem;color:var(--accent)}
+@media(max-width:600px){
+  .cl-item{grid-template-columns:80px 1fr}
+  .cl-date{display:none}
 }
 </style>
 </head>
 <body>
 
+<nav class="nav">
+  <div class="container">
+    <a href="#" class="nav-brand">
+      <img src="icon48.png" alt="browsa">
+      <span>browsa</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#sites">站点</a>
+      <a href="#providers">Provider</a>
+      <a href="#install">安装</a>
+      <a href="#changelog">更新</a>
+      <a href="https://github.com/xiaohuzai/browsa">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
 <div class="hero">
   <div class="container">
     <img src="icon128.png" alt="browsa" class="logo">
     <h1>browsa</h1>
-    <p class="tagline"><strong>brow</strong>ser <strong>s</strong>ide p<strong>a</strong>nel <strong>A</strong>I</p>
-    <p class="subtitle">在任何网页旁打开 AI 对话面板，附带页面内容，流式回复。支持 Hermes、Claude Code、OpenAI 兼容 API。</p>
+    <p class="hero-lead">读着长文档想问 AI？<em>不用切窗口，不用复制粘贴。</em></p>
+    <p class="hero-sub">浏览器侧边栏 AI，一键附带当前页面，流式对话。支持 Hermes、Claude Code、任意 OpenAI 兼容 API。</p>
     <div class="cta-group">
-      <a href="https://github.com/xiaohuzai/browsa" class="btn btn-primary">⭐ GitHub 仓库</a>
-      <a href="#install" class="btn btn-secondary">安装指南</a>
-      <a href="https://github.com/xiaohuzai/browsa/releases/latest" class="btn btn-secondary">下载最新版</a>
+      <a href="#install" class="btn btn-primary">⚡ 5 分钟上手</a>
+      <a href="https://github.com/xiaohuzai/browsa" class="btn btn-secondary">⭐ GitHub 仓库</a>
     </div>
     <div class="badges">
       <span class="badge"><span class="dot"></span> v0.25.6</span>
       <span class="badge">Chrome / Edge MV3</span>
       <span class="badge">MIT License</span>
-      <span class="badge">JavaScript</span>
+      <span class="badge">10+ 站点结构化提取</span>
     </div>
+    <div class="shot-frame" id="hero-shot">
+      <!-- 截图位置：替换为真实截图 shots/main.png -->
+      <div class="shot-placeholder">
+        <div class="big">💬</div>
+        <div>主截图位 · 待添加 <code>shots/main.png</code></div>
+        <div style="font-size:0.8rem;opacity:0.7">建议：侧边栏对话 + Mermaid/代码高亮的完整场景</div>
+      </div>
+    </div>
+    <p class="shot-caption">browsa 在浏览器侧边栏中流式对话，自动附带当前页面内容</p>
   </div>
 </div>
 
@@ -159,10 +218,37 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
   </div>
 </section>
 
-<section>
+<section id="why">
+  <div class="container">
+    <h2 class="section-title">为什么选 browsa</h2>
+    <p class="section-desc">跟同类侧边栏 AI 对比，browsa 解决的是"数据自主 + 工具能力"这两个痛点。</p>
+    <div class="sites-table">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:26%">能力</th>
+            <th>browsa</th>
+            <th>普通 SaaS 侧边栏</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>API 后端</td><td><strong>自带</strong>（Hermes / Claude Code / OpenAI 兼容）</td><td>厂商锁定</td></tr>
+          <tr><td>订阅费</td><td><strong>免费</strong>，MIT 开源</td><td>月付 $10-20</td></tr>
+          <tr><td>工具执行</td><td><strong>能跑 bash、读写文件、搜索</strong>（Agent Provider）</td><td>通常不能</td></tr>
+          <tr><td>站点结构化提取</td><td><strong>10+ 站点</strong>拦截 XHR，拿到字幕、转录、评论</td><td>仅正文文本</td></tr>
+          <tr><td>数据流向</td><td>你的 API Key 直发后端，<strong>不经第三方</strong></td><td>经厂商服务器</td></tr>
+          <tr><td>Mermaid / ECharts / LaTeX</td><td><strong>全支持</strong>，Web Worker 加速</td><td>部分支持或无</td></tr>
+          <tr><td>会话管理</td><td>本地存储、命名、导出 Markdown、全文搜索</td><td>云端存储为主</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="features">
   <div class="container">
     <h2 class="section-title">核心功能</h2>
-    <p class="section-desc">不只是一个聊天框——browsa 是一个完整的阅读辅助工作站。</p>
+    <p class="section-desc">不只是一个聊天框--browsa 是一个完整的阅读辅助工作站。</p>
     <div class="feature-grid">
       <div class="feature">
         <div class="ficon">💬</div>
@@ -221,7 +307,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
   </div>
 </section>
 
-<section>
+<section id="sites">
   <div class="container">
     <h2 class="section-title">支持的站点</h2>
     <p class="section-desc">对这些站点，browsa 直接拦截浏览器 API 调用提取结构化内容——无需登录、无需重新认证。</p>
@@ -247,7 +333,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
   </div>
 </section>
 
-<section>
+<section id="providers">
   <div class="container">
     <h2 class="section-title">支持的 Provider</h2>
     <p class="section-desc">分两类：Agent Provider 能执行工具（bash、文件操作、网络搜索），LLM Provider 只做对话。</p>
@@ -268,6 +354,82 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
         <p>任何 <code>/v1/chat/completions</code> 端点：OpenAI、Anthropic、Ollama、Groq、LiteLLM 等。需指定 Model ID。</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="changelog">
+  <div class="container">
+    <h2 class="section-title">最近更新</h2>
+    <p class="section-desc">browsa 发版很勤，最近一个月内连续 10+ 个版本。下面是主要功能演进，完整历史见 <a href="https://github.com/xiaohuzai/browsa/releases" style="color:var(--accent)">Releases</a>。</p>
+    <div class="changelog">
+      <div class="cl-item">
+        <div class="cl-version">v0.25.6</div>
+        <div class="cl-date">07-16</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          Provider 下拉按可达性排序，首次 Ping 成功自动切换活跃 Provider
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.25.5</div>
+        <div class="cl-date">07-15</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          提取同源 iframe 和 open shadow-DOM 内容
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.25.4</div>
+        <div class="cl-date">07-14</div>
+        <div class="cl-body">
+          <span class="cl-tag fix">fix</span>
+          DOMPurify 属性过滤 bug、流式光标泄漏、think 块实时 Markdown 渲染
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.25.3</div>
+        <div class="cl-date">07-14</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          提取质量加固（剔除隐藏元素、重复结构标记、小红书重定位）+ 测试覆盖
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.25.1</div>
+        <div class="cl-date">07-10</div>
+        <div class="cl-body">
+          <span class="cl-tag fix">fix</span>
+          PDF 内容检测 + 中日韩粗体渲染
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.25.0</div>
+        <div class="cl-date">07-06</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          统一设计系统、标题+列表 prompt 规则、消息折叠
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.24.34</div>
+        <div class="cl-date">07-06</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          细聊（detail-thread）-- 选中回复中的任意文字开启独立侧线对话
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.24.21</div>
+        <div class="cl-date">07-04</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          迁移到 Hermes <code>/v1/runs</code> API，支持工具调用进度 + 危险操作审批
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;margin-top:24px">
+      <a href="https://github.com/xiaohuzai/browsa/releases" class="btn btn-secondary">查看全部 Release →</a>
+    </p>
   </div>
 </section>
 
