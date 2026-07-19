@@ -6,7 +6,7 @@ import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderMermaid, renderEcharts,
+  renderSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps,
   makeStreamRenderer, setThoughtAutoCollapse
 } from './lib/sidepanel/render.js';
@@ -1043,6 +1043,12 @@ async function onSend() {
 
   if (!rawText) return;
 
+  // Fire-and-forget: warm up the mermaid/echarts/markmap vendor bundles now,
+  // during the request/inference latency, so if this reply contains a
+  // diagram it's already cached by the time DONE arrives instead of paying
+  // a multi-MB cold import right when the user is waiting to see it render.
+  preloadChartVendors();
+
   // Slash commands: expand `/summarize` etc. into full prompts. The original
   // slash text is shown in the user bubble; the expanded prompt is what the
   // LLM receives. Unknown commands pass through as-is.
@@ -1183,7 +1189,7 @@ async function onSend() {
         // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
         if (m.videoSrc) assistantEl.dataset.videoSrc = JSON.stringify(m.videoSrc);
         addCodeCopyButtons();
-        renderMermaid(assistantEl); renderEcharts(assistantEl);
+        renderMermaid(assistantEl); renderEcharts(assistantEl); renderMarkmap(assistantEl);
         outputTokens = 0;
         // Show token usage if the provider returned it
         if (m.usage) showTokenUsage(assistantEl, m.usage);
@@ -1409,7 +1415,7 @@ async function resumeInFlightStream(tabId) {
       assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
       await r(m.full || acc, true);
       addCodeCopyButtons();
-      renderMermaid(assistantEl); renderEcharts(assistantEl);
+      renderMermaid(assistantEl); renderEcharts(assistantEl); renderMarkmap(assistantEl);
       outputTokens = 0;
       if (m.usage) showTokenUsage(assistantEl, m.usage);
 
@@ -2239,7 +2245,7 @@ async function renderHistory() {
       linkifyTimestamps(el);
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc); // enables [mm:ss] seek links
       addMsgActions(el, () => rawContent);
-      renderMermaid(el); renderEcharts(el);
+      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
       el.dataset.hidx = i;
     }
   }

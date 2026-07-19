@@ -88,6 +88,20 @@ const VENDORS = [
     outName:   'echarts'
   },
   {
+    name: 'markmap-lib',
+    srcEntry:  'markmap-lib/dist/index.mjs',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'markmap-lib'
+  },
+  {
+    name: 'markmap-view',
+    srcEntry:  'markmap-view/dist/index.js',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'markmap-view'
+  },
+  {
     name: 'markstream-core',
     srcEntry:  'markstream-core/dist/index.js',
     srcDir:    join(DEPS, 'node_modules'),

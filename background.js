@@ -16,6 +16,7 @@ import {
 } from './lib/state.js';
 import { handleChat } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
+import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -31,7 +32,7 @@ import { extractActiveTab, buildPageContextText, ensureReadabilityInjected } fro
 // never need to configure them manually. Shared by both CHAT (full turn,
 // with page context/domain rules/history) and SUBCHAT (scoped detail-thread
 // side-conversation, see openDetailThread in sidepanel.js) — both render
-// through the same markdown/Mermaid/ECharts/KaTeX pipeline.
+// through the same markdown/Mermaid/ECharts/Markmap/KaTeX pipeline.
 const CAPABILITY_HINTS = [
   'When writing mathematical expressions or formulas, always use LaTeX notation: wrap inline math with $...$ and display/block math with $$...$$. This applies everywhere including inside Markdown table cells — never write formulas as plain text in tables.',
   'When drawing diagrams or charts, output Mermaid code blocks (```mermaid) directly in your response. The chat UI renders Mermaid natively — do not create HTML files or write files to disk for diagrams.',
@@ -41,9 +42,11 @@ const CAPABILITY_HINTS = [
   'When your answer covers multiple sub-questions or sections, give each one an actual Markdown heading (## or ###) — never a plain unformatted line of text pretending to be a title. A bare line like "BF16 比 FP16 强在哪?" followed by a paragraph renders with no visual distinction from body text; "### BF16 比 FP16 强在哪?" renders as a real heading.',
   'When listing multiple parallel points, reasons, or comparisons (even just 2-3 short ones), format them as a Markdown list (- item per line or 1. item per line) instead of separate plain lines with no list marker — plain consecutive lines render as one undifferentiated block with no visual separation between items.',
   'In Mermaid diagrams, NEVER use Markdown bold (**text**) or italic (*text*) inside node labels — they display as literal asterisks. Instead use HTML: <b>text</b> for bold, <i>text</i> for italic. Example: A["<b>Title</b><br/>subtitle"] not A["**Title**<br/>subtitle"].',
-  'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Never mix plain-text approximations with LaTeX in the same label. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
+  'In Mermaid diagrams, use $$...$$ (KaTeX) for math inside node labels with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Write the formula EXACTLY ONCE per label, wrapped in $$...$$ — never write a compact/plain-text version of the formula (e.g. "T=D/BW+O/R") followed by the LaTeX version in the same label; if you want to explain the formula, put the explanation in a separate node or as plain text OUTSIDE the $$...$$ span, never a second unwrapped copy of the formula itself. Never use double backslashes (\\\\frac) — single backslash only inside $$...$$.',
   'For data visualizations (bar charts, line charts, pie charts, scatter plots, etc.), output an ECharts option object as JSON in a ```echarts code block. The chat UI renders it natively. Example: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
   'In ECharts option JSON, NEVER put HTML tags like <b>, <br/>, or <span> inside title/legend/axis/label text fields (e.g. title.text) — unlike Mermaid node labels, ECharts text fields render as plain text, so HTML tags show up as literal characters instead of being interpreted. Use \\n for line breaks in text fields. If you need mixed styling within one text field, use ECharts\' own rich-text syntax (a "rich" object in textStyle keyed by style name, referenced as {styleName|text} in the text string) — never raw HTML.',
+  'For mind maps / outlines / hierarchical breakdowns (a topic and its sub-points, a video note\'s table of contents, etc.), output a ```markmap code block containing a plain Markdown outline (headings # ## ### and/or nested - lists) — not Mermaid syntax and not JSON. The chat UI renders it as an interactive mind map natively.',
+  'Do not use ```markmap for flowcharts, sequence diagrams, or timelines — use ```mermaid for those. ```markmap is only for a plain nested outline of headings/bullets.',
 ].join(' ');
 
 // CHOICE_REQUEST is CHAT-only, deliberately NOT part of CAPABILITY_HINTS:
@@ -741,8 +744,26 @@ async function handle(msg, sender) {
             tabId,
           };
         }
+        // Very long attachments (e.g. a 4-5 hour video's transcript) get
+        // resent in FULL on every subsequent turn (buildMessages pushes the
+        // whole history every time) — so it's worth a one-time chunk/
+        // summarize/merge pass now rather than paying that cost (and risking
+        // exceeding a smaller-context provider's window) on every message.
+        // Stamp attachId BEFORE appending so maybeSummarizeAttachment can
+        // find this exact entry later, then kick it off fire-and-forget
+        // AFTER the response below is prepared — the raw text is never
+        // rendered in the chat bubble, so there's no UI to block on.
+        const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(ctx.text, all.summarizeThresholdChars);
+        if (willSummarize) historyEntry.attachId = crypto.randomUUID();
         await storage.appendToHistory(historyEntry);
         console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
+        if (willSummarize) {
+          maybeSummarizeAttachment({
+            attachId: historyEntry.attachId,
+            ctx,
+            provider: all.providers?.[all.activeProvider]
+          });
+        }
         return { ok: true, ctx };
       } catch (e) {
         console.warn('browsa: ATTACH_PAGE failed', e);
