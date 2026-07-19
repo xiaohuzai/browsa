@@ -162,3 +162,68 @@ test('ATTACH_PDF_CONFIRM: missing text is a no-op error, not a crash', async () 
   const res = await handle({ type: 'ATTACH_PDF_CONFIRM', metaUrl: 'https://example.com/doc.pdf' }, {});
   assert.equal(res.ok, false);
 });
+
+// Same asymmetry test as test/attach-page-summarize.test.mjs, but through
+// ATTACH_PDF_CONFIRM -- this is a regression test for a real gap: PDF
+// attachments used to bypass the auto-summarize feature entirely (no
+// attachId stamp, no shouldSummarize check), unlike same-sized page
+// attachments via ATTACH_PAGE.
+
+function sseFor(text) {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
+  return new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } });
+}
+
+async function flush() {
+  await new Promise((r) => setTimeout(r, 20));
+}
+
+test('ATTACH_PDF_CONFIRM: below-threshold PDF text gets no attachId, no summarize call', async () => {
+  let fetchCalled = false;
+  globalThis.fetch = async () => { fetchCalled = true; return { ok: true, status: 200, body: sseFor('x'), text: async () => '' }; };
+
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'short pdf text well under the threshold',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'A Document'
+  }, {});
+  await flush();
+
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.equal(entry.attachId, undefined, 'short PDF attachments must not get an attachId');
+  assert.equal(fetchCalled, false, 'no summarization call should happen for short content');
+});
+
+test('ATTACH_PDF_CONFIRM: above-threshold PDF text gets an attachId and is auto-summarized like a page attachment', async () => {
+  localArea._set({ summarizeThresholdChars: 100 }); // low threshold so a short test string still triggers it
+  globalThis.fetch = async () => ({ ok: true, status: 200, body: sseFor('CONDENSED PDF'), text: async () => '' });
+
+  const longText = 'p'.repeat(500);
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: longText,
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'A Long Document',
+    numPages: 80
+  }, {});
+
+  assert.equal(res.ok, true);
+  const historyRightAfter = await localArea.get('history');
+  const entry = historyRightAfter.history[historyRightAfter.history.length - 1];
+  assert.ok(entry.attachId, 'above-threshold PDF attachment must be stamped with an attachId immediately');
+  assert.match(entry.content, /p{500}/);
+
+  await flush();
+
+  const historyAfterFlush = await localArea.get('history');
+  const updated = historyAfterFlush.history.find((m) => m.attachId === entry.attachId);
+  assert.match(updated.content, /CONDENSED PDF/, 'the entry content must be replaced with the summarized text once the background pipeline completes');
+  assert.equal(updated.summarized, true);
+  assert.match(updated.content, /Mode: pdf/, 'summarized entry must still be rebuilt via buildPageContextText with mode:pdf');
+
+  localArea._set({ summarizeThresholdChars: undefined });
+});
