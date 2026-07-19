@@ -189,6 +189,30 @@ async function bundleAsESM(vendor) {
   console.log(`  ✓ lib/vendor/${outName}.bundle.js (${size.toLocaleString()} bytes)`);
 }
 
+// Pre-built vendor artifacts that esbuild must not touch: a .wasm binary
+// can't be bundled, and pdf-inspector-wasm's JS glue (wasm-bindgen --target
+// web output) is already a clean, dependency-free ESM file. Copied as-is.
+const RAW_COPIES = [
+  {
+    srcDir:  join(ROOT, 'node_modules/@firecrawl/pdf-inspector-wasm'),
+    files:   ['pdf_inspector_wasm_bg.wasm', 'pdf_inspector_wasm.js']
+  }
+];
+
+async function copyRaw({ srcDir, files }) {
+  for (const file of files) {
+    const srcPath = join(srcDir, file);
+    if (!existsSync(srcPath)) {
+      console.log(`  ⚠ skipping ${file} (source not found: ${srcPath})`);
+      continue;
+    }
+    const outPath = join(VENDOR, file);
+    await fs.copyFile(srcPath, outPath);
+    const size = (await fs.stat(outPath)).size;
+    console.log(`  ✓ lib/vendor/${file} (${size.toLocaleString()} bytes)`);
+  }
+}
+
 console.log('browsa: building vendor bundles...');
 for (const v of VENDORS) {
   const srcPath = join(v.srcDir, v.srcEntry);
@@ -199,4 +223,5 @@ for (const v of VENDORS) {
   if (v.cjsToIife) await bundleAsCJS(v);
   if (v.esmBundle) await bundleAsESM(v);
 }
+for (const r of RAW_COPIES) await copyRaw(r);
 console.log('done.');

@@ -597,14 +597,31 @@ async function handle(msg, sender) {
           } catch (_) {}
         }
       }
-      const contextText = buildPageContextText({
+      const pdfCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
         mode: 'pdf',
         text: finalText,
         format: numPages ? `pdf-text, ${numPages} pages` : 'pdf-text'
-      });
-      await storage.appendToHistory({ role: 'user', content: contextText });
+      };
+      const contextText = buildPageContextText(pdfCtx);
+      const historyEntry = { role: 'user', content: contextText };
+      // Same asymmetry ATTACH_PAGE already guards against: a large PDF's
+      // extracted text is resent in FULL on every subsequent turn, and
+      // pdf-extractor.js's own DEFAULT_MAX_CHARS (500K) only guards against
+      // extreme sizes via lossy truncation -- it's not a substitute for the
+      // LLM-based compression pass below, which most oversized-but-under-500K
+      // PDFs (e.g. a 50-100 page document) would otherwise never get.
+      const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
+      if (willSummarize) historyEntry.attachId = crypto.randomUUID();
+      await storage.appendToHistory(historyEntry);
       console.log(`browsa[bg]: pdf attached — ${finalText.length} chars, ${numPages || '?'} pages`);
+      if (willSummarize) {
+        maybeSummarizeAttachment({
+          attachId: historyEntry.attachId,
+          ctx: pdfCtx,
+          provider: all.providers?.[all.activeProvider]
+        });
+      }
       return { ok: true };
     }
 

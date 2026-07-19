@@ -1,35 +1,72 @@
 /* lib/theme.css — shared design tokens for sidepanel.html and options.html.
    Both extension pages <link> this before their own stylesheet so they draw
-   from one palette instead of two independently-invented ones. Dark is the
-   default (this is primarily a dark-UI product); light is an override. */
+   from one palette instead of two independently-invented ones.
+
+   Design concept: browsa docks alongside whatever page you're reading, like
+   a page-margin annotation column, not a generic chat-app skin. The palette
+   is built around that: a cool ink-slate ground (not a warm near-black,
+   which reads as generic "cozy dark SaaS"), a red-orange "proofreader's
+   mark" as the primary accent (--mark), and a second "highlighter gold"
+   (--gold) reserved specifically for margin-note-like content — timestamps,
+   citations, highlights — never mixed arbitrarily with --mark. Dark is the
+   default (this is primarily a dark-UI product); light is a real second mode
+   with its own cool paper-white ground, not a cream/parchment inversion.
+   (An earlier pass also tried a literal "Margin Rail" — a persistent
+   stitched line down the panel's edge as a live state indicator. Removed:
+   it read as an odd, unexplained vertical line rather than a legible status
+   signal. The same three-state idea now lives in a small status dot next to
+   the wordmark — see sidepanel.css's .status-dot.) */
 
 :root {
-  --bg:           #0f0e0b;
-  --bg-2:         #161410;
-  --bg-3:         #1e1c17;
-  --bg-4:         #252219;
-  --fg:           #ede8df;
-  --fg-2:         #ccc5ba;
-  --fg-dim:       #948c81;
-  --border:       #2e2b24;
-  --border-soft:  #242119;
-  --border-strong:#3a3730;
-  --accent:       #f97316;
-  --accent-dim:   rgba(249,115,22,0.10);
-  --accent-hover: rgba(249,115,22,0.16);
-  --accent-glow:  rgba(249,115,22,0.22);
-  --user-bg:      #2a1f14;
-  --user-border:  rgba(249,115,22,0.30);
-  --error:        #f87171;
-  --warn:         #fbbf24;
+  /* Ground */
+  --bg:           #0d0f14;
+  --bg-2:         #14171f;
+  --bg-3:         #1b1f29;
+  --bg-4:         #232734;
+  --fg:           #eef0ee;
+  --fg-2:         #c7cbd1;
+  --fg-dim:       #9aa0ab;
+  --border:       #262b38;
+  --border-soft:  #1e222c;
+  --border-strong:#343a4a;
+
+  /* Primary accent — "proofreader's mark" red-orange. More red, less yellow
+     than a candy/Tailwind orange; reads as ink, not as a UI-kit default. */
+  --accent:       #e0542c;
+  --accent-dim:   rgba(224,84,44,0.10);
+  --accent-hover: rgba(224,84,44,0.16);
+  --accent-glow:  rgba(224,84,44,0.24);
+  --mark:         var(--accent);
+  --mark-dim:     var(--accent-dim);
+  --mark-hover:   var(--accent-hover);
+  --mark-glow:    var(--accent-glow);
+
+  /* Secondary accent — "highlighter gold". Reserved for margin-note content
+     (video timestamps, citation markers, search highlights) — never used for
+     primary actions/buttons, which stay --mark only. */
+  --gold:         #d4a72c;
+  --gold-dim:     rgba(212,167,44,0.12);
+  --gold-hover:   rgba(212,167,44,0.20);
+
+  --user-bg:      #241811;
+  --user-border:  rgba(224,84,44,0.30);
+  --error:        #f0685a;
+  --warn:         #e0b23a;
   --success:      #4ade80;
-  --radius-sm:    5px;
+
+  /* Radius — three tiers only: controls / cards+composer / (reserved, unused
+     today, kept for a future larger surface). Previously five+ competing
+     radii (20px pills, 8px icon buttons, 16px composer, 10px cards, 999px
+     qa-btns) with no shared rule. */
+  --radius-sm:    6px;
   --radius:       10px;
-  --radius-lg:    16px;
+  --radius-lg:    14px;
+
   --t:            0.15s ease;
   --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
   --shadow-md:    0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg:    0 8px 32px rgba(0,0,0,0.50);
+
   /* Semantic aliases — shared vocabulary so consumers (sessions drawer,
      options page cards, detail-thread cards, etc.) don't need to know
      which literal token backs a given name. */
@@ -37,30 +74,44 @@
   --err:          var(--error);
   --muted:        var(--fg-dim);
   --accent-bg:    var(--accent-dim);
-  --hover-bg:     rgba(128,128,128,0.08);
+  --hover-bg:     rgba(148,160,171,0.08);
   --input-bg:     var(--bg);
-  --code-bg:      rgba(128,128,128,0.08);
+  --code-bg:      rgba(148,160,171,0.08);
   --shadow:       var(--shadow-sm);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg:           #faf9f6;
+    /* Cool paper-white, not warm cream/parchment — the light mode is its own
+       considered surface, not a tinted inversion of the dark one. */
+    --bg:           #f5f6f3;
     --bg-2:         #ffffff;
-    --bg-3:         #f2efe8;
-    --bg-4:         #eae6de;
-    --fg:           #1a1710;
-    --fg-2:         #3d3a33;
-    --fg-dim:       #7a746c;
-    --border:       #e4e0d8;
-    --border-soft:  #ece9e2;
-    --border-strong:#c8c4bb;
+    --bg-3:         #eceeea;
+    --bg-4:         #e2e5e0;
+    --fg:           #14171f;
+    --fg-2:         #3a3f4a;
+    --fg-dim:       #5b6270;
+    --border:       #dfe2dc;
+    --border-soft:  #e8eae5;
+    --border-strong:#c5c9c2;
+
     --accent:       #c2410c;
     --accent-dim:   rgba(194,65,12,0.08);
     --accent-hover: rgba(194,65,12,0.13);
     --accent-glow:  rgba(194,65,12,0.18);
-    --user-bg:      #fff2eb;
+
+    /* Darkened from an earlier #a3790f (3.96:1 on white — fails WCAG AA for
+       the small text it's actually used as, e.g. the .browsa-ts timestamp
+       chip). This value hits 4.80:1, same hue, just less luminant. */
+    --gold:         #926c0d;
+    --gold-dim:     rgba(146,108,13,0.10);
+    --gold-hover:   rgba(146,108,13,0.16);
+
+    --user-bg:      #fdf1ea;
     --user-border:  rgba(194,65,12,0.22);
+    --error:        #c0392b;
+    --warn:         #926c0d; /* same contrast fix as --gold above — was #a3790f */
+
     --shadow-sm:    0 1px 4px rgba(0,0,0,0.08);
     --shadow-md:    0 4px 16px rgba(0,0,0,0.10);
     --shadow-lg:    0 8px 32px rgba(0,0,0,0.18);

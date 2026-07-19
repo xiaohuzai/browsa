@@ -99,7 +99,7 @@ const messagesEl = document.getElementById('messages');
 test('resumeInFlightStream(): pre-renders the STREAM_PEEK accumulated text and opens a browsa-chat port', () => {
   assert.ok(lastChatPort, 'resumeInFlightStream() must open its own browsa-chat port');
   assert.ok(lastChatPort.sent.some((m) => m.type === 'STREAM_HELLO'));
-  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
   assert.ok(assistantEl, 'an assistant bubble must exist to hold the resumed content');
 });
 
@@ -111,7 +111,7 @@ test('resumeInFlightStream()\'s CHUNK/DONE listener only runs addCodeCopyButtons
   // — give it a tick to fully resolve.
   await new Promise((r) => setTimeout(r, 50));
 
-  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
   assert.match(assistantEl.innerHTML, /<pre[ >]/, 'the final markdown must have been rendered into real HTML');
   assert.ok(assistantEl.querySelector('.code-copy-btn'),
     'addCodeCopyButtons() must have run AFTER the final render — proves the await was not skipped in this listener too');
@@ -138,7 +138,56 @@ test('resumeInFlightStream()\'s ensureAssistantEl() re-resolves and destroys the
   lastChatPort.emit({ type: 'DONE', full: finalText2 });
   await new Promise((r) => setTimeout(r, 50));
 
-  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
   assert.match(assistantEl.textContent, /second resumed reply/);
   assert.ok(assistantEl.classList.contains('done'));
+});
+
+test('resumeInFlightStream()\'s DONE handler stamps dataset.videoSrc, same as onSend()\'s (regression: this path used to skip it entirely, silently breaking [mm:ss] seek clicks on a resumed video-note reply)', async () => {
+  const finalText = 'Video note reply with a timestamp [01:09] in it.';
+  const videoSrc = { platform: 'youtube', url: 'https://youtube.com/watch?v=abc', tabId: 7 };
+  lastChatPort.emit({ type: 'DONE', full: finalText, videoSrc });
+  await new Promise((r) => setTimeout(r, 50));
+
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.equal(assistantEl.dataset.videoSrc, JSON.stringify(videoSrc),
+    'the resumed DONE handler must stamp dataset.videoSrc exactly like the main onSend() DONE handler does');
+  assert.ok(assistantEl.querySelector('.browsa-ts'), 'the [mm:ss] marker must still be linkified into a clickable span');
+});
+
+test('resumeInFlightStream()\'s DONE handler renders CHOICE_REQUEST interactive buttons, same as onSend()\'s (regression: this path used to skip renderChoiceRequest entirely)', async () => {
+  const finalText = 'Which option do you want?';
+  const choiceRequest = { question: 'Pick one', choices: ['Option A', 'Option B'] };
+  lastChatPort.emit({ type: 'DONE', full: finalText, choiceRequest });
+  await new Promise((r) => setTimeout(r, 50));
+
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  const choiceWrap = assistantEl.nextElementSibling;
+  assert.ok(choiceWrap?.classList.contains('choice-request'), 'a .choice-request block must be inserted after the resumed bubble');
+  const buttons = choiceWrap.querySelectorAll('.choice-btn');
+  assert.equal(buttons.length, 2);
+  assert.equal(buttons[0].textContent, 'Option A');
+});
+
+test('resumeInFlightStream()\'s DONE handler shows the one-click "→ 继续" button on a max-turns reply, same as onSend()\'s', async () => {
+  const finalText = '已达上限，请问是否继续？';
+  lastChatPort.emit({ type: 'DONE', full: finalText });
+  await new Promise((r) => setTimeout(r, 50));
+
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  const actionRow = assistantEl.nextElementSibling;
+  assert.ok(actionRow, 'an action row must be inserted after the bubble');
+  assert.match(actionRow.textContent, /继续/, 'the one-click continue button must be present on a resumed max-turns reply');
+});
+
+test('resumeInFlightStream()\'s ERROR/ABORTED handler renders through the markdown pipeline and marks the bubble .done (regression: this path used to do a raw el.textContent= assignment, leaving literal markdown syntax and a permanently-blinking cursor)', async () => {
+  lastChatPort.emit({ type: 'CHUNK', delta: '**partial** reply' });
+  await new Promise((r) => setTimeout(r, 20));
+  lastChatPort.emit({ type: 'ERROR', code: 'ABORTED' });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.ok(assistantEl.classList.contains('done'), 'the .done class must be added so the blinking ::after cursor stops');
+  assert.ok(assistantEl.querySelector('strong'), 'markdown (**partial**) must be rendered as real HTML, not shown as literal syntax');
+  assert.match(assistantEl.textContent, /cancelled/);
 });

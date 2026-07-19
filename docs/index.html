@@ -173,7 +173,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
       <a href="https://github.com/xiaohuzai/browsa" class="btn btn-secondary">⭐ GitHub 仓库</a>
     </div>
     <div class="badges">
-      <span class="badge"><span class="dot"></span> v0.25.6</span>
+      <span class="badge"><span class="dot"></span> v0.28.0</span>
       <span class="badge">Chrome / Edge MV3</span>
       <span class="badge">MIT License</span>
       <span class="badge">10+ 站点结构化提取</span>
@@ -363,6 +363,31 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
     <p class="section-desc">browsa 发版很勤，最近一个月内连续 10+ 个版本。下面是主要功能演进，完整历史见 <a href="https://github.com/xiaohuzai/browsa/releases" style="color:var(--accent)">Releases</a>。</p>
     <div class="changelog">
       <div class="cl-item">
+        <div class="cl-version">v0.28.0</div>
+        <div class="cl-date">07-20</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          侧边栏视觉重设计（页边注解隐喻的配色/品牌字/顶栏状态指示点）；<span class="cl-tag fix">fix</span>
+          流式恢复代码去重（onSend / 断线重连共用同一套 DONE 处理逻辑，消除两处漏改风险）、多处硬编码错误色统一为设计 token、浅色模式对比度修正
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.27.0</div>
+        <div class="cl-date">07-19</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          PDF 附件抽取升级为 pdf-inspector-wasm 优先（表格/标题/多栏结构重建，纯本地 WASM），pdf.js 纯文本兜底；PDF 客户端文本抽取、提取前页面清理（cookie 横幅/展开/懒加载滚动/虚拟滚动列表捕获）、Turndown GFM 表格支持、DOM 相关性重排序、附件中断进度提示、长 PDF 附件自动摘要
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.26.0</div>
+        <div class="cl-date">07-18</div>
+        <div class="cl-body">
+          <span class="cl-tag feat">feat</span>
+          Markmap 思维导图渲染、超长附件自动摘要、图表渲染性能优化
+        </div>
+      </div>
+      <div class="cl-item">
         <div class="cl-version">v0.25.6</div>
         <div class="cl-date">07-16</div>
         <div class="cl-body">
@@ -513,7 +538,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
       <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md">文档</a>
       <a href="https://github.com/xiaohuzai/browsa/issues">Issues</a>
     </div>
-    <div class="copyright">MIT License · browsa v0.25.6</div>
+    <div class="copyright">MIT License · browsa v0.28.0</div>
   </div>
 </footer>
 
