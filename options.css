@@ -1,6 +1,6 @@
 /* options.css */
 
-/* Design tokens (--bg, --surface, --fg, --muted, --accent, --radius,
+/* Design tokens (--bg, --surface, --fg, --muted, --accent, --gold, --radius,
    --shadow, ...) now come from the shared lib/theme.css, <link>-ed before
    this file in options.html — same palette as sidepanel.html instead of a
    separately-invented (and previously light-first, inverted-default) one.
@@ -14,7 +14,7 @@
   --ok:     var(--success);
   --err:    var(--error);
   --ok-bg:  rgba(74, 222, 128, 0.08);
-  --err-bg: rgba(248, 113, 113, 0.08);
+  --err-bg: rgba(240, 104, 90, 0.08);
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -50,20 +50,30 @@ main {
   align-items: center;
   gap: 14px;
   padding: 0 0 20px;
-  border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
+  /* Stitched-line divider — same visual vocabulary as the sidepanel's Rail
+     signature element, echoed here as a horizontal binding line rather than
+     a plain hairline border. */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border-strong) 0px, var(--border-strong) 5px,
+    transparent 5px, transparent 9px
+  );
+  background-position: bottom;
+  background-size: 100% 2px;
+  background-repeat: no-repeat;
 }
 .page-header .logo {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
 }
 .page-header h1 {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 19px;
   font-weight: 700;
-  letter-spacing: -0.5px;
+  letter-spacing: 0.02em;
   line-height: 1.2;
 }
 .page-header .subtitle {
@@ -75,13 +85,15 @@ main {
 }
 
 /* ── Section cards ────────────────────────────────────────────────────────── */
+/* "Tab" language, not the generic all-around-border-plus-shadow SaaS card:
+   a colored top rule (like a binder-tab divider) instead of a full border. */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
+  border-top: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 0;
   overflow: hidden;
-  box-shadow: var(--shadow);
 }
 
 .card-header {
@@ -214,7 +226,7 @@ details.provider-group[open] > .provider-group-header::before {
   font-size: 10.5px;
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 999px;
   letter-spacing: 0.02em;
 }
 .provider-badge.configured   { background: var(--accent-bg); color: var(--accent); }
@@ -369,7 +381,7 @@ button {
   font-weight: 500;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--fg-2);
   cursor: pointer;

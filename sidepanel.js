@@ -883,17 +883,37 @@ async function reconcileHistoryIdx() {
 const SEND_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>`;
 const STOP_ICON  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
 
+// Drives the topbar status dot's live state (idle / streaming / error) —
+// see the .status-dot rules in sidepanel.css. A short-lived 'error' state
+// auto-reverts to idle (or streaming, if a stream is still active) so a
+// single failed request doesn't leave the dot stuck red.
+let statusDotErrorTimer = null;
+function setStatusDotState(state) {
+  const dot = document.getElementById('status-dot');
+  if (!dot) return;
+  if (statusDotErrorTimer) { clearTimeout(statusDotErrorTimer); statusDotErrorTimer = null; }
+  dot.dataset.state = state;
+  if (state === 'error') {
+    statusDotErrorTimer = setTimeout(() => {
+      dot.dataset.state = activeController ? 'streaming' : 'idle';
+      statusDotErrorTimer = null;
+    }, 1600);
+  }
+}
+
 function setStreamingUI(on) {
   if (on) {
     sendBtn.innerHTML = STOP_ICON;
     sendBtn.classList.add('is-stopping');
     sendBtn.disabled = false;
     sendBtn.title = 'Stop (Esc)';
+    setStatusDotState('streaming');
   } else {
     sendBtn.innerHTML = SEND_ICON;
     sendBtn.classList.remove('is-stopping');
     sendBtn.disabled = false;
     sendBtn.title = '';
+    setStatusDotState('idle');
   }
 }
 
@@ -1103,6 +1123,116 @@ function expandSlash(text) {
   return rest ? `${template}\n\nAdditional instruction: ${rest}` : template;
 }
 
+// Shared `browsa-chat` port message handler, used by BOTH onSend() (a fresh
+// send) and resumeInFlightStream() (reconnecting to a stream already running
+// on the background). These two call sites used to each hand-roll their own
+// near-identical `port.onMessage.addListener(async (m) => {...})` body; a
+// real bug sweep (see test/lib-sidepanel-resume-streaming.test.mjs) found
+// four places where a feature added to onSend()'s copy was never mirrored
+// into resumeInFlightStream()'s (videoSrc stamp, CHOICE_REQUEST buttons, the
+// max-turns "→ 继续" button, and ERROR/ABORTED rendering). Extracting the
+// CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY/DONE/ERROR handling into one function
+// removes the possibility of that class of drift going forward — only the
+// genuinely different bits (RETRY behavior, and what to do right after DONE)
+// stay as caller-supplied hooks.
+//
+//   getEl()        — returns the CURRENT assistant bubble element. For
+//                    onSend() this is just the fixed bubble it created; for
+//                    resumeInFlightStream() it re-resolves on every call
+//                    since a prior panel session's DOM can have been replaced.
+//   getRenderer()  — returns the CURRENT renderStream() closure (may be
+//                    swapped by onRetry/DOM-identity-change).
+//   state          — mutable { acc, toolEvents } shared with the caller.
+//   stopKeepAlive()— clears the caller's SW_PING setInterval.
+//   onRetry(m)     — RETRY handling differs: onSend() wipes the bubble and
+//                    starts a fresh renderer; resume just shows a toast.
+//   afterDone(el)  — extra caller-specific cleanup once DONE has already run
+//                    the shared handling (onSend has none; resume also calls
+//                    setStreamingUI(false)).
+//   onAborted()    — extra caller-specific cleanup on ERROR/ABORTED (resume
+//                    also disconnects its port; onSend does not).
+function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAlive, onRetry, afterDone, onAborted }) {
+  port.onMessage.addListener(async (m) => {
+    if (m.type === 'CHUNK') {
+      if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
+      state.acc += m.delta;
+      getRenderer()(m.delta, false); // pass delta, not accumulated text
+      updateOutputTokenCount(m.delta);
+
+    } else if (m.type === 'TOOL_PROGRESS') {
+      state.toolEvents.push(m.text);
+      showToolProgress(getEl(), m.text);
+
+    } else if (m.type === 'TS_STATUS') {
+      // Transient status from the background's auto timestamp-rewrite
+      // (video notes whose first reply lacked [mm:ss]). Shown like
+      // tool-progress but NOT recorded into toolEvents, so DONE's
+      // renderToolHistory won't render it as a tool event; DONE's
+      // existing clearToolProgress removes it.
+      showToolProgress(getEl(), m.text, 'warn');
+
+    } else if (m.type === 'APPROVAL') {
+      showApprovalCard(getEl(), m.data);
+
+    } else if (m.type === 'CLARIFY') {
+      showClarifyCard(getEl(), m.data);
+
+    } else if (m.type === 'RETRY') {
+      onRetry(m);
+
+    } else if (m.type === 'DONE') {
+      const el = getEl();
+      const r = getRenderer();
+      clearToolProgress(el);
+      _findCard(el, 'approval-card')?.remove();
+      _findCard(el, 'clarify-card')?.remove();
+      if (state.toolEvents.length > 0) {
+        renderToolHistory(el, state.toolEvents);
+        state.toolEvents = [];
+      }
+      const finalText = m.full || state.acc;
+      el.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
+      await r(finalText, true);
+      // linkifyTimestamps already ran inside renderStream's isDone path;
+      // stamp the video source (carried in the DONE chunk by the chat
+      // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
+      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
+      addCodeCopyButtons();
+      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      outputTokens = 0;
+      // Show token usage if the provider returned it
+      if (m.usage) showTokenUsage(el, m.usage);
+      if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
+      // Detect max-turns: agent hit the tool-call ceiling and is asking
+      // the user to continue. Show a one-click Continue button.
+      if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
+        appendMsgAction(el, '→ 继续', () => { inputEl.value = '继续'; onSend(); });
+      }
+      stopKeepAlive();
+      try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+      try { port.disconnect(); } catch (_) {}
+      // port.disconnect() does NOT fire this side's own onDisconnect listener
+      // (only the other end's), so activeController must be cleared here —
+      // otherwise it stays set until the async round trip settles, and a
+      // Send click in that window is misrouted to cancelStream() instead.
+      activeController = null;
+      sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
+      reconcileHistoryIdx(); // detect + correct auto-trim drift (fire-and-forget)
+      afterDone?.(el);
+
+    } else if (m.type === 'ERROR') {
+      // Only ABORTED reaches here — real errors are re-thrown by background
+      // and handled via the !res.ok block below (no pushChunk for real errors).
+      stopKeepAlive();
+      if (m.code === 'ABORTED') {
+        const r = getRenderer();
+        await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
+      }
+      onAborted?.();
+    }
+  });
+}
+
 async function onSend() {
   if (!currentTabId) {
     appendError('No active tab.');
@@ -1162,8 +1292,7 @@ async function onSend() {
 
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('');
-  let acc = '';
-  let toolEvents = [];   // accumulate TOOL_PROGRESS events for post-stream history panel
+  const state = { acc: '', toolEvents: [] };   // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel
   let renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
   streamStartAt = 0; // reset for tokens/sec calculation
 
@@ -1201,36 +1330,18 @@ async function onSend() {
   });
 
   function attachChunkListener() {
-    port.onMessage.addListener(async (m) => {
-      if (m.type === 'CHUNK') {
-        if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
-        acc += m.delta;
-        renderStream(m.delta, false); // pass delta, not accumulated text
-        updateOutputTokenCount(m.delta);
-
-      } else if (m.type === 'TOOL_PROGRESS') {
-        toolEvents.push(m.text);
-        showToolProgress(assistantEl, m.text);
-
-      } else if (m.type === 'TS_STATUS') {
-        // Transient status from the background's auto timestamp-rewrite
-        // (video notes whose first reply lacked [mm:ss]). Shown like
-        // tool-progress but NOT recorded into toolEvents, so DONE's
-        // renderToolHistory won't render it as a tool event; DONE's
-        // existing clearToolProgress removes it.
-        showToolProgress(assistantEl, m.text, 'warn');
-
-      } else if (m.type === 'APPROVAL') {
-        showApprovalCard(assistantEl, m.data);
-
-      } else if (m.type === 'CLARIFY') {
-        showClarifyCard(assistantEl, m.data);
-
-      } else if (m.type === 'RETRY') {
+    wireChatStreamPort({
+      port,
+      tabId: currentTabId,
+      getEl: () => assistantEl,
+      getRenderer: () => renderStream,
+      state,
+      stopKeepAlive: () => clearInterval(_swPingInterval),
+      onRetry: (m) => {
         // Background is retrying. Reset accumulator and renderer so the bubble
         // shows only the new attempt's content, not stale content from the failed one.
-        acc = '';
-        toolEvents = [];
+        state.acc = '';
+        state.toolEvents = [];
         outputTokens = 0;
         // Remove any stale live-think block from the previous attempt.
         // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
@@ -1241,58 +1352,14 @@ async function onSend() {
         renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
         if (activeController) activeController.renderStream = renderStream;
         showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
-
-      } else if (m.type === 'DONE') {
-        clearToolProgress(assistantEl);
-        _findCard(assistantEl, 'approval-card')?.remove();
-        _findCard(assistantEl, 'clarify-card')?.remove();
-        if (toolEvents.length > 0) {
-          renderToolHistory(assistantEl, toolEvents);
-          toolEvents = [];
-        }
-        const finalText = m.full || acc;
-        assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
-        await renderStream(finalText, true);
-        // linkifyTimestamps already ran inside renderStream's isDone path;
-        // stamp the video source (carried in the DONE chunk by the chat
-        // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
-        if (m.videoSrc) assistantEl.dataset.videoSrc = JSON.stringify(m.videoSrc);
-        addCodeCopyButtons();
-        renderMermaid(assistantEl); renderEcharts(assistantEl); renderMarkmap(assistantEl);
-        outputTokens = 0;
-        // Show token usage if the provider returned it
-        if (m.usage) showTokenUsage(assistantEl, m.usage);
-        if (m.choiceRequest) renderChoiceRequest(assistantEl, m.choiceRequest);
-        // Detect max-turns: agent hit the tool-call ceiling and is asking
-        // the user to continue. Show a one-click Continue button.
-        if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
-          appendMsgAction(assistantEl, '→ 继续', () => { inputEl.value = '继续'; onSend(); });
-        }
-        clearInterval(_swPingInterval);
-        try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
-        try { port.disconnect(); } catch (_) {}
-        // port.disconnect() does NOT fire this side's own onDisconnect listener
-        // (only the other end's), so activeController must be cleared here —
-        // otherwise it stays set until the async round trip settles, and a
-        // Send click in that window is misrouted to cancelStream() instead.
-        activeController = null;
-        sendMessage({ type: 'STREAM_RELEASE', tabId: currentTabId }).catch(() => {});
-        reconcileHistoryIdx(); // detect + correct auto-trim drift (fire-and-forget)
-      } else if (m.type === 'ERROR') {
-        // Only ABORTED reaches here — real errors are re-thrown by background
-        // and handled via the !res.ok block below (no pushChunk for real errors).
-        clearInterval(_swPingInterval);
-        if (m.code === 'ABORTED') {
-          await renderStream(acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
-        }
-      }
+      },
     });
   }
   port.onDisconnect.addListener(() => {
     clearInterval(_swPingInterval);
     setStreamingUI(false);
     activeController = null;
-    if (acc === '' && assistantEl.textContent === '▍') {
+    if (state.acc === '' && assistantEl.textContent === '▍') {
       // No chunks received AND the assistant bubble still shows the
       // placeholder. The background reported an error before any delta
       // was emitted. Show a clear hint.
@@ -1318,8 +1385,8 @@ async function onSend() {
       // Real error (re-thrown by background, port receives nothing).
       // Preserve any partial streaming content; append the error inline.
       const errMsg = res.error || 'Unknown error';
-      if (acc) {
-        await renderStream(acc + `\n\n---\n❌ **${errMsg}**`, true);
+      if (state.acc) {
+        await renderStream(state.acc + `\n\n---\n❌ **${errMsg}**`, true);
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
@@ -1333,8 +1400,8 @@ async function onSend() {
   } catch (e) {
     // sendMessage itself threw (SW restart, no receiver, etc.).
     // The CHAT handler never ran, so the user turn was likely NOT stored.
-    if (acc) {
-      await renderStream(acc + `\n\n---\n❌ **${e.message}**`, true);
+    if (state.acc) {
+      await renderStream(state.acc + `\n\n---\n❌ **${e.message}**`, true);
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
@@ -1400,20 +1467,29 @@ async function resumeInFlightStream(tabId) {
   let _swPingInterval = setInterval(() => {
     try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
   }, 20_000);
-  let acc = peek.acc || '';
-  let resumedToolEvents = [];
+  const state = { acc: peek.acc || '', toolEvents: [] };
   const initialBubble = getOrCreateAssistantBubble();
   let renderStream = makeStreamRenderer(initialBubble, streamRendererOpts);
   let assistantEl = initialBubble;
   function getOrCreateAssistantBubble() {
-    let el = messagesEl.querySelector('.msg.assistant:last-of-type');
+    // Deliberately NOT '.msg.assistant:last-of-type' -- that pseudo-class
+    // requires the element to be the last DIV among its siblings BY TAG
+    // NAME, not just the last .msg.assistant found. A sibling <div> inserted
+    // right after a resumed reply (renderChoiceRequest's .choice-request
+    // wrap, or appendMsgAction's action row -- both real, both already used
+    // by this exact resumed-DONE handler) silently un-qualifies the bubble
+    // from ':last-of-type' for any LATER lookup in the same session, so the
+    // next resumed turn's ensureAssistantEl() would spawn a stray new empty
+    // bubble instead of finding the real one. Found via a test regression
+    // while adding CHOICE_REQUEST/max-turns parity to this file.
+    let el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
     if (!el) el = appendAssistant('');
     return el;
   }
   function ensureAssistantEl() {
     // The DOM node identity may have changed (innerHTML restore
     // replaces the whole subtree). Re-resolve on every chunk.
-    let el = messagesEl.querySelector('.msg.assistant:last-of-type');
+    let el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
     if (!el) el = appendAssistant('');
     if (el !== assistantEl) {
       // Switch the stream renderer's target. makeStreamRenderer
@@ -1429,9 +1505,10 @@ async function resumeInFlightStream(tabId) {
   // Pre-render the accumulated text from the PEEK. This is the only
   // place this initial text is rendered — the background's STREAM_HELLO
   // does NOT push a drain chunk (see background.js for why). Subsequent
-  // CHUNKs are pure new deltas; acc += m.delta in the listener is
-  // correct because we start acc at peek.acc, not at ''.
-  if (acc) renderStream(acc, false);
+  // CHUNKs are pure new deltas; state.acc += m.delta inside
+  // wireChatStreamPort is correct because we seed state.acc from
+  // peek.acc, not ''.
+  if (state.acc) renderStream(state.acc, false);
   // HELLO the background so it knows this port owns the stream now.
   // Wait for ACK so any in-flight delta that's about to fire from the
   // LLM (after the PEEK/HELLO race window) goes to a port that's
@@ -1447,71 +1524,39 @@ async function resumeInFlightStream(tabId) {
     });
     port.postMessage({ type: 'STREAM_HELLO', tabId });
   });
-  port.onMessage.addListener(async (m) => {
-    if (m.type === 'CHUNK') {
-      const r = ensureAssistantEl();
-      acc += m.delta;
-      r(m.delta, false); // pass delta, not accumulated text
-      updateOutputTokenCount(m.delta);
-
-    } else if (m.type === 'TOOL_PROGRESS') {
-      resumedToolEvents.push(m.text);
-      showToolProgress(assistantEl, m.text);
-
-    } else if (m.type === 'TS_STATUS') {
-      // Mirrors the onSend listener: transient timestamp-rewrite status,
-      // shown but not recorded into resumedToolEvents.
-      showToolProgress(assistantEl, m.text, 'warn');
-
-    } else if (m.type === 'APPROVAL') {
-      showApprovalCard(assistantEl, m.data);
-
-    } else if (m.type === 'CLARIFY') {
-      showClarifyCard(assistantEl, m.data);
-
-    } else if (m.type === 'RETRY') {
+  // The DONE/ERROR/CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY handling itself is
+  // shared with onSend() via wireChatStreamPort — see its doc comment. Only
+  // the genuinely different bits stay here: RETRY is just a toast (no bubble
+  // reset, unlike onSend()'s), afterDone also calls setStreamingUI(false)
+  // (onSend()'s own port.onDisconnect already does that; this path's
+  // onDisconnect fires on user-Esc/cleanup, not on a normal DONE), and
+  // onAborted additionally disconnects the port (onSend()'s ABORTED branch
+  // relies on the background having already disconnected first).
+  wireChatStreamPort({
+    port,
+    tabId,
+    getEl: () => { ensureAssistantEl(); return assistantEl; },
+    getRenderer: () => ensureAssistantEl(),
+    state,
+    stopKeepAlive: () => clearInterval(_swPingInterval),
+    onRetry: (m) => {
       showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
-
-    } else if (m.type === 'DONE') {
-      const r = ensureAssistantEl();
-      clearToolProgress(assistantEl);
-      _findCard(assistantEl, 'approval-card')?.remove();
-      _findCard(assistantEl, 'clarify-card')?.remove();
-      if (resumedToolEvents.length > 0) {
-        renderToolHistory(assistantEl, resumedToolEvents);
-        resumedToolEvents = [];
-      }
-      assistantEl.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
-      await r(m.full || acc, true);
-      addCodeCopyButtons();
-      renderMermaid(assistantEl); renderEcharts(assistantEl); renderMarkmap(assistantEl);
-      outputTokens = 0;
-      if (m.usage) showTokenUsage(assistantEl, m.usage);
-
-      clearInterval(_swPingInterval);
-      try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
-      try { port.disconnect(); } catch (_) {}
-      sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
-      activeController = null;
+    },
+    afterDone: () => {
       setStreamingUI(false);
-      reconcileHistoryIdx();
-    } else if (m.type === 'ERROR') {
-      // Only ABORTED reaches here (same reasoning as onSend path).
-      clearInterval(_swPingInterval);
-      const el = messagesEl.querySelector('.msg.assistant:last-of-type') || appendAssistant('');
-      if (m.code === 'ABORTED') {
-        el.textContent = acc ? acc + '\n\n_(cancelled)_' : '_(cancelled)_';
-      }
+    },
+    onAborted: () => {
       try { port.disconnect(); } catch (_) {}
-    }
+    },
   });
   port.onDisconnect.addListener(() => {
     clearInterval(_swPingInterval);
     setStreamingUI(false);
+    activeController = null;
     // If the port died with no chunks at all, show the same hint as
     // onSend (the user has nothing to look at otherwise).
-    const el = messagesEl.querySelector('.msg.assistant:last-of-type');
-    if (acc === '' && el && el.textContent === '▍') {
+    const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+    if (state.acc === '' && el && el.textContent === '▍') {
       el.textContent = '(no chunks received — check Service Worker DevTools)';
     }
   });
@@ -2215,6 +2260,7 @@ function appendError(text) {
   el.textContent = '⚠ ' + text;
   messagesEl.appendChild(el);
   scrollToBottom(true);
+  setStatusDotState('error');
 }
 
 // force=true: always scroll (user action, new message).

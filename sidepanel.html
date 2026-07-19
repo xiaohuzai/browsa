@@ -9,8 +9,14 @@
   <body>
     <a href="#input" class="skip-link">Skip to composer</a>
 
-    <!-- Slim topbar: just provider + utility buttons -->
+    <!-- Slim topbar: wordmark + provider + utility buttons -->
     <header class="topbar" role="banner">
+      <!-- Live state indicator (idle / streaming / error), a quiet dot next
+           to the wordmark instead of a panel-edge rail -- see
+           sidepanel.css's .status-dot rules and sidepanel.js's
+           setStatusDotState(). -->
+      <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+      <span class="wordmark" aria-hidden="true">browsa</span>
       <select id="provider" class="provider" aria-label="AI provider"></select>
       <button id="sessions-btn" class="iconbtn" aria-label="Session history" title="Session history">
         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>

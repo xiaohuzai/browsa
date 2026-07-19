@@ -33,19 +33,57 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 10px;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  box-shadow: 0 1px 0 var(--border-soft);
+}
+
+/* Live state indicator (idle / streaming / error) — a quiet dot next to the
+   wordmark, driven by setStatusDotState() in sidepanel.js. Replaces an
+   earlier "Margin Rail" design (a persistent stitched line down the panel's
+   left edge) that read as an odd, unexplained vertical line rather than a
+   legible status signal — same three states, much lower-key presentation. */
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+  transition: background-color 0.3s ease;
+}
+.status-dot[data-state="streaming"] {
+  background: var(--mark);
+  animation: status-dot-pulse 1.4s ease-in-out infinite;
+}
+.status-dot[data-state="error"] {
+  background: var(--error);
+}
+@keyframes status-dot-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .status-dot[data-state="streaming"] { animation: none; opacity: 0.85; }
+}
+
+/* Small tracked-out monospace wordmark — the brand's one consistent
+   typographic voice, now actually visible in the primary UI instead of
+   hidden at 50% opacity behind the empty-state selector. */
+.wordmark {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .provider {
   flex: 1;
   padding: 5px 10px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-sm);
   background: var(--bg-3);
   color: var(--fg);
   font: inherit;
@@ -56,7 +94,7 @@ body {
   transition: border-color var(--t), background var(--t);
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a8278' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239aa0ab' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 26px;
@@ -72,7 +110,7 @@ body {
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
@@ -230,7 +268,7 @@ body {
   box-shadow: var(--shadow-sm);
 }
 .msg-action-icon:hover { background: var(--bg-4); border-color: var(--fg-dim); color: var(--fg); }
-.msg-action-icon.delete-icon:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: var(--error); }
+.msg-action-icon.delete-icon:hover { background: color-mix(in srgb, var(--error) 12%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
 
 /* ─── Collapse/expand a long assistant reply (manual, ephemeral) ────────── */
 .fold-btn svg { transition: transform var(--t); }
@@ -324,7 +362,7 @@ body {
   font-size: 12.5px;
   padding: 6px 16px;
   border: 1px solid var(--accent);
-  border-radius: 20px;
+  border-radius: 999px;
   background: transparent;
   color: var(--accent);
   cursor: pointer;
@@ -350,7 +388,7 @@ body {
   color: var(--accent);
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 20px;
+  border-radius: 999px;
   padding: 2px 10px;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
@@ -379,10 +417,10 @@ body {
   align-self: center;
   color: var(--error);
   font-size: 12px;
-  background: rgba(248,113,113,0.07);
+  background: color-mix(in srgb, var(--error) 7%, transparent);
   padding: 7px 14px;
   border-radius: var(--radius);
-  border: 1px solid rgba(248,113,113,0.18);
+  border: 1px solid color-mix(in srgb, var(--error) 18%, transparent);
   animation: none;
   max-width: 100%;
 }
@@ -441,7 +479,7 @@ body {
   font: inherit;
   font-size: 11.5px;
   padding: 4px 11px;
-  border-radius: 20px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--fg-2);
@@ -509,14 +547,15 @@ body {
 .msg.assistant a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .msg.assistant a:hover { opacity: 0.8; }
 /* Clickable [mm:ss] timestamp markers in video-note replies - click seeks
-   the source video in place. Styled as a small accent chip to read as a
-   control, not body text. */
+   the source video in place. Styled as a "highlighter gold" margin-note
+   chip (--gold), not the primary --accent -- per the two-accent rule,
+   --accent is reserved for actions, --gold for annotation-like content. */
 .msg.assistant .browsa-ts {
   display: inline-block;
   padding: 0 0.32em;
   margin: 0 0.1em;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--gold);
+  background: var(--gold-dim);
   border-radius: 5px;
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
@@ -526,7 +565,7 @@ body {
   vertical-align: baseline;
 }
 .msg.assistant .browsa-ts:hover { opacity: 0.8; }
-.msg.assistant .browsa-ts:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.msg.assistant .browsa-ts:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .msg.assistant blockquote {
   margin: 0.5em 0;
   padding: 0.5em 1em;
@@ -740,10 +779,10 @@ math[display="block"] {
 }
 .mermaid-btn:hover { background: var(--bg-hover, #3a3a4a); }
 .mermaid-error {
-  color: #f87171;
+  color: var(--error);
   font-size: 12px;
   padding: 4px 8px;
-  border: 1px solid rgba(248,113,113,0.3);
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   border-radius: 4px;
   margin: 4px 0;
 }
@@ -759,10 +798,10 @@ math[display="block"] {
 }
 .markmap-svg { width: 100%; height: 100%; display: block; }
 .markmap-error {
-  color: #f87171;
+  color: var(--error);
   font-size: 12px;
   padding: 4px 8px;
-  border: 1px solid rgba(248,113,113,0.3);
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   border-radius: 4px;
   margin: 4px 0;
 }
@@ -791,8 +830,8 @@ math[display="block"] {
   margin: 8px 12px 0;
   padding: 8px 12px;
   border-radius: var(--radius);
-  background: rgba(251,191,36,0.06);
-  border: 1px solid rgba(251,191,36,0.2);
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 20%, transparent);
   color: var(--warn);
   font-size: 12px;
   line-height: 1.5;
@@ -806,7 +845,7 @@ math[display="block"] {
 .diagnostics code {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
-  background: rgba(255,255,255,0.06);
+  background: var(--code-bg);
   padding: 1px 5px;
   border-radius: 3px;
   color: var(--fg);
@@ -984,7 +1023,7 @@ math[display="block"] {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-size: 11px;
   cursor: pointer;
   color: var(--fg-dim);
@@ -1073,10 +1112,14 @@ math[display="block"] {
 }
 
 /* ─── Accessibility ─────────────────────────────────────────────────────────── */
-/* The typing-cursor blink, tool-progress pulse, and stop-button pulse all
-   loop indefinitely — collapse them to a single frame for users who've
-   asked the OS for reduced motion, instead of running three different
-   infinite animations at once in an always-visible panel. */
+/* Every looping animation in this file (status-dot pulse, typing-cursor
+   blink, tool-progress pulse, attach-button spin, stop-button pulse)
+   collapses to a single frame for users who've asked the OS for reduced
+   motion, instead of running five different infinite animations at once in
+   an always-visible panel. The `.status-dot[data-state="streaming"]` rule
+   above additionally pins an explicit resting opacity, since this wildcard
+   rule alone only guarantees the animation stops — not which keyframe it
+   stops on. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1175,9 +1218,9 @@ math[display="block"] {
   flex-shrink: 0;
 }
 .toast-x:hover { opacity: 1; }
-.toast-success { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); color: #4ade80; }
-.toast-error   { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: #f87171; }
-.toast-warn    { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+.toast-success { background: color-mix(in srgb, var(--success) 12%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+.toast-error   { background: color-mix(in srgb, var(--error) 12%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+.toast-warn    { background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
 .toast-info    { background: rgba(148,163,184,0.12); border-color: rgba(148,163,184,0.3); color: var(--fg-2); }
 
 /* ─── Confirm dialog ─────────────────────────────────────────────────────────── */
@@ -1241,11 +1284,11 @@ math[display="block"] {
 }
 .confirm-ok:hover { background: var(--accent-hover); }
 .confirm-ok.danger {
-  background: rgba(248,113,113,0.12);
-  border-color: #f87171;
-  color: #f87171;
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  border-color: var(--error);
+  color: var(--error);
 }
-.confirm-ok.danger:hover { background: rgba(248,113,113,0.22); }
+.confirm-ok.danger:hover { background: color-mix(in srgb, var(--error) 22%, transparent); }
 
 /* ─── Scroll-to-bottom button badge ─────────────────────────────────────────── */
 .scroll-to-bottom-btn.has-new { color: var(--accent); }
@@ -1365,8 +1408,8 @@ code.language-diff,
 code.language-patch {
   display: block;
 }
-.diff-add  { color: #4ade80; display: block; }
-.diff-del  { color: #f87171; display: block; }
+.diff-add  { color: var(--success); display: block; }
+.diff-del  { color: var(--error); display: block; }
 .diff-hunk { color: var(--fg-dim); display: block; }
 
 /* ── Sessions drawer ─────────────────────────────────────────────────────── */
@@ -1690,8 +1733,8 @@ code.language-patch {
   padding: 2px 6px;
 }
 .msg-search-nav:hover, .msg-search-close:hover { color: var(--fg); border-color: var(--fg-dim); }
-mark.search-highlight { background: rgba(251,191,36,0.35); color: inherit; border-radius: 2px; }
-mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px solid #fbbf24; }
+mark.search-highlight { background: color-mix(in srgb, var(--gold) 35%, transparent); color: inherit; border-radius: 2px; }
+mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, transparent); outline: 1px solid var(--gold); }
 
 /* ── Multi-select bar ───────────────────────────────────────────────────── */
 .multiselect-bar[hidden] { display: none !important; }
@@ -1709,13 +1752,13 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
   font-size: 11.5px;
   padding: 3px 10px;
   border-radius: 6px;
-  border: 1px solid rgba(248,113,113,0.35);
-  background: rgba(248,113,113,0.1);
-  color: var(--error, #f87171);
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
   cursor: pointer;
 }
 .multiselect-delete-btn:disabled { opacity: 0.4; cursor: default; }
-.multiselect-delete-btn:not(:disabled):hover { background: rgba(248,113,113,0.2); }
+.multiselect-delete-btn:not(:disabled):hover { background: color-mix(in srgb, var(--error) 20%, transparent); }
 .multiselect-cancel-btn {
   font-size: 11.5px;
   padding: 3px 10px;
@@ -1806,9 +1849,9 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.approval-risk-high   { background: rgba(248,113,113,0.18); color: #f87171; }
-.approval-risk-medium { background: rgba(251,191,36,0.18);  color: #fbbf24; }
-.approval-risk-low    { background: rgba(74,222,128,0.18);  color: #4ade80; }
+.approval-risk-high   { background: color-mix(in srgb, var(--error) 18%, transparent); color: var(--error); }
+.approval-risk-medium { background: color-mix(in srgb, var(--warn) 18%, transparent);  color: var(--warn); }
+.approval-risk-low    { background: color-mix(in srgb, var(--success) 18%, transparent);  color: var(--success); }
 .approval-cmd {
   background: var(--bg-3);
   padding: 4px 8px;
@@ -1935,7 +1978,7 @@ mark.search-highlight-active { background: rgba(251,191,36,0.75); outline: 1px s
 /* User/AI messages inside the card reuse .msg.user/.msg.assistant directly
    (see openDetailThread in sidepanel.js) — no parallel bubble styling here,
    so they can never drift out of sync with the main chat's look. */
-.subchat-error { color: #f87171; }
+.subchat-error { color: var(--error); }
 .detail-thread-input-row {
   display: flex;
   gap: 6px;
