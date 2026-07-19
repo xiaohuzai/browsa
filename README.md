@@ -172,6 +172,8 @@ Click 📎 in the composer to attach the current page. browsa supports two attac
 | **Auto** | Tries Mozilla Readability first (clean article text, ~5–30 KB), falls back to DOM tree, then full `body.innerText` |
 | **📷 Screenshot** | PNG of the visible tab — for multimodal models or visual content |
 
+Attaching a PDF (or a page that turns out to be one) is automatic — no separate mode to pick. browsa tries [`pdf-inspector-wasm`](https://github.com/firecrawl/pdf-inspector) first (full layout reconstruction — tables, headings, columns — running client-side, nothing uploaded), falls back to plain `pdf.js` text extraction if that's unavailable or the PDF turns out to be a scanned/image-only page with no text layer, and as a last resort attaches just the PDF's URL so your agent can fetch and read it with its own tools.
+
 For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
 
 ---
@@ -281,6 +283,7 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 - **`sidepanel.js`** — Chat UI orchestrator: init/send/history/approval-clarify cards/screenshot crop. The Markdown/Mermaid/Markmap/KaTeX/ECharts rendering pipeline, sessions drawer, in-conversation search, multi-select, and detail-thread ("细聊") side conversations are each their own module under `lib/sidepanel/`.
 - **`lib/sidepanel/render.js`** — marked + DOMPurify + KaTeX + Mermaid + ECharts + Markmap + highlight.js pipeline. Streaming deltas are smoothed via `reveal-pacer.js` (a thin wrapper around the vendored `markstream-core` package); KaTeX rendering for the final per-message render offloads formula-heavy messages to a Web Worker (`katex-worker-client.js`/`katex.worker.js`), falling back to synchronous rendering below a small-batch threshold or on worker failure; Mermaid's SVG output is sanitized (`sanitizeMermaidSvg`, from the vendored `stream-markdown-parser` package) and sequence-diagram parse failures auto-retry with problem semicolons escaped (`mermaid-utils.js`). All three diagram vendor bundles (Mermaid/ECharts/Markmap) are speculatively preloaded (`preloadChartVendors()`) the moment a turn starts, so the first diagram in a session doesn't pay a multi-MB cold-load penalty right when it needs to render.
 - **`lib/page-extractor.js`** — Injects Readability + Turndown into the page MAIN world for reader mode. For SPA sites, uses the XHR cache from the matching content script.
+- **`lib/sidepanel/pdf-extractor.js`** — PDF attachment pipeline: tries `pdf-inspector-wasm` (full layout/table/heading reconstruction) in a dedicated Worker first, falls back to plain-text `pdf.js` extraction, and quality-gates both (empty/scanned results don't get treated as success) before the caller falls back further to a plain URL attachment.
 - **`lib/openai-client.js`** — Fetch-based SSE streaming client. Supports `/v1/chat/completions` (all providers) and `/v1/runs` (Hermes — approval/clarification/tool-progress events, auto-detected).
 - **`lib/storage.js`** — `chrome.storage.local` wrapper. Global flat conversation history (not per-tab), session management, mask rules.
 - **Content scripts** (`lib/content-scripts/`) — Run at `document_start` in MAIN world. Wrap `window.fetch` and `XMLHttpRequest.prototype` to observe SPA API calls and forward structured data to the background.
@@ -312,6 +315,9 @@ browsa/
 │   │   ├── katex-worker-client.js     # batches formulas to katex.worker.js, sync fallback
 │   │   ├── katex.worker.js            # dedicated KaTeX rendering Worker
 │   │   ├── mermaid-utils.js           # sequence-diagram semicolon fix + preview-height estimate
+│   │   ├── pdf-extractor.js           # PDF attach: wasm-primary/pdf.js-fallback orchestration
+│   │   ├── pdf-inspector-worker-client.js # pdf-inspector-wasm Worker client (sticky-failure, timeout→null)
+│   │   ├── pdf-inspector.worker.js    # dedicated Worker running pdf-inspector-wasm's processPdf()
 │   │   ├── sessions-ui.js             # sessions drawer
 │   │   ├── multiselect.js             # bulk-delete mode
 │   │   ├── msg-search.js              # Ctrl+F in-conversation search
@@ -342,13 +348,17 @@ browsa/
 │       ├── markmap-lib.bundle.js       # Markdown → mind map tree transformer
 │       ├── markmap-view.bundle.js      # d3-zoom mind map SVG renderer
 │       ├── markstream-core.bundle.js   # streaming-reveal pacing controller
-│       └── stream-markdown-parser.bundle.js # Mermaid SVG sanitizer
+│       ├── stream-markdown-parser.bundle.js # Mermaid SVG sanitizer
+│       ├── pdf.bundle.js               # pdf.js — fallback PDF text extraction
+│       ├── pdf.worker.bundle.js        # pdf.js's own Worker
+│       ├── pdf_inspector_wasm.js       # pdf-inspector-wasm glue (wasm-bindgen)
+│       └── pdf_inspector_wasm_bg.wasm  # pdf-inspector-wasm binary — primary PDF extraction
 ├── _locales/{en,zh_CN}/
 ├── icons/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (460+ tests)
+├── test/                              # node:test unit tests (529 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
@@ -368,6 +378,7 @@ browsa/
 ## Security
 
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
+- PDF attachments are parsed entirely client-side (WebAssembly + pdf.js, both running in the side panel) — the file's bytes are never uploaded anywhere, only the extracted text is sent to your configured provider.
 - LLM replies are sanitized with DOMPurify before rendering, including a hook that blocks `data:image/svg+xml` sources (which can carry their own `<script>`/event handlers) while still allowing normal bitmap `data:` images.
 - Mermaid diagram SVG output is sanitized before insertion (strips `<script>`, event-handler attributes, and dangerous URLs) — needed because Mermaid's `securityLevel:'loose'` mode, required for KaTeX math inside diagram labels, otherwise permits arbitrary HTML through.
 - Content scripts only observe network requests; they never modify or block them.

@@ -20,7 +20,7 @@ import {
   deleteSelectedMessages
 } from './lib/sidepanel/multiselect.js';
 import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
-import { extractPdfText } from './lib/sidepanel/pdf-extractor.js';
+import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
@@ -739,16 +739,17 @@ async function onAttachPage() {
     // never a stuck/broken state. History storage happens via ATTACH_PDF_CONFIRM.
     if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
       attachBtn.title = '解析 PDF 中…';
-      let pdfText, pdfNumPages;
+      let pdfText, pdfNumPages, pdfOcrPages;
       try {
         const pdfResult = await Promise.race([
-          extractPdfText(ctx.pdfBase64),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('pdf extraction timeout')), 20_000))
+          extractPdfContent(ctx.pdfBase64),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('pdf extraction timeout')), 45_000))
         ]);
         pdfText = pdfResult.text;
         pdfNumPages = pdfResult.numPages;
+        pdfOcrPages = pdfResult.pagesNeedingOcr;
       } catch (e) {
-        console.warn('browsa: pdf.js extraction failed, using placeholder', e.message);
+        console.warn('browsa: pdf extraction failed, using placeholder', e.message);
         pdfText = `[PDF file — agent should fetch and read directly]\nURL: ${ctx.meta?.url || ''}\nTitle: ${ctx.meta?.title || ''}`;
       }
       const confirmRes = await sendMessage({
@@ -763,7 +764,8 @@ async function onAttachPage() {
         const title = ctx.meta?.title || 'PDF';
         const charLabel = pdfText?.length > 0 ? `，${pdfText.length.toLocaleString()} 字符` : '';
         const pagesLabel = pdfNumPages ? `，${pdfNumPages} 页` : '';
-        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}）`);
+        const ocrLabel = pdfOcrPages?.length > 0 ? `，${pdfOcrPages.length} 页可能需要 OCR` : '';
+        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}）`);
       } else {
         appendError('PDF attach failed');
       }

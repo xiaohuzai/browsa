@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
@@ -190,6 +190,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://*:* https://*:* ws://*:* wss://*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'none'; worker-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://*:* https://*:* ws://*:* wss://*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'none'; worker-src 'self'"
   }
 }
