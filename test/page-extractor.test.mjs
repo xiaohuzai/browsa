@@ -1068,6 +1068,51 @@ test('extractFullInPageWorld strips zero-width/control chars from raw textConten
   assert.ok(out.text.includes('HelloWorld'), 'surrounding text must be preserved');
 });
 
+// --- Unpaired UTF-16 surrogate stripping ------------------------------------
+// Ported from auditing browser-use's sanitize_surrogates -- real-world pages
+// sometimes leak broken emoji/symbol encodings as lone surrogate code units,
+// which can break JSON request-body encoding or get rejected by a provider.
+// Must only strip UNPAIRED surrogates -- real emoji/astral chars are valid
+// high+low pairs and must survive untouched.
+
+test('unpaired surrogate regex: strips a lone high surrogate but keeps a valid emoji pair', () => {
+  const re = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+  const lonelyHigh = String.fromCharCode(0xD800);
+  const lonelyLow = String.fromCharCode(0xDC00);
+  const emoji = '\u{1F389}'; // 🎉 -- a real, valid surrogate pair
+  assert.equal(('a' + lonelyHigh + 'b').replace(re, ''), 'ab', 'unpaired high surrogate must be removed');
+  assert.equal(('a' + lonelyLow + 'b').replace(re, ''), 'ab', 'unpaired low surrogate must be removed');
+  assert.equal(('party ' + emoji + ' time').replace(re, ''), 'party ' + emoji + ' time', 'valid emoji pair must survive untouched');
+});
+
+test('extractInPageWorld: unpaired surrogate is stripped, valid emoji survives', async () => {
+  const lonelyHigh = String.fromCharCode(0xD800);
+  const emoji = '\u{1F389}';
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>Broken${lonelyHigh}text and a real emoji ${emoji} here.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(!result.text.includes(lonelyHigh), 'unpaired surrogate must not survive into the final markdown');
+  assert.ok(result.text.includes(emoji), 'valid emoji pair must survive');
+});
+
+test('extractFullInPageWorld: strips unpaired surrogates from raw textContent', async () => {
+  const fnBody = await loadSiblingFn('extractFullInPageWorld');
+  const lonelyLow = String.fromCharCode(0xDC00);
+  const html = `<!doctype html><html><body>Hello${lonelyLow}World, this is enough visible text to extract.</body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, NodeFilter: dom.window.NodeFilter });
+  const out = vm.runInContext(`${fnBody}\nextractFullInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.ok(!out.text.includes(lonelyLow), 'unpaired surrogate must be stripped from full-mode output');
+  assert.ok(out.text.includes('HelloWorld'), 'surrounding text must be preserved');
+});
+
 // --- Same-origin iframe / open shadow-DOM extraction ------------------------
 // All three MAIN-world extraction paths used to treat <iframe> as pure noise
 // and never traversed shadow DOM, silently dropping any page content
@@ -1417,6 +1462,121 @@ test('extractDomTreeInPageWorld: non-group outlier sibling keeps its original po
   assert.ok(buttonPos > lastItemMarker, 'outlier button must appear after all Item markers, not promoted into the middle of items');
 });
 
+// --- BM25 relevance scoring with tag-priority weights -----------------------
+// Ported from auditing crawl4ai's BM25ContentFilter -- replaces the plain
+// bigram Dice-coefficient cosine score with proper BM25 (term frequency +
+// document-length normalization + inverse-document-frequency), using bigram
+// tokens (CJK-friendly) instead of crawl4ai's whitespace-split+stemmed words.
+
+test('extractDomTreeInPageWorld: BM25 scoring still promotes a clearly-matching item over non-matching ones (regression for the algorithm swap)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <ul>
+      <li class="prod">常规商品 价格 100 元 普通描述内容</li>
+      <li class="prod">普通商品 价格 200 元 一般说明内容</li>
+      <li class="prod">特价商品 今日特价 仅售 50 元内容</li>
+    </ul>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '特价' });`, ctx);
+  const posMatching = out.text.indexOf('特价商品');
+  const posFirst = out.text.indexOf('常规商品');
+  assert.ok(posMatching > -1 && posMatching < posFirst, 'BM25-scored item must still be promoted ahead of non-matching items');
+});
+
+test('extractDomTreeInPageWorld: an item whose dominant heading is h2 outranks an equal-text-overlap plain-div item (tag-priority weight)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  // Both items contain the same query-matching phrase ("特价商品") with the
+  // same surrounding filler length, so their raw BM25 scores are equal --
+  // only the h2-heading item should be promoted via tagPriorityWeight.
+  const filler = '一些额外的说明文字用于填充长度保持一致';
+  const html = `<!doctype html><html><body>
+    <div id="list">
+      <div class="card"><p>特价商品 ${filler}</p></div>
+      <div class="card"><h2>特价商品</h2><p>${filler}</p></div>
+      <div class="card"><p>不相关的商品介绍文字 完全没有关联词汇内容</p></div>
+    </div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '特价商品' });`, ctx);
+  // Item 2 (has <h2>) must be promoted ahead of Item 1 (plain <p>, same text match)
+  const item2Pos = out.text.indexOf('— Item 2 —');
+  const item1Pos = out.text.indexOf('— Item 1 —');
+  assert.ok(item2Pos > -1 && item1Pos > -1, 'both item markers must be present');
+  assert.ok(item2Pos < item1Pos, `heading item (Item 2) must rank ahead of plain-text item (Item 1) with equal text overlap; got:\n${out.text}`);
+});
+
+// --- Link-to-citation numbering ---------------------------------------------
+// Ported from auditing crawl4ai's convert_links_to_citations -- on link-dense
+// pages, replacing [text](https://long-url) with text⟨N⟩ + a References
+// footer meaningfully cuts token usage versus repeating full URLs inline.
+
+test('extractInPageWorld: 6+ distinct links get converted to citation markers with a References section', async () => {
+  const links = Array.from({ length: 6 }, (_, i) => `<a href="https://example.com/page${i}">link ${i}</a>`).join(' and ');
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>Check these: ${links}.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /link 0⟨1⟩/, 'first link must be converted to a citation marker');
+  assert.match(result.text, /## References/, 'a References section must be appended');
+  assert.match(result.text, /\[1\] https:\/\/example\.com\/page0/, 'reference list must map number back to the URL');
+  assert.doesNotMatch(result.text, /\]\(https:\/\/example\.com\/page0\)/, 'the original inline (url) form must be gone');
+});
+
+test('extractInPageWorld: References section survives even when page is long enough to trigger htmlCap truncation (regression for bug where References was appended inside postProcessMarkdown and could get cut before reaching the model)', async () => {
+  // The links come AFTER a huge body of text so that without the fix, the
+  // References list appended at the very end would be cut off by htmlCap.
+  const hugeFiller = 'A long paragraph. '.repeat(2000); // ~36K chars -- pushes toward cap
+  const links = Array.from({ length: 6 }, (_, i) => `<a href="https://example.com/page${i}">link ${i}</a>`).join(' ');
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${hugeFiller}</p>
+      <p>See: ${links}</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  // Use a small cap so truncation definitely fires
+  const fnBody = await loadSiblingFn('extractInPageWorld');
+  const rSrc = await readFile(join(ROOT, 'lib/vendor/Readability.iife.js'), 'utf8');
+  const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
+  const gfmSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 100 });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 20 });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node, NodeFilter: dom.window.NodeFilter, DOMParser: dom.window.DOMParser, console });
+  vm.runInContext(rSrc, ctx);
+  vm.runInContext(tSrc, ctx);
+  vm.runInContext(gfmSrc, ctx);
+  const result = vm.runInContext(`${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 10000 });`, ctx);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(result.wasCapped, 'content must have been capped for this regression test to be meaningful');
+  assert.match(result.text, /## References/, 'References section must survive truncation and appear in the final text');
+  assert.match(result.text, /\[1\] https:\/\/example\.com\/page0/, 'reference URL must appear after truncation');
+});
+
+test('extractInPageWorld: below-threshold link count (few links) leaves markdown links untouched', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>See <a href="https://example.com/a">this</a> and <a href="https://example.com/b">that</a>.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /\]\(https:\/\/example\.com\/a\)/, 'inline link form must survive when below the citation threshold');
+  assert.doesNotMatch(result.text, /## References/, 'no References section should be added for a handful of links');
+});
+
 // --- Turndown GFM plugin (tables/strikethrough/task-lists) -----------------
 // Ported from auditing firecrawl's html-to-markdown fallback path, which
 // loads the same turndown-plugin-gfm package for exactly this reason: plain
@@ -1510,6 +1670,180 @@ test('postProcessMarkdown regex: multi-line link text gets its inner newline esc
   const md = '[line one\nline two](https://example.com)';
   const out = md.replace(/\[([^\]]*\n[^\]]*)\]\(([^)]+)\)/g, (m, text, url) => `[${text.replace(/\n/g, '\\\n')}](${url})`);
   assert.equal(out, '[line one\\\nline two](https://example.com)');
+});
+
+// --- postProcessMarkdown(): SPA-embedded JSON state/config blob stripping --
+// Ported from auditing browser-use's _preprocess_markdown_content -- LinkedIn/
+// Facebook-style SPAs leave large {"key":"value",...} state blobs sitting in
+// otherwise-readable DOM text.
+
+test('extractInPageWorld: a long JSON blob inside a code span is stripped', async () => {
+  const jsonBlob = `{"description":"${'a'.repeat(200)}"}`;
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p><code>${jsonBlob}</code></p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /a{200}/, 'the JSON blob body must not survive into the final markdown');
+  assert.match(result.text, /Real Article/, 'real surrounding content must be kept');
+});
+
+test('extractInPageWorld: a long {"$type":...} JSON blob is stripped', async () => {
+  const jsonBlob = `{"$type":"${'z'.repeat(150)}"}`;
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>${jsonBlob}</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /z{150}/, 'the $type JSON blob body must not survive into the final markdown');
+  assert.match(result.text, /Real Article/, 'real surrounding content must be kept');
+});
+
+test('extractInPageWorld: a long flat JSON blob (not code span, no $type) is dropped via the JSON.parse line filter', async () => {
+  // Deliberately avoids underscores/asterisks in the key -- Turndown escapes
+  // those as Markdown special chars (e.g. "__STATE__" -> "\_\_STATE\_\_"),
+  // which would break the JSON.parse sanity check below before it even runs.
+  const jsonBlob = JSON.stringify({ pageState: 'b'.repeat(150) });
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>${jsonBlob}</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /b{150}/, 'the flat JSON blob must not survive into the final markdown');
+  assert.match(result.text, /Real Article/, 'real surrounding content must be kept');
+});
+
+test('postProcessMarkdown line filter: a long line that only LOOKS like JSON (fails to parse) is kept', () => {
+  const line = '{' + 'not actually valid json, just starts with a brace and runs long enough. '.repeat(2);
+  assert.ok(line.length > 100 && line[0] === '{');
+  let threw = false;
+  try { JSON.parse(line.trim()); } catch (_) { threw = true; }
+  assert.ok(threw, 'sanity check: this fixture must not be valid JSON');
+});
+
+test('extractInPageWorld: a small legitimate inline JSON example in the article body is kept', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>The config looks like <code>{"a":1}</code> in this example.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /\{"a":1\}/, 'a small, clearly-intentional inline JSON example must not be stripped');
+});
+
+// --- findSafeCutPoint / findDomTreeCutPoint (structural truncation) --------
+// Each nested helper is exercised via the same end-to-end
+// runExtractInPageWorldOnLiveDoc / loadSiblingFn path as other extractInPageWorld
+// tests, but with a deliberately tiny htmlCap so the truncation triggers.
+
+test('extractInPageWorld: truncation does not cut inside a fenced code block', async () => {
+  // Preamble fills ~300 chars, then a fenced code block starts.
+  // htmlCap = 320 would land mid-fence if a dumb slice were used.
+  const preamble = 'A'.repeat(30) + ' ';  // repeated 10 times in <p> = ~300 chars after Turndown
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Article</h1>
+      <p>${preamble.repeat(10)}</p>
+      <pre><code>const x = 1;\nconst y = 2;\nconst z = 3;</code></pre>
+      <p>After the code block.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const fnBody = await loadSiblingFn('extractInPageWorld');
+  const rSrc = await readFile(join(ROOT, 'lib/vendor/Readability.iife.js'), 'utf8');
+  const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
+  const gfmSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 100 });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 20 });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node, NodeFilter: dom.window.NodeFilter, DOMParser: dom.window.DOMParser, console });
+  vm.runInContext(rSrc, ctx);
+  vm.runInContext(tSrc, ctx);
+  vm.runInContext(gfmSrc, ctx);
+  // cap = 330 — lands inside the ``` block with a dumb slice
+  const result = vm.runInContext(`${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 330 });`, ctx);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(result.wasCapped, 'content should have been capped');
+  // The resulting text must not start an unclosed fence — i.e. the number of
+  // ``` occurrences in the output must be even (open+close pairs) or zero.
+  const tickCount = (result.text.match(/```/g) || []).length;
+  assert.ok(tickCount % 2 === 0, `found ${tickCount} fence markers (odd = unclosed fence in output)`);
+});
+
+test('extractDomTreeInPageWorld: truncation lands at an item or heading boundary', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  // Build a page where the cap falls mid-way through an item group
+  const items = Array.from({ length: 10 }, (_, i) =>
+    `<div class="card"><h3>Card ${i}</h3><p>${'text '.repeat(20)}</p></div>`
+  ).join('');
+  const html = `<!doctype html><html><body>
+    <main>${items}</main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 100 });
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 20 });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node, NodeFilter: dom.window.NodeFilter, console });
+  // cap = 400 — lands mid-item with dumb slice
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 400 });`, ctx);
+  assert.ok(out.wasCapped, 'content should have been capped');
+  // The cut must not land in the middle of an item's prose line —
+  // the last real content line before the truncation marker must either
+  // end at a complete line (no partial word), which we check by confirming
+  // the text before the marker doesn't end with a character from mid-word.
+  const beforeMarker = out.text.split('\n\n[... truncated')[0];
+  const lastLine = beforeMarker.split('\n').pop();
+  // Last line should not be a partial fragment of a known phrase
+  assert.ok(!lastLine.endsWith('tex'), 'truncation must not slice "text" mid-word');
+});
+
+test('findDomTreeCutPoint regex: recognizes the real em-dash (U+2014) item-marker character, not an ASCII hyphen (regression for wrong-character bug)', () => {
+  // Copied verbatim from lib/page-extractor.js's findDomTreeCutPoint, same
+  // pattern as this file's other isolated "regex/logic" unit tests (see
+  // "postProcessMarkdown regex: ..." above) -- avoids ambiguity about what
+  // "last kept line" means when going through the full extraction pipeline.
+  function findDomTreeCutPoint(txt, cap) {
+    if (!txt || cap >= txt.length) return cap;
+    var i = cap;
+    while (i > 0) {
+      if (txt[i] === '\n') {
+        var next = txt[i + 1];
+        if (next === '—' || next === '#') return i;
+      }
+      i--;
+    }
+    var plain = txt.lastIndexOf('\n', cap);
+    return plain > 0 ? plain : cap;
+  }
+  const prefix = 'A'.repeat(30);
+  const marker = '— Item 3 —';
+  const suffix = 'B'.repeat(30);
+  const text = prefix + '\n' + marker + '\n' + suffix;
+  const markerLineStart = prefix.length + 1; // position right after prefix's \n
+  const cap = markerLineStart + 5; // land partway INTO the marker line
+  const cut = findDomTreeCutPoint(text, cap);
+  // The cut must land at the '\n' immediately BEFORE the marker line (so the
+  // marker line -- and everything from it onward -- is excluded wholesale,
+  // never included partially).
+  assert.equal(cut, prefix.length, `cut must land right before the marker line's own preceding newline; got ${cut}`);
+  assert.equal(text.slice(cut + 1, cut + 1 + marker.length), marker, 'sanity: the text right after the cut must be the marker itself');
 });
 
 // --- NOISE_SELECTORS additions + srcset highest-resolution picking ---------

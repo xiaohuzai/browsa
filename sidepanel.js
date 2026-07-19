@@ -698,10 +698,13 @@ function cycleContextMode() {
 async function onAttachPage() {
   if (!currentTabId) return;
   const mode = [...ctxRadios].find((r) => r.checked)?.value || 'reader';
-  attachBtn.disabled = true;
-  attachBtn.style.opacity = '0.5';
+  const origAttachIcon = attachBtn.innerHTML;
   const origTitle = attachBtn.title;
+  attachBtn.disabled = true;
+  attachBtn.innerHTML = ICONS.retry;
+  attachBtn.classList.add('is-attaching');
   attachBtn.title = 'Reading page…';
+  showAttachProgress('正在读取页面…');
 
   try {
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode, query: inputEl.value || '' });
@@ -739,6 +742,7 @@ async function onAttachPage() {
     // never a stuck/broken state. History storage happens via ATTACH_PDF_CONFIRM.
     if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
       attachBtn.title = '解析 PDF 中…';
+      showAttachProgress('解析 PDF 中…');
       let pdfText, pdfNumPages, pdfOcrPages;
       try {
         const pdfResult = await Promise.race([
@@ -782,9 +786,34 @@ async function onAttachPage() {
     appendError('Page attach failed: ' + e.message);
   } finally {
     attachBtn.disabled = false;
-    attachBtn.style.opacity = '';
+    attachBtn.innerHTML = origAttachIcon;
+    attachBtn.classList.remove('is-attaching');
     attachBtn.title = origTitle;
+    clearAttachProgress();
   }
+}
+
+/** Show a visible "attaching…" status pill above the composer, reusing the
+ * same .tool-progress styling as the chat tool-progress indicator. Unlike
+ * showToolProgress (anchored relative to a streaming message bubble), this
+ * has a fixed anchor: right before .composer-box, inside <footer class="composer">. */
+function showAttachProgress(text) {
+  let el = document.getElementById('attach-progress');
+  if (!el) {
+    const composerBox = document.querySelector('.composer-box');
+    if (!composerBox) return;
+    el = document.createElement('div');
+    el.id = 'attach-progress';
+    el.className = 'tool-progress';
+    el.dataset.tier = 'reading';
+    composerBox.parentNode.insertBefore(el, composerBox);
+  }
+  el.innerHTML = `<span class="tp-icon">${ICONS.book}</span><span class="tp-text">${escM(text)}</span>`;
+}
+
+/** Remove the attach-progress pill, if present. */
+function clearAttachProgress() {
+  document.getElementById('attach-progress')?.remove();
 }
 
 async function newSession() {
@@ -1598,12 +1627,33 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
 
     cancelBtn.addEventListener('click', close);
 
-    fullBtn.addEventListener('click', () => {
+    // Downscale a JPEG data URL to at most maxWidth px wide (proportional).
+    // Retina / 4K screenshots can be 2560-3840px wide — most vision models
+    // perform equally well at 1400px and the token cost drops significantly.
+    // Returns a Promise<string> resolving to the (possibly smaller) data URL.
+    function resizeScreenshot(dataUrl, maxWidth = 1400, quality = 0.85) {
+      return new Promise((resolve) => {
+        const src = new Image();
+        src.onload = () => {
+          if (src.naturalWidth <= maxWidth) { resolve(dataUrl); return; }
+          const ratio = maxWidth / src.naturalWidth;
+          const rc = document.createElement('canvas');
+          rc.width  = maxWidth;
+          rc.height = Math.round(src.naturalHeight * ratio);
+          rc.getContext('2d').drawImage(src, 0, 0, rc.width, rc.height);
+          resolve(rc.toDataURL('image/jpeg', quality));
+        };
+        src.onerror = () => resolve(dataUrl); // fall back to original on any error
+        src.src = dataUrl;
+      });
+    }
+
+    fullBtn.addEventListener('click', async () => {
       close();
-      onConfirm(imageDataUrl);
+      onConfirm(await resizeScreenshot(imageDataUrl));
     });
 
-    confirmBtn.addEventListener('click', () => {
+    confirmBtn.addEventListener('click', async () => {
       if (!selection || selection.w < 2 || selection.h < 2) return;
       // Crop at original resolution
       const oc = document.createElement('canvas');
@@ -1614,7 +1664,7 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
         oc.width, oc.height,
         0, 0, oc.width, oc.height);
       close();
-      onConfirm(oc.toDataURL('image/jpeg', 0.85));
+      onConfirm(await resizeScreenshot(oc.toDataURL('image/jpeg', 0.85)));
     });
   };
   img.src = imageDataUrl;

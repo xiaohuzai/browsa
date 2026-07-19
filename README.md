@@ -308,6 +308,7 @@ browsa/
 │   │   ├── chat-handler.js            # CHAT case body
 │   │   ├── subchat-handler.js         # SUBCHAT / SUBCHAT_ABORT case bodies
 │   │   └── attach-summarizer.js       # auto-compress long page/video attachments
+│   ├── markdown-chunker.js            # structure-aware truncation + chunking (fences/tables never split)
 │   ├── sidepanel/                     # sidepanel.js's feature modules
 │   │   ├── render.js                  # marked+DOMPurify+KaTeX+Mermaid+ECharts pipeline
 │   │   ├── reveal-pacer.js            # smooth-reveal wrapper around vendored markstream-core
@@ -358,7 +359,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (531 tests)
+├── test/                              # node:test unit tests (569 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 

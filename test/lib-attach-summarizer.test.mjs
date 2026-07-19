@@ -111,6 +111,42 @@ test('splitIntoChunks: exact multiples of the chunk size pack cleanly', () => {
   assert.equal(chunks.join('\n').split('\n').join('\n'), text);
 });
 
+// ─── summarizeLongText now uses splitIntoMarkdownChunks ──────────────────────
+// summarizeLongText was updated to use the structure-aware splitIntoMarkdownChunks
+// instead of the plain splitIntoChunks. The regression test below confirms that
+// a markdown table is kept intact across the split (header row survives into
+// the segment that contains data rows, avoiding orphaned headerless table rows).
+
+test('summarizeLongText: markdown table is not split across chunk boundaries', async () => {
+  // Build text where the table would land right at a chunk boundary with
+  // dumb line-by-line greedy packing but must not be split.
+  const pre = Array.from({ length: 8 }, (_, i) => `[00:0${i}] line ${i}`).join('\n'); // ~110 chars
+  const table = '| Name | Value |\n|------|-------|\n| foo  | 123   |\n| bar  | 456   |';
+  const text = pre + '\n' + table;
+
+  // Capture every chatStream call's messages to inspect what was sent
+  const sentSegments = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    sentSegments.push(body.messages.map((m) => m.content).join('\n'));
+    const enc = new TextEncoder();
+    const resp = `data: ${JSON.stringify({ choices: [{ delta: { content: 'summary' } }] })}\n\n`;
+    return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(enc.encode(resp)); c.close(); } }), text: async () => '' };
+  };
+
+  const provider = { baseUrl: 'http://localhost:9999', apiKey: '', model: 'm', temperature: 0.5, maxTokens: 100 };
+  await summarizeLongText({ text, mode: 'other', provider, chunkSizeChars: 60 });
+
+  // If the table was split, some segment would contain table rows WITHOUT the
+  // header row (i.e. a line starting with '| foo' but no prior '| Name' line).
+  // We assert that every segment containing '| foo' also contains '| Name'.
+  for (const seg of sentSegments) {
+    if (seg.includes('| foo')) {
+      assert.ok(seg.includes('| Name'), 'segment with data rows must also contain the table header row');
+    }
+  }
+});
+
 // ─── summarizeLongText ───────────────────────────────────────────────────────
 
 test('summarizeLongText: makes one fetch call per chunk plus one merge call, returns the merge result', async () => {

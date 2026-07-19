@@ -931,6 +931,9 @@ math[display="block"] {
 }
 .attachbtn:hover { background: var(--accent-hover); color: var(--accent); }
 .attachbtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.attachbtn.is-attaching { opacity: 0.7 !important; cursor: wait; }
+.attachbtn.is-attaching svg { animation: attach-spin 0.9s linear infinite; }
+@keyframes attach-spin { to { transform: rotate(360deg); } }
 
 /* Send button */
 .sendbtn {
