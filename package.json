@@ -1,6 +1,6 @@
 {
   "name": "browsa",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "private": true,
   "description": "Hand the current page to your AI agent — side-panel chat for Hermes, Claude Code, or any OpenAI-compatible API",
   "scripts": {
@@ -22,6 +22,7 @@
   "dependencies": {
     "echarts": "^6.1.0",
     "markmap-lib": "^0.18.12",
-    "markmap-view": "^0.18.12"
+    "markmap-view": "^0.18.12",
+    "pdfjs-dist": "^6.1.200"
   }
 }
