@@ -20,6 +20,7 @@ import {
   deleteSelectedMessages
 } from './lib/sidepanel/multiselect.js';
 import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
+import { extractPdfText } from './lib/sidepanel/pdf-extractor.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
@@ -703,7 +704,7 @@ async function onAttachPage() {
   attachBtn.title = 'Reading page…';
 
   try {
-    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode });
+    const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode, query: inputEl.value || '' });
     if (!res?.ok || !res.data?.ok) {
       appendError(res?.data?.error || res?.error || 'Failed to read page');
       return;
@@ -730,6 +731,43 @@ async function onAttachPage() {
         appendAttachSystem(`📎 已附加截图："${title}"`, screenshotEl);
       });
       return; // crop UI takes over; nothing else to do here
+    }
+
+    // PDF bytes ready: run pdf.js text extraction here (sidepanel has a real
+    // `window` that pdf.js needs; background.js service worker does not).
+    // Any failure falls back to the same URL placeholder text as before --
+    // never a stuck/broken state. History storage happens via ATTACH_PDF_CONFIRM.
+    if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
+      attachBtn.title = '解析 PDF 中…';
+      let pdfText, pdfNumPages;
+      try {
+        const pdfResult = await Promise.race([
+          extractPdfText(ctx.pdfBase64),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('pdf extraction timeout')), 20_000))
+        ]);
+        pdfText = pdfResult.text;
+        pdfNumPages = pdfResult.numPages;
+      } catch (e) {
+        console.warn('browsa: pdf.js extraction failed, using placeholder', e.message);
+        pdfText = `[PDF file — agent should fetch and read directly]\nURL: ${ctx.meta?.url || ''}\nTitle: ${ctx.meta?.title || ''}`;
+      }
+      const confirmRes = await sendMessage({
+        type: 'ATTACH_PDF_CONFIRM',
+        text: pdfText,
+        metaUrl: ctx.meta?.url || '',
+        metaTitle: ctx.meta?.title || '',
+        numPages: pdfNumPages
+      }).catch(() => null);
+      if (confirmRes?.ok) {
+        nextHistoryIdx++;
+        const title = ctx.meta?.title || 'PDF';
+        const charLabel = pdfText?.length > 0 ? `，${pdfText.length.toLocaleString()} 字符` : '';
+        const pagesLabel = pdfNumPages ? `，${pdfNumPages} 页` : '';
+        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}）`);
+      } else {
+        appendError('PDF attach failed');
+      }
+      return;
     }
 
     nextHistoryIdx++; // page context stored in ATTACH_PAGE handler

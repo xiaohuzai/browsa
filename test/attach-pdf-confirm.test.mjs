@@ -1,0 +1,164 @@
+// test/attach-pdf-confirm.test.mjs — end-to-end wiring test for client-side
+// PDF text extraction (Feature A from firecrawl research) through the real
+// background.js ATTACH_PAGE / ATTACH_PDF_CONFIRM cases. pdf.js itself (real
+// Worker + binary parsing) can't be meaningfully exercised in this Node test
+// environment -- see test/lib-pdf-extractor.test.mjs for structural coverage
+// of lib/sidepanel/pdf-extractor.js, and the CLAUDE.md/plan notes for the
+// required manual browser sanity check. This file only covers the
+// background.js message wiring: tryPdfExtraction's in-tab byte fetch +
+// fallback, and ATTACH_PDF_CONFIRM's history-storage path.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+function makeStorageArea(initial = {}) {
+  let store = { ...initial };
+  return {
+    async get(keys) {
+      if (keys == null) return { ...store };
+      if (typeof keys === 'string') return { [keys]: store[keys] };
+      if (Array.isArray(keys)) {
+        const out = {};
+        for (const k of keys) out[k] = store[k];
+        return out;
+      }
+      return { ...store };
+    },
+    async set(obj) { store = { ...store, ...obj }; },
+    async remove(key) { delete store[key]; },
+    _set(obj) { store = { ...store, ...obj }; },
+    _dump() { return store; },
+  };
+}
+
+const localArea = makeStorageArea({
+  activeProvider: 'compatible',
+  providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+});
+const sessionArea = makeStorageArea();
+
+// Mutable per-test so different tests can control what the in-tab
+// _fetchPdfBytesInPageWorld executeScript call "returns".
+let executeScriptImpl = async () => [{ result: { error: 'not configured for this test' } }];
+
+const chromeMock = {
+  runtime: {
+    onMessage: { addListener: () => {} },
+    onConnect: { addListener: () => {} },
+    onInstalled: { addListener: () => {} },
+    sendMessage: () => {},
+    connect: () => null,
+    getURL: (p) => p,
+    lastError: undefined
+  },
+  tabs: {
+    onActivated: { addListener: () => {} },
+    onRemoved: { addListener: () => {} },
+    query: async () => [{ id: 1, url: 'https://example.com/doc.pdf', title: 'A Document' }],
+    get: async () => ({ id: 1, url: 'https://example.com/doc.pdf', title: 'A Document', favIconUrl: '' }),
+  },
+  sidePanel: {
+    setOptions: () => {},
+    setPanelBehavior: async () => {},
+  },
+  webNavigation: {
+    onHistoryStateUpdated: { addListener: () => {} },
+    onCommitted: { addListener: () => {} },
+    onBeforeNavigate: { addListener: () => {} },
+  },
+  scripting: {
+    executeScript: (...args) => executeScriptImpl(...args),
+  },
+  storage: {
+    onChanged: { addListener: () => {} },
+    local: localArea,
+    session: sessionArea,
+  },
+  alarms: {
+    create: () => {},
+    onAlarm: { addListener: () => {} },
+  },
+  contextMenus: {
+    create: () => {},
+    onClicked: { addListener: () => {} },
+  },
+};
+
+Object.defineProperty(globalThis, 'chrome', {
+  value: chromeMock,
+  writable: true,
+  configurable: true,
+});
+
+const bg = await import('../background.js');
+const { handle } = bg;
+
+let nextTabId = 400;
+
+test('ATTACH_PAGE on a PDF URL: successful byte fetch returns pdf-pending WITHOUT storing to history', async () => {
+  executeScriptImpl = async () => [{ result: { base64: 'ZmFrZS1wZGYtYnl0ZXM=', byteLength: 15 } }];
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'pdf-pending');
+  assert.equal(res.ctx.pdfBase64, 'ZmFrZS1wZGYtYnl0ZXM=');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 0, 'pdf-pending must not be stored to history yet');
+});
+
+test('ATTACH_PAGE on a PDF URL: byte fetch failure falls back to the placeholder text unchanged', async () => {
+  executeScriptImpl = async () => [{ result: { error: 'pdf too large: 99999999' } }];
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'pdf-url');
+  assert.match(res.ctx.text, /agent should fetch and read directly/);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.match(entry.content, /agent should fetch and read directly/, 'placeholder must still be stored to history like before this feature existed');
+});
+
+test('ATTACH_PAGE on a PDF URL: executeScript throwing also falls back to the placeholder', async () => {
+  executeScriptImpl = async () => { throw new Error('scripting API unavailable'); };
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'pdf-url');
+});
+
+test('ATTACH_PDF_CONFIRM: stores the given text to history via buildPageContextText', async () => {
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'Extracted PDF body text here.',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'A Document',
+    numPages: 3
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.match(entry.content, /Extracted PDF body text here\./);
+  assert.match(entry.content, /Mode: pdf/);
+  assert.match(entry.content, /3 pages/);
+});
+
+test('ATTACH_PDF_CONFIRM: applies mask rules like the normal ATTACH_PAGE path', async () => {
+  localArea._set({ maskRules: [{ pattern: 'SECRET-\\d+', flags: 'g', replacement: '[REDACTED]' }] });
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'Contract number SECRET-12345 must stay private.',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'Contract'
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.match(entry.content, /\[REDACTED\]/);
+  assert.doesNotMatch(entry.content, /SECRET-12345/);
+  localArea._set({ maskRules: [] });
+});
+
+test('ATTACH_PDF_CONFIRM: missing text is a no-op error, not a crash', async () => {
+  const res = await handle({ type: 'ATTACH_PDF_CONFIRM', metaUrl: 'https://example.com/doc.pdf' }, {});
+  assert.equal(res.ok, false);
+});

@@ -777,8 +777,11 @@ async function loadDedupeFn() {
 async function loadSiblingFn(name, file = join(ROOT, 'lib/page-extractor.js')) {
   const src = await readFile(file, 'utf8');
   // Match the function name and the position of the closing paren
-  // of its parameter list.
-  const m = src.match(new RegExp(`function ${name}\\s*\\([^)]*\\)`));
+  // of its parameter list. Optional `async` prefix so async functions
+  // (e.g. preExtractCleanup) are extracted with their `async` keyword intact
+  // -- without it, a body containing `await` would be a syntax error once
+  // re-emitted as a plain (non-async) function declaration.
+  const m = src.match(new RegExp(`(?:async\\s+)?function ${name}\\s*\\([^)]*\\)`));
   if (!m) throw new Error(`${name} not found in ${file}`);
   const headerEnd = m.index + m[0].length;
   // Skip whitespace / comments / newlines to find the body's `{`.
@@ -1070,9 +1073,8 @@ test('extractFullInPageWorld strips zero-width/control chars from raw textConten
 // and never traversed shadow DOM, silently dropping any page content
 // embedded that way. Ported idea from auditing page-agent's extension.
 
-async function runExtractInPageWorldOnLiveDoc(doc, win) {
+async function runExtractInPageWorldOnLiveDoc(doc, win, { withGfm = true } = {}) {
   const fnBody = await loadSiblingFn('extractInPageWorld');
-  const countImagesBody = await loadSiblingFn('countImages');
   const rSrc = await readFile(join(ROOT, 'lib/vendor/Readability.iife.js'), 'utf8');
   const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
   // jsdom has no layout engine, so offsetWidth/offsetHeight are always 0 for
@@ -1087,7 +1089,11 @@ async function runExtractInPageWorldOnLiveDoc(doc, win) {
   });
   vm.runInContext(rSrc, ctx);
   vm.runInContext(tSrc, ctx);
-  return vm.runInContext(`${countImagesBody}\n${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 100000 });`, ctx);
+  if (withGfm) {
+    const gfmSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+    vm.runInContext(gfmSrc, ctx);
+  }
+  return vm.runInContext(`${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 100000 });`, ctx);
 }
 
 // Same-origin iframe content is a real, separate Document in a real browser
@@ -1320,4 +1326,285 @@ test('extractDomTreeInPageWorld: outlier non-repeated sibling is still included 
   assert.match(out.text, /— Item 1 —/, 'items group must get markers');
   assert.match(out.text, /Load more/, 'outlier non-repeated element must still appear in output');
   assert.doesNotMatch(out.text, /— Item 4 —/, 'the button is not part of the repeated group');
+});
+
+// --- DOM relevance-based item reordering (Feature B from firecrawl research) ----
+// When a non-empty query is provided, extractDomTreeInPageWorld reorders
+// repeated-group items by bigram text-overlap score so relevant items survive
+// when truncation is needed. query='' must be a provable no-op.
+
+test('extractDomTreeInPageWorld: query="" is a byte-identical no-op — same output as passing no query', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <ul>
+      <li>Alpha product description here</li>
+      <li>Beta product description here</li>
+      <li>Gamma product description here</li>
+    </ul>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const outNoQuery  = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  const outEmptyQuery = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '' });`, ctx);
+  assert.equal(outNoQuery.text, outEmptyQuery.text, 'empty query must produce byte-identical output to omitting query entirely');
+});
+
+test('extractDomTreeInPageWorld: query reorders items so matching item appears before non-matching ones', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  // Item 3 (the <li> for "特价") is last in DOM order but uniquely matches the
+  // query. Using <li> elements so walk() emits their textContent via TEXTBLOCK.
+  const html = `<!doctype html><html><body>
+    <ul>
+      <li class="prod">常规商品 价格 100 元 普通描述内容</li>
+      <li class="prod">普通商品 价格 200 元 一般说明内容</li>
+      <li class="prod">特价商品 今日特价 仅售 50 元内容</li>
+    </ul>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const outReordered = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '特价' });`, ctx);
+  // "特价商品" (item 3 in DOM) must appear before "常规商品" (item 1 in DOM)
+  const posMatching = outReordered.text.indexOf('特价商品');
+  const posFirst    = outReordered.text.indexOf('常规商品');
+  assert.ok(posMatching > -1, 'matching item text must appear in output');
+  assert.ok(posMatching < posFirst, `relevant item must be promoted before non-matching items; got:\n${outReordered.text}`);
+});
+
+test('extractDomTreeInPageWorld: Item N labels always reflect true DOM order even when items are reordered', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  // Item 3 ("特价") will be promoted to emit first, but must still be labelled
+  // "— Item 3 —" (its true DOM position), not "— Item 1 —".
+  const html = `<!doctype html><html><body>
+    <ul>
+      <li class="prod">普通 first item content</li>
+      <li class="prod">普通 second item content</li>
+      <li class="prod">特价 third item matching query</li>
+    </ul>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '特价' });`, ctx);
+  // The matching item should appear first in output AND carry label "Item 3" (true DOM pos).
+  const item3Pos = out.text.indexOf('— Item 3 —');
+  const item1Pos = out.text.indexOf('— Item 1 —');
+  assert.ok(item3Pos > -1, 'Item 3 label must be present');
+  assert.ok(item3Pos < item1Pos, `Item 3 (matching) must appear before Item 1 in output; got:\n${out.text}`);
+  // All three items must still be present.
+  assert.match(out.text, /first item content/);
+  assert.match(out.text, /second item content/);
+  assert.match(out.text, /特价/);
+});
+
+test('extractDomTreeInPageWorld: non-group outlier sibling keeps its original position after item reordering', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  // "Load more" button is the outlier -- it must appear after the group items
+  // (interleaved in its original DOM position) regardless of query reordering.
+  const html = `<!doctype html><html><body>
+    <div id="list">
+      <div class="card">普通商品 Alpha</div>
+      <div class="card">普通商品 Beta</div>
+      <div class="card">特价商品 Gamma</div>
+      <button>Load more button</button>
+    </div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000, query: '特价' });`, ctx);
+  assert.match(out.text, /Load more button/, 'outlier button must survive reordering unchanged');
+  // Button must appear after ALL item markers (still outside/below the group items block)
+  const buttonPos = out.text.indexOf('Load more button');
+  const lastItemMarker = out.text.lastIndexOf('— Item');
+  assert.ok(buttonPos > lastItemMarker, 'outlier button must appear after all Item markers, not promoted into the middle of items');
+});
+
+// --- Turndown GFM plugin (tables/strikethrough/task-lists) -----------------
+// Ported from auditing firecrawl's html-to-markdown fallback path, which
+// loads the same turndown-plugin-gfm package for exactly this reason: plain
+// Turndown collapses <table>/<del>/checkbox <li> into unstructured text.
+
+test('TurndownPluginGfm bundle loads and exposes gfm/tables/strikethrough', async () => {
+  const { ctx } = makePageWorld();
+  await injectVendor(ctx);
+  const gfmSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+  vm.runInContext(gfmSrc, ctx);
+  assert.equal(typeof ctx.TurndownPluginGfm.gfm, 'function');
+  assert.equal(typeof ctx.TurndownPluginGfm.tables, 'function');
+  assert.equal(typeof ctx.TurndownPluginGfm.strikethrough, 'function');
+});
+
+test('Turndown + GFM plugin converts a <table> into pipe-table Markdown', async () => {
+  const { ctx } = makePageWorld();
+  const { TurndownService } = await injectVendor(ctx);
+  const gfmSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+  vm.runInContext(gfmSrc, ctx);
+  const td = new TurndownService({ headingStyle: 'atx' });
+  td.use(ctx.TurndownPluginGfm.gfm);
+  const md = td.turndown('<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>');
+  assert.match(md, /\|\s*A\s*\|\s*B\s*\|/, `should render a pipe-table header, got: ${md}`);
+  assert.match(md, /---/, 'should render the header separator row');
+});
+
+test('extractInPageWorld: a real <table> survives as pipe-table Markdown when TurndownPluginGfm is loaded', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <table><tr><th>Name</th><th>Score</th></tr><tr><td>Alice</td><td>90</td></tr></table>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window, { withGfm: true });
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /\|\s*Name\s*\|\s*Score\s*\|/, `table must survive as pipe-table markdown, got: ${result.text}`);
+});
+
+test('extractInPageWorld: still works (no table structure, just plain text) when TurndownPluginGfm is NOT loaded', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <table><tr><th>Name</th><th>Score</th></tr><tr><td>Alice</td><td>90</td></tr></table>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window, { withGfm: false });
+  assert.ok(!result.error, `extraction should still succeed without the GFM plugin, got: ${result.error}`);
+  assert.match(result.text, /Alice/, 'table cell text must still survive even without pipe-table structure');
+});
+
+// --- postProcessMarkdown() (base64 image / skip-link / multi-line link) ----
+// Ported from auditing firecrawl's removeBase64Images.ts + html-to-markdown.ts
+// helpers, applied as a Markdown-level cleanup pass after Turndown.
+
+test('extractInPageWorld: inline base64 images are replaced with a placeholder, not left as raw giant strings', async () => {
+  const base64 = 'A'.repeat(2000);
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <img src="data:image/png;base64,${base64}" alt="chart">
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, new RegExp(base64), 'the giant base64 string must not survive into the final markdown');
+  assert.match(result.text, /<image-removed>/, 'a placeholder must be left in its place');
+});
+
+test('extractInPageWorld: "Skip to Content" accessibility anchors are stripped', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <a href="#main">Skip to Content</a>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /Skip to Content/i, 'skip-to-content anchor text must be stripped');
+});
+
+test('postProcessMarkdown regex: multi-line link text gets its inner newline escaped', () => {
+  const md = '[line one\nline two](https://example.com)';
+  const out = md.replace(/\[([^\]]*\n[^\]]*)\]\(([^)]+)\)/g, (m, text, url) => `[${text.replace(/\n/g, '\\\n')}](${url})`);
+  assert.equal(out, '[line one\\\nline two](https://example.com)');
+});
+
+// --- NOISE_SELECTORS additions + srcset highest-resolution picking ---------
+// Ported from auditing firecrawl's onlyMainContent tag list (language
+// switcher / breadcrumbs) and its responsive-image srcset handling.
+
+test('extractInPageWorld: .breadcrumbs and .lang-selector elements are stripped as noise', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <nav class="breadcrumbs">Home / Section / BREADCRUMB-NOISE</nav>
+      <div class="lang-selector">English / LANG-SELECTOR-NOISE / 中文</div>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /BREADCRUMB-NOISE/, 'breadcrumb text must be stripped');
+  assert.doesNotMatch(result.text, /LANG-SELECTOR-NOISE/, 'language selector text must be stripped');
+});
+
+test('extractInPageWorld: img[srcset] picks the highest-resolution candidate over a low-res src', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <figure><img src="https://example.com/tiny-placeholder.jpg" srcset="https://example.com/small.jpg 400w, https://example.com/large.jpg 1200w" alt="photo"></figure>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /large\.jpg/, `should pick the 1200w candidate, got: ${result.text}`);
+  assert.doesNotMatch(result.text, /tiny-placeholder\.jpg/, 'the low-res placeholder src must not survive');
+});
+
+// --- PDF client-side text extraction (Feature A from firecrawl research) ---
+// _fetchPdfBytesInPageWorld runs IN-TAB (MAIN world) so the browser attaches
+// cookies -- tested here via a mocked fetch/Blob/btoa in the vm sandbox.
+
+test('_fetchPdfBytesInPageWorld: success path returns base64 + byteLength', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
+  const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async () => ({
+      ok: true,
+      blob: async () => ({
+        size: fakeBytes.length,
+        arrayBuffer: async () => fakeBytes.buffer
+      })
+    })
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.ok(!result.error, `expected success, got error: ${result.error}`);
+  assert.equal(result.byteLength, 5);
+  assert.equal(Buffer.from(result.base64, 'base64').toString('binary'), Buffer.from(fakeBytes).toString('binary'));
+});
+
+test('_fetchPdfBytesInPageWorld: oversized PDF is rejected with an error, not silently truncated', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async () => ({ ok: true, blob: async () => ({ size: 999_999_999 }) })
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.ok(result.error, 'oversized PDF must return an error field');
+  assert.ok(!result.base64, 'must not return partial/truncated base64');
+});
+
+test('_fetchPdfBytesInPageWorld: non-ok fetch response returns an error', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async () => ({ ok: false, status: 403 })
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.ok(result.error, 'a 403 response must surface as an error, not throw uncaught');
+});
+
+test('_fetchPdfBytesInPageWorld: a thrown fetch error is caught and returned as {error}, never rejects', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async () => { throw new Error('network down'); }
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.equal(result.error, 'network down');
 });

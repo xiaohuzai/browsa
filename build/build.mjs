@@ -46,6 +46,13 @@ const VENDORS = [
     define:    { 'process.browser': 'true' }   // skip node-only paths
   },
   {
+    name: 'TurndownPluginGfm',
+    srcEntry:  'turndown-plugin-gfm/lib/turndown-plugin-gfm.cjs.js',  // in build/_deps/node_modules/
+    srcDir:    join(DEPS, 'node_modules'),
+    cjsToIife: true,
+    iifeName:  'TurndownPluginGfm'
+  },
+  {
     name: 'marked',
     srcEntry:  'marked/lib/marked.cjs',
     srcDir:    join(DEPS, 'node_modules'),
@@ -100,6 +107,23 @@ const VENDORS = [
     srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'markmap-view'
+  },
+  {
+    // pdf.js spawns its own Worker at RUNTIME by URL (new Worker(workerSrc)),
+    // not a static import esbuild can inline -- so pdf.mjs and pdf.worker.mjs
+    // must be bundled as two independent entries, not merged into one file.
+    name: 'pdf',
+    srcEntry:  'build/pdf.mjs',
+    srcDir:    join(ROOT, 'node_modules/pdfjs-dist'),
+    esmBundle: true,
+    outName:   'pdf'
+  },
+  {
+    name: 'pdf-worker',
+    srcEntry:  'build/pdf.worker.mjs',
+    srcDir:    join(ROOT, 'node_modules/pdfjs-dist'),
+    esmBundle: true,
+    outName:   'pdf.worker'
   },
   {
     name: 'markstream-core',

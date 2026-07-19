@@ -17,6 +17,7 @@ import {
 import { handleChat } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
+import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -578,6 +579,35 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'ATTACH_PDF_CONFIRM': {
+      // Side panel finished pdf.js text extraction (or fell back to the
+      // placeholder text on any parse failure/timeout) and hands us the final
+      // text to store — mirrors ATTACH_SCREENSHOT_CONFIRM's two-step handoff.
+      const { text, metaUrl, metaTitle, numPages } = msg;
+      if (!text) return { ok: false, error: 'no text' };
+      const all = await storage.getAll();
+      let finalText = text;
+      const maskRules = all.maskRules || [];
+      if (maskRules.length) {
+        for (const rule of maskRules) {
+          if (!rule.pattern) continue;
+          try {
+            const re = new RegExp(rule.pattern, rule.flags || 'gi');
+            finalText = finalText.replace(re, rule.replacement || '***');
+          } catch (_) {}
+        }
+      }
+      const contextText = buildPageContextText({
+        meta: { url: metaUrl || '', title: metaTitle || '' },
+        mode: 'pdf',
+        text: finalText,
+        format: numPages ? `pdf-text, ${numPages} pages` : 'pdf-text'
+      });
+      await storage.appendToHistory({ role: 'user', content: contextText });
+      console.log(`browsa[bg]: pdf attached — ${finalText.length} chars, ${numPages || '?'} pages`);
+      return { ok: true };
+    }
+
     case 'SAVE_SESSION': {
       const session = await saveCurrentSession(msg.name || '');
       return { ok: !!session, session };
@@ -681,7 +711,9 @@ async function handle(msg, sender) {
             mode,
             maxTextChars: all.maxTextChars,
             xhsXhrNote: xhsXhrCache.get(tabId) || null,
-            siteCache: getSiteCache(tabId)
+            siteCache: getSiteCache(tabId),
+            query: msg.query || '',
+            preClean: true
           });
           if (!ctx) return { ok: false, error: 'extraction returned null' };
 
@@ -717,6 +749,11 @@ async function handle(msg, sender) {
         if (mode === 'screenshot' && ctx.imageDataUrl) {
           return { ok: true, ctx };
         }
+        // PDF bytes fetched: hand off to sidepanel.js for pdf.js text extraction.
+        // Like screenshot, history storage is deferred until ATTACH_PDF_CONFIRM.
+        if (ctx.mode === 'pdf-pending' && ctx.pdfBase64) {
+          return { ok: true, ctx };
+        }
         // Apply mask rules (sensitive data redaction) before storing
         const maskRules = all.maskRules || [];
         if (maskRules.length && ctx.text) {
@@ -729,6 +766,17 @@ async function handle(msg, sender) {
             } catch (_) {}
           }
           ctx.text = masked;
+        }
+
+        // Local, offline change detection: warn the model (not the UI, no
+        // new chip/badge) when a re-attached page's content differs from the
+        // last time it was attached. Keyed by (mode, url) rather than just
+        // url -- comparing across different extraction modes for the same
+        // page would produce false "changed" signals, since reader/dom/full
+        // naturally yield different text for the same page.
+        if (ctx.meta?.url && !['selected', 'pdf-url', 'screenshot'].includes(ctx.mode) && (ctx.text || '').length > 50) {
+          const changeInfo = await checkAndRecordAttachChange(`${ctx.mode}::${ctx.meta.url}`, ctx.text);
+          if (changeInfo.changed) ctx.changedSinceLastAttach = changeInfo;
         }
 
         // All other modes: save to global history immediately.
