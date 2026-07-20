@@ -16,6 +16,7 @@ import {
 } from './lib/state.js';
 import { handleChat } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
+import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
@@ -25,8 +26,6 @@ export {
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState
 };
-// Session management re-exported from storage for use in handle()
-const { saveCurrentSession, getSavedSessions, loadSession, deleteSession, renameSession } = storage;
 import { extractActiveTab, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
 
 // Capability hints: browsa rendering rules injected automatically so users
@@ -445,57 +444,22 @@ async function handle(msg, sender) {
       return { pending };
     }
 
-    case 'YOUTUBE_DATA': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.youtube.set(tabId, msg.video); persistSiteCache(tabId, 'youtube', msg.video); }
-      return { ok: true };
-    }
-
-    case 'JUEJIN_ARTICLE': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.juejin.set(tabId, msg.article); persistSiteCache(tabId, 'juejin', msg.article); }
-      return { ok: true };
-    }
-
-    case 'ZHIHU_CONTENT': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.zhihu.set(tabId, msg.content); persistSiteCache(tabId, 'zhihu', msg.content); }
-      return { ok: true };
-    }
-
-    case 'DEDAO_ARTICLE': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.dedao.set(tabId, msg.article); persistSiteCache(tabId, 'dedao', msg.article); }
-      return { ok: true };
-    }
-
-    case 'GEEKTIME_ARTICLE': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.geektime.set(tabId, msg.article); persistSiteCache(tabId, 'geektime', msg.article); }
-      return { ok: true };
-    }
-
-    case 'BILIBILI_VIDEO': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.bilibili.set(tabId, msg.video); persistSiteCache(tabId, 'bilibili', msg.video); }
-      return { ok: true };
-    }
-
-    case 'XUEQIU_DATA': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.xueqiu.set(tabId, msg.data); persistSiteCache(tabId, 'xueqiu', msg.data); }
-      return { ok: true };
-    }
-
-    case 'TWITTER_TWEET': {
-      const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.twitter.set(tabId, msg.tweet); persistSiteCache(tabId, 'twitter', msg.tweet); }
-      return { ok: true };
-    }
-
+    case 'YOUTUBE_DATA':
+    case 'JUEJIN_ARTICLE':
+    case 'ZHIHU_CONTENT':
+    case 'DEDAO_ARTICLE':
+    case 'GEEKTIME_ARTICLE':
+    case 'BILIBILI_VIDEO':
+    case 'XUEQIU_DATA':
+    case 'TWITTER_TWEET':
     case 'XIAOYUZHOU_EPISODE': {
+      const { site, field } = SITE_MESSAGE_MAP[msg.type];
       const tabId = sender?.tab?.id;
-      if (tabId) { SITE_CACHES.xiaoyuzhou.set(tabId, msg.episode); persistSiteCache(tabId, 'xiaoyuzhou', msg.episode); }
+      if (tabId) {
+        const data = msg[field];
+        SITE_CACHES[site].set(tabId, data);
+        persistSiteCache(tabId, site, data);
+      }
       return { ok: true };
     }
 
@@ -625,40 +589,14 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
-    case 'SAVE_SESSION': {
-      const session = await saveCurrentSession(msg.name || '');
-      return { ok: !!session, session };
-    }
-
-    case 'GET_SESSIONS': {
-      const sessions = await getSavedSessions();
-      return { sessions };
-    }
-
-    case 'LOAD_SESSION': {
-      const len = await loadSession(msg.id);
-      return { ok: len >= 0, len };
-    }
-
-    case 'DELETE_SESSION': {
-      await deleteSession(msg.id);
-      return { ok: true };
-    }
-
-    case 'RENAME_SESSION': {
-      await renameSession(msg.id, msg.name || '');
-      return { ok: true };
-    }
-
-    case 'CLEAR_ALL_SESSIONS': {
-      await storage.clearAllSessions();
-      return { ok: true };
-    }
-
-    case 'GET_SESSION_FULL': {
-      const session = await storage.getSessionFull(msg.id);
-      return { session };
-    }
+    case 'SAVE_SESSION':
+    case 'GET_SESSIONS':
+    case 'LOAD_SESSION':
+    case 'DELETE_SESSION':
+    case 'RENAME_SESSION':
+    case 'CLEAR_ALL_SESSIONS':
+    case 'GET_SESSION_FULL':
+      return handleSession(msg);
 
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
@@ -1117,6 +1055,26 @@ const SITE_CACHES = {
   twitter:    new Map(), // Twitter/X tweet data
   xiaoyuzhou: new Map(), // 小宇宙 podcast episode
 };
+
+// Maps each site content script's push-message type to which SITE_CACHES
+// entry it writes and which field of the message carries the payload.
+// Every entry here follows the exact same shape (SITE_CACHES[site].set(tabId,
+// msg[field]); persistSiteCache(tabId, site, msg[field])) — the single
+// generic case below in handle() replaces what used to be 9 near-identical
+// copy-pasted case blocks. Adding a new site's push message only needs a
+// new SITE_CACHES entry (above) plus one line here.
+const SITE_MESSAGE_MAP = {
+  YOUTUBE_DATA:       { site: 'youtube',    field: 'video' },
+  JUEJIN_ARTICLE:     { site: 'juejin',     field: 'article' },
+  ZHIHU_CONTENT:      { site: 'zhihu',      field: 'content' },
+  DEDAO_ARTICLE:      { site: 'dedao',      field: 'article' },
+  GEEKTIME_ARTICLE:   { site: 'geektime',   field: 'article' },
+  BILIBILI_VIDEO:     { site: 'bilibili',   field: 'video' },
+  XUEQIU_DATA:        { site: 'xueqiu',     field: 'data' },
+  TWITTER_TWEET:      { site: 'twitter',    field: 'tweet' },
+  XIAOYUZHOU_EPISODE: { site: 'xiaoyuzhou', field: 'episode' },
+};
+
 
 // Site caches above are module-level Maps that are wiped on every SW restart
 // (~30s idle). Persist them to chrome.storage.session so they survive SW

@@ -21,6 +21,7 @@ import {
 } from './lib/sidepanel/multiselect.js';
 import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
+import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
@@ -411,6 +412,11 @@ async function init() {
       console.warn('browsa: init resumeInFlightStream failed', e)
     );
   }
+  // Pre-warm the pdf-inspector WASM Worker so the first real PDF attach
+  // doesn't pay the cold-compile cost (~10-30s in Chrome) at click time.
+  // Fire-and-forget: never awaited, silently no-ops if worker construction
+  // fails — same pattern as preloadChartVendors().
+  warmupPdfInspector();
   // Snap to the bottom of the rendered history. renderHistory() does
   // call scrollToBottom, but Chrome may not have finished the first
   // layout pass by the time we read scrollHeight (the side panel
@@ -1123,6 +1129,25 @@ function expandSlash(text) {
   return rest ? `${template}\n\nAdditional instruction: ${rest}` : template;
 }
 
+// Starts a 20s SW keep-alive ping loop — shared by onSend() and
+// resumeInFlightStream(). Returns the interval id so the caller can
+// clear it via clearInterval(id), which is what stopKeepAlive() does in
+// wireChatStreamPort and what port.onDisconnect does in both functions.
+function startSwPingKeepAlive(port) {
+  return setInterval(() => {
+    try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
+  }, 20_000);
+}
+
+// Shown in port.onDisconnect when the port dies before any chunks arrived —
+// a real hint vs a silent empty bubble. Shared by onSend() and
+// resumeInFlightStream() (same message, same guard: acc === '' && text '▍').
+function showNoChunkHint(el, state) {
+  if (state.acc === '' && el && el.textContent === '▍') {
+    el.textContent = '(no chunks received — check Service Worker DevTools)';
+  }
+}
+
 // Shared `browsa-chat` port message handler, used by BOTH onSend() (a fresh
 // send) and resumeInFlightStream() (reconnecting to a stream already running
 // on the background). These two call sites used to each hand-roll their own
@@ -1151,6 +1176,27 @@ function expandSlash(text) {
 //                    setStreamingUI(false)).
 //   onAborted()    — extra caller-specific cleanup on ERROR/ABORTED (resume
 //                    also disconnects its port; onSend does not).
+// Sends STREAM_HELLO on `port` and waits for STREAM_HELLO_ACK, with a 500ms
+// safety-net timeout that resolves unconditionally so we never hang. Shared
+// by onSend() (which also calls `onAck` — the `attachChunkListener` wiring
+// that must happen right as the ACK arrives, before the outer `await` returns
+// so no in-flight chunks miss the listener) and resumeInFlightStream() (which
+// needs no onAck since it wires wireChatStreamPort() after the await returns).
+function waitForStreamHelloAck(port, tabId, { onAck } = {}) {
+  return new Promise((resolve) => {
+    const ackTimeout = setTimeout(resolve, 500);
+    port.onMessage.addListener(function once(m) {
+      if (m.type === 'STREAM_HELLO_ACK') {
+        clearTimeout(ackTimeout);
+        port.onMessage.removeListener(once);
+        onAck?.();
+        resolve();
+      }
+    });
+    port.postMessage({ type: 'STREAM_HELLO', tabId });
+  });
+}
+
 function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAlive, onRetry, afterDone, onAborted }) {
   port.onMessage.addListener(async (m) => {
     if (m.type === 'CHUNK') {
@@ -1306,28 +1352,14 @@ async function onSend() {
   // Chrome's MV3 SW can be killed for idleness when the SSE stream goes
   // silent (e.g. while an agent is executing a tool call server-side),
   // which aborts the in-flight fetch and shows _(cancelled)_.
-  let _swPingInterval = setInterval(() => {
-    try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
-  }, 20_000);
+  const _swPingInterval = startSwPingKeepAlive(port);
 
   // Hand the tabId to the background so it knows which port serves which tab.
   // The background stores the port in a Map keyed by tabId; when the CHAT
   // handler emits a delta, it looks up the port via this tabId.
   // We wait for an ACK before sending the CHAT message, to avoid a race
   // where the first chunk fires before the background has registered us.
-  await new Promise((resolve) => {
-    const ackTimeout = setTimeout(resolve, 500); // safety net
-    port.onMessage.addListener(function once(m) {
-      if (m.type === 'STREAM_HELLO_ACK') {
-        clearTimeout(ackTimeout);
-        port.onMessage.removeListener(once);
-        // Re-attach the chunk listener that we just shadowed.
-        attachChunkListener();
-        resolve();
-      }
-    });
-    port.postMessage({ type: 'STREAM_HELLO', tabId: currentTabId });
-  });
+  await waitForStreamHelloAck(port, currentTabId, { onAck: attachChunkListener });
 
   function attachChunkListener() {
     wireChatStreamPort({
@@ -1359,12 +1391,9 @@ async function onSend() {
     clearInterval(_swPingInterval);
     setStreamingUI(false);
     activeController = null;
-    if (state.acc === '' && assistantEl.textContent === '▍') {
-      // No chunks received AND the assistant bubble still shows the
-      // placeholder. The background reported an error before any delta
-      // was emitted. Show a clear hint.
-      assistantEl.textContent = '(no chunks received — check Service Worker DevTools)';
-    }
+    // No chunks received AND bubble still shows the placeholder: background
+    // reported an error before any delta was emitted — show a clear hint.
+    showNoChunkHint(assistantEl, state);
   });
 
   try {
@@ -1464,9 +1493,7 @@ async function resumeInFlightStream(tabId) {
   //      onActivated replaces the whole subtree).
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
   // Same SW keep-alive as the onSend path — resumed streams face identical risk.
-  let _swPingInterval = setInterval(() => {
-    try { port.postMessage({ type: 'SW_PING' }); } catch (_) {}
-  }, 20_000);
+  const _swPingInterval = startSwPingKeepAlive(port);
   const state = { acc: peek.acc || '', toolEvents: [] };
   const initialBubble = getOrCreateAssistantBubble();
   let renderStream = makeStreamRenderer(initialBubble, streamRendererOpts);
@@ -1513,17 +1540,7 @@ async function resumeInFlightStream(tabId) {
   // Wait for ACK so any in-flight delta that's about to fire from the
   // LLM (after the PEEK/HELLO race window) goes to a port that's
   // already wired with a listener.
-  await new Promise((resolve) => {
-    const ackTimeout = setTimeout(resolve, 500);
-    port.onMessage.addListener(function once(m) {
-      if (m.type === 'STREAM_HELLO_ACK') {
-        clearTimeout(ackTimeout);
-        port.onMessage.removeListener(once);
-        resolve();
-      }
-    });
-    port.postMessage({ type: 'STREAM_HELLO', tabId });
-  });
+  await waitForStreamHelloAck(port, tabId);
   // The DONE/ERROR/CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY handling itself is
   // shared with onSend() via wireChatStreamPort — see its doc comment. Only
   // the genuinely different bits stay here: RETRY is just a toast (no bubble
@@ -1553,12 +1570,8 @@ async function resumeInFlightStream(tabId) {
     clearInterval(_swPingInterval);
     setStreamingUI(false);
     activeController = null;
-    // If the port died with no chunks at all, show the same hint as
-    // onSend (the user has nothing to look at otherwise).
-    const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
-    if (state.acc === '' && el && el.textContent === '▍') {
-      el.textContent = '(no chunks received — check Service Worker DevTools)';
-    }
+    // Same no-chunks hint as onSend's onDisconnect handler.
+    showNoChunkHint([...messagesEl.querySelectorAll('.msg.assistant')].pop(), state);
   });
   // Track this stream on the activeController slot so Esc-to-cancel
   // and the early-return guard above work. cancelled is false (this
