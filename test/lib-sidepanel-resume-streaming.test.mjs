@@ -19,6 +19,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
+import { makeSidepanelChromeMock, wireSendMessage } from './helpers/chrome-mock.mjs';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -34,62 +35,24 @@ globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 0);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-function makeFakePort(name) {
-  const listeners = [];
-  const port = {
-    name,
-    sent: [],
-    onMessage: {
-      addListener: (fn) => listeners.push(fn),
-      removeListener: (fn) => { const i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); },
-    },
-    onDisconnect: { addListener: () => {} },
-    postMessage: (msg) => {
-      port.sent.push(msg);
-      if (msg.type === 'STREAM_HELLO') {
-        queueMicrotask(() => port.emit({ type: 'STREAM_HELLO_ACK' }));
-      }
-    },
-    disconnect: () => {},
-    emit: (msg) => { for (const fn of [...listeners]) fn(msg); },
-  };
-  return port;
-}
-
 let lastChatPort = null;
 
-globalThis.chrome = {
-  tabs: {
-    query: async () => [{ id: 7, url: 'https://example.com/', title: 'Example' }],
-    get: async (id) => ({ id, url: 'https://example.com/', title: 'Example' }),
-    onActivated: { addListener: () => {} },
-    onUpdated: { addListener: () => {} },
-  },
-  runtime: {
-    connect: ({ name }) => {
-      const port = makeFakePort(name);
-      if (name === 'browsa-chat') lastChatPort = port;
-      return port;
-    },
-    sendMessage: (msg, cb) => {
-      if (msg.type === 'GET_CONFIG') return cb({ data: {} });
-      // The key difference from the onSend() test: STREAM_PEEK reports an
-      // in-flight stream with some accumulated text already, so init()'s
-      // resumeInFlightStream() takes the "resume" branch instead of
-      // returning early.
-      if (msg.type === 'STREAM_PEEK') return cb({ inFlight: true, acc: 'resumed so far. ', startedAt: Date.now() - 5000 });
-      cb({ ok: true });
-    },
-    lastError: undefined,
-  },
-  storage: {
-    local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-    session: { get: async () => ({}), remove: async () => {} },
-    onChanged: { addListener: () => {} },
-  },
-  action: { setBadgeText: () => {} },
-  downloads: { download: async () => {} },
-};
+globalThis.chrome = makeSidepanelChromeMock({
+  tabId: 7,
+  // trackDisconnect: false matches this file's original no-op onDisconnect —
+  // deliberately NOT the same as the other 3 sidepanel-* test files' mocks.
+  portOptions: { trackDisconnect: false },
+  onConnect: (name, port) => { if (name === 'browsa-chat') lastChatPort = port; },
+  sendMessage: wireSendMessage((msg) => {
+    if (msg.type === 'GET_CONFIG') return { data: {} };
+    // The key difference from the onSend() test: STREAM_PEEK reports an
+    // in-flight stream with some accumulated text already, so init()'s
+    // resumeInFlightStream() takes the "resume" branch instead of
+    // returning early.
+    if (msg.type === 'STREAM_PEEK') return { inFlight: true, acc: 'resumed so far. ', startedAt: Date.now() - 5000 };
+    return { ok: true };
+  }),
+});
 
 await import('../sidepanel.js?resume-test=' + Math.random());
 await new Promise((r) => setTimeout(r, 100));

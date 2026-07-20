@@ -47,6 +47,11 @@ with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
             if fn in exclude_files: continue
             if fn == out_name: continue
             if fn.startswith("browsa-v") and fn.endswith(".zip"): continue
+            # Loose PDFs at any depth are never part of the extension itself
+            # (a real 17.9MB test fixture left at the repo root once bloated
+            # a package to 21MB by being silently swept up here) -- browsa
+            # ships no .pdf assets, so this is a safe blanket exclusion.
+            if fn.endswith(".pdf"): continue
             full = os.path.join(dirpath, fn)
             arcname = os.path.join(rel, fn) if rel else fn
             if any(arcname.startswith(p) for p in exclude_path_prefixes):

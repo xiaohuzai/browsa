@@ -21,6 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
+import { makeSidepanelChromeMock, wireSendMessage } from './helpers/chrome-mock.mjs';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -35,29 +36,6 @@ globalThis.location = dom.window.location;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 0);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
-
-function makeFakePort(name) {
-  const listeners = [];
-  const disconnectListeners = [];
-  const port = {
-    name,
-    sent: [],
-    onMessage: {
-      addListener: (fn) => listeners.push(fn),
-      removeListener: (fn) => { const i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); },
-    },
-    onDisconnect: { addListener: (fn) => disconnectListeners.push(fn) },
-    postMessage: (msg) => {
-      port.sent.push(msg);
-      if (msg.type === 'STREAM_HELLO') {
-        queueMicrotask(() => port.emit({ type: 'STREAM_HELLO_ACK' }));
-      }
-    },
-    disconnect: () => { for (const fn of disconnectListeners) fn(); },
-    emit: (msg) => { for (const fn of [...listeners]) fn(msg); },
-  };
-  return port;
-}
 
 // Lets a single test hold the CHAT sendMessage response open (simulating a
 // request genuinely in flight) so the transient 'streaming' dot state can
@@ -76,32 +54,10 @@ let sendMessageHandler = async (msg) => {
 
 let lastChatPort = null;
 
-globalThis.chrome = {
-  tabs: {
-    query: async () => [{ id: 1, url: 'https://example.com/', title: 'Example' }],
-    get: async (id) => ({ id, url: 'https://example.com/', title: 'Example' }),
-    onActivated: { addListener: () => {} },
-    onUpdated: { addListener: () => {} },
-  },
-  runtime: {
-    connect: ({ name }) => {
-      const port = makeFakePort(name);
-      if (name === 'browsa-chat') lastChatPort = port;
-      return port;
-    },
-    sendMessage: (msg, cb) => {
-      sendMessageHandler(msg).then((res) => cb(res)).catch((e) => cb({ ok: false, error: e.message }));
-    },
-    lastError: undefined,
-  },
-  storage: {
-    local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
-    session: { get: async () => ({}), remove: async () => {} },
-    onChanged: { addListener: () => {} },
-  },
-  action: { setBadgeText: () => {} },
-  downloads: { download: async () => {} },
-};
+globalThis.chrome = makeSidepanelChromeMock({
+  sendMessage: wireSendMessage((msg) => sendMessageHandler(msg)),
+  onConnect: (name, port) => { if (name === 'browsa-chat') lastChatPort = port; },
+});
 
 await import('../sidepanel.js');
 await new Promise((r) => setTimeout(r, 100));

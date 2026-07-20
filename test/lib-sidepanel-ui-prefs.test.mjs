@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
+import { makeSidepanelChromeMock, wireSendMessage } from './helpers/chrome-mock.mjs';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -27,68 +28,18 @@ globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 0);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-function makeFakePort(name) {
-  const listeners = [];
-  const disconnectListeners = [];
-  const port = {
-    name,
-    sent: [],
-    onMessage: {
-      addListener: (fn) => listeners.push(fn),
-      removeListener: (fn) => { const i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); },
-    },
-    onDisconnect: { addListener: (fn) => disconnectListeners.push(fn) },
-    postMessage: (msg) => {
-      port.sent.push(msg);
-      if (msg.type === 'STREAM_HELLO') {
-        queueMicrotask(() => port.emit({ type: 'STREAM_HELLO_ACK' }));
-      }
-    },
-    disconnect: () => { for (const fn of disconnectListeners) fn(); },
-    emit: (msg) => { for (const fn of [...listeners]) fn(msg); },
-  };
-  return port;
-}
-
 let lastChatPort = null;
 const storageSetCalls = [];
 
-globalThis.chrome = {
-  tabs: {
-    query: async () => [{ id: 1, url: 'https://example.com/', title: 'Example' }],
-    get: async (id) => ({ id, url: 'https://example.com/', title: 'Example' }),
-    onActivated: { addListener: () => {} },
-    onUpdated: { addListener: () => {} },
-  },
-  runtime: {
-    connect: ({ name }) => {
-      const port = makeFakePort(name);
-      if (name === 'browsa-chat') lastChatPort = port;
-      return port;
-    },
-    sendMessage: (msg, cb) => {
-      let res = { ok: true };
-      if (msg.type === 'GET_CONFIG') res = { data: { quickbarCollapsed: true } };
-      if (msg.type === 'STREAM_PEEK') res = { inFlight: false };
-      cb(res);
-    },
-    lastError: undefined,
-  },
-  storage: {
-    local: {
-      get: async () => ({}),
-      set: async (obj) => { storageSetCalls.push(obj); },
-      remove: async () => {},
-    },
-    session: {
-      get: async () => ({}),
-      remove: async () => {},
-    },
-    onChanged: { addListener: () => {} },
-  },
-  action: { setBadgeText: () => {} },
-  downloads: { download: async () => {} },
-};
+globalThis.chrome = makeSidepanelChromeMock({
+  onConnect: (name, port) => { if (name === 'browsa-chat') lastChatPort = port; },
+  storageLocalSet: async (obj) => { storageSetCalls.push(obj); },
+  sendMessage: wireSendMessage((msg) => {
+    if (msg.type === 'GET_CONFIG') return { data: { quickbarCollapsed: true } };
+    if (msg.type === 'STREAM_PEEK') return { inFlight: false };
+    return { ok: true };
+  }),
+});
 
 await import('../sidepanel.js');
 await new Promise((r) => setTimeout(r, 100));
