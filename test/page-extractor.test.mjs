@@ -1355,6 +1355,45 @@ test('extractDomTreeInPageWorld: items markers for a plain <ul>/<li> list', asyn
   assert.match(out.text, /— Item 4 —/, 'must emit marker for all 4 items');
 });
 
+test('extractDomTreeInPageWorld: bare text nodes directly inside a plain container (no <p>/TEXTBLOCK wrapper) are NOT silently dropped (regression: a paid-article site rendering paragraphs as `<div>text</div>` with no <p> tag lost every paragraph — headings/links survived since walk() only ever recursed into el.children, which never includes TEXT_NODEs)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <div class="article">
+      <h1>标题</h1>
+      <div class="rich-text-p">这是没有 p 标签包裹的正文段落，直接塞在 div 里。</div>
+      <div class="rich-text-p">第二段也是裸文本<a href="https://example.com">一个链接</a>还有链接后面的文字。</div>
+    </div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /这是没有 p 标签包裹的正文段落/, 'bare-text paragraph content must survive, not just its wrapper structure');
+  assert.match(out.text, /第二段也是裸文本/, 'text before an inline element inside the same bare div must survive');
+  assert.match(out.text, /还有链接后面的文字/, 'text after an inline element inside the same bare div must survive too');
+  assert.match(out.text, /\[0\]<a> 一个链接/, 'the link element itself must still be captured (this path already worked before the fix)');
+});
+
+test('extractDomTreeInPageWorld: <img> tags are not silently dropped (regression: a paid-article page with 13 body <img> tags produced zero image references anywhere in the DOM-tree output — img is not in SKIP/HEADINGS/INTERACTIVE/TEXTBLOCK and has no children/text of its own)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <div class="article">
+      <h1>标题</h1>
+      <p>正文一段。</p>
+      <img src="https://example.com/diagram.png" alt="架构图">
+      <p>正文二段。</p>
+      <img src="https://example.com/spacer.gif" width="1" height="1">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAABCAYAAACL8217AAAALUlEQVR4Ab" alt="内联图">
+    </div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /<img> 架构图 → https:\/\/example\.com\/diagram\.png/, 'an <img> with alt text and src must be reported');
+  assert.doesNotMatch(out.text, /spacer\.gif/, 'a 1x1 tracking-pixel/spacer image must be skipped as noise');
+  assert.match(out.text, /<img> 内联图 → \(inline data URI\)/, 'a data: URI src must be summarized, not dumped as raw truncated base64 garbage');
+  assert.doesNotMatch(out.text, /iVBORw0KGgo/, 'raw base64 bytes must never leak into the output');
+});
+
 test('extractDomTreeInPageWorld: outlier non-repeated sibling is still included without marker', async () => {
   const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
   const html = `<!doctype html><html><body>

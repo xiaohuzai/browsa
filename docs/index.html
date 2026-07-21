@@ -173,7 +173,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
       <a href="https://github.com/xiaohuzai/browsa" class="btn btn-secondary">⭐ GitHub 仓库</a>
     </div>
     <div class="badges">
-      <span class="badge"><span class="dot"></span> v0.28.1</span>
+      <span class="badge"><span class="dot"></span> v0.28.2</span>
       <span class="badge">Chrome / Edge MV3</span>
       <span class="badge">MIT License</span>
       <span class="badge">10+ 站点结构化提取</span>
@@ -363,7 +363,15 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
     <p class="section-desc">browsa 发版很勤，最近一个月内连续 10+ 个版本。下面是主要功能演进，完整历史见 <a href="https://github.com/xiaohuzai/browsa/releases" style="color:var(--accent)">Releases</a>。</p>
     <div class="changelog">
       <div class="cl-item">
-        <div class="cl-version">v0.28.1</div>
+        <div class="cl-version">v0.28.2</div>
+        <div class="cl-date">07-21</div>
+        <div class="cl-body">
+          <span class="cl-tag fix">fix</span>
+          DOM 树模式提取遇到无 &lt;p&gt; 包裹的裸文本段落（常见于富文本编辑器渲染的付费文章站）时正文被静默丢弃；DOM 树模式完全不提取 &lt;img&gt; 导致图片引用丢失；历史消息后台渲染升级会清空消息操作按钮（复制/引用/折叠）；PDF wasm 高精度解析引擎因 Worker 内部误用 chrome.* API 从未真正生效，一直静默降级为纯文本兜底
+        </div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-version">v0.28.2</div>
         <div class="cl-date">07-21</div>
         <div class="cl-body">
           <span class="cl-tag fix">fix</span>
@@ -547,7 +555,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
       <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md">文档</a>
       <a href="https://github.com/xiaohuzai/browsa/issues">Issues</a>
     </div>
-    <div class="copyright">MIT License · browsa v0.28.1</div>
+    <div class="copyright">MIT License · browsa v0.28.2</div>
   </div>
 </footer>
 

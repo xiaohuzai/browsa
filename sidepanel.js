@@ -6,7 +6,7 @@ import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
+  renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps,
   makeStreamRenderer, setThoughtAutoCollapse
 } from './lib/sidepanel/render.js';
@@ -820,6 +820,28 @@ function showAttachProgress(text) {
 /** Remove the attach-progress pill, if present. */
 function clearAttachProgress() {
   document.getElementById('attach-progress')?.remove();
+}
+
+/** Same fixed-anchor pill pattern as showAttachProgress, shown while
+ * renderHistory()'s background KaTeX/mermaid/echarts upgrade pass is still
+ * running, so a long history with several formulas reads as "still working"
+ * rather than looking like the extension is broken/unresponsive. */
+function showHistoryUpgradeIndicator() {
+  let el = document.getElementById('history-upgrade-progress');
+  if (!el) {
+    const composerBox = document.querySelector('.composer-box');
+    if (!composerBox) return;
+    el = document.createElement('div');
+    el.id = 'history-upgrade-progress';
+    el.className = 'tool-progress';
+    el.dataset.tier = 'reading';
+    composerBox.parentNode.insertBefore(el, composerBox);
+  }
+  el.innerHTML = `<span class="tp-icon">${ICONS.book}</span><span class="tp-text">正在渲染历史消息…</span>`;
+}
+
+function hideHistoryUpgradeIndicator() {
+  document.getElementById('history-upgrade-progress')?.remove();
 }
 
 async function newSession() {
@@ -2367,11 +2389,19 @@ async function renderHistory() {
   const { history } = await chrome.storage.local.get('history');
   const list = Array.isArray(history) ? history : [];
   nextHistoryIdx = list.length; // keep local mirror in sync with storage
+
+  // Two-pass rendering: paint bubbles synchronously first (renderStreamingSafe,
+  // no async KaTeX) so the panel is visible immediately, then upgrade each
+  // assistant bubble to the full renderSafe() output in parallel. Previously
+  // this was a single serial loop `await renderSafe()` per message, which
+  // meant init() blocked for (N assistant messages × KaTeX Worker latency)
+  // before the panel showed anything — visibly 5+ seconds with a long history.
+  const asyncUpgrades = []; // [{ el, rawContent, videoSrc }] to upgrade in parallel
+
   for (let i = 0; i < list.length; i++) {
     const m = list[i];
     if (m.role === 'user') {
       if (Array.isArray(m.content)) {
-        // Message with attached images: extract text part and image URLs
         const textPart = m.content.find(p => p.type === 'text')?.text || '';
         if (textPart.startsWith(PAGE_CONTEXT_PREFIX)) continue;
         const imgUrls = m.content
@@ -2388,18 +2418,48 @@ async function renderHistory() {
     } else if (m.role === 'assistant') {
       const rawContent = m.content;
       const el = appendAssistant('', true);
-      el.innerHTML = await renderSafe(rawContent);
-      el.dataset.raw = rawContent; // mirrors appendUser's dataset.raw — read by openDetailThread
-      decorateLinks(el);
-      linkifyTimestamps(el);
-      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc); // enables [mm:ss] seek links
-      addMsgActions(el, () => rawContent);
-      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      // Sync fast-render so the bubble is visible immediately
+      el.innerHTML = renderStreamingSafe(rawContent);
+      el.dataset.raw = rawContent;
       el.dataset.hidx = i;
+      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
+      addMsgActions(el, () => rawContent);
+      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc });
     }
   }
+
+  // Synchronous rendering done — panel is visible. Wire shallow decorations
+  // (copy buttons, timestamps) on the fast-rendered content now so they work
+  // even before the full upgrade resolves.
   addCodeCopyButtons();
   scrollToBottom(true);
+
+  // Upgrade all assistant bubbles to the full renderSafe() output (KaTeX
+  // math, proper think-block handling, etc.) in the BACKGROUND — deliberately
+  // NOT awaited here. init() awaits renderHistory() before wiring every
+  // other button's event listener; if this function didn't return until
+  // every formula/mermaid diagram finished rendering, the whole panel would
+  // stay uninteractive (nothing clickable) for that entire stretch on a long
+  // history, reading as "the extension is broken" rather than "still
+  // loading." A visible pill covers the gap instead. Each bubble still
+  // upgrades independently as soon as its own renderSafe resolves — a long
+  // formula in message 3 doesn't delay message 5 from upgrading.
+  if (asyncUpgrades.length > 0) {
+    showHistoryUpgradeIndicator();
+    Promise.all(asyncUpgrades.map(async ({ el, rawContent }) => {
+      const html = await renderSafe(rawContent);
+      el.innerHTML = html;
+      decorateLinks(el);
+      linkifyTimestamps(el);
+      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      addCodeCopyButtons(el); // re-wire copy buttons on the upgraded content
+      // el.innerHTML above wipes out the .msg-actions row appended during the
+      // sync pass (it's a child of el, not a sibling) — re-add it here.
+      // addMsgActions is idempotent (no-ops if .msg-actions already present),
+      // but since innerHTML just destroyed the old one, this always re-creates it.
+      addMsgActions(el, () => rawContent);
+    })).finally(hideHistoryUpgradeIndicator);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

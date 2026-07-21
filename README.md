@@ -359,7 +359,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (576 tests)
+├── test/                              # node:test unit tests (585 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
