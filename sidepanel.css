@@ -413,6 +413,60 @@ body {
 .undo-attach:hover { opacity: 0.75; }
 .undo-attach:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
 
+/* ─── Context inspector modal ─────────────────────────────────────────────── */
+.ctx-inspector-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: calc(100% - 32px);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.ctx-inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.ctx-inspector-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  flex: 1;
+}
+.ctx-inspector-len {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ctx-inspector-copy, .ctx-inspector-close {
+  font: inherit;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: var(--fg-2);
+}
+.ctx-inspector-copy:hover, .ctx-inspector-close:hover { background: var(--bg-3); }
+.ctx-inspector-body {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg-2);
+  overflow-y: auto;
+  flex: 1;
+  line-height: 1.55;
+}
+
 .msg.error {
   align-self: center;
   color: var(--error);

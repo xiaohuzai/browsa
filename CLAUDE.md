@@ -196,6 +196,15 @@ MAIN-world content scripts can't use ES module imports, so URL matchers there mu
 
 Extension resources used inside Shadow DOM or injected pages (e.g. `icons/icon16.png`) must be declared in `web_accessible_resources`. `ShadowRoot` supports both `querySelector('#id')` and `getElementById('id')` in current Chrome — prefer `querySelector` for consistency with the rest of the codebase.
 
+### YouTube content script critical lessons (confirmed 2026-07-25)
+
+- **`chrome.runtime` is undefined in MAIN world** — `installYouTubeInterceptor()` must NOT guard on `chrome.runtime`; use only `typeof window !== 'undefined'`.
+- **YouTube loads the current video's captions via XHR, not fetch** — `XMLHttpRequest.prototype.send` must be wrapped to intercept `/api/timedtext`. The fetch wrapper only catches recommended/sidebar video pre-fetches (whose responses are often HTML error pages or empty).
+- **timedtext URLs require a PO token (`exp=xpe`)** — re-fetching the URL from our own code returns 200 + empty body (missing browser-level auth headers). The only reliable path: intercept the XHR response body at the moment the player itself makes the request, parse it, store in `window.__browsaTranscriptCache[videoId]`.
+- **Do not modify `fmt=` in the baseUrl** — even though `fmt` is not in `sparams`, re-fetching with a modified URL still fails. Parse the original response body directly (supports both json3 and srv3/ttml XML).
+- **`/player` uses ANDROID client, `/next` uses WEB client** — ANDROID `/next` returns `singleColumnWatchNextResults` with `elementRenderer` blobs (unparseable). Fire both in parallel via `Promise.allSettled`.
+- **YouTube SITE_CACHES is always skipped** — the passive interceptor runs in MAIN world without `chrome.runtime`, so `SITE_CACHES` never gets YouTube data. `page-extractor.js` always falls through to `activeYouTubeFetch`.
+
 ### Detail-thread ("SUBCHAT") side conversations
 
 Selecting text inside an assistant reply opens an inline card scoped to that excerpt (`lib/sidepanel/detail-thread.js`: `openDetailThread`, `findBlockAnchor`; `lib/handlers/subchat-handler.js`: `handleSubchat`/`handleSubchatAbort`, dispatched from `background.js`'s `SUBCHAT`/`SUBCHAT_ABORT` cases). Rules that are easy to accidentally violate when touching this code:

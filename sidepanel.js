@@ -510,7 +510,7 @@ async function handleSelectionAction(action, text) {
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
-      appendAttachSystem(`📎 已附加：「${preview}」`);
+      appendAttachSystem(`📎 已附加：「${preview}」`, null, text);
     } else {
       appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
     }
@@ -775,7 +775,7 @@ async function onAttachPage() {
         const charLabel = pdfText?.length > 0 ? `，${pdfText.length.toLocaleString()} 字符` : '';
         const pagesLabel = pdfNumPages ? `，${pdfNumPages} 页` : '';
         const ocrLabel = pdfOcrPages?.length > 0 ? `，${pdfOcrPages.length} 页可能需要 OCR` : '';
-        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}）`);
+        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}）`, null, pdfText);
       } else {
         appendError('PDF attach failed');
       }
@@ -787,7 +787,7 @@ async function onAttachPage() {
     const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
     // For auto mode, show which sub-mode was actually used
     const modeLabel = mode === 'auto' ? `auto/${ctx?.autoMode || 'reader'}` : mode;
-    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`);
+    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '');
   } catch (e) {
     appendError('Page attach failed: ' + e.message);
   } finally {
@@ -2179,11 +2179,50 @@ function appendSystem(text) {
   return el;
 }
 
-function appendAttachSystem(text, relatedEl) {
+function appendAttachSystem(text, relatedEl, ctxText) {
   const el = document.createElement('div');
   el.className = 'msg system attach-msg';
   const span = document.createElement('span');
   span.textContent = text;
+
+  // "检查" button — shows the raw context sent to the model in a scrollable overlay.
+  if (ctxText) {
+    const inspectBtn = document.createElement('button');
+    inspectBtn.className = 'undo-attach inspect-ctx';
+    inspectBtn.textContent = '检查';
+    inspectBtn.title = '查看发送给模型的完整上下文';
+    inspectBtn.addEventListener('click', () => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="ctx-inspector-modal">
+          <div class="ctx-inspector-header">
+            <span class="ctx-inspector-title">上下文预览</span>
+            <span class="ctx-inspector-len">${ctxText.length.toLocaleString()} 字符</span>
+            <button class="ctx-inspector-copy">复制</button>
+            <button class="ctx-inspector-close">✕</button>
+          </div>
+          <pre class="ctx-inspector-body"></pre>
+        </div>`;
+      // Set textContent on the <pre> to avoid any XSS from raw page content.
+      overlay.querySelector('.ctx-inspector-body').textContent = ctxText;
+      overlay.querySelector('.ctx-inspector-close').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
+        _copyText(ctxText);
+        showToast('已复制');
+      });
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); }
+      });
+      document.body.appendChild(overlay);
+    });
+    el.appendChild(span);
+    el.appendChild(inspectBtn);
+  } else {
+    el.appendChild(span);
+  }
+
   const btn = document.createElement('button');
   btn.className = 'undo-attach';
   btn.textContent = '撤销';
@@ -2204,6 +2243,7 @@ function appendAttachSystem(text, relatedEl) {
       span.textContent = text + '（已撤销）';
       span.style.opacity = '0.45';
       btn.remove();
+      el.querySelector('.inspect-ctx')?.remove();
       // The undone attachment (e.g. the screenshot preview bubble) must
       // disappear too — leaving it visible after "撤销" reads as if the
       // undo only touched the label text, not the actual attached content.
@@ -2212,7 +2252,6 @@ function appendAttachSystem(text, relatedEl) {
       btn.disabled = false;
     }
   });
-  el.appendChild(span);
   el.appendChild(btn);
   messagesEl.appendChild(el);
   scrollToBottom(true);
