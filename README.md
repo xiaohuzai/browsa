@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 460+ unit tests
+npm test             # run 604 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -359,7 +359,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (585 tests)
+├── test/                              # node:test unit tests (604 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
