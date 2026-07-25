@@ -664,6 +664,7 @@ async function handle(msg, sender) {
           await siteCacheReady; // ensure session-storage restore finished
           ctx = await extractActiveTab({
             mode,
+            tabId,
             maxTextChars: all.maxTextChars,
             xhsXhrNote: xhsXhrCache.get(tabId) || null,
             siteCache: getSiteCache(tabId),
@@ -929,6 +930,7 @@ async function handle(msg, sender) {
       await siteCacheReady; // ensure session-storage restore finished
       const ctx = await extractActiveTab({
         mode,
+        tabId: typeof t === 'number' ? t : null,
         maxTextChars: all.maxTextChars,
         xhsXhrNote: (typeof t === 'number') ? (xhsXhrCache.get(t) || null) : null,
         siteCache: (typeof t === 'number') ? getSiteCache(t) : null

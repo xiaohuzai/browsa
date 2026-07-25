@@ -104,7 +104,7 @@ function loadContentScript(name) {
 // youtube-content-script.js
 // ============================================================================
 {
-  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, installYouTubeInterceptor } =
+  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml } =
     loadContentScript('youtube-content-script.js');
 
   test('youtube: isYouTubePlayerUrl matches both apex and www hosts, prefix-matches the path', () => {
@@ -114,7 +114,7 @@ function loadContentScript(name) {
     assert.equal(isYouTubePlayerUrl('https://example.com/youtubei/v1/player'), false);
   });
 
-  test('youtube: extractVideoMeta maps videoDetails and truncates shortDescription to 600 chars', () => {
+  test('youtube: extractVideoMeta maps videoDetails and preserves full shortDescription', () => {
     const longDesc = 'x'.repeat(1000);
     const meta = extractVideoMeta({
       videoDetails: { videoId: 'abc123', title: ' T ', author: ' A ', lengthSeconds: '125', shortDescription: longDesc },
@@ -123,7 +123,7 @@ function loadContentScript(name) {
     assert.equal(meta.videoId, 'abc123');
     assert.equal(meta.title, 'T');
     assert.equal(meta.lengthSeconds, 125);
-    assert.equal(meta.shortDescription.length, 600);
+    assert.equal(meta.shortDescription.length, 1000, 'shortDescription must not be truncated');
     assert.equal(meta.captionTracks.length, 1);
   });
 
@@ -135,9 +135,8 @@ function loadContentScript(name) {
 
   test('youtube: fetchTranscript prefers manual English over auto (asr) English', async () => {
     globalThis.fetch = async (url) => {
-      assert.ok(url.includes('&fmt=json3'));
       assert.ok(url.startsWith('manual-en'), `must fetch the manual English track, got ${url}`);
-      return { ok: true, json: async () => ({ events: [{ tStartMs: 1000, segs: [{ utf8: 'hello' }] }] }) };
+      return { ok: true, text: async () => JSON.stringify({ events: [{ tStartMs: 1000, segs: [{ utf8: 'hello' }] }] }) };
     };
     const transcript = await fetchTranscript([
       { languageCode: 'en', kind: 'asr', baseUrl: 'auto-en' },
@@ -148,18 +147,17 @@ function loadContentScript(name) {
   });
 
   test('youtube: fetchTranscript falls back to auto English, then any manual, then first available', async () => {
-    globalThis.fetch = async (url) => ({ ok: true, json: async () => ({ events: [] }) });
-    // Only an auto (asr) English track exists.
+    // fetchTranscript now uses baseUrl as-is (no fmt= modification) to preserve URL signatures
     let urlSeen;
-    globalThis.fetch = async (url) => { urlSeen = url; return { ok: true, json: async () => ({ events: [] }) }; };
+    globalThis.fetch = async (url) => { urlSeen = url; return { ok: true, text: async () => JSON.stringify({ events: [] }) }; };
     await fetchTranscript([{ languageCode: 'en', kind: 'asr', baseUrl: 'auto-en' }]);
-    assert.equal(urlSeen, 'auto-en&fmt=json3');
+    assert.equal(urlSeen, 'auto-en');
 
     await fetchTranscript([{ languageCode: 'fr', baseUrl: 'manual-fr' }]);
-    assert.equal(urlSeen, 'manual-fr&fmt=json3', 'no English at all — falls back to any non-asr track');
+    assert.equal(urlSeen, 'manual-fr', 'no English at all — falls back to any non-asr track');
 
     await fetchTranscript([{ languageCode: 'ja', kind: 'asr', baseUrl: 'only-track' }]);
-    assert.equal(urlSeen, 'only-track&fmt=json3', 'no English and no manual track — falls back to the first track');
+    assert.equal(urlSeen, 'only-track', 'no English and no manual track — falls back to the first track');
   });
 
   test('youtube: fetchTranscript returns null for empty/missing caption tracks', async () => {
@@ -238,8 +236,188 @@ function loadContentScript(name) {
     }
   });
 
+  // Regression: ytInitialPlayerResponse was removed from window by YouTube in mid-2026.
+  // activeYouTubeFetch used to bail out with `return null` when that global was absent,
+  // meaning the whole active-fallback path silently produced no data. Fix: fall through
+  // to Stage 3 (POST /youtubei/v1/player) using the videoId from the URL instead.
+  // Regression: ytInitialPlayerResponse was removed from window by YouTube in mid-2026.
+  // activeYouTubeFetch used to bail out with `return null` when that global was absent,
+  // meaning the whole active-fallback path silently produced no data. Fix: fall through
+  // to Stage 3 (POST /youtubei/v1/player) using the videoId from the URL instead.
+  test('youtube: activeYouTubeFetch falls through to Stage 3 when ytInitialPlayerResponse is absent', async () => {
+    const prevWindow = globalThis.window;
+    const prevPerf = globalThis.performance;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      // activeYouTubeFetch reads window.location.search, window.ytInitialPlayerResponse,
+      // window.ytInitialData, window.ytcfg — all need to be on the same `window` object.
+      globalThis.window = {
+        location: { search: '?v=TEST123' },
+        ytInitialData: {},
+        ytcfg: { get: (k) => k === 'INNERTUBE_CONTEXT' ? { client: { clientName: 'WEB' } } : undefined }
+        // ytInitialPlayerResponse deliberately absent — this is the regression scenario
+      };
+      globalThis.document = { getElementById: () => null };
+      globalThis.performance = { getEntriesByType: () => [] }; // no cached timedtext entries — must fall through to Stage 3
+
+      // Two fetch calls happen: (1) POST /youtubei/v1/player, (2) caption track fetch
+      const calls = [];
+      globalThis.fetch = async (url, opts) => {
+        calls.push(url);
+        if (typeof url === 'string' && url.includes('/youtubei/v1/player')) {
+          const body = JSON.parse(opts.body);
+          assert.equal(body.videoId, 'TEST123');
+          return {
+            ok: true,
+            json: async () => ({
+              videoDetails: { videoId: 'TEST123', title: 'Test Video', author: 'Author', lengthSeconds: '120', shortDescription: 'desc' },
+              captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ languageCode: 'en', baseUrl: 'https://example.com/timedtext' }] } }
+            })
+          };
+        }
+        // caption track fetch — fetchTranscript now uses res.text() + JSON.parse
+        return { ok: true, text: async () => JSON.stringify({ events: [{ tStartMs: 5000, segs: [{ utf8: 'hello world' }] }] }) };
+      };
+
+      const result = await activeYouTubeFetch();
+      assert.ok(result, 'must return a result even without ytInitialPlayerResponse');
+      assert.equal(result.videoId, 'TEST123');
+      assert.equal(result.title, 'Test Video');
+      assert.ok(result.transcript?.includes('[00:05] hello world'), `transcript must contain timestamped line, got: ${result.transcript}`);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+    }
+  });
+
+  test('youtube: activeYouTubeFetch returns null when videoId is not in the URL and player has no video', async () => {
+    const prevWindow = globalThis.window;
+    const prevDocument = globalThis.document;
+    const prevPerf = globalThis.performance;
+    try {
+      globalThis.window = { location: { search: '' } };
+      globalThis.document = { getElementById: () => null };
+      globalThis.performance = { getEntriesByType: () => [] };
+      const result = await activeYouTubeFetch();
+      assert.equal(result, null);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+    }
+  });
+
+  test('youtube: activeYouTubeFetch uses window.location (not getVideoData) for videoId — URL updates before player state', async () => {
+    // Empirically confirmed: when the user clicks a new video, window.location
+    // updates immediately via history.pushState, while getVideoData().video_id
+    // still returns the previous video's ID. So URL is the correct source.
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      globalThis.window = {
+        location: { search: '?v=NEW_VIDEO_ID' }, // URL already updated
+        ytInitialData: {},
+        ytcfg: { get: (k) => k === 'INNERTUBE_CONTEXT' ? { client: { clientName: 'WEB' } } : undefined }
+      };
+      // Player getVideoData() still has the OLD video_id (confirmed behavior)
+      globalThis.document = { getElementById: () => null };
+      // performance buffer has a timedtext URL for NEW_VIDEO_ID
+      globalThis.performance = { getEntriesByType: () => [
+        { name: 'https://www.youtube.com/api/timedtext?v=NEW_VIDEO_ID&fmt=json3&lang=en' }
+      ] };
+      globalThis.fetch = async () => ({
+        ok: true, json: async () => ({ events: [{ tStartMs: 0, segs: [{ utf8: 'new caption' }] }] })
+      });
+      const result = await activeYouTubeFetch();
+      assert.ok(result, 'must return a result');
+      assert.equal(result.videoId, 'NEW_VIDEO_ID', 'videoId must come from URL (window.location), not stale getVideoData()');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+    }
+  });
+
   test('youtube: installYouTubeInterceptor is a no-op outside a browser context', () => {
     assert.equal(installYouTubeInterceptor(), false);
+  });
+
+  test('youtube: isTimedtextUrl matches /api/timedtext URLs only', () => {
+    assert.equal(isTimedtextUrl('https://www.youtube.com/api/timedtext?v=abc&fmt=json3'), true);
+    assert.equal(isTimedtextUrl('https://www.youtube.com/youtubei/v1/player'), false);
+    assert.equal(isTimedtextUrl(null), false);
+  });
+
+  test('youtube: extractVideoIdFromTimedtextUrl extracts v= param', () => {
+    assert.equal(extractVideoIdFromTimedtextUrl('https://www.youtube.com/api/timedtext?v=abc123&fmt=json3'), 'abc123');
+    assert.equal(extractVideoIdFromTimedtextUrl('https://www.youtube.com/api/timedtext?fmt=json3'), null);
+    assert.equal(extractVideoIdFromTimedtextUrl('not-a-url'), null);
+  });
+
+  test('youtube: parseTimedtextJson parses json3 events into timestamped lines', () => {
+    const json = JSON.stringify({ events: [
+      { tStartMs: 1000, segs: [{ utf8: 'hello' }] },
+      { tStartMs: 61500, segs: [{ utf8: 'world' }] },
+      { segs: [{ utf8: 'no time — skipped' }] },  // missing tStartMs is 0 but has segs
+    ]});
+    const result = parseTimedtextJson(json);
+    assert.ok(result?.includes('[00:01] hello'), `expected [00:01] hello, got: ${result}`);
+    assert.ok(result?.includes('[01:01] world'), `expected [01:01] world, got: ${result}`);
+  });
+
+  test('youtube: parseTimedtextXml parses srv3/ttml XML into timestamped lines', () => {
+    const xml = `<?xml version="1.0"?><timedtext><body><p t="1000">hello world</p><p t="61500">second line</p></body></timedtext>`;
+    const result = parseTimedtextJson(xml) || parseTimedtextXml(xml);
+    assert.ok(result?.includes('[00:01] hello world'), `expected [00:01] hello world, got: ${result}`);
+    assert.ok(result?.includes('[01:01] second line'), `expected [01:01] second line, got: ${result}`);
+  });
+
+  test('youtube: parseTimedtextJson returns null for empty/invalid input', () => {
+    assert.equal(parseTimedtextJson(''), null);
+    assert.equal(parseTimedtextJson('not json'), null);
+    assert.equal(parseTimedtextJson(JSON.stringify({ events: [] })), null);
+  });
+
+  test('youtube: installYouTubeInterceptor clones timedtext response body and caches the parsed transcript', async () => {
+    const prevWindow = globalThis.window;
+    const prevChrome = globalThis.chrome;
+    try {
+      const transcriptJson = JSON.stringify({ events: [{ tStartMs: 2000, segs: [{ utf8: 'cached line' }] }] });
+      const fakeWindow = {
+        __browsaYouTubeInterceptorInstalled: false,
+        fetch: async (url) => {
+          // The player's own timedtext fetch — clone() returns parseable JSON transcript
+          return {
+            ok: true,
+            clone: () => ({ json: async () => ({}), text: async () => transcriptJson }),
+            text: async () => transcriptJson,
+          };
+        },
+        location: { origin: 'https://www.youtube.com' },
+        XMLHttpRequest: undefined,
+      };
+      globalThis.window = fakeWindow;
+      globalThis.chrome = { runtime: { sendMessage: () => {} } };
+
+      const installed = installYouTubeInterceptor();
+      assert.equal(installed, true);
+
+      // Simulate the player's own timedtext fetch
+      await fakeWindow.fetch('https://www.youtube.com/api/timedtext?v=TEST999&fmt=srv3&expire=999');
+      // Clone + parse runs asynchronously — flush microtasks
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.ok(fakeWindow.__browsaTranscriptCache?.['TEST999']?.includes('[00:02] cached line'),
+        `cache should contain the parsed transcript, got: ${JSON.stringify(fakeWindow.__browsaTranscriptCache)}`);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevChrome === undefined) delete globalThis.chrome; else globalThis.chrome = prevChrome;
+    }
   });
 }
 
