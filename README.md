@@ -21,7 +21,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 604 unit tests
+npm test             # run 660 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -172,7 +172,7 @@ Click 📎 in the composer to attach the current page. browsa supports two attac
 | **Auto** | Tries Mozilla Readability first (clean article text, ~5–30 KB), falls back to DOM tree, then full `body.innerText` |
 | **📷 Screenshot** | PNG of the visible tab — for multimodal models or visual content |
 
-Attaching a PDF (or a page that turns out to be one) is automatic — no separate mode to pick. browsa tries [`pdf-inspector-wasm`](https://github.com/firecrawl/pdf-inspector) first (full layout reconstruction — tables, headings, columns — running client-side, nothing uploaded), falls back to plain `pdf.js` text extraction if that's unavailable or the PDF turns out to be a scanned/image-only page with no text layer, and as a last resort attaches just the PDF's URL so your agent can fetch and read it with its own tools.
+Attaching a PDF (or a page that turns out to be one) is automatic — no separate mode to pick. browsa tries [`pdf-inspector-wasm`](https://github.com/firecrawl/pdf-inspector) first (full layout reconstruction — tables, headings, columns — running client-side, nothing uploaded), falls back to plain `pdf.js` text extraction if that's unavailable or the PDF turns out to be a scanned/image-only page with no text layer, and as a last resort attaches just the PDF's URL so your agent can fetch and read it with its own tools. For figure-heavy PDFs (textbooks, papers with plots), browsa also crops the actual figure regions - not whole-page renders - pairs each with its caption, and sends them as inline vision content so a vision-capable model can actually see the diagrams; once the model has answered, those figure images are compacted to labeled text placeholders in history so later turns resend cheap text instead of the pixels.
 
 For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
 
@@ -359,7 +359,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (604 tests)
+├── test/                              # node:test unit tests (660 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 

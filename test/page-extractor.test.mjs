@@ -1981,3 +1981,45 @@ test('_fetchPdfBytesInPageWorld: a thrown fetch error is caught and returned as 
   const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
   assert.equal(result.error, 'network down');
 });
+
+test('_fetchPdfBytesInPageWorld: github.com /blob/ URL is rewritten to raw.githubusercontent.com with credentials:omit', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://github.com/alxndrTL/little-book-rl/blob/main/book.pdf' });
+  let fetchedUrl = null, fetchedCreds = null;
+  const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    URL: globalThis.URL,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async (url, opts) => {
+      fetchedUrl = url;
+      fetchedCreds = opts && opts.credentials;
+      return { ok: true, headers: { get: () => 'application/octet-stream' }, blob: async () => ({ size: fakeBytes.length, arrayBuffer: async () => fakeBytes.buffer }) };
+    }
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.equal(fetchedUrl, 'https://raw.githubusercontent.com/alxndrTL/little-book-rl/main/book.pdf', 'github /blob/ URL must be rewritten to the raw host');
+  assert.equal(fetchedCreds, 'omit', 'cross-origin raw fetch must use credentials:omit (raw host sends no Allow-Credentials)');
+  assert.ok(result.base64, 'should return base64 for the rewritten raw URL');
+  assert.equal(result.byteLength, 5);
+});
+
+test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) returns an error, not base64-encoded HTML', async () => {
+  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+  const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
+  let blobCalled = false;
+  const ctx = vm.createContext({
+    location: dom.window.location,
+    URL: globalThis.URL,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    fetch: async () => ({
+      ok: true,
+      headers: { get: () => 'text/html; charset=utf-8' },
+      blob: async () => { blobCalled = true; return { size: 5000, arrayBuffer: async () => new Uint8Array(5000).buffer }; }
+    })
+  });
+  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  assert.ok(result.error, 'an HTML viewer page must surface as an error');
+  assert.ok(!result.base64, 'must not base64-encode HTML as if it were a PDF');
+  assert.equal(blobCalled, false, 'should not consume the blob body once content-type says HTML');
+});

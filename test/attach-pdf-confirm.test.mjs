@@ -142,6 +142,68 @@ test('ATTACH_PDF_CONFIRM: stores the given text to history via buildPageContextT
   assert.match(entry.content, /3 pages/);
 });
 
+test('ATTACH_PDF_CONFIRM: figureImages with captions become a caption-anchored multimodal entry', async () => {
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'PDF body with figures referenced.',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'Figured Doc',
+    numPages: 5,
+    figureImages: [
+      { url: 'data:image/jpeg;base64,AAA', caption: 'Figure 1: a diagram', page: 3 },
+      { url: 'data:image/jpeg;base64,BBB', caption: null, page: 7 }
+    ]
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.ok(Array.isArray(entry.content), 'figures present -> content is a multimodal array');
+  assert.equal(entry.content[0].type, 'text');
+  assert.match(entry.content[0].text, /PDF body with figures referenced\./);
+  assert.match(entry.content[0].text, /Mode: pdf/);
+  // The Figures section lists captions in order as the positional anchor the
+  // model matches to the prose's "Figure N" reference.
+  assert.match(entry.content[0].text, /## Figures/);
+  assert.match(entry.content[0].text, /1\. Figure 1: a diagram/);
+  assert.match(entry.content[0].text, /2\. Figure on page 7/, 'no-caption figure falls back to a page label');
+  const imgs = entry.content.filter((b) => b.type === 'image_url');
+  assert.equal(imgs.length, 2, 'both figure JPEGs stored as image_url blocks');
+  assert.equal(imgs[0].image_url.url, 'data:image/jpeg;base64,AAA');
+  assert.equal(imgs[1].image_url.url, 'data:image/jpeg;base64,BBB');
+});
+
+test('ATTACH_PDF_CONFIRM: bare-string figureImages still work (normalized to {url}, page-label anchors)', async () => {
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'PDF body.',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'Figured Doc',
+    numPages: 5,
+    figureImages: ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB']
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.ok(Array.isArray(entry.content));
+  assert.match(entry.content[0].text, /1\. Figure on page \?/, 'bare strings have no caption/page -> page-label fallback');
+  assert.equal(entry.content.filter((b) => b.type === 'image_url').length, 2);
+});
+
+test('ATTACH_PDF_CONFIRM: empty figureImages keeps the plain-string content shape', async () => {
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: 'Text-only PDF, no figures.',
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'Text Doc',
+    figureImages: []
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.equal(typeof entry.content, 'string', 'no figures -> plain-string content, history stays uniform');
+  assert.match(entry.content, /Text-only PDF, no figures\./);
+});
+
 test('ATTACH_PDF_CONFIRM: applies mask rules like the normal ATTACH_PAGE path', async () => {
   localArea._set({ maskRules: [{ pattern: 'SECRET-\\d+', flags: 'g', replacement: '[REDACTED]' }] });
   const res = await handle({
@@ -224,6 +286,45 @@ test('ATTACH_PDF_CONFIRM: above-threshold PDF text gets an attachId and is auto-
   assert.match(updated.content, /CONDENSED PDF/, 'the entry content must be replaced with the summarized text once the background pipeline completes');
   assert.equal(updated.summarized, true);
   assert.match(updated.content, /Mode: pdf/, 'summarized entry must still be rebuilt via buildPageContextText with mode:pdf');
+
+  localArea._set({ summarizeThresholdChars: undefined });
+});
+
+test('ATTACH_PDF_CONFIRM: figures survive auto-summarize (image_url blocks preserved alongside condensed text)', async () => {
+  localArea._set({ summarizeThresholdChars: 100 });
+  globalThis.fetch = async () => ({ ok: true, status: 200, body: sseFor('CONDENSED FIGURED PDF'), text: async () => '' });
+
+  const longText = 'p'.repeat(500);
+  const res = await handle({
+    type: 'ATTACH_PDF_CONFIRM',
+    text: longText,
+    metaUrl: 'https://example.com/doc.pdf',
+    metaTitle: 'Long Figured Doc',
+    numPages: 80,
+    figureImages: [
+      { url: 'data:image/jpeg;base64,FIG1', caption: 'Figure 1: arch', page: 4 },
+      { url: 'data:image/jpeg;base64,FIG2', caption: 'Figure 2: plot', page: 9 }
+    ]
+  }, {});
+  assert.equal(res.ok, true);
+
+  const historyRightAfter = await localArea.get('history');
+  const entry = historyRightAfter.history[historyRightAfter.history.length - 1];
+  assert.ok(entry.attachId, 'above-threshold -> attachId stamped');
+  assert.ok(Array.isArray(entry.content), 'figures present -> content starts as a multimodal array');
+  assert.equal(entry.content.filter((b) => b.type === 'image_url').length, 2);
+
+  await flush();
+
+  const historyAfterFlush = await localArea.get('history');
+  const updated = historyAfterFlush.history.find((m) => m.attachId === entry.attachId);
+  assert.ok(Array.isArray(updated.content), 'content must STAY a multimodal array after summarize, not collapse to a string');
+  assert.equal(updated.content[0].type, 'text');
+  assert.match(updated.content[0].text, /CONDENSED FIGURED PDF/, 'text block holds the condensed text');
+  const imgs = updated.content.filter((b) => b.type === 'image_url');
+  assert.equal(imgs.length, 2, 'both figure blocks preserved through the summarize rewrite');
+  assert.equal(imgs[0].image_url.url, 'data:image/jpeg;base64,FIG1');
+  assert.equal(updated.summarized, true);
 
   localArea._set({ summarizeThresholdChars: undefined });
 });

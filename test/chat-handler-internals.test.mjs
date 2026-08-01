@@ -365,3 +365,218 @@ test('shouldRewriteTimestamps: bare mm:ss without brackets does NOT count as pre
   // be linkified, so the rewrite should still fire to fix it.
   assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: 'see 1:23 for the demo ' + 'x'.repeat(60), userText: '总结' }), true);
 });
+
+// --------------- buildRunsConversationHistory (Hermes /v1/runs) ------------
+// Verifies inline images are preserved as input_image parts (not flattened to
+// text), so XHS / PDF figures / screenshots attached via 📎 reach Hermes.
+// handleChat itself needs a heavier chrome.storage mock than this suite sets
+// up, so the pure helper is tested directly.
+
+let _buildRunsConversationHistory;
+async function buildRunsConversationHistory(history) {
+  if (!_buildRunsConversationHistory) {
+    ({ buildRunsConversationHistory: _buildRunsConversationHistory } = await import('../lib/handlers/chat-handler.js'));
+  }
+  return _buildRunsConversationHistory(history);
+}
+
+test('buildRunsConversationHistory: plain text turns pass through as strings', async () => {
+  const out = await buildRunsConversationHistory([
+    { role: 'user', content: 'hello' },
+    { role: 'assistant', content: 'hi there' },
+    { role: 'user', content: 'another question' },
+  ]);
+  assert.deepEqual(out, [
+    { role: 'user', content: 'hello' },
+    { role: 'assistant', content: 'hi there' },
+    { role: 'user', content: 'another question' },
+  ]);
+});
+
+test('buildRunsConversationHistory: multimodal user turn keeps image_url -> input_image', async () => {
+  // The exact shape stored by ATTACH_PAGE/ATTACH_PDF_CONFIRM/screenshot: a text
+  // block plus one or more {type:'image_url', image_url:{url}} blocks.
+  const out = await buildRunsConversationHistory([
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: '[Page context]\nURL: https://example.com\n...\n## Figures\n1. Figure 1.1: ...' },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,FIG1' } },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,FIG2' } },
+      ],
+    },
+    { role: 'assistant', content: 'What would you like to know?' },
+    { role: 'user', content: 'Describe the figures' },
+  ]);
+  assert.equal(out.length, 3);
+  // First turn: text normalized to input_text, both images become input_image,
+  // order preserved (text first, then images in storage order).
+  assert.deepEqual(out[0], {
+    role: 'user',
+    content: [
+      { type: 'input_text', text: '[Page context]\nURL: https://example.com\n...\n## Figures\n1. Figure 1.1: ...' },
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,FIG1' },
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,FIG2' },
+    ],
+  });
+  assert.deepEqual(out[1], { role: 'assistant', content: 'What would you like to know?' });
+  assert.deepEqual(out[2], { role: 'user', content: 'Describe the figures' });
+});
+
+test('buildRunsConversationHistory: image-only turn is kept (not dropped, not "[multimodal message]")', async () => {
+  // Regression guard for the old text-only flatten, which turned an image-only
+  // turn into the literal '[multimodal message]' placeholder. The image must
+  // survive as an input_image part, and the turn must NOT be filtered out.
+  const out = await buildRunsConversationHistory([
+    { role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,ONLY' } }] },
+  ]);
+  assert.equal(out.length, 1, 'image-only turn must not be dropped');
+  assert.deepEqual(out[0], {
+    role: 'user',
+    content: [{ type: 'input_image', image_url: 'data:image/png;base64,ONLY' }],
+  });
+  assert.notEqual(out[0].content, '[multimodal message]');
+});
+
+test('buildRunsConversationHistory: accepts bare-string image_url shape defensively', async () => {
+  // /v1/responses uses {type:'image_url', image_url:'data:...'} (string, not
+  // nested). Old history or other callers might store that shape; handle it.
+  const out = await buildRunsConversationHistory([
+    { role: 'user', content: [
+      { type: 'text', text: 'look' },
+      { type: 'image_url', image_url: 'data:image/png;base64,BARE' },
+    ] },
+  ]);
+  assert.deepEqual(out[0].content, [
+    { type: 'input_text', text: 'look' },
+    { type: 'input_image', image_url: 'data:image/png;base64,BARE' },
+  ]);
+});
+
+test('buildRunsConversationHistory: drops empty turns but keeps image-only ones', async () => {
+  const out = await buildRunsConversationHistory([
+    { role: 'user', content: '' },                       // empty string -> drop
+    { role: 'user', content: '   ' },                    // whitespace -> drop
+    { role: 'assistant', content: 'real answer' },       // keep
+    { role: 'user', content: [] },                       // empty array -> drop
+    { role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,X' } }] }, // image-only -> keep
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].role, 'assistant');
+  assert.equal(out[1].content.length, 1);
+  assert.equal(out[1].content[0].type, 'input_image');
+});
+
+test('buildRunsConversationHistory: filters to user/assistant roles only', async () => {
+  const out = await buildRunsConversationHistory([
+    { role: 'system', content: 'system prompt' },
+    { role: 'user', content: 'hi' },
+    { role: 'tool', content: 'tool result' },
+    { role: 'assistant', content: 'hey' },
+  ]);
+  assert.deepEqual(out, [
+    { role: 'user', content: 'hi' },
+    { role: 'assistant', content: 'hey' },
+  ]);
+});
+
+test('buildRunsConversationHistory: null/undefined history -> []', async () => {
+  assert.deepEqual(await buildRunsConversationHistory(null), []);
+  assert.deepEqual(await buildRunsConversationHistory(undefined), []);
+});
+
+// --------------- buildHermesTurn (current-turn image routing) ---------------
+// Verifies pasted images go directly into `input` as input_image parts (read
+// natively by a vision-capable Hermes model), alongside the text -- NOT into a
+// synthetic conversation_history turn. conversation_history is just the built
+// prior history.
+
+let _buildHermesTurn;
+async function buildHermesTurn(msg, history) {
+  if (!_buildHermesTurn) {
+    ({ buildHermesTurn: _buildHermesTurn } = await import('../lib/handlers/chat-handler.js'));
+  }
+  return _buildHermesTurn(msg, history);
+}
+
+test('buildHermesTurn: no images -> input is the text, history is built normally', async () => {
+  const out = await buildHermesTurn(
+    { userText: 'hello', images: [] },
+    [{ role: 'user', content: 'prior' }, { role: 'assistant', content: 'reply' }],
+  );
+  assert.equal(out.input, 'hello');
+  assert.deepEqual(out.conversationHistory, [
+    { role: 'user', content: 'prior' },
+    { role: 'assistant', content: 'reply' },
+  ]);
+});
+
+test('buildHermesTurn: pasted images go into input as input_image, NOT into conversation_history', async () => {
+  const out = await buildHermesTurn(
+    { userText: 'what color is this?', images: ['data:image/png;base64,A', 'data:image/png;base64,B'] },
+    [{ role: 'assistant', content: 'earlier reply' }],
+  );
+  // input is a structured user message: text + both images as input_image,
+  // order preserved (text first, then images). NOT a plain string.
+  assert.deepEqual(out.input, [{
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'what color is this?' },
+      { type: 'input_image', image_url: 'data:image/png;base64,A' },
+      { type: 'input_image', image_url: 'data:image/png;base64,B' },
+    ],
+  }]);
+  // conversation_history is just the built prior history -- NO synthetic
+  // trailing image turn appended.
+  assert.deepEqual(out.conversationHistory, [{ role: 'assistant', content: 'earlier reply' }]);
+});
+
+test('buildHermesTurn: empty userText with images -> input_text is empty string, image still in input', async () => {
+  const out = await buildHermesTurn({ userText: '', images: ['data:image/png;base64,X'] }, []);
+  assert.deepEqual(out.input, [{
+    role: 'user',
+    content: [
+      { type: 'input_text', text: '' },
+      { type: 'input_image', image_url: 'data:image/png;base64,X' },
+    ],
+  }]);
+  assert.deepEqual(out.conversationHistory, []);
+});
+
+test('buildHermesTurn: prior history images preserved in conversation_history, new pasted image in input', async () => {
+  // A prior page-context turn (text + image) is in history; the user now
+  // pastes another image. The prior image stays in conversation_history (via
+  // buildRunsConversationHistory -> input_image); the new pasted image goes in
+  // the current `input`.
+  const out = await buildHermesTurn(
+    { userText: 'and this one?', images: ['data:image/png;base64,NEW'] },
+    [{
+      role: 'user',
+      content: [
+        { type: 'text', text: '[Page context]' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,PRIOR' } },
+      ],
+    }],
+  );
+  // New pasted image is in input, alongside the text question.
+  assert.deepEqual(out.input, [{
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'and this one?' },
+      { type: 'input_image', image_url: 'data:image/png;base64,NEW' },
+    ],
+  }]);
+  // Prior turn (text + prior image) preserved in conversation_history.
+  assert.equal(out.conversationHistory.length, 1);
+  assert.equal(out.conversationHistory[0].content[0].type, 'input_text');
+  assert.equal(out.conversationHistory[0].content[1].type, 'input_image');
+  assert.equal(out.conversationHistory[0].content[1].image_url, 'data:image/png;base64,PRIOR');
+});
+
+test('buildHermesTurn: null/undefined msg -> empty input, built history', async () => {
+  const out = await buildHermesTurn(undefined, [{ role: 'user', content: 'hi' }]);
+  assert.equal(out.input, '');
+  assert.deepEqual(out.conversationHistory, [{ role: 'user', content: 'hi' }]);
+});
+
+
