@@ -547,7 +547,7 @@ async function handle(msg, sender) {
       // Side panel finished pdf.js text extraction (or fell back to the
       // placeholder text on any parse failure/timeout) and hands us the final
       // text to store — mirrors ATTACH_SCREENSHOT_CONFIRM's two-step handoff.
-      const { text, metaUrl, metaTitle, numPages } = msg;
+      const { text, metaUrl, metaTitle, numPages, figureImages } = msg;
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
       let finalText = text;
@@ -561,6 +561,22 @@ async function handle(msg, sender) {
           } catch (_) {}
         }
       }
+      // Figure preservation (vision-capable providers): each extracted figure
+      // arrives as {url, caption, page} (caption may be null). The caption is
+      // the positional anchor - it is listed in the body text under a Figures
+      // section (so the model can match "Figure 3" in the prose to the labeled
+      // figure), and the image_url blocks follow in the SAME order. This gives
+      // figure<->text correspondence WITHOUT page markers, which the (page-
+      // boundary-less) wasm markdown cannot provide. Bare-string figureImages
+      // (older callers / fallbacks) are normalized to {url} with no caption.
+      const figures = (Array.isArray(figureImages) ? figureImages : [])
+        .map((f) => (typeof f === 'string' ? { url: f } : f))
+        .filter((f) => f && f.url);
+      if (figures.length) {
+        const lines = figures.map((f, i) =>
+          `${i + 1}. ${f.caption || `Figure on page ${f.page || '?'}`}`);
+        finalText += '\n\n## Figures\nThe descriptions below correspond to the following images in order:\n' + lines.join('\n');
+      }
       const pdfCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
         mode: 'pdf',
@@ -568,7 +584,24 @@ async function handle(msg, sender) {
         format: numPages ? `pdf-text, ${numPages} pages` : 'pdf-text'
       };
       const contextText = buildPageContextText(pdfCtx);
-      const historyEntry = { role: 'user', content: contextText };
+      // Store the page text plus figure JPEGs as a multimodal content array -
+      // exactly like ATTACH_SCREENSHOT_CONFIRM - so figures are resent on every
+      // turn alongside the text. buildMessages pushes history entries through
+      // unchanged, so the image_url blocks reach the provider each turn. The
+      // image_url blocks follow the text block in the SAME order as the
+      // Figures section above, preserving the caption<->image pairing. Text-
+      // only PDFs (no figures, or figure extraction disabled/failed) keep the
+      // plain-string content shape used everywhere else, so history stays
+      // uniform and Hermes's text-only flattening is unaffected.
+      const historyEntry = figures.length
+        ? {
+            role: 'user',
+            content: [
+              { type: 'text', text: contextText },
+              ...figures.map((f) => ({ type: 'image_url', image_url: { url: f.url } }))
+            ]
+          }
+        : { role: 'user', content: contextText };
       // Same asymmetry ATTACH_PAGE already guards against: a large PDF's
       // extracted text is resent in FULL on every subsequent turn, and
       // pdf-extractor.js's own DEFAULT_MAX_CHARS (500K) only guards against

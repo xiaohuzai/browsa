@@ -749,15 +749,16 @@ async function onAttachPage() {
     if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
       attachBtn.title = '解析 PDF 中…';
       showAttachProgress('解析 PDF 中…');
-      let pdfText, pdfNumPages, pdfOcrPages;
+      let pdfText, pdfNumPages, pdfOcrPages, pdfFigureImages = [];
       try {
         const pdfResult = await Promise.race([
-          extractPdfContent(ctx.pdfBase64),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('pdf extraction timeout')), 45_000))
+          extractPdfContent(ctx.pdfBase64, { extractFigures: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('pdf extraction timeout')), 150_000))
         ]);
         pdfText = pdfResult.text;
         pdfNumPages = pdfResult.numPages;
         pdfOcrPages = pdfResult.pagesNeedingOcr;
+        pdfFigureImages = Array.isArray(pdfResult.figureImages) ? pdfResult.figureImages : [];
       } catch (e) {
         console.warn('browsa: pdf extraction failed, using placeholder', e.message);
         pdfText = `[PDF file — agent should fetch and read directly]\nURL: ${ctx.meta?.url || ''}\nTitle: ${ctx.meta?.title || ''}`;
@@ -767,7 +768,8 @@ async function onAttachPage() {
         text: pdfText,
         metaUrl: ctx.meta?.url || '',
         metaTitle: ctx.meta?.title || '',
-        numPages: pdfNumPages
+        numPages: pdfNumPages,
+        figureImages: pdfFigureImages
       }).catch(() => null);
       if (confirmRes?.ok) {
         nextHistoryIdx++;
@@ -775,7 +777,8 @@ async function onAttachPage() {
         const charLabel = pdfText?.length > 0 ? `，${pdfText.length.toLocaleString()} 字符` : '';
         const pagesLabel = pdfNumPages ? `，${pdfNumPages} 页` : '';
         const ocrLabel = pdfOcrPages?.length > 0 ? `，${pdfOcrPages.length} 页可能需要 OCR` : '';
-        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}）`, null, pdfText);
+        const figLabel = pdfFigureImages.length > 0 ? `，${pdfFigureImages.length} figure${pdfFigureImages.length > 1 ? 's' : ''}` : '';
+        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}${figLabel}）`, null, pdfText, pdfFigureImages);
       } else {
         appendError('PDF attach failed');
       }
@@ -2179,14 +2182,18 @@ function appendSystem(text) {
   return el;
 }
 
-function appendAttachSystem(text, relatedEl, ctxText) {
+function appendAttachSystem(text, relatedEl, ctxText, figures) {
   const el = document.createElement('div');
   el.className = 'msg system attach-msg';
   const span = document.createElement('span');
   span.textContent = text;
 
+  const figList = Array.isArray(figures)
+    ? figures.filter((f) => f && (typeof f === 'string' ? f : f.url))
+    : [];
+
   // "检查" button — shows the raw context sent to the model in a scrollable overlay.
-  if (ctxText) {
+  if (ctxText || figList.length) {
     const inspectBtn = document.createElement('button');
     inspectBtn.className = 'undo-attach inspect-ctx';
     inspectBtn.textContent = '检查';
@@ -2198,17 +2205,40 @@ function appendAttachSystem(text, relatedEl, ctxText) {
         <div class="ctx-inspector-modal">
           <div class="ctx-inspector-header">
             <span class="ctx-inspector-title">上下文预览</span>
-            <span class="ctx-inspector-len">${ctxText.length.toLocaleString()} 字符</span>
+            <span class="ctx-inspector-len">${(ctxText || '').length.toLocaleString()} 字符${figList.length ? ` · ${figList.length} figure${figList.length > 1 ? 's' : ''}` : ''}</span>
             <button class="ctx-inspector-copy">复制</button>
             <button class="ctx-inspector-close">✕</button>
           </div>
           <pre class="ctx-inspector-body"></pre>
+          ${figList.length ? '<div class="ctx-inspector-figures"></div>' : ''}
         </div>`;
       // Set textContent on the <pre> to avoid any XSS from raw page content.
-      overlay.querySelector('.ctx-inspector-body').textContent = ctxText;
+      overlay.querySelector('.ctx-inspector-body').textContent = ctxText || '(无文本)';
+      const figContainer = overlay.querySelector('.ctx-inspector-figures');
+      if (figContainer && figList.length) {
+        const figTitle = document.createElement('div');
+        figTitle.className = 'ctx-fig-title';
+        figTitle.textContent = `Figures (${figList.length}, in context order)`;
+        figContainer.appendChild(figTitle);
+        figList.forEach((f, i) => {
+          const url = typeof f === 'string' ? f : f.url;
+          const cap = typeof f === 'string' ? '' : (f.caption || '');
+          const page = typeof f === 'string' ? '' : (f.page || '');
+          const figure = document.createElement('figure');
+          figure.className = 'ctx-fig';
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = cap || `Figure on page ${page || '?'}`;
+          const figcaption = document.createElement('figcaption');
+          figcaption.textContent = `${i + 1}. ${cap || `Figure on page ${page || '?'}`}`;
+          figure.appendChild(img);
+          figure.appendChild(figcaption);
+          figContainer.appendChild(figure);
+        });
+      }
       overlay.querySelector('.ctx-inspector-close').addEventListener('click', () => overlay.remove());
       overlay.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
-        _copyText(ctxText);
+        _copyText(ctxText || '');
         showToast('已复制');
       });
       overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
