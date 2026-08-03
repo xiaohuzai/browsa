@@ -139,9 +139,9 @@ async function runXhsInSandbox(html, url = 'https://www.xiaohongshu.com/explore/
   // everything up to the matching closing brace. We strip the outer
   // braces so we can re-emit it as a top-level function declaration in
   // the sandbox, then invoke it.
-  const src = await readFile(join(ROOT, 'lib/page-extractor.js'), 'utf8');
+  const src = await readFile(join(ROOT, 'lib/xhs-extractor.js'), 'utf8');
   const fnMatch = src.match(/(?:async\s+)?function extractXiaohongshuInPageWorld\(\)\s*\{/);
-  if (!fnMatch) throw new Error('extractXiaohongshuInPageWorld not found in page-extractor.js');
+  if (!fnMatch) throw new Error('extractXiaohongshuInPageWorld not found in xhs-extractor.js');
   const start = fnMatch.index;
   // Walk forward, counting braces, to find the matching close.
   let depth = 0;
@@ -169,7 +169,7 @@ async function runXhsInSandbox(html, url = 'https://www.xiaohongshu.com/explore/
   // from the sandbox global, exactly as they would in the page world.
   // gradeXiaohongshuResult is a sibling function the extractor calls
   // — it has to be loaded into the sandbox too.
-  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult');
+  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult', join(ROOT, 'lib/xhs-extractor.js'));
   return vm.runInContext(
     `${siblingBody}\n${fnBody}\n;(async () => { return await extractXiaohongshuInPageWorld(); })();`,
     ctx
@@ -354,7 +354,7 @@ async function runXhsWithStateInSandbox(html, initialState) {
     AbortSignal: { timeout: () => ({}) },
     Image: dom.window.Image
   });
-  const src = await readFile(join(ROOT, 'lib/page-extractor.js'), 'utf8');
+  const src = await readFile(join(ROOT, 'lib/xhs-extractor.js'), 'utf8');
   const fnMatch = src.match(/(?:async\s+)?function extractXiaohongshuInPageWorld\(\)\s*\{/);
   const start = fnMatch.index;
   let depth = 0, i = src.indexOf('{', start);
@@ -363,7 +363,7 @@ async function runXhsWithStateInSandbox(html, initialState) {
     else if (src[i] === '}') { depth--; if (depth === 0) break; }
   }
   const fnBody = src.slice(start, i + 1);
-  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult');
+  const siblingBody = await loadSiblingFn('gradeXiaohongshuResult', join(ROOT, 'lib/xhs-extractor.js'));
   return vm.runInContext(
     `${siblingBody}\n${fnBody}\n;(async () => { return await extractXiaohongshuInPageWorld(); })();`,
     ctx
@@ -444,7 +444,7 @@ test('xhs INITIAL_STATE: returns error when both sources fail', async () => {
 // surface a yellow banner when desc is suspiciously short or empty.
 
 async function runGrade(args) {
-  const fnBody = await loadSiblingFn('gradeXiaohongshuResult');
+  const fnBody = await loadSiblingFn('gradeXiaohongshuResult', join(ROOT, 'lib/xhs-extractor.js'));
   const ctx = vm.createContext({});
   vm.runInContext(fnBody, ctx);
   return vm.runInContext(
@@ -677,7 +677,7 @@ test('content script: maybeExtract returns a summary for a healthy feed response
 // one. This is the v0.19.0 fast path.
 
 async function runSynthesize(args) {
-  const fnBody = await loadSiblingFn('synthesizeXhsResultFromXhr');
+  const fnBody = await loadSiblingFn('synthesizeXhsResultFromXhr', join(ROOT, 'lib/xhs-extractor.js'));
   const ctx = vm.createContext({});
   vm.runInContext(fnBody, ctx);
   return vm.runInContext(
