@@ -26,7 +26,9 @@ export {
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState
 };
-import { extractActiveTab, buildPageContextText, ensureReadabilityInjected } from './lib/page-extractor.js';
+import { extractActiveTab } from './lib/page-extractor.js';
+import { buildPageContextText } from './lib/message-builder.js';
+import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
 // Capability hints: browsa rendering rules injected automatically so users
 // never need to configure them manually. Shared by both CHAT (full turn,

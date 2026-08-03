@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPageContextText } from '../lib/page-extractor.js';
+import { buildPageContextText } from '../lib/message-builder.js';
 
 test('buildPageContextText: no change note when changedSinceLastAttach is absent', () => {
   const out = buildPageContextText({
