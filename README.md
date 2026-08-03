@@ -174,6 +174,8 @@ Click 📎 in the composer to attach the current page. browsa supports two attac
 
 Attaching a PDF (or a page that turns out to be one) is automatic — no separate mode to pick. browsa tries [`pdf-inspector-wasm`](https://github.com/firecrawl/pdf-inspector) first (full layout reconstruction — tables, headings, columns — running client-side, nothing uploaded), falls back to plain `pdf.js` text extraction if that's unavailable or the PDF turns out to be a scanned/image-only page with no text layer, and as a last resort attaches just the PDF's URL so your agent can fetch and read it with its own tools. For figure-heavy PDFs (textbooks, papers with plots), browsa also crops the actual figure regions - not whole-page renders - pairs each with its caption, and sends them as inline vision content so a vision-capable model can actually see the diagrams; once the model has answered, those figure images are compacted to labeled text placeholders in history so later turns resend cheap text instead of the pixels.
 
+GitHub file pages (`github.com/…/blob/…`) are a special case: browsa fetches the file's raw source from `raw.githubusercontent.com` directly. This is cleaner than scraping the rendered GitHub UI (markdown and code keep their structure instead of being flattened to plain text) and skips the page-cleanup step that would otherwise click through GitHub's nav menus and branch pickers.
+
 For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
 
 ---
@@ -359,7 +361,7 @@ browsa/
 ├── build/
 │   ├── build.mjs                      # esbuild vendor bundler
 │   └── package.mjs                    # distribution zip builder
-├── test/                              # node:test unit tests (660 tests)
+├── test/                              # node:test unit tests (673 tests)
 └── check-compat.sh                    # MV3 / static compatibility check
 ```
 
