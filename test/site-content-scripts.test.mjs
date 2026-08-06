@@ -21,7 +21,7 @@ function loadContentScript(name) {
 // bilibili-content-script.js
 // ============================================================================
 {
-  const { isBilibiliViewUrl, isBilibiliPlayerUrl, extractBilibiliVideo, installBilibiliInterceptor, md5, wbiSign } =
+  const { isBilibiliViewUrl, isBilibiliPlayerUrl, extractBilibiliVideo, installBilibiliInterceptor, md5, wbiSign, activeFetchBilibiliVideo, readBilibiliAudioUrl } =
     loadContentScript('bilibili-content-script.js');
 
   test('bilibili: isBilibiliViewUrl matches the video-view endpoint only', () => {
@@ -97,6 +97,104 @@ function loadContentScript(name) {
 
   test('bilibili: installBilibiliInterceptor is a no-op outside a browser context', () => {
     assert.equal(installBilibiliInterceptor(), false);
+  });
+
+  test('bilibili: readBilibiliAudioUrl prefers dash audio, falls back to durl, null without either', () => {
+    const prevWindow = globalThis.window;
+    try {
+      globalThis.window = { __playinfo__: { data: { dash: { audio: [{ base_url: 'https://a/dash.m4s' }] } } } };
+      assert.equal(readBilibiliAudioUrl(), 'https://a/dash.m4s');
+      globalThis.window = { __playinfo__: { data: { durl: [{ url: 'https://a/durl.m4s' }] } } };
+      assert.equal(readBilibiliAudioUrl(), 'https://a/durl.m4s');
+      globalThis.window = { __playinfo__: { data: {} } };
+      assert.equal(readBilibiliAudioUrl(), null);
+      globalThis.window = {};
+      assert.equal(readBilibiliAudioUrl(), null);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+    }
+  });
+
+  // Regression: activeFetchBilibiliVideo used to require window.__INITIAL_STATE__.videoData
+  // and throw when it was absent, silently falling back to a generic DOM extraction that
+  // dumped the whole channel feed instead of the video. Fix: take bvid from the URL path,
+  // fall back to the view API for meta, and read __playinfo__ audio unconditionally.
+  test('bilibili: activeFetchBilibiliVideo falls back to the view API + __playinfo__ audio when __INITIAL_STATE__ is absent', async () => {
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    try {
+      globalThis.window = {
+        location: { pathname: '/video/BV1D5411f7ch' },
+        // __INITIAL_STATE__ deliberately absent — the SSR-restructure regression scenario
+        __playinfo__: { data: { dash: { audio: [{ base_url: 'https://audio.cdn/stream.m4s' }] } } },
+      };
+      const calls = [];
+      globalThis.fetch = async (url) => {
+        calls.push(url);
+        if (url.includes('/x/web-interface/view')) {
+          return {
+            ok: true,
+            json: async () => ({
+              code: 0,
+              data: {
+                bvid: 'BV1D5411f7ch', title: '革命年代共产党的红军很穷？', desc: 'desc',
+                owner: { name: '思维实验室' }, tname: '社科人文', duration: 1062,
+                pages: [{ cid: 12345 }], stat: { view: 100, like: 10 },
+              },
+            }),
+          };
+        }
+        return { ok: false }; // nav / player / conclusion — short-circuit before WBI
+      };
+      const result = await activeFetchBilibiliVideo();
+      assert.ok(result, 'must return a result even without __INITIAL_STATE__');
+      assert.equal(result.bvid, 'BV1D5411f7ch');
+      assert.equal(result.title, '革命年代共产党的红军很穷？');
+      assert.equal(result.author, '思维实验室');
+      assert.equal(result.cid, 12345);
+      assert.equal(result.audioUrl, 'https://audio.cdn/stream.m4s', 'audio URL must survive the meta fallback');
+      assert.ok(calls.some(u => u.includes('/x/web-interface/view?bvid=BV1D5411f7ch')), 'must fetch the view API');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
+  test('bilibili: activeFetchBilibiliVideo prefers __INITIAL_STATE__ and still captures audio', async () => {
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    try {
+      globalThis.window = {
+        location: { pathname: '/video/BV1D5411f7ch' },
+        __INITIAL_STATE__: {
+          videoData: { bvid: 'BV1D5411f7ch', title: 'FromState', owner: { name: 'A' }, cid: 7, pages: [{ cid: 7 }], duration: 60, stat: {} },
+        },
+        __playinfo__: { data: { dash: { audio: [{ base_url: 'https://audio.cdn/state.m4s' }] } } },
+      };
+      const calls = [];
+      globalThis.fetch = async (url) => { calls.push(url); return { ok: false }; };
+      const result = await activeFetchBilibiliVideo();
+      assert.equal(result.title, 'FromState');
+      assert.equal(result.cid, 7);
+      assert.equal(result.audioUrl, 'https://audio.cdn/state.m4s');
+      assert.ok(!calls.some(u => u.includes('/x/web-interface/view')), 'must NOT fetch view API when __INITIAL_STATE__ has cid');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
+  test('bilibili: activeFetchBilibiliVideo throws when no bvid is available anywhere', async () => {
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    try {
+      globalThis.window = { location: { pathname: '/video/' } };
+      globalThis.fetch = async () => ({ ok: false });
+      await assert.rejects(() => activeFetchBilibiliVideo(), /no bvid/);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
   });
 }
 
