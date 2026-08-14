@@ -14,7 +14,8 @@
     "webNavigation",
     "alarms",
     "contextMenus",
-    "downloads"
+    "downloads",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"

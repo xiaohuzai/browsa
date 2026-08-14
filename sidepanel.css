@@ -994,6 +994,7 @@ math[display="block"] {
 
 /* ─── Composer ──────────────────────────────────────────────────────────────── */
 .composer {
+  position: relative; /* anchors the media-download popover */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2149,3 +2150,153 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .selection-ask-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ─── Media download (video pages) ─────────────────────────────────────────────
+   Download entry for bilibili/youtube video pages: a small ⬇ next to the page
+   meta in the composer footer, opening a popover listing the video's streams.
+   Audio section first (download audio is the primary intent); video section
+   below, muxed first and dash video labelled "no audio track". Follows the
+   theme's margin-note concept - the platform tag is monospace + --gold, like a
+   hand-written annotation, not a chrome-y badge. */
+.mediadl {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+.mediadl:hover { color: var(--accent); }
+.mediadl[hidden] { display: none; }
+
+.media-panel {
+  position: absolute;
+  right: 0;
+  bottom: 58px;               /* above the composer-footer row */
+  width: 264px;
+  max-height: 330px;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 30;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.media-panel[hidden] { display: none; }
+
+.media-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--fg-2);
+  line-height: 1.35;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.media-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-platform {
+  flex-shrink: 0;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+
+.media-section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-top: 6px;
+}
+.media-section:first-of-type { margin-top: 2px; }
+
+.media-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+}
+.media-item:hover { background: var(--bg-4); }
+.media-label {
+  flex: 1;
+  color: var(--fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-item.no-audio .media-label { color: var(--fg-dim); }
+
+.media-dl {
+  flex-shrink: 0;
+  border: none;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.media-dl:hover { background: var(--accent-hover); }
+.media-dl:disabled { opacity: 0.5; cursor: default; }
+
+.media-prog {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.media-prog-bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.media-prog-pct { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.media-prog-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.media-error {
+  font-size: 11px;
+  color: var(--error);
+  padding: 4px 8px;
+}
+.media-empty {
+  font-size: 11px;
+  color: var(--fg-dim);
+  padding: 4px 8px;
+}
+.media-debug {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--gold, #d4a72c);
+  background: var(--bg-2, rgba(255,255,255,0.03));
+  padding: 6px 8px;
+  margin: 4px 6px 6px;
+  border-radius: 6px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}

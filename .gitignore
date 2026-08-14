@@ -33,3 +33,6 @@ browsa.bundle
 
 # Local tool caches (e.g. CodeGraph indexer) — machine-local, never for committing.
 .codegraph/
+
+# Session-local Claude config (permission allowlists, plans)
+.claude/
