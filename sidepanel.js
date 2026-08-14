@@ -11,6 +11,7 @@ import {
   makeStreamRenderer, setThoughtAutoCollapse
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
+import { initMediaDownload } from './lib/sidepanel/media-download.js';
 import {
   initSessionsUI, getSessionsDrawer, openSessionsDrawer, onSessionSearch,
   closeSessionsDrawer, clearAllSessions
@@ -50,6 +51,7 @@ if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user 
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const pagemetaEl = $('pagemeta');
+let mediaDownloadRefresh = null;  // set by initMediaDownload in init(); called on tab changes
 const diagnosticsEl = $('diagnostics');
 const imagePreviewsEl = $('imagepreviews');
 const imageInfoEl = $('imageinfo');
@@ -95,6 +97,7 @@ async function init() {
   initMultiselect({
     decrementNextHistoryIdx: () => { nextHistoryIdx = Math.max(0, nextHistoryIdx - 1); }
   });
+  mediaDownloadRefresh = initMediaDownload({ getTabId: () => currentTabId }).refresh;
 
   // Load config
   const cfgRes = await sendMessage({ type: 'GET_CONFIG' });
@@ -215,6 +218,7 @@ async function init() {
     pagemetaEl.href = tab.url || '#';
     pagemetaEl.title = tab.url || '';
   }
+  mediaDownloadRefresh?.();
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
@@ -233,6 +237,7 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
+    mediaDownloadRefresh?.();
     if (navPort) {
       try { navPort.postMessage({ type: 'NAV_FOLLOW', tabId }); } catch (_) {}
     }
@@ -243,6 +248,7 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
+    mediaDownloadRefresh?.();
   });
 
   // Long-lived nav port. The background pushes NAVIGATED events for ANY
@@ -301,6 +307,7 @@ async function init() {
         pagemetaEl.textContent = msg.url;
       }
     }
+    mediaDownloadRefresh?.();
     // Re-probe the new URL. If it's a 小红书 explore page, the
     // diagnostics banner needs to update. We don't await — the new
     // banner will appear when the probe finishes (a few hundred ms).
