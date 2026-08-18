@@ -1,8 +1,8 @@
 // test/attach-page-summarize.test.mjs — end-to-end wiring test for the
 // auto-summarize-long-attachments feature (lib/handlers/attach-summarizer.js)
 // through the real background.js ATTACH_PAGE case, not just the isolated
-// module. Uses the same handle()-via-'selected'-mode approach as
-// test/mask-rules.test.mjs (the simplest path that reaches the history-append
+// module. Uses the same handle()-via-'selected'-mode approach
+// (the simplest path that reaches the history-append
 // code without needing to mock Readability/DOM extraction).
 //
 // The summarization pipeline is fire-and-forget (ATTACH_PAGE's response must

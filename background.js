@@ -20,6 +20,7 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { extFromMime } from './lib/handlers/media-downloader.js';
+import { ASR_DEFAULTS } from './lib/handlers/attach-asr.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -530,7 +531,27 @@ async function handle(msg, sender) {
       let files, func, diagFunc;
       if (/bilibili\.com\/video\//.test(url)) {
         files = ['lib/content-scripts/bilibili-content-script.js'];
-        func = () => readBilibiliMediaStreams();
+        // Prefer a FRESH playurl re-signed at click time: the __playinfo__ URLs
+        // baked into page HTML carry a `deadline` signature that expires within
+        // hours - a page loaded long ago yields 403 on its cached URLs (user
+        // hit exactly this; cat-catch gets fresh URLs by webRequest-capturing
+        // the page player's own playurl re-requests). Fall back to __playinfo__
+        // if the active playurl fetch fails.
+        func = async () => {
+          try {
+            const pi = window.__playinfo__?.data || window.__playinfo__;
+            const bvid = pi?.bvid || '';
+            const cid = pi?.cid || 0;
+            const freshFn = window.__browsaFetchFreshBilibiliStreams;
+            if (typeof freshFn === 'function' && bvid && cid) {
+              try {
+                const fresh = await freshFn(bvid, cid);
+                if (Array.isArray(fresh) && fresh.length > 0) return fresh;
+              } catch (_) {}
+            }
+          } catch (_) {}
+          return readBilibiliMediaStreams();
+        };
         // Self-contained diagnostic (only window + built-ins) run in MAIN world
         // when the stream list is empty, so the panel can show WHY (absent
         // __playinfo__, not-logged-in code:-101, structural change, ...).
@@ -654,11 +675,12 @@ async function handle(msg, sender) {
                 // etc.), and an exact-URL rule is lost after the redirect - the
                 // redirect target has no Referer, the CDN returns a 403 HTML
                 // page, and Chrome saves/fails it as .html/.txt. Substring
-                // 'bilivideo.com' covers every mirror host including redirect
-                // targets. Injecting bilibili.com as Referer on bilivideo.com
-                // requests is harmless (that's the value a B站 page sends
-                // naturally anyway).
-                urlFilter: 'bilivideo.com',
+                // 'bilivideo' covers every mirror host including redirect
+                // targets, on both .com and .cn CDN hosts (real downloads hit
+                // mcdn.bilivideo.cn and upos-sz-*.bilivideo.com). Injecting
+                // bilibili.com as Referer on bilivideo.* requests is harmless
+                // (that's the value a B站 page sends naturally anyway).
+                urlFilter: 'bilivideo',
                 resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'webtransport', 'webbundle', 'other']
               }
             }]
@@ -762,16 +784,6 @@ async function handle(msg, sender) {
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
       let finalText = text;
-      const maskRules = all.maskRules || [];
-      if (maskRules.length) {
-        for (const rule of maskRules) {
-          if (!rule.pattern) continue;
-          try {
-            const re = new RegExp(rule.pattern, rule.flags || 'gi');
-            finalText = finalText.replace(re, rule.replacement || '***');
-          } catch (_) {}
-        }
-      }
       // Figure preservation (vision-capable providers): each extracted figure
       // arrives as {url, caption, page} (caption may be null). The caption is
       // the positional anchor - it is listed in the body text under a Figures
@@ -827,6 +839,47 @@ async function handle(msg, sender) {
         maybeSummarizeAttachment({
           attachId: historyEntry.attachId,
           ctx: pdfCtx,
+          provider: all.providers?.[all.activeProvider]
+        });
+      }
+      return { ok: true };
+    }
+
+    case 'ATTACH_ASR_CONFIRM': {
+      // Side panel finished the ASR pipeline (download audio -> upload to
+      // 火山方舟 Files API -> poll -> Responses API ASR transcript) and hands
+      // us the final subtitle text to store. Mirrors ATTACH_PDF_CONFIRM's
+      // two-step handoff. The transcript is a `[mm:ss] text` block which, when
+      // stamped with videoSrc below, becomes clickable seek links in the
+      // rendered reply (linkifyTimestamps).
+      const { text, metaUrl, metaTitle } = msg;
+      if (!text) return { ok: false, error: 'no text' };
+      const all = await storage.getAll();
+      let finalText = text;
+      const asrCtx = {
+        meta: { url: metaUrl || '', title: metaTitle || '' },
+        mode: 'bilibili',
+        text: finalText,
+        format: 'bilibili-asr',
+      };
+      const contextText = buildPageContextText(asrCtx);
+      const historyEntry = { role: 'user', content: contextText };
+      // Stamp videoSrc so the [mm:ss] transcript renders as clickable seek
+      // links (same platform/url/tabId shape as ATTACH_PAGE stamps on video
+      // page-contexts).
+      historyEntry.videoSrc = {
+        platform: 'bilibili',
+        url: metaUrl || '',
+        tabId: msg.tabId ?? null,
+      };
+      const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
+      if (willSummarize) historyEntry.attachId = crypto.randomUUID();
+      await storage.appendToHistory(historyEntry);
+      console.log(`browsa[bg]: bilibili asr attached — ${finalText.length} chars`);
+      if (willSummarize) {
+        maybeSummarizeAttachment({
+          attachId: historyEntry.attachId,
+          ctx: asrCtx,
           provider: all.providers?.[all.activeProvider]
         });
       }
@@ -954,18 +1007,23 @@ async function handle(msg, sender) {
         if (ctx.mode === 'pdf-pending' && ctx.pdfBase64) {
           return { ok: true, ctx };
         }
-        // Apply mask rules (sensitive data redaction) before storing
-        const maskRules = all.maskRules || [];
-        if (maskRules.length && ctx.text) {
-          let masked = ctx.text;
-          for (const rule of maskRules) {
-            if (!rule.pattern) continue;
-            try {
-              const re = new RegExp(rule.pattern, rule.flags || 'gi');
-              masked = masked.replace(re, rule.replacement || '***');
-            } catch (_) {}
-          }
-          ctx.text = masked;
+        // Bilibili video WITHOUT subtitles + ASR enabled: hand off to sidepanel
+        // for the ASR pipeline (download audio in page-world -> upload to 火山方舟
+        // Files API -> poll -> Responses API transcript). Deferred storage until
+        // ATTACH_ASR_CONFIRM, mirroring the pdf-pending handoff. The audio stream
+        // URL is read fresh via the MAIN-world-exposed reader so the signed URL is
+        // valid at handoff time. Detection keys off the structured noTranscript
+        // flag (from synthesizeBilibiliResult), NOT the `## 字幕` text marker — auto
+        // mode's silent Jina fallback can rewrite ctx.text and drop the marker.
+        if (ctx.mode === 'bilibili' && ctx.noTranscript && all.asr?.enabled) {
+          const asrCtx = await buildAsrPendingCtx(tabId, ctx);
+          if (asrCtx) return { ok: true, ctx: asrCtx };
+        } else if (ctx.mode === 'bilibili' && ctx.noTranscript) {
+          // Bilibili video WITHOUT subtitles AND ASR not enabled: keep the
+          // current behavior (plain video-info attach) but flag the ctx so
+          // the sidepanel can hint that this video has no subtitles and
+          // that enabling ASR would auto-transcribe it.
+          ctx.noTranscriptHint = true;
         }
 
         // Local, offline change detection: warn the model (not the UI, no
@@ -1211,6 +1269,90 @@ function tabIdOf(msg, sender) {
   if (sender?.tab?.id != null) return sender.tab.id;
   return null;
 }
+
+// Build an `asr-pending` ctx for a subtitle-less bilibili page when ASR is
+// enabled. Reads the fresh audio stream URL via the MAIN-world-exposed
+// window.__browsaGetBilibiliStreams (injected by bilibili-content-script.js;
+// re-injected on demand if absent — same on-demand injection pattern as
+// tryBilibiliActiveFallback), picks the highest-bandwidth audio stream, and
+// attaches the config the side panel needs to run the pipeline. Returns null
+// when no usable audio stream is available (falls through to the normal
+// placeholder store path).
+async function buildAsrPendingCtx(tabId, ctx) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      files: ['lib/content-scripts/bilibili-content-script.js']
+    });
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: async () => {
+        try {
+          // Prefer a FRESH playurl signed at attach time: the __playinfo__ URLs
+          // baked into page HTML carry a deadline signature that expires within
+          // hours (user hit a real 403 from a stale URL - see the deadline in the
+          // failed request). The page player re-requests playurl on each play but
+          // never writes fresh URLs back to __playinfo__; cat-catch captures those
+          // player requests via webRequest. Here we actively re-request the same
+          // playurl API (MAIN world, page cookies) to get a fresh URL, then fall
+          // back to __playinfo__ if the active fetch fails.
+          const pi = window.__playinfo__?.data || window.__playinfo__;
+          const bvid = pi?.bvid || '';
+          const cid = pi?.cid || 0;
+          const freshFn = window.__browsaFetchFreshBilibiliStreams;
+          if (typeof freshFn === 'function' && bvid && cid) {
+            try {
+              const fresh = await freshFn(bvid, cid);
+              if (Array.isArray(fresh) && fresh.length > 0) return fresh;
+            } catch (_) {}
+          }
+          return (typeof window.__browsaGetBilibiliStreams === 'function')
+            ? window.__browsaGetBilibiliStreams()
+            : [];
+        } catch (_) { return []; }
+      }
+    });
+    const streams = Array.isArray(res?.result) ? res.result : [];
+    const audio = streams.filter((s) => s.type === 'audio' && s.url)
+      .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))[0];
+    if (!audio) return null;
+    // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR
+    // 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
+    // onSendHeaders 捕获页面播放器真实请求的完整 cookie（含 HttpOnly），而
+    // document.cookie 读不到 HttpOnly。登录态/大会员 m4s 流缺 SESSDATA 会 403。
+    // chrome.cookies 权限 + <all_urls> host_permissions 才能读 HttpOnly cookie。
+    let biliCookie = '';
+    try {
+      const cookies = await chrome.cookies.getAll({ url: 'https://www.bilibili.com' });
+      biliCookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    } catch (e) {
+      console.warn('browsa: chrome.cookies.getAll failed', e?.message);
+    }
+    const all = await storage.getAll();
+    const asr = { ...ASR_DEFAULTS, ...(all.asr || {}) };
+    return Object.assign({}, ctx, {
+      mode: 'asr-pending',
+      audioUrl: audio.url,
+      audioLabel: audio.label || '',
+      // 传给 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
+      biliCookie,
+      asr: {
+        apiKey: asr.apiKey,
+        baseUrl: asr.baseUrl,
+        model: asr.model,
+        language: asr.language,
+        format: asr.format,
+        timeoutMs: asr.timeoutMs,
+      },
+    });
+  } catch (e) {
+    console.warn('browsa: buildAsrPendingCtx failed', e?.message);
+    return null;
+  }
+}
+
 
 // SPA navigation watch.
 //

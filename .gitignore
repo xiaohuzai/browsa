@@ -36,3 +36,6 @@ browsa.bundle
 
 # Session-local Claude config (permission allowlists, plans)
 .claude/
+
+# Pi channel transcripts (Feishu chat logs) - local only, never commit
+.pi/

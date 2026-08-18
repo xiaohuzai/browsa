@@ -204,22 +204,6 @@ test('ATTACH_PDF_CONFIRM: empty figureImages keeps the plain-string content shap
   assert.match(entry.content, /Text-only PDF, no figures\./);
 });
 
-test('ATTACH_PDF_CONFIRM: applies mask rules like the normal ATTACH_PAGE path', async () => {
-  localArea._set({ maskRules: [{ pattern: 'SECRET-\\d+', flags: 'g', replacement: '[REDACTED]' }] });
-  const res = await handle({
-    type: 'ATTACH_PDF_CONFIRM',
-    text: 'Contract number SECRET-12345 must stay private.',
-    metaUrl: 'https://example.com/doc.pdf',
-    metaTitle: 'Contract'
-  }, {});
-  assert.equal(res.ok, true);
-  const history = await localArea.get('history');
-  const entry = history.history[history.history.length - 1];
-  assert.match(entry.content, /\[REDACTED\]/);
-  assert.doesNotMatch(entry.content, /SECRET-12345/);
-  localArea._set({ maskRules: [] });
-});
-
 test('ATTACH_PDF_CONFIRM: missing text is a no-op error, not a crash', async () => {
   const res = await handle({ type: 'ATTACH_PDF_CONFIRM', metaUrl: 'https://example.com/doc.pdf' }, {});
   assert.equal(res.ok, false);

@@ -398,6 +398,14 @@ body {
 }
 
 .attach-msg { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.attach-hint {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 260px;
+  white-space: normal;
+  line-height: 1.4;
+  text-align: left;
+}
 .undo-attach {
   font: inherit;
   font-size: 10.5px;

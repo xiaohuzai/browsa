@@ -23,6 +23,9 @@ import {
 import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
+import {
+  downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript
+} from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
@@ -792,12 +795,189 @@ async function onAttachPage() {
       return;
     }
 
+    // Bilibili no-subtitle video + ASR enabled: run the ASR pipeline here.
+    // The download+transcode+upload run in this extension context (sidepanel),
+    // NOT page-world — the 火山方舟 Files API upload is a cross-origin request
+    // that page-world JS cannot make (Ark sends no CORS headers; only an
+    // extension context with host_permissions is exempt — a real failure mode
+    // found in the field: the original MAIN-world-injected downloadAndUpload
+    // returned "Failed to fetch" on the upload). B站 m4s download also works
+    // here (host_permissions exempt it from CORS), and a session DNR rule
+    // injects the bilibili.com Referer the CDN checks (same pattern as
+    // DOWNLOAD_MEDIA) — set right before the fetch, removed right after. The
+    // m4s is an MP4 container 方舟 misclassifies as video (file status failed:
+    // Invalid video_url), so the bytes are transcoded to 16kHz mono WAV via Web
+    // Audio API (Chrome decodes fMP4 natively) before upload — verified
+    // end-to-end 2026-08-16. The bytes never cross extension messaging (a
+    // ~44MB audio would base64 to ~59MB, hitting the 64MB limit). Poll +
+    // transcribe then run here (sidepanel has a window, unlike the SW). Any
+    // failure falls back to storing the plain bilibili text (existing behavior).
+    if (ctx?.mode === 'asr-pending' && ctx?.audioUrl && ctx?.asr) {
+      attachBtn.title = '转写音频中…';
+      showAttachProgress('下载并转写音频中…');
+      const { asr } = ctx;
+      let transcriptText = '';
+      let audioBytes = 0;
+      const dnrRuleId = Math.floor(Math.random() * 4_999_999) + 1;
+      try {
+        // 0. Register a session DNR rule injecting the bilibili.com Referer
+        // onto B站 CDN requests so the signed m4s download isn't 403'd (the
+        // extension context's own Referer is chrome-extension://..., which the
+        // CDN rejects). Mirrors background.js's DOWNLOAD_MEDIA rule exactly.
+        await chrome.declarativeNetRequest.updateSessionRules({
+          removeRuleIds: [dnrRuleId],
+          addRules: [{
+            id: dnrRuleId,
+            priority: 1,
+            action: {
+              type: 'modifyHeaders',
+              // Cookie 注入对齐 cat-catch 的 setHeaders：跨源（chrome-extension:// →
+              // bilivideo.cn）带 SameSite cookie 的唯一可靠方式就是 DNR set。
+              // credentials:'include' 在扩展 fetch 里带不上 B站 cookie（SameSite=Lax
+              // 跨站不带，且触发 CORS 预检）。biliCookie 是 buildAsrPendingCtx 在
+              // MAIN world 同源读到的 document.cookie（含 buvid 族；HttpOnly 读不到，
+              // 见 background.js buildAsrPendingCtx 注释）。
+              requestHeaders: [
+                { header: 'referer', operation: 'set', value: 'https://www.bilibili.com' },
+                ...(ctx.biliCookie ? [{ header: 'cookie', operation: 'set', value: ctx.biliCookie }] : []),
+              ]
+            },
+            condition: {
+              // 只作用于扩展上下文（sidepanel）自己发起的下载请求——对齐
+              // cat-catch setRequestHeaders 的 initiatorDomains:[chrome.runtime.id]
+              // 做法，确保规则命中 sidepanel 的 fetch 而不是误伤页面请求。
+              initiatorDomains: [chrome.runtime.id],
+              // 'bilivideo' (substring) covers BOTH .com and .cn CDN hosts:
+              // real downloads hit mcdn.bilivideo.cn / upos-sz-*.bilivideo.com
+              // etc., and a rule scoped to 'bilivideo.com' silently misses the
+              // .cn mirrors (403 — a real bug found via live testing 2026-08-15).
+              urlFilter: 'bilivideo',
+              // Full list (same as DOWNLOAD_MEDIA): the B站 CDN 302-redirects
+              // the download to mirror hosts (upos-sz-a -> upos-sz-b), and a
+              // redirect keeps the original request's resourceType, so every
+              // type must be listed to survive the redirect with the injected
+              // Referer intact.
+              resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'webtransport', 'webbundle', 'other']
+            }
+          }]
+        });
+        // 1. Download the m4s bytes (extension context, DNR-injected Referer).
+        const dl = await downloadAudioBytes({ audioUrl: ctx.audioUrl });
+        if (!dl?.ok || !dl.blob) {
+          throw new Error('ASR download failed: ' + (dl?.error || 'no blob'));
+        }
+        audioBytes = dl.bytes || 0;
+        console.log('[ASR] downloaded m4s', audioBytes, 'bytes; url host:', (() => { try { return new URL(ctx.audioUrl).host; } catch { return '?'; } })());
+        showAttachProgress('转码音频中…（转为 WAV）');
+        // 2. Transcode to 16kHz mono WAV — B站 m4s is an MP4 container that 方舟
+        // misclassifies as video (failed: Invalid video_url); WAV is pure audio
+        // (active, verified end-to-end 2026-08-16). Web Audio API decodes fMP4.
+        const trans = await transcodeAudioBlob(dl.blob);
+        if (!trans?.ok || !trans.wavBlob) {
+          throw new Error('ASR transcode failed: ' + (trans?.error || 'no wav'));
+        }
+        console.log('[ASR] transcoded -> WAV', trans.wavBytes, 'bytes, sampleRate', trans.sampleRate, '(src', audioBytes, 'bytes)');
+        // 3. Upload the WAV to 方舟 Files API -> file_id
+        const up = await uploadBlobToArk({
+          blob: trans.wavBlob,
+          filename: 'audio.wav',
+          apiKey: asr.apiKey,
+          baseUrl: asr.baseUrl,
+        });
+        if (!up?.ok || !up.fileId) {
+          throw new Error('ASR upload failed: ' + (up?.error || 'no fileId'));
+        }
+        console.log('[ASR] uploaded fileId', up.fileId, '| sent', up.bytes, '| Ark meta:', JSON.stringify({ upBytes: up.upBytes, upContentType: up.upContentType, upStatus: up.upStatus }));
+        showAttachProgress('转写音频中…（已上传，等待识别）');
+        // 实时等待反馈：poll + transcribe 都可能耗时较长（长音频处理 + 同步转写），
+        // 用一个 interval 每秒刷新已等待秒数，让用户知道仍在处理而非卡死。
+        const waitStart = Date.now();
+        let stageLabel = '处理音频';
+        const waitTimer = setInterval(() => {
+          const secs = Math.round((Date.now() - waitStart) / 1000);
+          showAttachProgress(`${stageLabel}中…（已等待 ${secs}s）`);
+        }, 1000);
+        try {
+          // 2. Poll file status (sidepanel, has window)
+          stageLabel = '识别处理';
+          const poll = await pollFileStatus(asr.baseUrl, asr.apiKey, up.fileId, {
+            timeoutMs: asr.timeoutMs,
+          });
+          console.log('[ASR] poll result:', JSON.stringify(poll));
+          if (!poll.ready) {
+            throw new Error('ASR file processing failed: ' + (poll.error || ''));
+          }
+          // 3. Transcribe via Responses API
+          stageLabel = '转写';
+          const tr = await transcribeAudio({
+            baseUrl: asr.baseUrl,
+            apiKey: asr.apiKey,
+            fileId: up.fileId,
+            model: asr.model,
+            language: asr.language,
+            // 总预算：长音频流式转写可能很久；10 分钟兜底防无限挂起。
+            // 流式内部另有 60s“无新数据”空闲超时，中途有数据会持续重置，
+            // 所以正常流式不会因为转写本身慢而被误杀。
+            signal: AbortSignal.timeout(10 * 60_000),
+          });
+          const fmt = formatAsrTranscript(tr.text);
+          transcriptText = fmt.lines.join('\n');
+          if (!transcriptText) {
+            throw new Error('ASR returned empty transcript');
+          }
+        } finally {
+          clearInterval(waitTimer);
+        }
+      } catch (e) {
+        console.warn('[ASR] pipeline failed, falling back to plain bilibili text:', e?.message);
+        console.warn('[ASR] stack:', e?.stack);
+        // 明确告知失败（而不是静默 fallback）——长等待后用户需要知道是失败而非卡死。
+        showToast(`ASR 转写失败：${e?.message || '未知错误'}（已回退为视频信息）`, 'error');
+      } finally {
+        // Remove the Referer-injection rule now that the download is done.
+        // (A download that never started, a throw, or a success all land here.)
+        try {
+          await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [dnrRuleId] });
+        } catch (_) {}
+      }
+      // Store the transcript (or fall back to the plain bilibili text).
+      // ASR 字幕作为【增量】追加在视频元信息之后（像有字幕的视频 attach 一样保留
+      // UP主/标题/播放量等元信息），而不是用字幕整体替换 ctx.text。
+      const confirmText = transcriptText
+        ? ctx.text + '\n\n## 字幕（ASR）\n\n' + transcriptText
+        : ctx.text || '';
+      const confirmRes = await sendMessage({
+        type: 'ATTACH_ASR_CONFIRM',
+        text: confirmText,
+        metaUrl: ctx.meta?.url || '',
+        metaTitle: ctx.meta?.title || '',
+        tabId: currentTabId,
+      }).catch(() => null);
+      if (confirmRes?.ok) {
+        nextHistoryIdx++;
+        const title = ctx.meta?.title || 'B站视频';
+        const lineCount = transcriptText ? transcriptText.split('\n').length : 0;
+        const bytesLabel = audioBytes > 0 ? `，${(audioBytes / 1024 / 1024).toFixed(1)}MB 音频` : '';
+        const subLabel = transcriptText ? `，${lineCount} 行字幕` : '（无字幕，已用视频信息代替）';
+        appendAttachSystem(`📎 已附加 B站字幕："${title}"（ASR${bytesLabel}${subLabel}）`, null, confirmText);
+      } else {
+        appendError('ASR attach failed');
+      }
+      return;
+    }
+
     nextHistoryIdx++; // page context stored in ATTACH_PAGE handler
     const charCount = ctx?.truncated?.textLength ?? (ctx?.text?.length || 0);
     const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
     // For auto mode, show which sub-mode was actually used
     const modeLabel = mode === 'auto' ? `auto/${ctx?.autoMode || 'reader'}` : mode;
-    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '');
+    // Bilibili video without subtitles + ASR not enabled: tell the user the
+    // current behavior (plain video-info attach, no transcription) and how
+    // to opt into automatic subtitle transcription.
+    const noTranscriptHint = ctx.noTranscriptHint
+      ? '⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。'
+      : undefined;
+    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '', undefined, noTranscriptHint);
   } catch (e) {
     appendError('Page attach failed: ' + e.message);
   } finally {
@@ -2189,7 +2369,7 @@ function appendSystem(text) {
   return el;
 }
 
-function appendAttachSystem(text, relatedEl, ctxText, figures) {
+function appendAttachSystem(text, relatedEl, ctxText, figures, hint) {
   const el = document.createElement('div');
   el.className = 'msg system attach-msg';
   const span = document.createElement('span');
@@ -2258,6 +2438,15 @@ function appendAttachSystem(text, relatedEl, ctxText, figures) {
     el.appendChild(inspectBtn);
   } else {
     el.appendChild(span);
+  }
+
+  // Optional hint line (e.g. "video has no subtitles, enable ASR") rendered
+  // as an extra span after the main label, before the 撤销/检查 buttons.
+  if (hint) {
+    const hintEl = document.createElement('span');
+    hintEl.className = 'attach-hint';
+    hintEl.textContent = hint;
+    el.appendChild(hintEl);
   }
 
   const btn = document.createElement('button');
@@ -2387,19 +2576,14 @@ function scrollToBottom(force = false) {
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────
 async function showEffectivePrompt() {
   const cfg = await chrome.storage.local.get(null);
-  const tabUrl = lastPageMeta?.url || '';
 
   // Replicate the same logic as background.js buildEffectivePrompt
   const base = cfg.systemPrompt || '';
-  const domainRules = cfg.domainRules || [];
-  const matchedRule = domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
-  const domainExtra = matchedRule ? `[Domain rule for "${matchedRule.pattern}"]\n${matchedRule.prompt}` : '';
   const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
   const langExtra = langMap[cfg.replyLanguage] || '';
 
   const sections = [
     base && { label: 'Base system prompt', text: base },
-    domainExtra && { label: `Domain rule (${matchedRule.pattern})`, text: matchedRule.prompt },
     langExtra && { label: 'Language instruction', text: langExtra },
   ].filter(Boolean);
 
