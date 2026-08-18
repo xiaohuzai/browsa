@@ -1,8 +1,8 @@
 // test/chat-handler-internals.test.mjs
 // Coverage for chat-handler.js support logic that wasn't exercised by any
 // existing test file: llms.txt fetch/cache/TTL, the CHOICE_REQUEST
-// trailing-JSON parse/strip contract, per-domain system-prompt matching,
-// and the SW_PING -> resetIdleTimer wiring in background.js's browsa-chat
+// trailing-JSON parse/strip contract, and the SW_PING -> resetIdleTimer
+// wiring in background.js's browsa-chat
 // port handler (documented in CLAUDE.md as a real bug class: without it,
 // long tool calls with minutes of SSE silence hit the 5-minute idle
 // timeout and get falsely cancelled).
@@ -10,7 +10,7 @@
 // handleChat() itself needs a fuller chrome.storage.local mock than any
 // other test file in this suite sets up (see subchat.test.mjs's header
 // comment for the same tradeoff) -- so fetchLlmsTxt is tested directly
-// (exported for this reason) and the CHOICE_REQUEST/domain-rule pieces are
+// (exported for this reason) and the CHOICE_REQUEST pieces are
 // tested by replicating the exact literal regex/logic from the source,
 // same convention as test/page-extractor.test.mjs's zero-width-char test.
 
@@ -144,40 +144,6 @@ test('parseChoiceRequest only matches CHOICE_REQUEST at the very end of the repl
   const { fullReply, choiceRequest } = parseChoiceRequest(raw);
   assert.equal(fullReply, raw);
   assert.equal(choiceRequest, null);
-});
-
-// --------------- per-domain system-prompt matching ---------------------------
-// Mirrors chat-handler.js's `domainRules.find(r => r.pattern && tabUrl.includes(r.pattern))`.
-
-function matchDomainRule(domainRules, tabUrl) {
-  return domainRules.find(r => r.pattern && tabUrl.includes(r.pattern));
-}
-
-test('chat-handler.js source defines the domain-rule matching used by this test (stay in lockstep)', async () => {
-  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
-  assert.match(src, /domainRules\.find\(r => r\.pattern && tabUrl\.includes\(r\.pattern\)\)/,
-    'production domain-rule matching logic must match the one this test replicates -- if it changes, update matchDomainRule() above too');
-});
-
-test('matchDomainRule picks the rule whose pattern is a substring of the tab URL', () => {
-  const rules = [
-    { pattern: 'github.com', prompt: 'Be terse, this is a code review context.' },
-    { pattern: 'news.ycombinator.com', prompt: 'Summarize discussion threads.' },
-  ];
-  const matched = matchDomainRule(rules, 'https://github.com/foo/bar/pull/1');
-  assert.equal(matched.prompt, 'Be terse, this is a code review context.');
-});
-
-test('matchDomainRule returns undefined when no rule pattern matches', () => {
-  const rules = [{ pattern: 'github.com', prompt: 'x' }];
-  const matched = matchDomainRule(rules, 'https://example.com/');
-  assert.equal(matched, undefined);
-});
-
-test('matchDomainRule skips rules with an empty/falsy pattern (avoids matching everything)', () => {
-  const rules = [{ pattern: '', prompt: 'would match every URL if not skipped' }];
-  const matched = matchDomainRule(rules, 'https://example.com/');
-  assert.equal(matched, undefined, 'a rule with an empty pattern must never match (tabUrl.includes(\'\') is always true otherwise)');
 });
 
 // --------------- SW_PING -> resetIdleTimer wiring ----------------------------

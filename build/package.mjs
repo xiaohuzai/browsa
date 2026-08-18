@@ -31,11 +31,15 @@ const py = `
 import os, sys, zipfile
 root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test"}
 exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "CLAUDE.md"}
+# Dev/editor dot-directories (.pi channel transcripts, .claude local config,
+# .github workflows, .vscode, ...) must never ship in a distribution zip --
+# they can contain Feishu chat transcripts and local secrets. Handled below
+# by dropping any directory whose name starts with '.'.
 exclude_path_prefixes = (os.path.join("lib", "_src"),)
 out_name = os.path.basename(out)
 with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
+        dirnames[:] = [d for d in dirnames if d not in exclude_dirs and not d.startswith('.')]
         rel_dir = os.path.relpath(dirpath, root)
         if rel_dir == "." or rel_dir.startswith(".."):
             rel = ""

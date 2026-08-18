@@ -133,37 +133,6 @@
 
         <section class="card">
           <div class="card-header">
-            <h2>Domain Rules</h2>
-          </div>
-          <div class="card-body">
-            <p class="hint">Add extra instructions to the system prompt for specific websites. The <b>Pattern</b> is matched against the page URL (simple substring match).</p>
-            <div id="domainRules"></div>
-            <div class="card-actions">
-              <button data-act="add-domain-rule">+ Add rule</button>
-              <button data-act="save-domain-rules" class="primary">Save</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
-            <h2>Content Masking</h2>
-          </div>
-          <div class="card-body">
-            <p class="hint">Regex patterns to redact sensitive data in page content before it is sent to the AI. Use standard JavaScript regex syntax.</p>
-            <table class="mask-table">
-              <thead><tr><th>Pattern (regex)</th><th>Flags</th><th>Replace with</th><th></th></tr></thead>
-              <tbody id="maskRules"></tbody>
-            </table>
-            <div class="card-actions">
-              <button data-act="add-mask-rule">+ Add rule</button>
-              <button data-act="save-mask-rules" class="primary">Save</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
             <h2>Content limits</h2>
           </div>
           <div class="card-body">
@@ -181,6 +150,40 @@
               <label for="summarizeThresholdChars">Threshold (chars)</label>
               <input id="summarizeThresholdChars" type="number" min="0" step="1000" placeholder="0 = default (40,000)" />
               <button data-act="save-limits" class="primary">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>ASR 字幕识别（火山方舟）</h2>
+          </div>
+          <div class="card-body">
+            <p class="hint">B 站无字幕视频 attach 时，下载音频 → 自动转码为 16kHz 单声道 WAV（方舟无法直接处理 B 站 m4s）→ 上传火山方舟录音文件识别（ASR）生成字幕。需要先开通方舟的音频理解模型并获取 <strong>标准版 API Key</strong>。</p>
+            <div class="inline-field">
+              <label for="asrEnabled">启用 ASR</label>
+              <input id="asrEnabled" type="checkbox" />
+            </div>
+            <div class="inline-field">
+              <label for="asrApiKey">API Key</label>
+              <input id="asrApiKey" type="password" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
+              <p class="hint">必须是 <strong>标准版方舟 API Key</strong>（方舟控制台 → API Key 管理里创建）。<strong>不要用 Agent Plan / Coding Agent 套餐的 key</strong>——实测确认编程套餐不含任何音频理解模型，上传报 404、音频输入报 “audio input is not supported”，无法转写。判断方法：标准 key 能在 <code>…/api/v3</code> 上认证（填错会在转写时报鉴权错误）。</p>
+            </div>
+            <div class="inline-field">
+              <label for="asrBaseUrl">Base URL</label>
+              <input id="asrBaseUrl" type="text" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
+              <p class="hint">必须用标准版端点 <code>…/api/v3</code>（Files API 上传只在此端点上）。如果填了 Agent Plan 的 <code>…/api/plan/v3</code>，保存时会自动规整回 <code>…/api/v3</code>（套餐端点没有文件上传能力）。</p>
+            </div>
+            <div class="inline-field">
+              <label for="asrModel">模型 ID</label>
+              <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
+            </div>
+            <div class="inline-field">
+              <label for="asrLanguage">语种</label>
+              <input id="asrLanguage" type="text" placeholder="zh" />
+            </div>
+            <div class="card-actions">
+              <button data-act="save-asr" class="primary">Save</button>
             </div>
           </div>
         </section>

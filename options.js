@@ -2,6 +2,7 @@
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/openai-client.js';
+import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 
 const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');
@@ -22,12 +23,11 @@ async function init() {
   renderProviders();
   applyContextMode(cachedCfg.contextMode || 'auto');
   applyLimits(cachedCfg);
+  applyAsr(cachedCfg);
   applyToolbarToggle();
   applyLlmsTxt();
   applySystemPrompt();
   applyReplyLanguage();
-  renderDomainRules(cachedCfg.domainRules || []);
-  renderMaskRules(cachedCfg.maskRules || []);
 
   document.querySelectorAll('input[name="ctx"]').forEach((r) => {
     r.addEventListener('change', async () => {
@@ -39,22 +39,7 @@ async function init() {
 
   // Save-limits button
   document.querySelector('button[data-act="save-limits"]')?.addEventListener('click', saveLimits);
-
-  // Domain rules
-  document.querySelector('button[data-act="add-domain-rule"]')?.addEventListener('click', () => {
-    const rules = readDomainRules();
-    rules.push({ pattern: '', prompt: '' });
-    renderDomainRules(rules);
-  });
-  document.querySelector('button[data-act="save-domain-rules"]')?.addEventListener('click', saveDomainRules);
-
-  // Mask rules
-  document.querySelector('button[data-act="add-mask-rule"]')?.addEventListener('click', () => {
-    const rules = readMaskRules();
-    rules.push({ pattern: '', flags: 'gi', replacement: '***' });
-    renderMaskRules(rules);
-  });
-  document.querySelector('button[data-act="save-mask-rules"]')?.addEventListener('click', saveMaskRules);
+  document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
 
   // Chat preferences
   applyChatPrefs(cachedCfg);
@@ -127,6 +112,41 @@ async function saveLimits() {
     summarizeThresholdChars: threshold
   });
   flash('ok', `Saved: max text ${text.toLocaleString()} chars, auto-summarize ${autoSummarize ? 'on' : 'off'}.`);
+}
+
+function applyAsr(cfg) {
+  const a = cfg.asr || {};
+  const set = (id, v, placeholder) => { const el = document.getElementById(id); if (el) { if (v != null && v !== '') el.value = v; else el.value = ''; el.placeholder = placeholder || el.placeholder; } };
+  const cb = document.getElementById('asrEnabled');
+  if (cb) cb.checked = a.enabled !== false;
+  set('asrApiKey', a.apiKey);
+  set('asrBaseUrl', a.baseUrl);
+  set('asrModel', a.model);
+  set('asrLanguage', a.language);
+}
+
+async function saveAsr() {
+  const enabled = !!document.getElementById('asrEnabled')?.checked;
+  const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
+  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || 'https://ark.cn-beijing.volces.com/api/v3';
+  const model = (document.getElementById('asrModel')?.value || '').trim() || 'doubao-seed-2-0-lite-260428';
+  const language = (document.getElementById('asrLanguage')?.value || '').trim() || 'zh';
+  if (enabled && !apiKey) {
+    flash('err', '启用 ASR 需要填写 API Key。');
+    return;
+  }
+  // Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
+  // 不硬拦截保存 —— 自动规整到标准版 api/v3 后正常保存（运行时 normalizeArkBaseUrl
+  // 也会兜底），只给一个醒目提示。否则用户点 Save 会被 return 挡住，整个 asr 配置
+  // （含 enabled）都存不进去，反而导致 ASR 静默不生效（2026-08-15 实机踩到）。
+  let savedBaseUrl = baseUrl;
+  if (baseUrl.includes('/api/plan')) {
+    savedBaseUrl = normalizeArkBaseUrl(baseUrl);
+    flash('err', `已把 Base URL 从 Agent Plan 端点自动改为标准版 ${savedBaseUrl}（api/plan/v3 没有文件上传）。`);
+  }
+  cachedCfg.asr = { enabled, apiKey, baseUrl: savedBaseUrl, model, language };
+  await chrome.storage.local.set({ asr: cachedCfg.asr });
+  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}${enabled ? '（模型 ' + model + '）' : ''}。`);
 }
 
 function renderProviders() {
@@ -441,103 +461,4 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;');
-}
-
-// ─── Domain Rules ─────────────────────────────────────────────────────────────
-
-function renderDomainRules(rules) {
-  const el = document.getElementById('domainRules');
-  if (!el) return;
-  el.innerHTML = '';
-  if (!rules.length) {
-    el.innerHTML = '<p class="hint" style="margin:0">No rules yet. Add one below.</p>';
-    return;
-  }
-  for (let i = 0; i < rules.length; i++) {
-    const r = rules[i];
-    const row = document.createElement('div');
-    row.className = 'domain-rule-row';
-    row.innerHTML = `
-      <div class="domain-rule-fields">
-        <label>URL pattern
-          <input type="text" data-field="pattern" value="${escapeAttr(r.pattern || '')}" placeholder="e.g. github.com" />
-        </label>
-        <label>Extra system prompt
-          <textarea data-field="prompt" rows="3" placeholder="e.g. Focus on code changes. Use English.">${escapeHtml(r.prompt || '')}</textarea>
-        </label>
-      </div>
-      <button class="del-rule-btn" title="Remove this rule">${ICON_CLOSE}</button>`;
-    row.querySelector('.del-rule-btn').addEventListener('click', () => {
-      const cur = readDomainRules();
-      cur.splice(i, 1);
-      renderDomainRules(cur);
-    });
-    el.appendChild(row);
-  }
-}
-
-function readDomainRules() {
-  const el = document.getElementById('domainRules');
-  if (!el) return [];
-  return [...el.querySelectorAll('.domain-rule-row')].map(row => ({
-    pattern: row.querySelector('[data-field="pattern"]')?.value?.trim() || '',
-    prompt: row.querySelector('[data-field="prompt"]')?.value?.trim() || ''
-  })).filter(r => r.pattern);
-}
-
-async function saveDomainRules() {
-  const rules = readDomainRules();
-  cachedCfg.domainRules = rules;
-  await chrome.storage.local.set({ domainRules: rules });
-  flash('ok', `Domain rules saved (${rules.length} rule${rules.length !== 1 ? 's' : ''}).`);
-}
-
-// ─── Mask Rules ───────────────────────────────────────────────────────────────
-
-function renderMaskRules(rules) {
-  const el = document.getElementById('maskRules');
-  if (!el) return;
-  el.innerHTML = '';
-  if (!rules.length) {
-    el.innerHTML = '<tr><td colspan="4" class="hint" style="padding:8px">No rules yet.</td></tr>';
-    return;
-  }
-  for (let i = 0; i < rules.length; i++) {
-    const r = rules[i];
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="text" data-field="pattern" value="${escapeAttr(r.pattern || '')}" placeholder="e.g. 1[3-9]\\d{9}" style="width:100%" /></td>
-      <td><input type="text" data-field="flags" value="${escapeAttr(r.flags || 'gi')}" placeholder="gi" style="width:48px" /></td>
-      <td><input type="text" data-field="replacement" value="${escapeAttr(r.replacement ?? '***')}" placeholder="***" style="width:80px" /></td>
-      <td><button class="del-rule-btn" title="Remove">${ICON_CLOSE}</button></td>`;
-    tr.querySelector('.del-rule-btn').addEventListener('click', () => {
-      const cur = readMaskRules();
-      cur.splice(i, 1);
-      renderMaskRules(cur);
-    });
-    el.appendChild(tr);
-  }
-}
-
-function readMaskRules() {
-  const el = document.getElementById('maskRules');
-  if (!el) return [];
-  return [...el.querySelectorAll('tr')].map(tr => ({
-    pattern: tr.querySelector('[data-field="pattern"]')?.value?.trim() || '',
-    flags: tr.querySelector('[data-field="flags"]')?.value?.trim() || 'gi',
-    replacement: tr.querySelector('[data-field="replacement"]')?.value ?? '***'
-  })).filter(r => r.pattern);
-}
-
-async function saveMaskRules() {
-  const rules = readMaskRules();
-  for (const r of rules) {
-    try { new RegExp(r.pattern, r.flags); } catch (e) {
-      flash('err', `Invalid regex "${r.pattern}": ${e.message}`);
-      return;
-    }
-  }
-  cachedCfg.maskRules = rules;
-  await chrome.storage.local.set({ maskRules: rules });
-  flash('ok', `Mask rules saved (${rules.length} rule${rules.length !== 1 ? 's' : ''}).`);
 }
