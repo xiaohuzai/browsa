@@ -240,7 +240,7 @@ For sites where Readability produces poor results, browsa intercepts the browser
 - **Reply language** — force replies in a specific language regardless of page language
 - **Max text chars** — cap how much page content is sent per turn
 - **Auto-summarize long attachments** — when an attached page or video transcript exceeds the threshold (default: 40,000 chars), browsa chunks it, summarizes each chunk in parallel using the configured provider, and merges the result once in the background — the attachment response returns immediately with no latency, and subsequent turns use the compressed version instead of re-sending the full text every time. Timestamp markers in video transcripts (`[mm:ss]`) are explicitly preserved so clickable seek links keep working. Fails open: any error silently keeps the original text.
-- **llms.txt** — optionally fetch `<origin>/llms.txt` before each chat for site-specific LLM instructions
+- **llms.txt** — when you attach a page (📎), browsa fetches `<origin>/llms.txt` once and bakes the site's LLM instructions into the attached page context (tied to the attached page, not the currently-active tab). Kept out of the system prompt so the prompt prefix stays byte-stable across turns (KV/prompt-cache friendly).
 
 ---
 

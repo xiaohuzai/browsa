@@ -14,7 +14,7 @@ import {
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState
 } from './lib/state.js';
-import { handleChat } from './lib/handlers/chat-handler.js';
+import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
 import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
@@ -860,7 +860,7 @@ async function handle(msg, sender) {
       const asrCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
         mode: 'bilibili',
-        text: finalText,
+        text: `${finalText}\n\nNote: ${VIDEO_NOTE_HINT}`,
         format: 'bilibili-asr',
       };
       const contextText = buildPageContextText(asrCtx);
@@ -1036,6 +1036,25 @@ async function handle(msg, sender) {
         if (ctx.meta?.url && !['selected', 'pdf-url', 'screenshot'].includes(ctx.mode) && (ctx.text || '').length > 50) {
           const changeInfo = await checkAndRecordAttachChange(`${ctx.mode}::${ctx.meta.url}`, ctx.text);
           if (changeInfo.changed) ctx.changedSinceLastAttach = changeInfo;
+        }
+
+        // llms.txt: fetch once per attach (NOT per chat turn) for the attached
+        // page's own origin, and bake it into the stored page-context text.
+        // This keeps the system prompt a byte-stable prefix (KV/prompt-cache
+        // friendly) and ties site instructions to the page actually attached.
+        // reader/dom/full/auto only: `selected` is a partial excerpt (quick
+        // actions shouldn't pull in full site instructions), `jina` is a
+        // third-party proxy, and the deferred paths (screenshot/pdf/asr) store
+        // derived content — none should carry site instructions.
+        if (['reader', 'dom', 'full', 'auto'].includes(ctx.mode)) {
+          ctx = await withSiteInstructions(ctx, all);
+        }
+        // Video page-contexts (youtube/bilibili): append the video-note
+        // formatting instruction to the stored text (same KV-cache rationale
+        // as llms.txt — dynamic formatting hints ride in the trajectory, not
+        // the static system prompt).
+        if (ctx.mode === 'youtube' || ctx.mode === 'bilibili') {
+          ctx = withVideoNote(ctx);
         }
 
         // All other modes: save to global history immediately.
@@ -1279,6 +1298,46 @@ function tabIdOf(msg, sender) {
 // attaches the config the side panel needs to run the pipeline. Returns null
 // when no usable audio stream is available (falls through to the normal
 // placeholder store path).
+
+// llms.txt — fetched ONCE at attach time and baked into the stored
+// page-context text (see ATTACH_PAGE), keyed to the ATTACHED page's own URL.
+// It used to be injected into the per-turn system prompt from whatever tab was
+// active at message time, which (a) invalidated the KV/prompt prefix cache on
+// every origin change (the "dynamic system prompt" anti-pattern from
+// ai-agent-book chapter 2 — same failure as a `Current time: {{now}}` line in
+// the system prompt) and (b) could deliver site instructions for a page the
+// user never attached. Baked into the attach text instead, it rides through
+// history exactly like the page body — auto-summarize, image compaction, and
+// session export all treat it as normal content. Returns the (possibly new)
+// ctx; a no-op when llms.txt is disabled, the URL is unparseable/non-http(s),
+// or the origin doesn't publish an llms.txt.
+async function withSiteInstructions(ctx, all) {
+  if (all.llmsTxtEnabled === false) return ctx;
+  const url = ctx?.meta?.url;
+  if (!url || !/^https?:\/\//.test(url)) return ctx;
+  const instructions = await fetchLlmsTxt(url);
+  if (!instructions) return ctx;
+  let site = url;
+  try { site = new URL(url).origin; } catch (_) {}
+  return Object.assign({}, ctx, {
+    text: `[Site instructions from ${site}/llms.txt]\n${instructions}\n\n${ctx.text || ''}`
+  });
+}
+
+// Video-note formatting instruction — baked into youtube/bilibili page-context
+// text at attach time (see ATTACH_PAGE / ATTACH_ASR_CONFIRM). It used to live
+// in the per-turn system prompt, present only when a video was attached — a
+// conditional dynamic prefix that split the KV/prompt cache key between
+// "video session" and "normal session" (same anti-pattern as llms.txt, cf.
+// ai-agent-book chapter 2). Rides in the trajectory like the transcript itself.
+const VIDEO_NOTE_HINT = 'The attached context includes a video transcript with [mm:ss] timestamps. When summarizing it as notes, organize the content into sections and append each section\'s start time at the end of its heading, formatted as [mm:ss] (use [h:mm:ss] for videos longer than an hour). Keep timestamps in this exact bracket form so they can be linked.';
+
+function withVideoNote(ctx) {
+  return Object.assign({}, ctx, {
+    text: `${ctx.text || ''}\n\nNote: ${VIDEO_NOTE_HINT}`
+  });
+}
+
 async function buildAsrPendingCtx(tabId, ctx) {
   try {
     await chrome.scripting.executeScript({
@@ -1526,4 +1585,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // Exported for testing. handle() is the switch-based message dispatcher.
-export { handle };
+export { handle, withSiteInstructions, withVideoNote };
