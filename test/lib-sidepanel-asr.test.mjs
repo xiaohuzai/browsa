@@ -315,3 +315,86 @@ test('ASR retries with the next candidate when the lowest-bitrate stream decodes
   downloadCalls = 0;
   uploadCalls = 0;
 });
+
+test('ASR retries with the next candidate when transcode fails (decodeAudioData rejects the first stream)', async () => {
+  // First candidate's decodeAudioData throws (e.g. HE-AAC the Web Audio decoder
+  // can't handle) — the retry loop must move to the next candidate instead of
+  // failing the whole ASR. This is the fix for the real user bug "transcode
+  // failed: Unable to decode audio data".
+  const OrigOAC2 = globalThis.OfflineAudioContext;
+  let decodeCalls = 0;
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData(buf) {
+      decodeCalls++;
+      // First decode (64kbps HE-AAC) throws; later decodes (192kbps AAC-LC) succeed.
+      if (decodeCalls === 1) throw new DOMException('Unable to decode audio data');
+      const srcRate = 48000;
+      const length = srcRate * 3;
+      return { sampleRate: srcRate, length, numberOfChannels: 1, getChannelData: () => new Float32Array(length) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+
+  const origFetch2 = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (typeof url === 'string' && (url.includes('bilivideo.com/audio/64.m4s') || url.includes('bilivideo.com/audio/192.m4s'))) {
+      downloadCalls++;
+      return { ok: true, blob: async () => new Blob([new Uint8Array(44 * 1024 * 1024)]) };
+    }
+    return origFetch2(url, init);
+  };
+
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+  dnrRemovedIds = [];
+
+  const origSendMessage2 = globalThis.chrome.runtime.sendMessage;
+  globalThis.chrome.runtime.sendMessage = (msg, cb) => {
+    if (msg.type === 'ATTACH_PAGE') {
+      cb({ ok: true, data: { ok: true, ctx: {
+        meta: { url: 'https://www.bilibili.com/video/BV1xx411c7mD', title: '测试视频' },
+        mode: 'asr-pending',
+        audioUrl: 'https://bilivideo.com/audio/64.m4s',
+        audioLabel: '64 kbps',
+        audioCandidates: [
+          { url: 'https://bilivideo.com/audio/64.m4s', label: '64 kbps', bandwidth: 64000, duration: 5, size: 0, codecs: 'mp4a.40.5' },
+          { url: 'https://bilivideo.com/audio/192.m4s', label: '192 kbps', bandwidth: 192000, duration: 5, size: 0, codecs: 'mp4a.40.2' },
+        ],
+        videoDurationSec: 5,
+        biliCookie: 'buvid3=test-buvid',
+        noTranscript: true,
+        text: 'bilibili plain text fallback',
+        asr: { apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000 },
+      } } });
+      return;
+    }
+    origSendMessage2(msg, cb);
+    if (msg.type === 'ATTACH_ASR_CONFIRM') confirmed = msg;
+  };
+
+  attachBtn.click();
+  // First candidate transcode fails (throws) → retry downloads the second →
+  // transcode succeeds → upload → transcribe → confirm.
+  await new Promise((r) => setTimeout(r, 400));
+
+  assert.equal(decodeCalls, 2, 'first decode must fail, second must succeed (retry across candidates)');
+  assert.equal(downloadCalls, 2, 'must re-download with the next candidate after a transcode failure');
+  assert.equal(uploadCalls, 1, 'must upload only the successfully-transcoded stream');
+  assert.ok(sent.includes('ATTACH_ASR_CONFIRM'), 'must confirm after the retry succeeds');
+  assert.ok(confirmed, 'confirm payload must be captured');
+  assert.match(confirmed.text, /\[00:00\] 大家好/, 'transcript must be attached');
+
+  // Restore mocks.
+  globalThis.chrome.runtime.sendMessage = origSendMessage2;
+  globalThis.fetch = origFetch2;
+  globalThis.OfflineAudioContext = OrigOAC2;
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+});

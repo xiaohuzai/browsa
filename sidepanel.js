@@ -880,7 +880,13 @@ async function onAttachPage() {
         let trans = null;
         let audioBytes = 0;
         let usedLabel = '';
-        for (const cand of candidates) {
+        let lastErr = '';
+        // 下载失败/转码失败/截断都换下一候选流重试——不同码率流可能是不同编码
+        // （最低码率常用 HE-AAC，decodeAudioData 可能解不了——真实 bug：transcode
+        // "Unable to decode audio data"），或不同 CDN 节点（坏文件/坏节点）。
+        for (let ci = 0; ci < candidates.length; ci++) {
+          const cand = candidates[ci];
+          const isLast = ci === candidates.length - 1;
           const dlStart = Date.now();
           const dlTimer = setInterval(() => {
             const secs = Math.round((Date.now() - dlStart) / 1000);
@@ -903,7 +909,10 @@ async function onAttachPage() {
             clearInterval(dlTimer);
           }
           if (!dl?.ok || !dl.blob) {
-            throw new Error('ASR download failed: ' + (dl?.error || 'no blob'));
+            lastErr = 'ASR download failed: ' + (dl?.error || 'no blob');
+            console.warn('[ASR]', lastErr, ci < candidates.length - 1 ? '— trying next candidate' : '');
+            if (isLast) throw new Error(lastErr);
+            continue;
           }
           const dlBytes = dl.bytes || 0;
           console.log('[ASR] downloaded m4s', dlBytes, 'bytes; url host:', (() => { try { return new URL(cand.url).host; } catch { return '?'; } })());
@@ -925,7 +934,10 @@ async function onAttachPage() {
             clearInterval(trTimer);
           }
           if (!tr?.ok || !tr.wavBlob) {
-            throw new Error('ASR transcode failed: ' + (tr?.error || 'no wav'));
+            lastErr = 'ASR transcode failed: ' + (tr?.error || 'no wav');
+            console.warn('[ASR]', lastErr, ci < candidates.length - 1 ? '— trying next candidate' : '');
+            if (isLast) throw new Error(lastErr);
+            continue;
           }
           // Truncation check: uncompressed 16-bit PCM WAV (1 channel) → bytes =
           // sec * sampleRate * 2 (2 bytes/sample, 16-bit). wavDur ≈ audio seconds.
@@ -947,7 +959,7 @@ async function onAttachPage() {
           break;
         }
         if (!trans?.ok || !trans.wavBlob) {
-          throw new Error('ASR transcode failed: no usable full-length audio stream');
+          throw new Error(lastErr || 'ASR transcode failed: no usable audio stream');
         }
         if (usedLabel) console.log('[ASR] using audio stream:', usedLabel);
         // 3. Upload the WAV to 方舟 Files API -> file_id.

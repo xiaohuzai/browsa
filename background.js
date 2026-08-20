@@ -1418,22 +1418,38 @@ async function buildAsrPendingCtx(tabId, ctx) {
     // fastest download; quality is irrelevant, it gets transcoded to 16kHz
     // mono WAV for Ark anyway). BUT reject streams whose duration is clearly
     // shorter than the video (truncated/partial stream → 20 min of a 100+ min
-    // video, a real user bug): only fall back to the lowest-bitrate-everything
+    // video, a real user bug), AND prefer decodable codecs: the lowest-bitrate
+    // stream is often HE-AAC (mp4a.40.5), which decodeAudioData may reject
+    // (real bug: transcode "Unable to decode audio data"), while AAC-LC
+    // (mp4a.40.2) decodes reliably. Only fall back to lowest-bitrate-everything
     // when duration metadata is missing/unusable.
     const fullLen = (s) => {
       if (!videoDurationSec || !s.duration) return null; // 无法判定 → 不拦截
       // 允许 -10% 容差（不同容器时长略有出入）；明显短则视为截断流。
       return s.duration >= videoDurationSec * 0.9 ? true : false;
     };
-    let audio = audioCandidates.find((s) => fullLen(s) === true)
-      || audioCandidates.find((s) => fullLen(s) === null)
-      || audioCandidates[0];
+    // codecPrio: AAC-LC 最稳（decodeAudioData 可靠）；未知居中；HE-AAC 等靠后。
+    const codecPrio = (s) => {
+      const c = s.codecs || '';
+      if (c === 'mp4a.40.2') return 0;
+      if (!c) return 1;
+      return 2; // 含 mp4a.40.5 (HE-AAC) 等
+    };
+    const sortBest = (list) => list.slice()
+      .sort((a, b) => (codecPrio(a) - codecPrio(b)) || ((a.bandwidth || 0) - (b.bandwidth || 0)));
+    const fullStreams = sortBest(audioCandidates.filter((s) => fullLen(s) === true));
+    const unknownStreams = sortBest(audioCandidates.filter((s) => fullLen(s) === null));
+    const anyStreams = sortBest(audioCandidates);
+    // 完整长度的流优先；无法判定时长（元数据缺失）次之；都没有才退回全部。
+    const ordered = fullStreams.length ? fullStreams : (unknownStreams.length ? unknownStreams : anyStreams);
+    const audio = ordered[0];
     // 即便被选中的流元数据看似完整，若真实解码时长远小于视频总长（服务端 body
-    // 截断、元数据谎报），也交由 sidepanel 在转码后二次校验并换流重试——这里
-    // 把完整候选列表 + 视频时长传给 sidepanel。
-    const candidateAudios = audioCandidates.map((s) => ({
+    // 截断、元数据谎报），或转码失败（编码不支持），也交由 sidepanel 在转码后
+    // 校验并换下一候选重试——这里把完整候选列表（按优先级排序）+ 视频时长传给
+    // sidepanel。
+    const candidateAudios = ordered.map((s) => ({
       url: s.url, label: s.label || '', bandwidth: s.bandwidth || 0,
-      duration: s.duration || 0, size: s.size || 0,
+      duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '',
     }));
     if (!audio) return null;
     // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR

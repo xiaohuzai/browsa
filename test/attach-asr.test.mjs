@@ -279,11 +279,9 @@ test('ASR stream selection rejects a TRUNCATED lowest-bitrate stream in favor of
   // it must NOT be chosen. The full-length 192kbps stream wins.
   assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/192.m4s', 'must skip the truncated lowest-bitrate stream and pick a full-length one');
   assert.equal(res.ctx.videoDurationSec, 6000, 'videoDurationSec must be passed to the sidepanel for the post-transcode sanity check');
-  assert.ok(Array.isArray(res.ctx.audioCandidates) && res.ctx.audioCandidates.length >= 2, 'audioCandidates must carry the full ordered stream list for sidepanel retry');
-  // Candidates are bitrate-ascending (lowest first) so the sidepanel retry loop
-  // tries 64kbps, detects it is truncated post-transcode, and moves to 192kbps.
-  assert.equal(res.ctx.audioCandidates[0].url, 'https://bilivideo.com/audio/64.m4s', 'candidates carry the full bitrate-ascending list (lowest first) for the sidepanel retry');
-  assert.equal(res.ctx.audioCandidates[1].url, 'https://bilivideo.com/audio/192.m4s', 'the full-length stream must be the next retry candidate');
+  // 截断流（64, 1200s）在选流时已被排除，重试列表只含可用的完整长度流。
+  assert.ok(Array.isArray(res.ctx.audioCandidates) && res.ctx.audioCandidates.length === 1, 'audioCandidates must only carry full-length (usable) streams for sidepanel retry');
+  assert.equal(res.ctx.audioCandidates[0].url, 'https://bilivideo.com/audio/192.m4s', 'the truncated stream must be excluded from retry candidates');
 });
 
 test('ASR stream selection: when duration metadata is missing, lowest bitrate wins (backward-compatible)', async () => {
@@ -316,4 +314,71 @@ test('ASR stream selection: when duration metadata is missing, lowest bitrate wi
   assert.equal(res.ok, true);
   assert.equal(res.ctx.mode, 'asr-pending');
   assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/64.m4s', 'no duration metadata -> lowest bitrate, same as before');
+});
+
+test('ASR stream selection prefers AAC-LC (decodable) over the lowest-bitrate HE-AAC stream', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  // Both streams are full-length (6000s). The lowest-bitrate one (64k) is
+  // HE-AAC (mp4a.40.5) — decodeAudioData may reject it (real user bug:
+  // transcode "Unable to decode audio data"); the 132k one is AAC-LC
+  // (mp4a.40.2) — reliably decodable. Selection must pick the AAC-LC 132k,
+  // not the lowest-bitrate 64k.
+  const chromeMock = makeChrome(localArea, { transcript: null, hasFreshStreams: false });
+  const origExecute = chromeMock.scripting.executeScript;
+  chromeMock.scripting.executeScript = async (opts) => {
+    if ((opts.func?.toString() || '').includes('__browsaGetBilibiliStreams')) {
+      return [{ result: {
+        streams: [
+          { type: 'audio', label: '132 kbps', url: 'https://bilivideo.com/audio/132.m4s', bandwidth: 132000, hasAudio: true, duration: 6000, size: 99_000_000, codecs: 'mp4a.40.2' },
+          { type: 'audio', label: '64 kbps', url: 'https://bilivideo.com/audio/64.m4s', bandwidth: 64000, hasAudio: true, duration: 6000, size: 48_000_000, codecs: 'mp4a.40.5' },
+        ],
+        videoDurationSec: 6000,
+      } }];
+    }
+    return origExecute(opts);
+  };
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'asr-pending');
+  assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/132.m4s', 'must prefer AAC-LC (mp4a.40.2) over a lower-bitrate HE-AAC (mp4a.40.5) stream for reliable decoding');
+  assert.equal(res.ctx.audioCandidates[0].url, 'https://bilivideo.com/audio/132.m4s', 'the AAC-LC stream must be the first retry candidate');
+  assert.equal(res.ctx.audioCandidates[1].url, 'https://bilivideo.com/audio/64.m4s', 'HE-AAC stream remains a later fallback candidate (sidepanel transcode retry)');
+});
+
+test('ASR stream selection: AAC-LC preferred, bitrate ties broken by lower bandwidth', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  // Two AAC-LC streams, both full-length — the LOWER bitrate one wins.
+  const chromeMock = makeChrome(localArea, { transcript: null, hasFreshStreams: false });
+  const origExecute = chromeMock.scripting.executeScript;
+  chromeMock.scripting.executeScript = async (opts) => {
+    if ((opts.func?.toString() || '').includes('__browsaGetBilibiliStreams')) {
+      return [{ result: {
+        streams: [
+          { type: 'audio', label: '192 kbps', url: 'https://bilivideo.com/audio/192.m4s', bandwidth: 192000, hasAudio: true, duration: 6000, size: 144_000_000, codecs: 'mp4a.40.2' },
+          { type: 'audio', label: '132 kbps', url: 'https://bilivideo.com/audio/132.m4s', bandwidth: 132000, hasAudio: true, duration: 6000, size: 99_000_000, codecs: 'mp4a.40.2' },
+        ],
+        videoDurationSec: 6000,
+      } }];
+    }
+    return origExecute(opts);
+  };
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/132.m4s', 'among AAC-LC streams of equal decodability, the lowest bitrate wins (fastest download)');
 });
