@@ -1338,6 +1338,62 @@ test('extractDomTreeInPageWorld: no item markers for fewer than 3 similar siblin
   assert.doesNotMatch(out.text, /— Item 1 —/, 'must NOT emit item markers when only 2 similar siblings (below threshold)');
 });
 
+test('extractDomTreeInPageWorld: strips site chrome (nav/header/footer/aside + role-based) from the walk (regression: attaching pi.dev/docs/latest/settings came back as a full nav/sidebar/TOC/footer dump instead of the article)', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <nav><a href="/">Top Nav Home</a><a href="/docs">Top Nav Docs</a></nav>
+    <aside class="docs-nav-rail"><h2>Sidebar</h2><a href="/a">Sidebar A</a><a href="/b">Sidebar B</a></aside>
+    <aside class="docs-toc-rail" aria-label="On this page"><h2>On this page</h2><a href="#x">Anchor X</a></aside>
+    <div role="banner"><a href="/banner">Banner Link</a></div>
+    <div role="navigation"><a href="/nav">Nav Link</a></div>
+    <section role="search"><label>Search docs</label><input type="search" placeholder="Search docs…"/></section>
+    <details class="docs-mobile-navigation"><summary>Navigation</summary><div><p>On this page</p><nav><a href="#a">TOC A</a></nav></div></details>
+    <details><summary>A legitimate FAQ question</summary><p>This is the real answer to the FAQ question.</p></details>
+    <header><h1>Real Article Title</h1><p>byline</p></header>
+    <main><article><p>This is the actual article content the model should see, with enough words to be meaningful.</p></article></main>
+    <footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+    <div aria-hidden="true">Hidden from screen readers</div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  // Article content survives
+  assert.match(out.text, /actual article content/, 'article content must survive');
+  assert.match(out.text, /A legitimate FAQ question/, 'a <details> with no chrome descendant (FAQ accordion) must survive');
+  assert.match(out.text, /real answer to the FAQ/, 'FAQ answer must survive');
+  // Chrome is gone
+  assert.doesNotMatch(out.text, /Top Nav/, 'nav must be stripped');
+  assert.doesNotMatch(out.text, /Sidebar A/, 'aside sidebar must be stripped');
+  assert.doesNotMatch(out.text, /Anchor X/, 'aside TOC must be stripped');
+  assert.doesNotMatch(out.text, /Banner Link/, 'role=banner must be stripped');
+  assert.doesNotMatch(out.text, /Nav Link/, 'role=navigation must be stripped');
+  assert.doesNotMatch(out.text, /Search docs/, 'role=search must be stripped');
+  assert.doesNotMatch(out.text, /On this page/, 'a <details> wrapping nav chrome (mobile TOC disclosure) must be stripped wholesale');
+  assert.doesNotMatch(out.text, /TOC A/, 'nav inside the stripped details must not leak');
+  assert.doesNotMatch(out.text, /Privacy|Terms/, 'footer must be stripped');
+  assert.doesNotMatch(out.text, /Hidden from screen readers/, 'aria-hidden must be stripped');
+  assert.doesNotMatch(out.text, /byline/, 'header (incl. its byline) must be stripped');
+});
+
+test('extractDomTreeInPageWorld: chrome noise is excluded from repeated-group detection so no empty item markers appear for a chrome-heavy container', async () => {
+  const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
+  const html = `<!doctype html><html><body>
+    <div id="wrap">
+      <nav><a href="/a">NAV A</a></nav>
+      <nav><a href="/b">NAV B</a></nav>
+      <nav><a href="/c">NAV C</a></nav>
+      <nav><a href="/d">NAV D</a></nav>
+      <main><p>Real content here.</p></main>
+    </div>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({ document: dom.window.document, window: dom.window, Node: dom.window.Node });
+  const out = vm.runInContext(`${fnBody}\nextractDomTreeInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.match(out.text, /Real content/, 'real content must survive');
+  assert.doesNotMatch(out.text, /NAV A|NAV B|NAV C|NAV D/, 'chrome navs must be stripped');
+  assert.doesNotMatch(out.text, /— Item 1 —/, 'chrome-heavy container must not emit item markers for stripped navs');
+});
+
 test('extractDomTreeInPageWorld: items markers for a plain <ul>/<li> list', async () => {
   const fnBody = await loadSiblingFn('extractDomTreeInPageWorld');
   const html = `<!doctype html><html><body>

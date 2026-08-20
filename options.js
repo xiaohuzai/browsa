@@ -442,7 +442,7 @@ function applyLlmsTxt() {
   });
   el.addEventListener('change', () => {
     chrome.storage.local.set({ llmsTxtEnabled: el.checked });
-    flash('ok', el.checked ? 'llms.txt enabled.' : 'llms.txt disabled.');
+    flash('ok', el.checked ? 'llms.txt will be included when attaching a page.' : 'llms.txt disabled.');
   });
 }
 

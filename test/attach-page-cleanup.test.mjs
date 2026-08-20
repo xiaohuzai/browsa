@@ -78,6 +78,11 @@ const chromeMock = {
 
 Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
 
+// llms.txt is fetched once at attach time (withSiteInstructions in
+// background.js) — stub it as absent (404) so no real network call happens
+// for https://example.com/llms.txt.
+globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => '' });
+
 const bg = await import('../background.js');
 const { handle } = bg;
 
