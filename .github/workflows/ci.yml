@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 需要完整历史来做 git diff 判断改动范围
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,8 +28,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 只在实际影响软件的路径有改动时才跑 test/compat，
+      # 否则（仅 .github/、docs/、*.md、*.css、icons/ 等）跳过以节省时间。
+      # 注意：job 本身始终运行并报告成功 —— main 把 "Test + Compat Check"
+      # 设为必需 status check，若 job 被整体跳过则 check 无结论，PR 无法合并。
+      - name: Detect source changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          echo "Base: $BASE  Head: ${{ github.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
+          echo "Changed files:"
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -qE '^(manifest\.json|background\.js|sidepanel\.(js|html)|options\.(js|html)|lib/|test/|build/|_locales/|package\.json|package-lock\.json|check-compat\.sh)'; then
+            echo "source_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run tests
+        if: steps.changes.outputs.source_changed == 'true'
         run: npm test
 
       - name: Run MV3 compat check
+        if: steps.changes.outputs.source_changed == 'true'
         run: bash check-compat.sh
