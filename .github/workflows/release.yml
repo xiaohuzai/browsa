@@ -18,23 +18,29 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
 
-      # Bump version (package.json + manifest.json via postversion hook)
+      # Bump version (package.json + manifest.json via postversion hook).
+      # 输入版本 == 当前版本时跳过 npm version（会报 "Version not changed"），
+      # 直接走当前版本 —— 覆盖"发当前已 bump 但未发布的版本"的场景。
+      # 输入可带可选的 v 前缀（用户可能照 GitHub tag 习惯输 v0.31.1），先剥掉再比较。
       - name: Bump version
         id: ver
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          INPUT="${{ github.event.inputs.version }}"
+          INPUT="${INPUT#v}"
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ -n "$INPUT" ] && [ "$INPUT" != "$CURRENT" ]; then
+            npm version "$INPUT" --no-git-tag-version
           fi
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
