@@ -662,17 +662,36 @@ test('splitMp4Fragments: extracts init (ftyp+moov) and each moof+mdat fragment',
   assert.equal(res.fragments[1].size, 24 + 72);
 });
 
-test('splitMp4Fragments: returns null for a non-fragmented (single mdat) file', () => {
+test('splitMp4Fragments: returns an Error (not fragmented) for a single-mdat file', () => {
   const ftyp = mp4Box('ftyp', new Uint8Array(8));
   const moov = mp4Box('moov', new Uint8Array(32));
   const mdat = mp4Box('mdat', new Uint8Array(128));
   const file = new Uint8Array([...ftyp, ...moov, ...mdat]);
-  assert.equal(splitMp4Fragments(file.buffer), null, 'no moof -> not fragmented');
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res instanceof Error, 'no moof -> Error, not a valid fragment parse');
+  assert.match(res.message, /not a fragmented mp4/);
+  assert.match(res.message, /ftyp,moov,mdat/);
 });
 
-test('splitMp4Fragments: returns null for empty/garbage input', () => {
-  assert.equal(splitMp4Fragments(new ArrayBuffer(0)), null);
-  assert.equal(splitMp4Fragments(new Uint8Array([1, 2, 3, 4, 5, 6, 7]).buffer), null);
+test('splitMp4Fragments: returns an Error for empty/garbage input', () => {
+  assert.ok(splitMp4Fragments(new ArrayBuffer(0)) instanceof Error);
+  assert.ok(splitMp4Fragments(new Uint8Array([1, 2, 3, 4, 5, 6, 7]).buffer) instanceof Error);
+});
+
+test('splitMp4Fragments: handles size==0 (extends to end) and size==1 (64-bit extended) boxes', () => {
+  // Build: ftyp + moov + moof + a mdat whose size field is 0 (extends to end).
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof = mp4Box('moof', new Uint8Array(16));
+  const mdatPayload = new Uint8Array(64).fill(9);
+  const mdat = new Uint8Array(8 + mdatPayload.byteLength);
+  new DataView(mdat.buffer).setUint32(0, 0); // size==0 → 到文件末尾
+  mdat.set(new Uint8Array([0x6d, 0x64, 0x61, 0x74]), 4); // 'mdat'
+  mdat.set(mdatPayload, 8);
+  const file = new Uint8Array([...ftyp, ...moov, ...moof, ...mdat]);
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res && !(res instanceof Error), 'size==0 mdat must still parse');
+  assert.equal(res.fragments.length, 1);
 });
 
 test('transcodeAudioBlob: falls back to fragmented decode when whole-file decodeAudioData fails (long audio)', async () => {
