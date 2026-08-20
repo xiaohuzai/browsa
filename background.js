@@ -1449,7 +1449,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
     // sidepanel。
     const candidateAudios = ordered.map((s) => ({
       url: s.url, label: s.label || '', bandwidth: s.bandwidth || 0,
-      duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '',
+      duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '', id: s.id || 0,
     }));
     if (!audio) return null;
     // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR
@@ -1470,6 +1470,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
       mode: 'asr-pending',
       audioUrl: audio.url,
       audioLabel: audio.label || '',
+      audioCodec: audio.codecs || '', audioId: audio.id || 0,
       // 完整候选音频流列表 + 视频总时长（秒）：sidepanel 转码后若发现实际解码
       // 时长远小于视频总长（服务端 body 截断 / 元数据谎报），可换下一候选流重试。
       audioCandidates: candidateAudios,

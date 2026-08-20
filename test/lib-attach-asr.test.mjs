@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 
 import {
   downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono,
-  pollFileStatus, transcribeAudio, formatAsrTranscript, ASR_DEFAULTS, extFromMime, normalizeArkBaseUrl
+  pollFileStatus, transcribeAudio, formatAsrTranscript, ASR_DEFAULTS, extFromMime, normalizeArkBaseUrl,
+  splitMp4Fragments
 } from '../lib/handlers/attach-asr.js';
 
 // ---- downloadAndUploadAudio (MAIN-world injectable) ----
@@ -628,4 +629,109 @@ test('resampleToMono: arbitrary-rate upsampling interpolates', () => {
   assert.ok(Math.abs(out[1] - 0.5) < 1e-4);
   assert.ok(Math.abs(out[2] - 1) < 1e-4);
   assert.ok(Math.abs(out[3] - 1) < 1e-4);
+});
+
+// ---- splitMp4Fragments (pure fMP4 box parser) ----
+
+// Build a synthetic MP4 box: [size(4)][type(4)][payload]. size includes the 8-byte header.
+function mp4Box(type, payload) {
+  const size = 8 + payload.byteLength;
+  const buf = new ArrayBuffer(size);
+  const dv = new DataView(buf);
+  dv.setUint32(0, size);
+  for (let i = 0; i < 4; i++) dv.setUint8(4 + i, type.charCodeAt(i));
+  new Uint8Array(buf, 8).set(new Uint8Array(payload));
+  return new Uint8Array(buf);
+}
+
+test('splitMp4Fragments: extracts init (ftyp+moov) and each moof+mdat fragment', () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array([0, 0, 0, 1, 'i', 's', 'o', '5'].map(c => typeof c === 'string' ? c.charCodeAt(0) : c)));
+  const moov = mp4Box('moov', new Uint8Array(32).fill(1));
+  const moof1 = mp4Box('moof', new Uint8Array(16).fill(2));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64).fill(3));
+  const moof2 = mp4Box('moof', new Uint8Array(16).fill(4));
+  const mdat2 = mp4Box('mdat', new Uint8Array(64).fill(5));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1, ...moof2, ...mdat2]);
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res, 'must parse a fragmented MP4');
+  assert.equal(res.fragments.length, 2, 'two moof+mdat pairs -> two fragments');
+  // init must contain ftyp (8+8=16) + moov (8+32=40) = 56 bytes
+  assert.equal(res.init.size, 16 + 40);
+  // each fragment = moof (8+16=24) + mdat (8+64=72) = 96
+  assert.equal(res.fragments[0].size, 24 + 72);
+  assert.equal(res.fragments[1].size, 24 + 72);
+});
+
+test('splitMp4Fragments: returns null for a non-fragmented (single mdat) file', () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const mdat = mp4Box('mdat', new Uint8Array(128));
+  const file = new Uint8Array([...ftyp, ...moov, ...mdat]);
+  assert.equal(splitMp4Fragments(file.buffer), null, 'no moof -> not fragmented');
+});
+
+test('splitMp4Fragments: returns null for empty/garbage input', () => {
+  assert.equal(splitMp4Fragments(new ArrayBuffer(0)), null);
+  assert.equal(splitMp4Fragments(new Uint8Array([1, 2, 3, 4, 5, 6, 7]).buffer), null);
+});
+
+test('transcodeAudioBlob: falls back to fragmented decode when whole-file decodeAudioData fails (long audio)', async () => {
+  // Build a synthetic fMP4 (init + 2 fragments). The decode mock throws on the
+  // WHOLE file (large buffer, like a 100+ min audio whose decoded PCM exceeds
+  // decodeAudioData limits — the real Edge bug) but succeeds per-fragment.
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof1 = mp4Box('moof', new Uint8Array(16));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64));
+  const moof2 = mp4Box('moof', new Uint8Array(16));
+  const mdat2 = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1, ...moof2, ...mdat2]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  let decodeCount = 0;
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData(buf) {
+      decodeCount++;
+      // Whole-file (248 bytes) throws; a fragment unit (init 56 + fragment 96
+      // = 152 bytes) is under the threshold and decodes.
+      if (buf.byteLength > 200) throw new Error('Unable to decode audio data');
+      return { sampleRate: 48000, length: 48000, numberOfChannels: 1, getChannelData: () => new Float32Array(48000) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+  globalThis.AudioContext = undefined; // force OfflineAudioContext path
+  const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(res.ok, true, 'must succeed via fragmented decode fallback: ' + (res.error || ''));
+  assert.equal(decodeCount, 3, '1 whole-file attempt (throws) + 2 fragment decodes');
+  // 2 fragments x 1s @48k -> 2s @16k = 32000 frames -> 44 + 64000 bytes
+  assert.equal(res.wavBytes, 44 + 32000 * 2);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcodeAudioBlob: when whole-file AND fragmented decode both fail, returns {ok:false} with a combined error', async () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof1 = mp4Box('moof', new Uint8Array(16));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData() { throw new Error('Unable to decode audio data'); }
+    async close() {}
+    destination = {};
+  };
+  globalThis.AudioContext = undefined;
+  const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(res.ok, false);
+  assert.match(res.error, /decode failed/);
+  assert.match(res.error, /whole:/);
+  assert.match(res.error, /fragmented:/);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
 });

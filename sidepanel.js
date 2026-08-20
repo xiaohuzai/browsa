@@ -869,10 +869,10 @@ async function onAttachPage() {
         const candidates = (() => {
           const seen = new Set();
           const out = [];
-          const push = (u, label) => { if (u && !seen.has(u)) { seen.add(u); out.push({ url: u, label: label || '' }); } };
-          push(ctx.audioUrl, ctx.audioLabel);
+          const push = (u, label, meta) => { if (u && !seen.has(u)) { seen.add(u); out.push({ url: u, label: label || '', ...(meta || {}) }); } };
+          push(ctx.audioUrl, ctx.audioLabel, { codecs: ctx.audioCodec || '', id: ctx.audioId || 0 });
           for (const c of (Array.isArray(ctx.audioCandidates) ? ctx.audioCandidates : [])) {
-            push(c.url, c.label);
+            push(c.url, c.label, { codecs: c.codecs || '', id: c.id || 0 });
           }
           return out;
         })();
@@ -915,7 +915,7 @@ async function onAttachPage() {
             continue;
           }
           const dlBytes = dl.bytes || 0;
-          console.log('[ASR] downloaded m4s', dlBytes, 'bytes; url host:', (() => { try { return new URL(cand.url).host; } catch { return '?'; } })());
+          console.log('[ASR] downloaded m4s', dlBytes, 'bytes; url host:', (() => { try { return new URL(cand.url).host; } catch { return '?'; } })(), '| codec:', cand.codecs || '?', '| id:', cand.id || 0, '| label:', cand.label || '');
           // Transcode: decodeAudioData is an opaque black box (no sub-progress),
           // and resample+encode is fast — so show elapsed time, not a fake %.
           showAttachProgress('转码音频中…（转为 WAV）');
