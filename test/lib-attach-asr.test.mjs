@@ -400,6 +400,41 @@ test('downloadAudioBytes: missing audioUrl / HTTP failure return {ok:false}', as
   assert.equal((await downloadAudioBytes({ audioUrl: 'u' })).error, 'download HTTP 403');
 });
 
+test('downloadAudioBytes: streams the body and reports real percentages via onProgress', async () => {
+  // 206 + Content-Range with a readable stream → onProgress sees done/total.
+  const enc = new TextEncoder();
+  const bytes = [enc.encode('0123456789'), enc.encode('abcdefghij'), enc.encode('klmnopqrst')];
+  const total = bytes.reduce((n, b) => n + b.byteLength, 0); // 30
+  const body = new ReadableStream({
+    start(controller) { for (const b of bytes) controller.enqueue(b); controller.close(); },
+  });
+  const headers = { get: (k) => (k === 'content-range' ? `bytes 0-${total - 1}/${total}` : null) };
+  globalThis.fetch = async () => ({ ok: true, body, headers });
+  const seen = [];
+  const res = await downloadAudioBytes({ audioUrl: 'https://upos-sz.bilivideo.com/audio/192.m4s', onProgress: (d, t) => seen.push([d, t]) });
+  assert.equal(res.ok, true);
+  assert.equal(res.bytes, total);
+  assert.ok(res.blob instanceof Blob);
+  assert.equal(seen.length, 3, 'one onProgress per percent step (10%, 20%, 100%)');
+  assert.equal(seen[0][0], 10); assert.equal(seen[0][1], total);
+  assert.equal(seen[1][0], 20); assert.equal(seen[1][1], total);
+  assert.equal(seen[2][0], total); assert.equal(seen[2][1], total); // final 100%
+});
+
+test('downloadAudioBytes: streams with NO content-length/report → onProgress gets null total', async () => {
+  const enc = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) { controller.enqueue(enc.encode('hello')); controller.close(); },
+  });
+  globalThis.fetch = async () => ({ ok: true, body, headers: { get: () => null } });
+  const seen = [];
+  const res = await downloadAudioBytes({ audioUrl: 'https://upos-sz.bilivideo.com/audio/192.m4s', onProgress: (d, t) => seen.push([d, t]) });
+  assert.equal(res.ok, true);
+  assert.equal(res.bytes, 5);
+  assert.ok(seen.length >= 1, 'onProgress called with bytes as it arrives');
+  assert.equal(seen[0][1], null, 'no total → null so caller falls back to elapsed-time');
+});
+
 test('uploadBlobToArk: POSTs the blob as multipart with purpose=user_data and returns fileId', async () => {
   let captured = null;
   globalThis.fetch = async (url, init) => {

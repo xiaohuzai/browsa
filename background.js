@@ -532,13 +532,25 @@ async function handle(msg, sender) {
       let files, func, diagFunc;
       if (/bilibili\.com\/video\//.test(url)) {
         files = ['lib/content-scripts/bilibili-content-script.js'];
-        // Prefer a FRESH playurl re-signed at click time: the __playinfo__ URLs
-        // baked into page HTML carry a `deadline` signature that expires within
-        // hours - a page loaded long ago yields 403 on its cached URLs (user
-        // hit exactly this; cat-catch gets fresh URLs by webRequest-capturing
-        // the page player's own playurl re-requests). Fall back to __playinfo__
-        // if the active playurl fetch fails.
+        // Prefer __playinfo__ cached URLs (SSR-picked CDN nodes, fastest) — only
+        // fall back to the fresh playurl API when the cached URL is expired
+        // (deadline signature → 403). This avoids the slow-CDN-node issue where
+        // the API re-routes to a different, slower mirror. Expiry is detected
+        // by parsing the `deadline` query param from the signed URL itself (a
+        // network probe is unreliable — B站 CDN may answer 200 to a plain GET
+        // for an already-expired URL, only the actual media download 403s).
         func = async () => {
+          const valid = (readBilibiliMediaStreams() || []).filter(s => {
+            if (!s.url) return false;
+            try {
+              const m = /[?&]deadline=(\d+)/.exec(s.url);
+              // No deadline param (non-CDN URL?) → assume valid. Buffer of 5
+              // min so a URL that's about to expire mid-download is not used.
+              return !m || (parseInt(m[1], 10) * 1000) > Date.now() + 5 * 60_000;
+            } catch (_) { return true; }
+          });
+          if (valid.length > 0) return valid;
+          // All cached URLs expired (or empty) — fall back to fresh playurl API
           try {
             const pi = window.__playinfo__?.data || window.__playinfo__;
             const bvid = pi?.bvid || '';
@@ -551,7 +563,7 @@ async function handle(msg, sender) {
               } catch (_) {}
             }
           } catch (_) {}
-          return readBilibiliMediaStreams();
+          return valid;
         };
         // Self-contained diagnostic (only window + built-ins) run in MAIN world
         // when the stream list is empty, so the panel can show WHY (absent
@@ -1348,16 +1360,32 @@ async function buildAsrPendingCtx(tabId, ctx) {
     const [res] = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
+      // Prefer __playinfo__ cached URLs (SSR-picked CDN nodes, fastest) — only
+      // fall back to the fresh playurl API when the cached URL is expired
+      // (deadline signature → 403). For ASR we only need the audio stream, and
+      // we want the LOWEST bitrate one (smallest/fastest download — quality is
+      // irrelevant, it gets transcoded to 16kHz mono WAV for Ark anyway).
       func: async () => {
         try {
-          // Prefer a FRESH playurl signed at attach time: the __playinfo__ URLs
-          // baked into page HTML carry a deadline signature that expires within
-          // hours (user hit a real 403 from a stale URL - see the deadline in the
-          // failed request). The page player re-requests playurl on each play but
-          // never writes fresh URLs back to __playinfo__; cat-catch captures those
-          // player requests via webRequest. Here we actively re-request the same
-          // playurl API (MAIN world, page cookies) to get a fresh URL, then fall
-          // back to __playinfo__ if the active fetch fails.
+          const cached = (typeof window.__browsaGetBilibiliStreams === 'function')
+            ? window.__browsaGetBilibiliStreams()
+            : [];
+          // Expiry is detected by parsing the `deadline` query param from the
+          // signed URL itself (a network probe is unreliable — B站 CDN may
+          // answer 200 to a plain GET for an already-expired URL, only the
+          // actual media download 403s). No deadline param → assume valid.
+          const isLive = (u) => {
+            try {
+              const m = /[?&]deadline=(\d+)/.exec(u);
+              return !m || (parseInt(m[1], 10) * 1000) > Date.now() + 5 * 60_000;
+            } catch (_) { return true; }
+          };
+          const cachedAudio = cached
+            .filter(s => s.type === 'audio' && s.url && isLive(s.url))
+            .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
+          if (cachedAudio) return cached;
+          // Cached audio empty or expired — fall back to fresh playurl API
+          // (re-signs a brand-new URL with a fresh deadline, no page refresh).
           const pi = window.__playinfo__?.data || window.__playinfo__;
           const bvid = pi?.bvid || '';
           const cid = pi?.cid || 0;
@@ -1368,15 +1396,16 @@ async function buildAsrPendingCtx(tabId, ctx) {
               if (Array.isArray(fresh) && fresh.length > 0) return fresh;
             } catch (_) {}
           }
-          return (typeof window.__browsaGetBilibiliStreams === 'function')
-            ? window.__browsaGetBilibiliStreams()
-            : [];
+          return cached;
         } catch (_) { return []; }
       }
     });
     const streams = Array.isArray(res?.result) ? res.result : [];
+    // ASR only needs the audio track — pick the LOWEST bitrate (smallest /
+    // fastest download; quality is irrelevant, it gets transcoded to 16kHz
+    // mono WAV for Ark anyway).
     const audio = streams.filter((s) => s.type === 'audio' && s.url)
-      .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))[0];
+      .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
     if (!audio) return null;
     // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR
     // 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
