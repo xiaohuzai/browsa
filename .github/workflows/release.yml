@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 0.32.0），不填则使用 package.json 当前版本'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Bump version (package.json + manifest.json via postversion hook)
+      - name: Bump version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          fi
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run MV3 compat check
+        run: bash check-compat.sh
+
+      - name: Build zip
+        run: npm run package
+
+      - name: Verify zip exists
+        run: |
+          ZIP="browsa-v${{ steps.ver.outputs.version }}.zip"
+          if [ ! -f "$ZIP" ]; then
+            echo "::error::Expected $ZIP but it was not found"
+            ls -la browsa-v*.zip 2>/dev/null || echo "No zip files found"
+            exit 1
+          fi
+          ls -lh "$ZIP"
+
+      # Commit version bump first, then push — so the release tag
+      # points at the correct (versioned) commit, not the old one.
+      - name: Commit & push version bump
+        id: push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json manifest.json
+          if git diff --cached --quiet; then
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "No version changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: release v${{ steps.ver.outputs.version }} [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Create GitHub Release (tag is created on the version-bump commit)
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: browsa v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ steps.push.outputs.sha }}
+          generate_release_notes: true
+          files: browsa-v${{ steps.ver.outputs.version }}.zip
