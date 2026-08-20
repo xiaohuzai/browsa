@@ -1364,7 +1364,10 @@ async function buildAsrPendingCtx(tabId, ctx) {
       // fall back to the fresh playurl API when the cached URL is expired
       // (deadline signature → 403). For ASR we only need the audio stream, and
       // we want the LOWEST bitrate one (smallest/fastest download — quality is
-      // irrelevant, it gets transcoded to 16kHz mono WAV for Ark anyway).
+      // irrelevant, it gets transcoded to 16kHz mono WAV for Ark anyway). BUT a
+      // truncated/short stream (a real user bug: 100+ min video → only ~20 min
+      // of subtitles) must be rejected — each stream carries a `duration` (sec)
+      // that we compare against the video's true length.
       func: async () => {
         try {
           const cached = (typeof window.__browsaGetBilibiliStreams === 'function')
@@ -1380,32 +1383,58 @@ async function buildAsrPendingCtx(tabId, ctx) {
               return !m || (parseInt(m[1], 10) * 1000) > Date.now() + 5 * 60_000;
             } catch (_) { return true; }
           };
+          // Video true length (sec) from __playinfo__ SSR data — the reference
+          // for detecting truncated audio streams.
+          const pi = window.__playinfo__?.data || window.__playinfo__;
+          const videoDurationSec = (pi?.duration || 0) > 0 ? pi.duration : 0;
           const cachedAudio = cached
             .filter(s => s.type === 'audio' && s.url && isLive(s.url))
             .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
-          if (cachedAudio) return cached;
+          if (cachedAudio) return { streams: cached, videoDurationSec };
           // Cached audio empty or expired — fall back to fresh playurl API
           // (re-signs a brand-new URL with a fresh deadline, no page refresh).
-          const pi = window.__playinfo__?.data || window.__playinfo__;
           const bvid = pi?.bvid || '';
           const cid = pi?.cid || 0;
           const freshFn = window.__browsaFetchFreshBilibiliStreams;
           if (typeof freshFn === 'function' && bvid && cid) {
             try {
               const fresh = await freshFn(bvid, cid);
-              if (Array.isArray(fresh) && fresh.length > 0) return fresh;
+              if (Array.isArray(fresh) && fresh.length > 0) {
+                return { streams: fresh, videoDurationSec };
+              }
             } catch (_) {}
           }
-          return cached;
-        } catch (_) { return []; }
+          return { streams: cached, videoDurationSec };
+        } catch (_) { return { streams: [], videoDurationSec: 0 }; }
       }
     });
-    const streams = Array.isArray(res?.result) ? res.result : [];
-    // ASR only needs the audio track — pick the LOWEST bitrate (smallest /
+    const got = (res?.result && Array.isArray(res.result.streams)) ? res.result : null;
+    const streams = got ? got.streams : (Array.isArray(res?.result) ? res.result : []);
+    const videoDurationSec = got ? (got.videoDurationSec || 0) : 0;
+    const audioCandidates = streams
+      .filter((s) => s.type === 'audio' && s.url)
+      .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0));
+    // ASR only needs the audio track — prefer the LOWEST bitrate (smallest /
     // fastest download; quality is irrelevant, it gets transcoded to 16kHz
-    // mono WAV for Ark anyway).
-    const audio = streams.filter((s) => s.type === 'audio' && s.url)
-      .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
+    // mono WAV for Ark anyway). BUT reject streams whose duration is clearly
+    // shorter than the video (truncated/partial stream → 20 min of a 100+ min
+    // video, a real user bug): only fall back to the lowest-bitrate-everything
+    // when duration metadata is missing/unusable.
+    const fullLen = (s) => {
+      if (!videoDurationSec || !s.duration) return null; // 无法判定 → 不拦截
+      // 允许 -10% 容差（不同容器时长略有出入）；明显短则视为截断流。
+      return s.duration >= videoDurationSec * 0.9 ? true : false;
+    };
+    let audio = audioCandidates.find((s) => fullLen(s) === true)
+      || audioCandidates.find((s) => fullLen(s) === null)
+      || audioCandidates[0];
+    // 即便被选中的流元数据看似完整，若真实解码时长远小于视频总长（服务端 body
+    // 截断、元数据谎报），也交由 sidepanel 在转码后二次校验并换流重试——这里
+    // 把完整候选列表 + 视频时长传给 sidepanel。
+    const candidateAudios = audioCandidates.map((s) => ({
+      url: s.url, label: s.label || '', bandwidth: s.bandwidth || 0,
+      duration: s.duration || 0, size: s.size || 0,
+    }));
     if (!audio) return null;
     // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR
     // 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
@@ -1425,6 +1454,10 @@ async function buildAsrPendingCtx(tabId, ctx) {
       mode: 'asr-pending',
       audioUrl: audio.url,
       audioLabel: audio.label || '',
+      // 完整候选音频流列表 + 视频总时长（秒）：sidepanel 转码后若发现实际解码
+      // 时长远小于视频总长（服务端 body 截断 / 元数据谎报），可换下一候选流重试。
+      audioCandidates: candidateAudios,
+      videoDurationSec: videoDurationSec || 0,
       // 传给 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
       biliCookie,
       asr: {

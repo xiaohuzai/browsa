@@ -75,21 +75,27 @@ function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStr
         }
         // The asr-pending ctx builder re-reads audio streams via the exposed reader.
         // Mock both window functions: __browsaFetchFreshBilibiliStreams (fresh
-        // playurl, preferred) and __browsaGetBilibiliStreams (__playinfo__ fallback).
-        // The injected func returns a bare streams array (fresh when available,
-        // else the __playinfo__ cache).
+        // playurl) and __browsaGetBilibiliStreams (__playinfo__ cache). The injected
+        // func returns { streams, videoDurationSec } — videoDurationSec (video true
+        // length) is the reference for rejecting truncated audio streams.
         if (body.includes('__browsaGetBilibiliStreams')) {
           if (hasFreshStreams) {
-            return [{ result: [
-              { type: 'audio', label: '320 kbps', url: 'https://bilivideo.com/audio/fresh-320.m4s', bandwidth: 320000, hasAudio: true },
-            ] }];
+            return [{ result: {
+              streams: [
+                { type: 'audio', label: '320 kbps', url: 'https://bilivideo.com/audio/fresh-320.m4s', bandwidth: 320000, hasAudio: true, duration: 300, size: 12_000_000 },
+              ],
+              videoDurationSec: 300,
+            } }];
           }
           return [{ result: hasAudio
-            ? [
-                { type: 'audio', label: '192 kbps', url: 'https://bilivideo.com/audio/192.m4s', bandwidth: 192000, hasAudio: true },
-                { type: 'audio', label: '64 kbps', url: 'https://bilivideo.com/audio/64.m4s', bandwidth: 64000, hasAudio: true },
-              ]
-            : [] }];
+            ? {
+                streams: [
+                  { type: 'audio', label: '192 kbps', url: 'https://bilivideo.com/audio/192.m4s', bandwidth: 192000, hasAudio: true, duration: 300, size: 7_200_000 },
+                  { type: 'audio', label: '64 kbps', url: 'https://bilivideo.com/audio/64.m4s', bandwidth: 64000, hasAudio: true, duration: 300, size: 2_400_000 },
+                ],
+                videoDurationSec: 300,
+              }
+            : { streams: [], videoDurationSec: 0 } }];
         }
         return [{ result: { text: 'mock content', rawTextLength: 12, wasCapped: false } }];
       },
@@ -237,4 +243,77 @@ test('ATTACH_ASR_CONFIRM: no text -> {ok:false}', async () => {
   const { handle } = await import('../background.js');
   const res = await handle({ type: 'ATTACH_ASR_CONFIRM', text: '', metaUrl: BILI_URL }, {});
   assert.equal(res.ok, false);
+});
+
+test('ASR stream selection rejects a TRUNCATED lowest-bitrate stream in favor of a full-length one', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  // Custom mock: the video is 6000s (100 min). The 64kbps stream's metadata
+  // claims only 1200s (20 min — the truncation bug); the 192kbps stream claims
+  // the full 6000s. Selection must reject the short stream and pick 192kbps.
+  const chromeMock = makeChrome(localArea, { transcript: null, hasFreshStreams: false });
+  const origExecute = chromeMock.scripting.executeScript;
+  chromeMock.scripting.executeScript = async (opts) => {
+    if ((opts.func?.toString() || '').includes('__browsaGetBilibiliStreams')) {
+      return [{ result: {
+        streams: [
+          { type: 'audio', label: '192 kbps', url: 'https://bilivideo.com/audio/192.m4s', bandwidth: 192000, hasAudio: true, duration: 6000, size: 144_000_000 },
+          { type: 'audio', label: '64 kbps', url: 'https://bilivideo.com/audio/64.m4s', bandwidth: 64000, hasAudio: true, duration: 1200, size: 9_600_000 },
+        ],
+        videoDurationSec: 6000,
+      } }];
+    }
+    return origExecute(opts);
+  };
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'asr-pending');
+  // The 64kbps stream is lowest bitrate but TRUNCATED (1200s < 90% of 6000s) —
+  // it must NOT be chosen. The full-length 192kbps stream wins.
+  assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/192.m4s', 'must skip the truncated lowest-bitrate stream and pick a full-length one');
+  assert.equal(res.ctx.videoDurationSec, 6000, 'videoDurationSec must be passed to the sidepanel for the post-transcode sanity check');
+  assert.ok(Array.isArray(res.ctx.audioCandidates) && res.ctx.audioCandidates.length >= 2, 'audioCandidates must carry the full ordered stream list for sidepanel retry');
+  // Candidates are bitrate-ascending (lowest first) so the sidepanel retry loop
+  // tries 64kbps, detects it is truncated post-transcode, and moves to 192kbps.
+  assert.equal(res.ctx.audioCandidates[0].url, 'https://bilivideo.com/audio/64.m4s', 'candidates carry the full bitrate-ascending list (lowest first) for the sidepanel retry');
+  assert.equal(res.ctx.audioCandidates[1].url, 'https://bilivideo.com/audio/192.m4s', 'the full-length stream must be the next retry candidate');
+});
+
+test('ASR stream selection: when duration metadata is missing, lowest bitrate wins (backward-compatible)', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  // No duration on any stream + no videoDurationSec -> cannot judge -> fall back
+  // to plain lowest-bitrate selection (pre-change behavior).
+  const chromeMock = makeChrome(localArea, { transcript: null, hasFreshStreams: false });
+  const origExecute = chromeMock.scripting.executeScript;
+  chromeMock.scripting.executeScript = async (opts) => {
+    if ((opts.func?.toString() || '').includes('__browsaGetBilibiliStreams')) {
+      return [{ result: {
+        streams: [
+          { type: 'audio', label: '192 kbps', url: 'https://bilivideo.com/audio/192.m4s', bandwidth: 192000, hasAudio: true },
+          { type: 'audio', label: '64 kbps', url: 'https://bilivideo.com/audio/64.m4s', bandwidth: 64000, hasAudio: true },
+        ],
+        videoDurationSec: 0,
+      } }];
+    }
+    return origExecute(opts);
+  };
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'asr-pending');
+  assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/64.m4s', 'no duration metadata -> lowest bitrate, same as before');
 });

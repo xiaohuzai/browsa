@@ -864,53 +864,92 @@ async function onAttachPage() {
         // 1. Download the m4s bytes (extension context, DNR-injected Referer).
         // Download can be slow (CDN node assignment) — show a real percentage
         // from the streamed bytes when a total is knowable, else elapsed time.
-        const dlStart = Date.now();
-        const dlTimer = setInterval(() => {
-          const secs = Math.round((Date.now() - dlStart) / 1000);
-          showAttachProgress(`下载音频中…（已等待 ${secs}s）`);
-        }, 1000);
-        let dl;
-        try {
-          dl = await downloadAudioBytes({
-            audioUrl: ctx.audioUrl,
-            onProgress: (done, total) => {
-              if (total) {
-                showAttachProgress(`下载音频中…（${Math.round((done / total) * 100)}%）`);
-              } else {
-                const secs = Math.round((Date.now() - dlStart) / 1000);
-                showAttachProgress(`下载音频中…（已下载 ${(done / 1024 / 1024).toFixed(1)}MB，已等待 ${secs}s）`);
-              }
-            },
-          });
-        } finally {
-          clearInterval(dlTimer);
-        }
-        if (!dl?.ok || !dl.blob) {
-          throw new Error('ASR download failed: ' + (dl?.error || 'no blob'));
-        }
-        audioBytes = dl.bytes || 0;
-        console.log('[ASR] downloaded m4s', audioBytes, 'bytes; url host:', (() => { try { return new URL(ctx.audioUrl).host; } catch { return '?'; } })());
-        // Transcode: decodeAudioData is an opaque black box (no sub-progress),
-        // and resample+encode is fast — so show elapsed time, not a fake %.
-        showAttachProgress('转码音频中…（转为 WAV）');
-        const trStart = Date.now();
-        const trTimer = setInterval(() => {
-          const secs = Math.round((Date.now() - trStart) / 1000);
-          showAttachProgress(`转码音频中…（已等待 ${secs}s）`);
-        }, 1000);
-        let trans;
-        try {
-          // 2. Transcode to 16kHz mono WAV — B站 m4s is an MP4 container that 方舟
-          // misclassifies as video (failed: Invalid video_url); WAV is pure audio
-          // (active, verified end-to-end 2026-08-16). Web Audio API decodes fMP4.
-          trans = await transcodeAudioBlob(dl.blob);
-        } finally {
-          clearInterval(trTimer);
+        // Truncation guard: 一个真实 bug 中最低码率流只给了 ~20min（视频 100+min），
+        // 转码后按实际 WAV 时长与视频总长比对，明显偏短则换下一候选流重试。
+        const candidates = (() => {
+          const seen = new Set();
+          const out = [];
+          const push = (u, label) => { if (u && !seen.has(u)) { seen.add(u); out.push({ url: u, label: label || '' }); } };
+          push(ctx.audioUrl, ctx.audioLabel);
+          for (const c of (Array.isArray(ctx.audioCandidates) ? ctx.audioCandidates : [])) {
+            push(c.url, c.label);
+          }
+          return out;
+        })();
+        const wantDurSec = (ctx.videoDurationSec && ctx.videoDurationSec > 0) ? ctx.videoDurationSec : 0;
+        let trans = null;
+        let audioBytes = 0;
+        let usedLabel = '';
+        for (const cand of candidates) {
+          const dlStart = Date.now();
+          const dlTimer = setInterval(() => {
+            const secs = Math.round((Date.now() - dlStart) / 1000);
+            showAttachProgress(`下载音频中…（已等待 ${secs}s）`);
+          }, 1000);
+          let dl;
+          try {
+            dl = await downloadAudioBytes({
+              audioUrl: cand.url,
+              onProgress: (done, total) => {
+                if (total) {
+                  showAttachProgress(`下载音频中…（${Math.round((done / total) * 100)}%）`);
+                } else {
+                  const secs = Math.round((Date.now() - dlStart) / 1000);
+                  showAttachProgress(`下载音频中…（已下载 ${(done / 1024 / 1024).toFixed(1)}MB，已等待 ${secs}s）`);
+                }
+              },
+            });
+          } finally {
+            clearInterval(dlTimer);
+          }
+          if (!dl?.ok || !dl.blob) {
+            throw new Error('ASR download failed: ' + (dl?.error || 'no blob'));
+          }
+          const dlBytes = dl.bytes || 0;
+          console.log('[ASR] downloaded m4s', dlBytes, 'bytes; url host:', (() => { try { return new URL(cand.url).host; } catch { return '?'; } })());
+          // Transcode: decodeAudioData is an opaque black box (no sub-progress),
+          // and resample+encode is fast — so show elapsed time, not a fake %.
+          showAttachProgress('转码音频中…（转为 WAV）');
+          const trStart = Date.now();
+          const trTimer = setInterval(() => {
+            const secs = Math.round((Date.now() - trStart) / 1000);
+            showAttachProgress(`转码音频中…（已等待 ${secs}s）`);
+          }, 1000);
+          let tr;
+          try {
+            // 2. Transcode to 16kHz mono WAV — B站 m4s is an MP4 container that 方舟
+            // misclassifies as video (failed: Invalid video_url); WAV is pure audio
+            // (active, verified end-to-end 2026-08-16). Web Audio API decodes fMP4.
+            tr = await transcodeAudioBlob(dl.blob);
+          } finally {
+            clearInterval(trTimer);
+          }
+          if (!tr?.ok || !tr.wavBlob) {
+            throw new Error('ASR transcode failed: ' + (tr?.error || 'no wav'));
+          }
+          // Truncation check: uncompressed 16-bit PCM WAV (1 channel) → bytes =
+          // sec * sampleRate * 2 (2 bytes/sample, 16-bit). wavDur ≈ audio seconds.
+          const wavDur = tr.wavBytes / ((tr.sampleRate || 16000) * 2);
+          const isShort = wantDurSec > 0 && wavDur < wantDurSec * 0.5;
+          console.log('[ASR] transcoded -> WAV', tr.wavBytes, 'bytes, sampleRate', tr.sampleRate, '| wav dur ~', wavDur.toFixed(0), 's vs video', wantDurSec, 's', isShort ? '→ TRUNCATED' : '');
+          if (isShort) {
+            if (candidates.length > 1) {
+              console.warn('[ASR] stream too short (' + wavDur.toFixed(0) + 's < 50% of ' + wantDurSec + 's) — trying next candidate');
+              continue;
+            }
+            // 唯一候选也截断：静默附加部分字幕正是用户报告的 bug，必须失败回退
+            // （纯文本 + 明确 toast），而不是继续把 ~20min 当 100min 用。
+            throw new Error('ASR audio stream is truncated (' + wavDur.toFixed(0) + 's vs video ' + wantDurSec + 's)');
+          }
+          trans = tr;
+          audioBytes = dlBytes;
+          usedLabel = cand.label;
+          break;
         }
         if (!trans?.ok || !trans.wavBlob) {
-          throw new Error('ASR transcode failed: ' + (trans?.error || 'no wav'));
+          throw new Error('ASR transcode failed: no usable full-length audio stream');
         }
-        console.log('[ASR] transcoded -> WAV', trans.wavBytes, 'bytes, sampleRate', trans.sampleRate, '(src', audioBytes, 'bytes)');
+        if (usedLabel) console.log('[ASR] using audio stream:', usedLabel);
         // 3. Upload the WAV to 方舟 Files API -> file_id.
         // XHR upload.onprogress gives a real percentage (fetch has none).
         showAttachProgress('上传音频中…（0%）');
