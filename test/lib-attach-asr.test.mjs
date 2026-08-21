@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 
 import {
   downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono,
-  pollFileStatus, transcribeAudio, formatAsrTranscript, ASR_DEFAULTS, extFromMime, normalizeArkBaseUrl
+  pollFileStatus, transcribeAudio, formatAsrTranscript, ASR_DEFAULTS, extFromMime, normalizeArkBaseUrl,
+  splitMp4Fragments
 } from '../lib/handlers/attach-asr.js';
 
 // ---- downloadAndUploadAudio (MAIN-world injectable) ----
@@ -400,6 +401,41 @@ test('downloadAudioBytes: missing audioUrl / HTTP failure return {ok:false}', as
   assert.equal((await downloadAudioBytes({ audioUrl: 'u' })).error, 'download HTTP 403');
 });
 
+test('downloadAudioBytes: streams the body and reports real percentages via onProgress', async () => {
+  // 206 + Content-Range with a readable stream → onProgress sees done/total.
+  const enc = new TextEncoder();
+  const bytes = [enc.encode('0123456789'), enc.encode('abcdefghij'), enc.encode('klmnopqrst')];
+  const total = bytes.reduce((n, b) => n + b.byteLength, 0); // 30
+  const body = new ReadableStream({
+    start(controller) { for (const b of bytes) controller.enqueue(b); controller.close(); },
+  });
+  const headers = { get: (k) => (k === 'content-range' ? `bytes 0-${total - 1}/${total}` : null) };
+  globalThis.fetch = async () => ({ ok: true, body, headers });
+  const seen = [];
+  const res = await downloadAudioBytes({ audioUrl: 'https://upos-sz.bilivideo.com/audio/192.m4s', onProgress: (d, t) => seen.push([d, t]) });
+  assert.equal(res.ok, true);
+  assert.equal(res.bytes, total);
+  assert.ok(res.blob instanceof Blob);
+  assert.equal(seen.length, 3, 'one onProgress per percent step (10%, 20%, 100%)');
+  assert.equal(seen[0][0], 10); assert.equal(seen[0][1], total);
+  assert.equal(seen[1][0], 20); assert.equal(seen[1][1], total);
+  assert.equal(seen[2][0], total); assert.equal(seen[2][1], total); // final 100%
+});
+
+test('downloadAudioBytes: streams with NO content-length/report → onProgress gets null total', async () => {
+  const enc = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) { controller.enqueue(enc.encode('hello')); controller.close(); },
+  });
+  globalThis.fetch = async () => ({ ok: true, body, headers: { get: () => null } });
+  const seen = [];
+  const res = await downloadAudioBytes({ audioUrl: 'https://upos-sz.bilivideo.com/audio/192.m4s', onProgress: (d, t) => seen.push([d, t]) });
+  assert.equal(res.ok, true);
+  assert.equal(res.bytes, 5);
+  assert.ok(seen.length >= 1, 'onProgress called with bytes as it arrives');
+  assert.equal(seen[0][1], null, 'no total → null so caller falls back to elapsed-time');
+});
+
 test('uploadBlobToArk: POSTs the blob as multipart with purpose=user_data and returns fileId', async () => {
   let captured = null;
   globalThis.fetch = async (url, init) => {
@@ -593,4 +629,167 @@ test('resampleToMono: arbitrary-rate upsampling interpolates', () => {
   assert.ok(Math.abs(out[1] - 0.5) < 1e-4);
   assert.ok(Math.abs(out[2] - 1) < 1e-4);
   assert.ok(Math.abs(out[3] - 1) < 1e-4);
+});
+
+// ---- splitMp4Fragments (pure fMP4 box parser) ----
+
+// Build a synthetic MP4 box: [size(4)][type(4)][payload]. size includes the 8-byte header.
+function mp4Box(type, payload) {
+  const size = 8 + payload.byteLength;
+  const buf = new ArrayBuffer(size);
+  const dv = new DataView(buf);
+  dv.setUint32(0, size);
+  for (let i = 0; i < 4; i++) dv.setUint8(4 + i, type.charCodeAt(i));
+  new Uint8Array(buf, 8).set(new Uint8Array(payload));
+  return new Uint8Array(buf);
+}
+
+test('splitMp4Fragments: extracts init (ftyp+moov) and each moof+mdat fragment', () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array([0, 0, 0, 1, 'i', 's', 'o', '5'].map(c => typeof c === 'string' ? c.charCodeAt(0) : c)));
+  const moov = mp4Box('moov', new Uint8Array(32).fill(1));
+  const moof1 = mp4Box('moof', new Uint8Array(16).fill(2));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64).fill(3));
+  const moof2 = mp4Box('moof', new Uint8Array(16).fill(4));
+  const mdat2 = mp4Box('mdat', new Uint8Array(64).fill(5));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1, ...moof2, ...mdat2]);
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res, 'must parse a fragmented MP4');
+  assert.equal(res.fragments.length, 2, 'two moof+mdat pairs -> two fragments');
+  // init must contain ftyp (8+8=16) + moov (8+32=40) = 56 bytes
+  assert.equal(res.init.size, 16 + 40);
+  // each fragment = moof (8+16=24) + mdat (8+64=72) = 96
+  assert.equal(res.fragments[0].size, 24 + 72);
+  assert.equal(res.fragments[1].size, 24 + 72);
+});
+
+test('splitMp4Fragments: returns an Error (not fragmented) for a single-mdat file', () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const mdat = mp4Box('mdat', new Uint8Array(128));
+  const file = new Uint8Array([...ftyp, ...moov, ...mdat]);
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res instanceof Error, 'no moof -> Error, not a valid fragment parse');
+  assert.match(res.message, /not a fragmented mp4/);
+  assert.match(res.message, /ftyp,moov,mdat/);
+});
+
+test('splitMp4Fragments: returns an Error for empty/garbage input', () => {
+  assert.ok(splitMp4Fragments(new ArrayBuffer(0)) instanceof Error);
+  assert.ok(splitMp4Fragments(new Uint8Array([1, 2, 3, 4, 5, 6, 7]).buffer) instanceof Error);
+});
+
+test('splitMp4Fragments: handles size==0 (extends to end) and size==1 (64-bit extended) boxes', () => {
+  // Build: ftyp + moov + moof + a mdat whose size field is 0 (extends to end).
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof = mp4Box('moof', new Uint8Array(16));
+  const mdatPayload = new Uint8Array(64).fill(9);
+  const mdat = new Uint8Array(8 + mdatPayload.byteLength);
+  new DataView(mdat.buffer).setUint32(0, 0); // size==0 → 到文件末尾
+  mdat.set(new Uint8Array([0x6d, 0x64, 0x61, 0x74]), 4); // 'mdat'
+  mdat.set(mdatPayload, 8);
+  const file = new Uint8Array([...ftyp, ...moov, ...moof, ...mdat]);
+  const res = splitMp4Fragments(file.buffer);
+  assert.ok(res && !(res instanceof Error), 'size==0 mdat must still parse');
+  assert.equal(res.fragments.length, 1);
+});
+
+test('transcodeAudioBlob: a fragmented fMP4 decodes straight via per-fragment decode (never whole-file)', async () => {
+  // Build a synthetic fMP4 (init + 2 fragments). The decode mock would throw on
+  // the whole file (>200 bytes, like the real 100min Edge bug) — but the new
+  // flow NEVER calls decodeAudioData on the whole file for a fragmented input,
+  // so it must succeed via per-fragment decode. This also guards the detached-
+  // ArrayBuffer regression (splitMp4Fragments runs before any decode).
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof1 = mp4Box('moof', new Uint8Array(16));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64));
+  const moof2 = mp4Box('moof', new Uint8Array(16));
+  const mdat2 = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1, ...moof2, ...mdat2]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  const decodedSizes = [];
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData(buf) {
+      decodedSizes.push(buf.byteLength);
+      if (buf.byteLength > 200) throw new Error('Unable to decode audio data');
+      return { sampleRate: 48000, length: 48000, numberOfChannels: 1, getChannelData: () => new Float32Array(48000) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+  globalThis.AudioContext = undefined; // force OfflineAudioContext path
+  const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(res.ok, true, 'must succeed via per-fragment decode: ' + (res.error || ''));
+  // whole file is 248 bytes — it must NEVER be passed to decodeAudioData
+  assert.ok(decodedSizes.every((s) => s <= 200), 'whole-file buffer must not reach decodeAudioData: ' + decodedSizes.join(','));
+  assert.equal(decodedSizes.length, 2, 'one decode per fragment (init+fragment unit), no whole-file attempt');
+  // 2 fragments x 1s @48k -> 2s @16k = 32000 frames -> 44 + 64000 bytes
+  assert.equal(res.wavBytes, 44 + 32000 * 2);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcodeAudioBlob: fragmented input whose per-fragment decode fails reports the fragment error', async () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const moof1 = mp4Box('moof', new Uint8Array(16));
+  const mdat1 = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData() { throw new Error('Unable to decode audio data'); }
+    async close() {}
+    destination = {};
+  };
+  globalThis.AudioContext = undefined;
+  const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(res.ok, false);
+  assert.match(res.error, /fragment decode failed/);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcodeAudioBlob: non-fragmented (single mdat) file uses whole-file decode; failure includes parse diagnostic', async () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const mdat = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...mdat]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  let wholeDecodeCount = 0;
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData(buf) {
+      wholeDecodeCount++;
+      // Non-fragmented file has no moof; the whole file is the only decodable unit.
+      return { sampleRate: 48000, length: 48000, numberOfChannels: 1, getChannelData: () => new Float32Array(48000) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+  globalThis.AudioContext = undefined;
+  const okRes = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(okRes.ok, true, 'non-fragmented decodes via whole-file path');
+  assert.equal(wholeDecodeCount, 1, 'whole-file decode used exactly once');
+
+  // Same file, but whole-file decode now fails → error must carry the parse diagnostic
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData() { throw new Error('Unable to decode audio data'); }
+    async close() {}
+    destination = {};
+  };
+  const failRes = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(failRes.ok, false);
+  assert.match(failRes.error, /Unable to decode audio data/);
+  assert.match(failRes.error, /not a fragmented mp4 \(boxes: ftyp,moov,mdat\)/);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
 });
