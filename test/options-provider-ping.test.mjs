@@ -193,14 +193,14 @@ function findProviderCard(name) {
   // Provider cards don't carry the raw provider-map key as a DOM attribute,
   // so locate by the prettyProviderName() label options.js renders instead.
   const cards = [...document.querySelectorAll('.provider')];
-  const labels = { hermes: 'Hermes', 'claude-code': 'Claude Code', compatible: 'OpenAI-compatible' };
+  const labels = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
   const target = labels[name] || name;
   return cards.find((c) => c.querySelector('.name')?.textContent === target);
 }
 
-test('options.js: init() rendered all three default provider cards without throwing', () => {
+test('options.js: init() rendered both default provider cards without throwing', () => {
   const cards = document.querySelectorAll('.provider');
-  assert.equal(cards.length, 3, 'hermes, claude-code, compatible');
+  assert.equal(cards.length, 2, 'hermes, compatible');
 });
 
 test('options.js: LLM provider (compatible) card shows a Model ID field; agent providers (hermes) do not', () => {
@@ -307,11 +307,13 @@ test('options.js: a failed ping sets the unreachable badge and shows the error m
 // doesn't silently leave the dropdown pointed at whatever was active before.
 
 test('options.js: first successful ping on a not-yet-reachable provider auto-switches the active provider', async () => {
-  // claude-code has not been pinged by any earlier test in this file, so
-  // its ping state is still unset (not reachable) regardless of whatever
-  // provider is currently active from earlier tests.
-  const card = findProviderCard('claude-code');
-  card.querySelector('[data-k="baseUrl"]').value = 'http://test-claude-code';
+  // By this point in the file: the earlier 'failed ping' test left hermes
+  // unreachable, and a later compatible ping made compatible the active
+  // provider. So hermes is a not-reachable, non-active provider -- pinging
+  // it successfully is the first transition to reachable, which must make
+  // it the active provider.
+  const card = findProviderCard('hermes');
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-hermes-auto';
   globalThis.fetch = async (url) => {
     const u = String(url);
     if (u.endsWith('/health')) return { ok: true };
@@ -325,43 +327,26 @@ test('options.js: first successful ping on a not-yet-reachable provider auto-swi
 
   const activeProviderSets = setCalls.filter((c) => 'activeProvider' in c);
   assert.equal(activeProviderSets.length, 1, 'a successful first-time ping must persist the new active provider exactly once');
-  assert.equal(activeProviderSets[0].activeProvider, 'claude-code');
+  assert.equal(activeProviderSets[0].activeProvider, 'hermes');
   assert.ok(card.classList.contains('active'), 'the pinged card must visually become the active one');
   assert.match(card.querySelector('.card-status').textContent, /set as active provider/);
 });
 
 test('options.js: re-pinging an already-reachable provider does not steal active-provider status from a different provider', async () => {
-  const card = findProviderCard('hermes');
-  card.querySelector('[data-k="baseUrl"]').value = 'http://test-hermes-reping';
+  // The auto-switch test above left hermes reachable AND active, and
+  // compatible already reachable (from the earlier ping tests). Re-pinging
+  // compatible (already reachable, not active) must NOT steal the active
+  // status away from hermes.
+  const card = findProviderCard('compatible');
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-compatible-reping';
+  card.querySelector('[data-k="model"]').value = 'my-model';
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.endsWith('/health')) return { ok: true };
+    if (u.includes('/v1/chat/completions')) return { ok: true, text: async () => '' };
     if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
     return { ok: true, json: async () => ({}) };
   };
 
-  // First ping establishes hermes as reachable (and, per the rule above,
-  // makes it the active provider -- expected, this is its first transition
-  // to reachable in this test).
-  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
-
-  // Switch active provider away from hermes back to claude-code by pinging
-  // it again (already reachable from the previous test -- a no-op switch
-  // since it's already active, but re-establishes claude-code as active
-  // for this test's purposes without any manual-set API to reach for).
-  const claudeCard = findProviderCard('claude-code');
-  globalThis.fetch = async (url) => {
-    const u = String(url);
-    if (u.endsWith('/health')) return { ok: true };
-    if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
-    return { ok: true, json: async () => ({}) };
-  };
-  claudeCard.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
-
-  // Now re-ping hermes, which is already reachable -- must NOT steal
-  // active-provider status back from claude-code.
   setCalls.length = 0;
   card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));

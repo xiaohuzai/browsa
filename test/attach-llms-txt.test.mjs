@@ -91,7 +91,7 @@ Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true,
 
 const bg = await import('../background.js');
 const { handle, withSiteInstructions, withVideoNote } = bg;
-const { llmsTxtCache } = await import('../lib/handlers/chat-handler.js');
+const { llmsTxtCache, fetchLlmsTxt } = await import('../lib/handlers/chat-handler.js');
 
 function setFetchImpl(fn) { globalThis.fetch = fn; }
 function clearLlmsCache() { llmsTxtCache.clear(); }
@@ -124,6 +124,39 @@ test('withSiteInstructions: origin without llms.txt (404) -> ctx unchanged', asy
   const out = await withSiteInstructions(ctx, { llmsTxtEnabled: true });
   assert.equal(out, ctx, 'no llms.txt -> same object, no text change');
   assert.equal(out.text, 'body');
+});
+
+test('fetchLlmsTxt: rejects an HTML response even on HTTP 200 (x.com/llms.txt case)', async () => {
+  // x.com serves its SPA index.html with HTTP 200 + Content-Type text/html for
+  // /llms.txt. This must NOT be treated as site instructions.
+  clearLlmsCache();
+  setFetchImpl(async () => ({
+    ok: true, status: 200,
+    headers: { get: (h) => (String(h).toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null) },
+    text: async () => '<!DOCTYPE html><html><head><title>x</title></head><body>nav nav</body></html>',
+  }));
+  const got = await fetchLlmsTxt('https://x.com/someuser/status/123');
+  assert.equal(got, null, 'HTML body must be rejected even with a 200 status');
+});
+
+test('fetchLlmsTxt: rejects an HTML-looking body when Content-Type header is absent', async () => {
+  clearLlmsCache();
+  setFetchImpl(async () => ({
+    ok: true, status: 200,
+    headers: { get: () => null }, // no Content-Type at all
+    text: async () => '<!DOCTYPE html><html><body>hello</body></html>',
+  }));
+  assert.equal(await fetchLlmsTxt('https://nohdr.example.com/'), null);
+});
+
+test('fetchLlmsTxt: accepts a real text/plain llms.txt', async () => {
+  clearLlmsCache();
+  setFetchImpl(async () => ({
+    ok: true, status: 200,
+    headers: { get: (h) => (String(h).toLowerCase() === 'content-type' ? 'text/plain; charset=utf-8' : null) },
+    text: async () => '# example\n\n- https://example.com/readme',
+  }));
+  assert.equal(await fetchLlmsTxt('https://example.com/'), '# example\n\n- https://example.com/readme');
 });
 
 test('withSiteInstructions: origin with llms.txt -> instructions prepended to ctx.text', async () => {

@@ -147,3 +147,82 @@ test('Bilibili active fallback: injects content script file on-demand before cal
     'must inject bilibili-content-script.js'
   );
 });
+
+// X/Twitter variant: the passive interceptor never runs in MAIN world (chrome.runtime
+// is undefined there — same lesson as YouTube), so SITE_CACHES.twitter is never
+// populated and tweet pages would otherwise fall through to the generic DOM dump.
+// The active fallback must inject twitter-content-script.js on-demand and call
+// activeXFetch(), then synthesize the tweet conversation.
+test('X/Twitter active fallback: injects content script then calls activeXFetch and synthesizes the tweet', async () => {
+  chromeMock.tabs.query = async () => [{ id: 3, url: 'https://x.com/jayair/status/2090596382306361380', title: 'Tweet' }];
+  chromeMock.tabs.get = async (id) => ({ id, url: 'https://x.com/jayair/status/2090596382306361380', title: 'Tweet', favIconUrl: '' });
+  chromeMock.scripting.executeScript = async (opts) => {
+    executeScriptCalls.push(opts);
+    if (opts.files) return [{ result: undefined }];
+    const body = opts.func?.toString() || '';
+    if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+    if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+    if (body.includes('activeXFetch')) {
+      return [{ result: {
+        tweetId: '2090596382306361380', text: 'Okay let me tell you about what is happening',
+        author: 'Jay', screenName: 'jayair', likes: 1115, retweets: 79, repliesCount: 65, quotes: 171,
+        replies: [{ text: 'a reply', author: 'Bob', screenName: 'bob' }],
+      } }];
+    }
+    return [{ result: { text: 'mock content', rawTextLength: 12, wasCapped: false } }];
+  };
+
+  executeScriptCalls = [];
+  const res = await handle({ type: 'ATTACH_PAGE', tabId: 3, mode: 'reader' }, { tab: { id: 3 } });
+  assert.equal(res.ok, true);
+  const fileInjections = executeScriptCalls.filter((c) => Array.isArray(c.files));
+  assert.ok(
+    fileInjections.some((c) => c.files.some((f) => f.includes('twitter-content-script.js'))),
+    'must inject twitter-content-script.js'
+  );
+  // The stored history entry must carry the tweet text (not a DOM dump) and the reply.
+  const history = await chromeMock.storage.local.get('history');
+  const joined = JSON.stringify(history);
+  assert.match(joined, /Okay let me tell you about what is happening/, 'main tweet text must be in the attached content');
+  assert.match(joined, /@jayair/, 'author handle must be in the attached content');
+  assert.match(joined, /a reply/, 'the visible reply must be in the attached content');
+});
+
+// Reddit variant: no passive interceptor exists (componentized SPA), so pages
+// fell through to the generic DOM dump with all the chrome (skip links, vote
+// buttons, ads, footer, SML.load noise). The active fallback must inject
+// reddit-content-script.js and call activeRedditFetch(), then synthesize a
+// clean post + comments.
+test('Reddit active fallback: injects content script then calls activeRedditFetch and synthesizes the post', async () => {
+  chromeMock.tabs.query = async () => [{ id: 4, url: 'https://www.reddit.com/user/Meshyai/', title: 'Meshyai' }];
+  chromeMock.tabs.get = async (id) => ({ id, url: 'https://www.reddit.com/user/Meshyai/', title: 'Meshyai', favIconUrl: '' });
+  chromeMock.scripting.executeScript = async (opts) => {
+    executeScriptCalls.push(opts);
+    if (opts.files) return [{ result: undefined }];
+    const body = opts.func?.toString() || '';
+    if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+    if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+    if (body.includes('activeRedditFetch')) {
+      return [{ result: {
+        post: { postId: 'abc123', title: 'Big issue with new post training', subreddit: 'opencodeCLI', author: 'Meshyai', selftext: 'Hi, so I am working on my own set of custom tools.', score: 120, numComments: 14 },
+        comments: [{ author: 'EndlessZone123', score: 5, depth: 0, text: 'cant fail toolcalling if it never uses new tools' }],
+      } }];
+    }
+    return [{ result: { text: 'mock content', rawTextLength: 12, wasCapped: false } }];
+  };
+
+  executeScriptCalls = [];
+  const res = await handle({ type: 'ATTACH_PAGE', tabId: 4, mode: 'reader' }, { tab: { id: 4 } });
+  assert.equal(res.ok, true);
+  const fileInjections = executeScriptCalls.filter((c) => Array.isArray(c.files));
+  assert.ok(
+    fileInjections.some((c) => c.files.some((f) => f.includes('reddit-content-script.js'))),
+    'must inject reddit-content-script.js'
+  );
+  const history = await chromeMock.storage.local.get('history');
+  const joined = JSON.stringify(history);
+  assert.match(joined, /Big issue with new post training/, 'post title must be in the attached content');
+  assert.match(joined, /u\/Meshyai/, 'author must be in the attached content');
+  assert.match(joined, /## 评论/, 'a comments section must be emitted');
+  assert.match(joined, /cant fail toolcalling/, 'the comment text must be in the attached content');
+});

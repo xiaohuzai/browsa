@@ -579,7 +579,7 @@ function populateProviderSelect(cfg) {
 }
 
 function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', 'claude-code': 'Claude Code', compatible: 'OpenAI-compatible' };
+  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
   return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
 }
 

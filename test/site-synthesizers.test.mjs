@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSiteCache } from '../lib/site-synthesizers.js';
+import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult } from '../lib/site-synthesizers.js';
 
 const fakeMeta = (url) => ({ url, title: 'Test', articleTitle: 'Test' });
 
@@ -70,4 +70,55 @@ test('synthesizeSiteCache juejin: not affected by the SPA staleness guard (no ID
   }};
   const result = synthesizeSiteCache(cache, fakeMeta('https://juejin.cn/post/1'));
   assert.ok(result, 'juejin cache must still work — staleness guard only applies to YouTube/Bilibili');
+});
+
+test('synthesizeTwitterResult: single tweet keeps the compact shape (no replies section)', () => {
+  const result = synthesizeTwitterResult({ author: 'Alice', screenName: 'alice', text: 'hello world', likes: 5, retweets: 2, replies: 1, quotes: 0 }, fakeMeta('https://x.com/alice/status/1'));
+  assert.equal(result.mode, 'twitter');
+  assert.match(result.text, /\*\*作者\*\*: Alice @alice/);
+  assert.match(result.text, /hello world/);
+  assert.match(result.text, /5 喜欢/);
+  assert.doesNotMatch(result.text, /## 回复/);
+});
+
+test('synthesizeTwitterResult: includes the visible replies as a numbered conversation', () => {
+  const result = synthesizeTwitterResult({
+    author: 'Alice', screenName: 'alice', text: 'main tweet', likes: 10, retweets: 3, repliesCount: 2, quotes: 1,
+    replies: [
+      { text: 'reply one', author: 'Bob', screenName: 'bob', likes: 1, retweets: 0 },
+      { text: 'reply two', author: 'Carol', screenName: 'carol', likes: 0, retweets: 0 },
+    ]
+  }, fakeMeta('https://x.com/alice/status/1'));
+  assert.match(result.text, /main tweet/);
+  assert.match(result.text, /## 回复/);
+  assert.match(result.text, /1\. \*\*Bob @bob\*\*: reply one/);
+  assert.match(result.text, /2\. \*\*Carol @carol\*\*: reply two/);
+});
+
+test('synthesizeTwitterResult: handles old XHR shape without a replies array (stats use data.replies)', () => {
+  const result = synthesizeTwitterResult({ author: 'A', screenName: 'a', text: 'old shape', likes: 0, retweets: 0, replies: 7, quotes: 0 }, fakeMeta('https://x.com/a/status/1'));
+  assert.match(result.text, /7 回复/);
+  assert.doesNotMatch(result.text, /## 回复/);
+});
+
+test('synthesizeRedditResult: emits title, meta line, body, and a ## 评论 comment tree with depth', () => {
+  const result = synthesizeRedditResult({
+    post: { title: 'Big issue', subreddit: 'opencodeCLI', author: 'Meshyai', selftext: 'the body text', score: 120, numComments: 14 },
+    comments: [
+      { author: 'Alice', score: 5, depth: 0, text: 'top comment' },
+      { author: 'Bob', score: 2, depth: 1, text: 'nested reply' },
+    ],
+  }, fakeMeta('https://www.reddit.com/user/Meshyai/'));
+  assert.equal(result.mode, 'reddit');
+  assert.match(result.text, /# Big issue/);
+  assert.match(result.text, /r\/opencodeCLI · u\/Meshyai · 120 分 · 14 条评论/);
+  assert.match(result.text, /the body text/);
+  assert.match(result.text, /## 评论/);
+  assert.match(result.text, /\*\*Alice\*\* \(5\): top comment/);
+  assert.match(result.text, /  \*\*Bob\*\* \(2\): nested reply/, 'depth-1 comment indented');
+});
+
+test('synthesizeRedditResult: degrades gracefully when post/comments are missing', () => {
+  const result = synthesizeRedditResult({}, fakeMeta('https://www.reddit.com/'));
+  assert.equal(result.text, '', 'empty input -> empty text, no throw');
 });

@@ -31,7 +31,6 @@ globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 const fakeCfg = {
   providers: {
     hermes:       { baseUrl: 'http://default-hermes' },   // "configured" by default, but never pinged
-    'claude-code': { baseUrl: '' },                        // unconfigured
     compatible:   { baseUrl: 'http://my-llm' },            // configured AND reachable
   },
   pingStates: { compatible: 'reachable' },
@@ -78,14 +77,14 @@ const providerSel = document.getElementById('provider');
 test('populateProviderSelect sorts the reachable provider first, ahead of a merely-configured-by-default one', () => {
   const optionOrder = [...providerSel.options].map((o) => o.value);
   assert.equal(optionOrder[0], 'compatible', 'the only reachable provider must sort to the top');
-  assert.deepEqual(new Set(optionOrder), new Set(['hermes', 'claude-code', 'compatible']), 'all providers must still be present');
+  assert.deepEqual(new Set(optionOrder), new Set(['hermes', 'compatible']), 'all providers must still be present');
 });
 
 test('populateProviderSelect keeps stable relative order among non-reachable providers', () => {
   const optionOrder = [...providerSel.options].map((o) => o.value);
-  const hermesIdx = optionOrder.indexOf('hermes');
-  const claudeIdx = optionOrder.indexOf('claude-code');
-  assert.ok(hermesIdx < claudeIdx, 'hermes and claude-code are both non-reachable; original relative order (hermes before claude-code) must be preserved');
+  // compatible is the only reachable provider, so it sorts to the front;
+  // hermes (non-reachable) must stay after it, preserving DEFAULTS order.
+  assert.deepEqual(optionOrder, ['compatible', 'hermes'], 'reachable first, then non-reachable in original order');
 });
 
 test('populateProviderSelect still selects the persisted activeProvider regardless of sort position', () => {
