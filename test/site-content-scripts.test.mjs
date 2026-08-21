@@ -503,7 +503,7 @@ function loadContentScript(name) {
 // twitter-content-script.js
 // ============================================================================
 {
-  const { isTwitterTweetUrl, extractTweetFromResult, extractTwitterTweet, installTwitterInterceptor } =
+  const { isTwitterTweetUrl, extractTweetFromResult, extractTwitterTweet, installTwitterInterceptor, activeXFetch, extractTweetFromDom, extractTweetsFromInitState } =
     loadContentScript('twitter-content-script.js');
 
   test('twitter: isTwitterTweetUrl matches both twitter.com and x.com for TweetDetail/TweetResultByRestId', () => {
@@ -567,6 +567,298 @@ function loadContentScript(name) {
 
   test('twitter: installTwitterInterceptor is a no-op outside a browser context', () => {
     assert.equal(installTwitterInterceptor(), false);
+  });
+
+  test('twitter: extractTweetsFromInitState maps entities.tweets/users into the compact shape', () => {
+    const state = {
+      entities: {
+        tweets: {
+          '111': { id_str: '111', full_text: 'main tweet', favorite_count: 5, retweet_count: 2, reply_count: 1, quote_count: 0, lang: 'en', created_at: 'now', user_id_str: 'u1' },
+          '222': { id_str: '222', full_text: 'a reply', favorite_count: 1, retweet_count: 0, reply_count: 0, quote_count: 0, user_id_str: 'u2' },
+        },
+        users: {
+          u1: { id_str: 'u1', name: 'Alice', screen_name: 'alice' },
+          u2: { id_str: 'u2', name: 'Bob', screen_name: 'bob' },
+        }
+      }
+    };
+    const tweets = extractTweetsFromInitState(state);
+    assert.equal(tweets.length, 2);
+    const main = tweets.find((t) => t.tweetId === '111');
+    assert.equal(main.text, 'main tweet');
+    assert.equal(main.author, 'Alice');
+    assert.equal(main.screenName, 'alice');
+    assert.equal(main.likes, 5);
+    const reply = tweets.find((t) => t.tweetId === '222');
+    assert.equal(reply.author, 'Bob');
+    assert.equal(reply.screenName, 'bob');
+  });
+
+  test('twitter: extractTweetsFromInitState returns [] on empty/garbage state (no throw)', () => {
+    assert.deepEqual(extractTweetsFromInitState(null), []);
+    assert.deepEqual(extractTweetsFromInitState({}), []);
+    assert.deepEqual(extractTweetsFromInitState({ entities: { tweets: { bad: { noId: 1 } } } }), []);
+  });
+
+  test('twitter: extractTweetFromDom reads data-testid="tweet" containers with author/body', () => {
+    const mkTweet = (authorLine, text, datetime) => ({
+      querySelector: (sel) => {
+        if (sel === '[data-testid="tweetText"]') return { textContent: text };
+        if (sel === '[data-testid="User-Name"]') return { textContent: authorLine };
+        if (sel === 'time') return datetime ? { getAttribute: (a) => (a === 'datetime' ? datetime : null) } : null;
+        return null;
+      },
+    });
+    const root = { querySelectorAll: () => [
+      mkTweet('Alice\n@alice', 'hello world', '2026-08-21T00:00:00Z'),
+      mkTweet('Bob\n@bob', 'reply one', null),
+    ] };
+    const tweets = extractTweetFromDom(root);
+    assert.equal(tweets.length, 2);
+    assert.equal(tweets[0].author, 'Alice');
+    assert.equal(tweets[0].screenName, 'alice');
+    assert.equal(tweets[0].text, 'hello world');
+    assert.equal(tweets[0].createdAt, '2026-08-21T00:00:00Z');
+    assert.equal(tweets[1].screenName, 'bob');
+  });
+
+  test('twitter: extractTweetFromDom dedupes identical tweets and returns [] on empty doc', () => {
+    const mkTweet = (authorLine, text) => ({
+      querySelector: (sel) => {
+        if (sel === '[data-testid="tweetText"]') return { textContent: text };
+        if (sel === '[data-testid="User-Name"]') return { textContent: authorLine };
+        return null;
+      },
+    });
+    const root = { querySelectorAll: () => [
+      mkTweet('A\n@a', 'dup'),
+      mkTweet('A\n@a', 'dup'),
+      mkTweet('B\n@b', 'unique'),
+    ] };
+    const tweets = extractTweetFromDom(root);
+    assert.equal(tweets.length, 2, 'identical tweet must be deduped, distinct kept');
+    assert.deepEqual(extractTweetFromDom({ querySelectorAll: () => [] }), []);
+  });
+
+  test('twitter: activeXFetch prefers __INITIAL_STATE__ and orders main tweet first by URL status id', async () => {
+    const prev = globalThis.window;
+    globalThis.window = {
+      location: { pathname: '/jayair/status/111' },
+      __INITIAL_STATE__: {
+        entities: {
+          tweets: {
+            '222': { id_str: '222', full_text: 'a reply', user_id_str: 'u2' },
+            '111': { id_str: '111', full_text: 'the main tweet', favorite_count: 3, user_id_str: 'u1' },
+          },
+          users: {
+            u1: { id_str: 'u1', name: 'Alice', screen_name: 'alice' },
+            u2: { id_str: 'u2', name: 'Bob', screen_name: 'bob' },
+          }
+        }
+      }
+    };
+    try {
+      const result = await activeXFetch();
+      assert.equal(result.tweetId, '111');
+      assert.equal(result.text, 'the main tweet');
+      assert.equal(result.likes, 3);
+      assert.equal(result.replies.length, 1);
+      assert.equal(result.replies[0].text, 'a reply');
+      assert.equal(result.replies[0].screenName, 'bob');
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
+
+  test('twitter: activeXFetch falls back to DOM when __INITIAL_STATE__ is absent', async () => {
+    const prev = globalThis.window;
+    const mkTweet = (authorLine, text) => ({
+      querySelector: (sel) => {
+        if (sel === '[data-testid="tweetText"]') return { textContent: text };
+        if (sel === '[data-testid="User-Name"]') return { textContent: authorLine };
+        return null;
+      },
+    });
+    globalThis.window = {
+      location: { pathname: '/jayair/status/111' },
+      __INITIAL_STATE__: undefined,
+      document: { querySelectorAll: () => [
+        mkTweet('Alice\n@alice', 'main from dom'),
+        mkTweet('Bob\n@bob', 'reply from dom'),
+      ] },
+    };
+    try {
+      const result = await activeXFetch();
+      assert.equal(result.text, 'main from dom');
+      assert.equal(result.replies.length, 1);
+      assert.equal(result.replies[0].text, 'reply from dom');
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
+
+  test('twitter: activeXFetch returns null (no throw) when nothing extractable', async () => {
+    const prev = globalThis.window;
+    globalThis.window = { location: { pathname: '/explore' }, __INITIAL_STATE__: undefined };
+    try {
+      assert.equal(await activeXFetch(), null);
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
+}
+
+// ============================================================================
+// reddit-content-script.js
+// ============================================================================
+{
+  const { activeRedditFetch, postFromState, postFromDom, postFromGenericDom, commentsFromState, commentsFromDom, stripSmlNoise } =
+    loadContentScript('reddit-content-script.js');
+
+  test('reddit: stripSmlNoise removes the SML.load([...]) module-loader leak from comment summaries', () => {
+    assert.equal(stripSmlNoise('EndlessZone123 • 9天前 SML.load(["BcN0R7ekQu","Bd0cV"])'), 'EndlessZone123 • 9天前');
+    assert.equal(stripSmlNoise('CoolHeadeGamer • 8天前 SML.load(["x","y"])'), 'CoolHeadeGamer • 8天前');
+    assert.equal(stripSmlNoise('plain text'), 'plain text');
+  });
+
+  test('reddit: postFromState maps a post from INITIAL_STATE.posts.posts', () => {
+    const p = postFromState({
+      post: { id: 'abc123', title: ' Big issue ', subreddit: 'opencodeCLI', author: 'Meshyai', selftext: 'Hi, so I am working', score: 120, upvote_ratio: 0.91, num_comments: 14, permalink: '/r/x/comments/abc/' }
+    });
+    assert.equal(p.postId, 'abc123');
+    assert.equal(p.title, 'Big issue');
+    assert.equal(p.subreddit, 'opencodeCLI');
+    assert.equal(p.author, 'Meshyai');
+    assert.equal(p.selftext, 'Hi, so I am working');
+    assert.equal(p.score, 120);
+  });
+
+  test('reddit: postFromState returns null for empty/garbage (no throw)', () => {
+    assert.equal(postFromState({}), null);
+    assert.equal(postFromState(null), null);
+    assert.equal(postFromState({ post: { no_title: 1 } }), null);
+  });
+
+  test('reddit: commentsFromState flattens a nested comment tree in depth-first order with depth', () => {
+    const tree = [
+      { data: { author: 'Alice', body: 'first comment', score: 5 }, children: [
+        { data: { author: 'Bob', body: 'reply to Alice', score: 2 }, children: [
+          { data: { author: 'Carol', body: 'nested reply', score: 1 }, children: [] },
+        ] },
+      ] },
+      { data: { author: 'Dave', body: 'second top-level', score: 3 }, children: [] },
+    ];
+    const out = commentsFromState(tree);
+    assert.equal(out.length, 4);
+    assert.deepEqual(out.map((c) => c.author), ['Alice', 'Bob', 'Carol', 'Dave']);
+    assert.deepEqual(out.map((c) => c.depth), [0, 1, 2, 0]);
+    assert.equal(out[0].text, 'first comment');
+  });
+
+  test('reddit: commentsFromState returns [] on empty/garbage', () => {
+    assert.deepEqual(commentsFromState(null), []);
+    assert.deepEqual(commentsFromState([]), []);
+    assert.deepEqual(commentsFromState([{ noData: 1 }]), []);
+  });
+
+  test('reddit: postFromDom reads a shreddit-post web component (title/author/score attributes)', () => {
+    const el = {
+      getAttribute: (name) => ({
+        'post-title': 'T', 'subreddit': 'opencodeCLI', 'author': 'Meshyai',
+        'score': '42', 'comment-count': '7', 'id': 't3_abc', 'created-timestamp': '123',
+      }[name] ?? null),
+      querySelector: (sel) => (sel.includes('text-body') ? { textContent: 'the body text' } : null),
+    };
+    const doc = { querySelector: (sel) => (sel === 'shreddit-post' ? el : null) };
+    const p = postFromDom(doc);
+    assert.equal(p.title, 'T');
+    assert.equal(p.author, 'Meshyai');
+    assert.equal(p.score, 42);
+    assert.equal(p.numComments, 7);
+    assert.equal(p.selftext, 'the body text');
+  });
+
+  test('reddit: postFromDom returns null when no shreddit-post exists', () => {
+    assert.equal(postFromDom({ querySelector: () => null }), null);
+  });
+
+  test('reddit: postFromGenericDom finds an h1 title and its surrounding body text', () => {
+    const h1 = { textContent: 'Big issue with new post training' };
+    const section = { textContent: 'Big issue with new post training Hi, so I am working on my own set of custom tools.' };
+    const container = { querySelector: (sel) => (sel.startsWith(':scope') ? section : null) };
+    const doc = {
+      querySelector: (sel) => (sel === 'h1' ? h1 : (sel === 'shreddit-post' ? null : null)),
+    };
+    // postFromGenericDom walks up from h1 via parentElement; simulate by
+    // passing a doc whose h1.parentElement chain is minimal.
+    h1.parentElement = container;
+    container.parentElement = null;
+    const p = postFromGenericDom(doc);
+    assert.equal(p.title, 'Big issue with new post training');
+    assert.ok(p.selftext.includes('custom tools'), 'body text captured and title stripped');
+    assert.ok(!p.selftext.includes('Big issue'), 'title not duplicated in selftext');
+  });
+
+  test('reddit: commentsFromDom reads shreddit-comment web components with author/score/depth', () => {
+    const mk = (author, score, depth, text) => ({
+      getAttribute: (n) => ({ author, score: String(score), depth: String(depth) }[n] ?? null),
+      querySelector: (sel) => (sel.includes('slot') ? { textContent: text } : null),
+    });
+    const doc = { querySelectorAll: (sel) => (sel === 'shreddit-comment'
+      ? [mk('Alice', 5, 0, 'first'), mk('Bob', 2, 1, 'reply')]
+      : []) };
+    const out = commentsFromDom(doc);
+    assert.equal(out.length, 2);
+    assert.equal(out[0].author, 'Alice');
+    assert.equal(out[0].score, 5);
+    assert.equal(out[1].depth, 1);
+  });
+
+  test('reddit: commentsFromDom falls back to <details>/<summary> structure when no shreddit-comment exists', () => {
+    const mkDetails = (sumText, bodyText) => ({
+      textContent: sumText + ' ' + bodyText,
+      querySelector: (sel) => (sel === ':scope > summary' ? { textContent: sumText } : null),
+    });
+    const doc = { querySelectorAll: (sel) => (sel === 'shreddit-comment' ? []
+      : (sel === 'details' ? [mkDetails('Alice • 9天前', 'hello there'), mkDetails('Bob • 8天前', 'hi bob')] : [])) };
+    const out = commentsFromDom(doc);
+    assert.equal(out.length, 2);
+    assert.equal(out[0].author, 'Alice');
+    assert.equal(out[0].text, 'hello there');
+  });
+
+  test('reddit: activeRedditFetch returns null off-site / on unrecognizable pages (no throw)', async () => {
+    const prev = globalThis.window;
+    globalThis.window = { location: { hostname: 'example.com' }, __INITIAL_STATE__: {} };
+    try {
+      assert.equal(await activeRedditFetch(), null);
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
+
+  test('reddit: activeRedditFetch reads post+comments from __INITIAL_STATE__ on a reddit host', async () => {
+    const prev = globalThis.window;
+    globalThis.window = {
+      location: { hostname: 'www.reddit.com' },
+      __INITIAL_STATE__: {
+        posts: { posts: {
+          'abc123': {
+            post: { id: 'abc123', title: 'Big issue', subreddit: 'opencodeCLI', author: 'Meshyai', selftext: 'the body', score: 5, num_comments: 2 },
+            comments: [{ data: { author: 'Alice', body: 'c1', score: 1 }, children: [] }],
+          },
+        } },
+      },
+    };
+    try {
+      const r = await activeRedditFetch();
+      assert.equal(r.post.title, 'Big issue');
+      assert.equal(r.post.subreddit, 'opencodeCLI');
+      assert.equal(r.comments.length, 1);
+      assert.equal(r.comments[0].author, 'Alice');
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
   });
 }
 

@@ -56,7 +56,6 @@ test('getAll() returns full defaults when storage is empty', async () => {
   assert.deepEqual(all.history, []);
   assert.equal(all.contextMode, 'auto');
   assert.ok(all.providers.hermes, 'default hermes provider must be present');
-  assert.ok(all.providers['claude-code']);
   assert.ok(all.providers.compatible);
 });
 
@@ -202,7 +201,7 @@ test('getOrCreateHermesSessionId creates once and returns the same id on subsequ
   const id1 = await storage.getOrCreateHermesSessionId('hermes');
   const id2 = await storage.getOrCreateHermesSessionId('hermes');
   assert.equal(id1, id2, 'session id must persist across calls (survives SW restart via storage.session)');
-  const idOther = await storage.getOrCreateHermesSessionId('claude-code');
+  const idOther = await storage.getOrCreateHermesSessionId('compatible');
   assert.notEqual(id1, idOther, 'different providers must get independent session ids');
 });
 

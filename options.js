@@ -186,7 +186,7 @@ function buildProviderCard(name, cfg) {
   card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '');
 
   const isConfigured = !!(cfg.baseUrl?.trim());
-  const showModel = (cfg.type || 'llm') === 'llm'; // Agent providers (Hermes, Claude Code) don't expose Model ID
+  const showModel = (cfg.type || 'llm') === 'llm'; // Agent providers (Hermes) don't expose Model ID
 
   // Restore ping state from memory
   const pinged = _pingState[name];
@@ -447,7 +447,7 @@ function applyLlmsTxt() {
 }
 
 function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', 'claude-code': 'Claude Code', compatible: 'OpenAI-compatible' };
+  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
   return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
 }
 

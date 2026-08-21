@@ -167,7 +167,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
     <img src="icon128.png" alt="browsa" class="logo">
     <h1>browsa</h1>
     <p class="hero-lead">读着长文档想问 AI？<em>不用切窗口，不用复制粘贴。</em></p>
-    <p class="hero-sub">浏览器侧边栏 AI，一键附带当前页面，流式对话。支持 Hermes、Claude Code、任意 OpenAI 兼容 API。</p>
+    <p class="hero-sub">浏览器侧边栏 AI，一键附带当前页面，流式对话。支持 Hermes、任意 OpenAI 兼容 API。</p>
     <div class="cta-group">
       <a href="#install" class="btn btn-primary">⚡ 5 分钟上手</a>
       <a href="https://github.com/xiaohuzai/browsa" class="btn btn-secondary">⭐ GitHub 仓库</a>
@@ -232,7 +232,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
           </tr>
         </thead>
         <tbody>
-          <tr><td>API 后端</td><td><strong>自带</strong>（Hermes / Claude Code / OpenAI 兼容）</td><td>厂商锁定</td></tr>
+          <tr><td>API 后端</td><td><strong>自带</strong>（Hermes / OpenAI 兼容）</td><td>厂商锁定</td></tr>
           <tr><td>订阅费</td><td><strong>免费</strong>，MIT 开源</td><td>月付 $10-20</td></tr>
           <tr><td>工具执行</td><td><strong>能跑 bash、读写文件、搜索</strong>（Agent Provider）</td><td>通常不能</td></tr>
           <tr><td>站点结构化提取</td><td><strong>10+ 站点</strong>拦截 XHR，拿到字幕、转录、评论</td><td>仅正文文本</td></tr>
@@ -278,7 +278,7 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
       <div class="feature">
         <div class="ficon">🎛️</div>
         <h3>多 Provider 支持</h3>
-        <p>Hermes Agent（含工具执行）、Claude Code、任意 OpenAI 兼容 API。Ping 按钮一键检测。</p>
+        <p>Hermes Agent（含工具执行）、任意 OpenAI 兼容 API。Ping 按钮一键检测。</p>
       </div>
       <div class="feature">
         <div class="ficon">⌨️</div>
@@ -342,11 +342,6 @@ footer .copyright{color:var(--muted);font-size:0.85rem}
         <span class="ptype agent">🤖 AGENT</span>
         <h3>Hermes Agent</h3>
         <p>自托管 AI Agent，内置工具（web 搜索、终端、文件操作、记忆、技能）。用 <code>/v1/runs</code> API，支持工具进度展示和危险操作审批。</p>
-      </div>
-      <div class="provider">
-        <span class="ptype agent">🤖 AGENT</span>
-        <h3>Claude Code</h3>
-        <p>通过 claude-code-openai-wrapper 把 Claude Code CLI 暴露为 OpenAI 兼容 API，完整工具能力（bash、文件读写）。</p>
       </div>
       <div class="provider">
         <span class="ptype llm">💬 LLM</span>
