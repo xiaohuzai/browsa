@@ -694,10 +694,12 @@ test('splitMp4Fragments: handles size==0 (extends to end) and size==1 (64-bit ex
   assert.equal(res.fragments.length, 1);
 });
 
-test('transcodeAudioBlob: falls back to fragmented decode when whole-file decodeAudioData fails (long audio)', async () => {
-  // Build a synthetic fMP4 (init + 2 fragments). The decode mock throws on the
-  // WHOLE file (large buffer, like a 100+ min audio whose decoded PCM exceeds
-  // decodeAudioData limits — the real Edge bug) but succeeds per-fragment.
+test('transcodeAudioBlob: a fragmented fMP4 decodes straight via per-fragment decode (never whole-file)', async () => {
+  // Build a synthetic fMP4 (init + 2 fragments). The decode mock would throw on
+  // the whole file (>200 bytes, like the real 100min Edge bug) — but the new
+  // flow NEVER calls decodeAudioData on the whole file for a fragmented input,
+  // so it must succeed via per-fragment decode. This also guards the detached-
+  // ArrayBuffer regression (splitMp4Fragments runs before any decode).
   const ftyp = mp4Box('ftyp', new Uint8Array(8));
   const moov = mp4Box('moov', new Uint8Array(32));
   const moof1 = mp4Box('moof', new Uint8Array(16));
@@ -707,13 +709,11 @@ test('transcodeAudioBlob: falls back to fragmented decode when whole-file decode
   const file = new Uint8Array([...ftyp, ...moov, ...moof1, ...mdat1, ...moof2, ...mdat2]);
 
   const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
-  let decodeCount = 0;
+  const decodedSizes = [];
   globalThis.OfflineAudioContext = class {
     constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
     async decodeAudioData(buf) {
-      decodeCount++;
-      // Whole-file (248 bytes) throws; a fragment unit (init 56 + fragment 96
-      // = 152 bytes) is under the threshold and decodes.
+      decodedSizes.push(buf.byteLength);
       if (buf.byteLength > 200) throw new Error('Unable to decode audio data');
       return { sampleRate: 48000, length: 48000, numberOfChannels: 1, getChannelData: () => new Float32Array(48000) };
     }
@@ -723,15 +723,17 @@ test('transcodeAudioBlob: falls back to fragmented decode when whole-file decode
   };
   globalThis.AudioContext = undefined; // force OfflineAudioContext path
   const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
-  assert.equal(res.ok, true, 'must succeed via fragmented decode fallback: ' + (res.error || ''));
-  assert.equal(decodeCount, 3, '1 whole-file attempt (throws) + 2 fragment decodes');
+  assert.equal(res.ok, true, 'must succeed via per-fragment decode: ' + (res.error || ''));
+  // whole file is 248 bytes — it must NEVER be passed to decodeAudioData
+  assert.ok(decodedSizes.every((s) => s <= 200), 'whole-file buffer must not reach decodeAudioData: ' + decodedSizes.join(','));
+  assert.equal(decodedSizes.length, 2, 'one decode per fragment (init+fragment unit), no whole-file attempt');
   // 2 fragments x 1s @48k -> 2s @16k = 32000 frames -> 44 + 64000 bytes
   assert.equal(res.wavBytes, 44 + 32000 * 2);
   globalThis.AudioContext = saved.AudioContext;
   globalThis.OfflineAudioContext = saved.OfflineAudioContext;
 });
 
-test('transcodeAudioBlob: when whole-file AND fragmented decode both fail, returns {ok:false} with a combined error', async () => {
+test('transcodeAudioBlob: fragmented input whose per-fragment decode fails reports the fragment error', async () => {
   const ftyp = mp4Box('ftyp', new Uint8Array(8));
   const moov = mp4Box('moov', new Uint8Array(32));
   const moof1 = mp4Box('moof', new Uint8Array(16));
@@ -748,9 +750,46 @@ test('transcodeAudioBlob: when whole-file AND fragmented decode both fail, retur
   globalThis.AudioContext = undefined;
   const res = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
   assert.equal(res.ok, false);
-  assert.match(res.error, /decode failed/);
-  assert.match(res.error, /whole:/);
-  assert.match(res.error, /fragmented:/);
+  assert.match(res.error, /fragment decode failed/);
+  globalThis.AudioContext = saved.AudioContext;
+  globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcodeAudioBlob: non-fragmented (single mdat) file uses whole-file decode; failure includes parse diagnostic', async () => {
+  const ftyp = mp4Box('ftyp', new Uint8Array(8));
+  const moov = mp4Box('moov', new Uint8Array(32));
+  const mdat = mp4Box('mdat', new Uint8Array(64));
+  const file = new Uint8Array([...ftyp, ...moov, ...mdat]);
+
+  const saved = { AudioContext: globalThis.AudioContext, OfflineAudioContext: globalThis.OfflineAudioContext };
+  let wholeDecodeCount = 0;
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData(buf) {
+      wholeDecodeCount++;
+      // Non-fragmented file has no moof; the whole file is the only decodable unit.
+      return { sampleRate: 48000, length: 48000, numberOfChannels: 1, getChannelData: () => new Float32Array(48000) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+  globalThis.AudioContext = undefined;
+  const okRes = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(okRes.ok, true, 'non-fragmented decodes via whole-file path');
+  assert.equal(wholeDecodeCount, 1, 'whole-file decode used exactly once');
+
+  // Same file, but whole-file decode now fails → error must carry the parse diagnostic
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData() { throw new Error('Unable to decode audio data'); }
+    async close() {}
+    destination = {};
+  };
+  const failRes = await transcodeAudioBlob(new Blob([file], { type: 'video/mp4' }));
+  assert.equal(failRes.ok, false);
+  assert.match(failRes.error, /Unable to decode audio data/);
+  assert.match(failRes.error, /not a fragmented mp4 \(boxes: ftyp,moov,mdat\)/);
   globalThis.AudioContext = saved.AudioContext;
   globalThis.OfflineAudioContext = saved.OfflineAudioContext;
 });

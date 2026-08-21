@@ -910,7 +910,10 @@ async function onAttachPage() {
           }
           if (!dl?.ok || !dl.blob) {
             lastErr = 'ASR download failed: ' + (dl?.error || 'no blob');
-            console.warn('[ASR]', lastErr, ci < candidates.length - 1 ? '— trying next candidate' : '');
+            // cookie 诊断：同 URL 一次成功一次 403，差异在请求上下文（登录态 cookie）。
+            // mid 登录流缺 SESSDATA 会 403——记录 biliCookie 是否非空，方便定位。
+            const cookieDiag = ctx.biliCookie ? `cookie:${ctx.biliCookie.length}chars` : 'cookie:EMPTY';
+            console.warn('[ASR]', lastErr, `[${cookieDiag}]`, ci < candidates.length - 1 ? '— trying next candidate' : '');
             if (isLast) throw new Error(lastErr);
             continue;
           }
