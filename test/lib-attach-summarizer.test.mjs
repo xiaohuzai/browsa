@@ -70,10 +70,10 @@ test('shouldSummarize: below threshold is false, above is true', () => {
   assert.equal(shouldSummarize('a'.repeat(300), 200), true);
 });
 
-test('shouldSummarize: 0/undefined threshold falls back to the 40,000-char default', () => {
-  assert.equal(shouldSummarize('a'.repeat(39_999), 0), false);
-  assert.equal(shouldSummarize('a'.repeat(40_001), 0), true);
-  assert.equal(shouldSummarize('a'.repeat(40_001), undefined), true);
+test('shouldSummarize: 0/undefined threshold falls back to the 100,000-char default', () => {
+  assert.equal(shouldSummarize('a'.repeat(99_999), 0), false);
+  assert.equal(shouldSummarize('a'.repeat(100_001), 0), true);
+  assert.equal(shouldSummarize('a'.repeat(100_001), undefined), true);
 });
 
 test('shouldSummarize: empty/falsy text is always false', () => {
