@@ -487,6 +487,75 @@ input[type="radio"] { accent-color: var(--accent); }
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* ── Hover tooltips (? icon) ────────────────────────────────────────────── */
+/* Used by the ASR card: explanatory text that used to be long inline .hint
+   paragraphs now lives in a ? bubble revealed on hover/focus, keeping the
+   card visually consistent with the other .row/.toggle-row cards. The bubble
+   opens to the RIGHT of the icon (vertically centered) so .card's overflow:
+   hidden never clips it at the top/bottom edge. */
+.field-title {
+  display: inline; /* keep "API Key ?" on one line inside the flex-column .row label */
+}
+.tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+  user-select: none;
+}
+.tip:hover,
+.tip:focus-visible {
+  background: var(--accent);
+  color: #fff;
+  outline: none;
+}
+.tip .tip-bubble {
+  display: none;
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 300px;
+  min-width: 180px;
+  background: var(--surface-2, #23262e);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-align: left;
+  letter-spacing: 0;
+  white-space: normal;
+  box-shadow: var(--shadow);
+  z-index: 100;
+}
+.tip:hover .tip-bubble,
+.tip:focus-visible .tip-bubble {
+  display: block;
+}
+.tip-bubble b { color: var(--fg-2); font-weight: 600; }
+.tip-bubble code {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11px;
+  background: var(--border);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--fg-2);
+}
+
 /* ── Per-card status ─────────────────────────────────────────────────────── */
 .card-status {
   font-size: 12px;

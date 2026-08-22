@@ -108,55 +108,42 @@
 
         <section class="card">
           <div class="card-header">
-            <h2>Content limits</h2>
-          </div>
-          <div class="card-body">
-            <p class="hint">Hard cap on extracted text sent to the model (characters). Readability typically yields 5–30K. Default 1M is safe for any modern LLM.</p>
-            <div class="inline-field">
-              <label for="maxTextChars">Max chars</label>
-              <input id="maxTextChars" type="number" min="1000" step="1000" />
-            </div>
-            <p class="hint">Very long attachments (e.g. a multi-hour video's transcript) get resent in full on every turn. When one exceeds the threshold below, browsa chunks it, summarizes each chunk, and merges the result once — before it ever enters history.</p>
-            <div class="inline-field">
-              <label for="autoSummarizeAttachments">Auto-summarize long attachments</label>
-              <input id="autoSummarizeAttachments" type="checkbox" />
-            </div>
-            <div class="inline-field">
-              <label for="summarizeThresholdChars">Threshold (chars)</label>
-              <input id="summarizeThresholdChars" type="number" min="0" step="1000" placeholder="0 = default (40,000)" />
-              <button data-act="save-limits" class="primary">Save</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
             <h2>ASR 字幕识别（火山方舟）</h2>
           </div>
           <div class="card-body">
-            <p class="hint">B 站无字幕视频 attach 时，下载音频 → 自动转码为 16kHz 单声道 WAV（方舟无法直接处理 B 站 m4s）→ 上传火山方舟录音文件识别（ASR）生成字幕。需要先开通方舟的音频理解模型并获取 <strong>标准版 API Key</strong>。</p>
-            <div class="inline-field">
-              <label for="asrEnabled">启用 ASR</label>
-              <input id="asrEnabled" type="checkbox" />
+            <label class="toggle-row">
+              <input type="checkbox" id="asrEnabled" />
+              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">B 站无字幕视频 attach 时，下载音频 → 自动转码为 16kHz 单声道 WAV（方舟无法直接处理 B 站 m4s）→ 上传火山方舟录音文件识别（ASR）生成字幕。需要先开通方舟的音频理解模型并获取 <b>标准版 API Key</b>。</span></span></span>
+            </label>
+
+            <div class="row mt-12">
+              <label for="asrApiKey">
+                <span class="field-title">API Key<span class="tip" tabindex="0">?<span class="tip-bubble">必须是 <b>标准版方舟 API Key</b>（方舟控制台 → API Key 管理里创建）。<b>不要用 Agent Plan / Coding Agent 套餐的 key</b>——实测确认编程套餐不含任何音频理解模型，上传报 404、音频输入报 “audio input is not supported”，无法转写。判断方法：标准 key 能在 <code>…/api/v3</code> 上认证（填错会在转写时报鉴权错误）。</span></span></span>
+                <input id="asrApiKey" type="password" class="mt-4" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
+              </label>
             </div>
-            <div class="inline-field">
-              <label for="asrApiKey">API Key</label>
-              <input id="asrApiKey" type="password" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
-              <p class="hint">必须是 <strong>标准版方舟 API Key</strong>（方舟控制台 → API Key 管理里创建）。<strong>不要用 Agent Plan / Coding Agent 套餐的 key</strong>——实测确认编程套餐不含任何音频理解模型，上传报 404、音频输入报 “audio input is not supported”，无法转写。判断方法：标准 key 能在 <code>…/api/v3</code> 上认证（填错会在转写时报鉴权错误）。</p>
+
+            <div class="row mt-12">
+              <label for="asrBaseUrl">
+                <span class="field-title">Base URL<span class="tip" tabindex="0">?<span class="tip-bubble">必须用标准版端点 <code>…/api/v3</code>（Files API 上传只在此端点上）。如果填了 Agent Plan 的 <code>…/api/plan/v3</code>，保存时会自动规整回 <code>…/api/v3</code>（套餐端点没有文件上传能力）。</span></span></span>
+                <input id="asrBaseUrl" type="text" class="mt-4" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
+              </label>
             </div>
-            <div class="inline-field">
-              <label for="asrBaseUrl">Base URL</label>
-              <input id="asrBaseUrl" type="text" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
-              <p class="hint">必须用标准版端点 <code>…/api/v3</code>（Files API 上传只在此端点上）。如果填了 Agent Plan 的 <code>…/api/plan/v3</code>，保存时会自动规整回 <code>…/api/v3</code>（套餐端点没有文件上传能力）。</p>
+
+            <div class="row mt-12">
+              <label for="asrModel">
+                <span class="field-title">模型 ID</span>
+                <input id="asrModel" type="text" class="mt-4" placeholder="doubao-seed-2-0-lite-260428" />
+              </label>
             </div>
-            <div class="inline-field">
-              <label for="asrModel">模型 ID</label>
-              <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
+
+            <div class="row mt-12">
+              <label for="asrLanguage">
+                <span class="field-title">语种</span>
+                <input id="asrLanguage" type="text" class="mt-4" placeholder="zh" />
+              </label>
             </div>
-            <div class="inline-field">
-              <label for="asrLanguage">语种</label>
-              <input id="asrLanguage" type="text" placeholder="zh" />
-            </div>
+
             <div class="card-actions">
               <button data-act="save-asr" class="primary">Save</button>
             </div>

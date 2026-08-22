@@ -21,14 +21,12 @@ async function init() {
   cachedCfg = await storage.getAll();
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
-  applyLimits(cachedCfg);
   applyAsr(cachedCfg);
   applyToolbarToggle();
   applyLlmsTxt();
   applySystemPrompt();
   applyReplyLanguage();
 
-  document.querySelector('button[data-act="save-limits"]')?.addEventListener('click', saveLimits);
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
 
   // Chat preferences
@@ -67,41 +65,6 @@ async function saveChatPrefs() {
     statusEl.textContent = '✓ Saved';
     setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'card-status'; }, 3000);
   }
-}
-
-function applyLimits(cfg) {
-  const textEl = document.getElementById('maxTextChars');
-  if (textEl) textEl.value = cfg.maxTextChars ?? 1_000_000;
-  const autoSumEl = document.getElementById('autoSummarizeAttachments');
-  if (autoSumEl) autoSumEl.checked = cfg.autoSummarizeAttachments !== false;
-  const thresholdEl = document.getElementById('summarizeThresholdChars');
-  if (thresholdEl) thresholdEl.value = cfg.summarizeThresholdChars ?? 0;
-}
-
-async function saveLimits() {
-  const textEl = document.getElementById('maxTextChars');
-  const text = parseInt(textEl?.value, 10);
-  if (!Number.isFinite(text) || text < 1000) {
-    flash('err', 'Limit must be ≥ 1000 chars.');
-    return;
-  }
-  const thresholdEl = document.getElementById('summarizeThresholdChars');
-  const threshold = parseInt(thresholdEl?.value, 10);
-  if (!Number.isFinite(threshold) || threshold < 0) {
-    flash('err', 'Summarize threshold must be ≥ 0 chars.');
-    return;
-  }
-  const autoSumEl = document.getElementById('autoSummarizeAttachments');
-  const autoSummarize = !!autoSumEl?.checked;
-  cachedCfg.maxTextChars = text;
-  cachedCfg.autoSummarizeAttachments = autoSummarize;
-  cachedCfg.summarizeThresholdChars = threshold;
-  await chrome.storage.local.set({
-    maxTextChars: text,
-    autoSummarizeAttachments: autoSummarize,
-    summarizeThresholdChars: threshold
-  });
-  flash('ok', `Saved: max text ${text.toLocaleString()} chars, auto-summarize ${autoSummarize ? 'on' : 'off'}.`);
 }
 
 function applyAsr(cfg) {
