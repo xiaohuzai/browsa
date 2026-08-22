@@ -1,5 +1,7 @@
 # browsa
 
+> **Languages**: **English** · [简体中文](README.zh-CN.md)
+
 > **browsa** = **brow**ser **s**ide p**a**nel **A**I. Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
 
 browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
@@ -21,7 +23,7 @@ browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next t
 
 ```bash
 npm install          # first time only
-npm test             # run 660 unit tests
+npm test             # run 789 unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
