@@ -21,7 +21,6 @@ async function init() {
   cachedCfg = await storage.getAll();
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
-  applyContextMode(cachedCfg.contextMode || 'auto');
   applyLimits(cachedCfg);
   applyAsr(cachedCfg);
   applyToolbarToggle();
@@ -29,15 +28,6 @@ async function init() {
   applySystemPrompt();
   applyReplyLanguage();
 
-  document.querySelectorAll('input[name="ctx"]').forEach((r) => {
-    r.addEventListener('change', async () => {
-      const mode = [...document.querySelectorAll('input[name="ctx"]')].find((x) => x.checked)?.value || 'reader';
-      await storage.setContextMode(mode);
-      flash('ok', `Default context mode: ${mode}`);
-    });
-  });
-
-  // Save-limits button
   document.querySelector('button[data-act="save-limits"]')?.addEventListener('click', saveLimits);
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
 
@@ -392,10 +382,6 @@ async function resetCard(name, card) {
   renderProviders();
 }
 
-
-function applyContextMode(mode) {
-  for (const r of document.querySelectorAll('input[name="ctx"]')) r.checked = r.value === mode;
-}
 
 function applySystemPrompt() {
   const el = $('systemPrompt');
