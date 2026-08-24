@@ -24,7 +24,8 @@ import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll liste
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import {
-  downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript
+  downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript, transcriptEndSec,
+  ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
@@ -816,6 +817,13 @@ async function onAttachPage() {
       attachBtn.title = '转写音频中…';
       showAttachProgress('下载并转写音频中…');
       const { asr } = ctx;
+      // 播放地址全部过期且自动刷新失败（deadline 签名的 m4s URL，过期后 CDN 一律
+      // 403，referer/cookie 再对也没用）——再试也是白等三轮 403，直接明示原因并
+      // 走回退（用户刷新视频页后重新 attach 即可，刷新 = 重新拉 playurl = 新签名）。
+      if (ctx.asrExpiredError) {
+        console.warn('[ASR] expired playurl, auto-refresh failed:', ctx.asrExpiredError);
+        throw new Error('B站播放地址已过期且自动刷新失败（' + ctx.asrExpiredError + '）——请刷新视频页面后重新附加');
+      }
       let transcriptText = '';
       let audioBytes = 0;
       const dnrRuleId = Math.floor(Math.random() * 4_999_999) + 1;
@@ -881,6 +889,7 @@ async function onAttachPage() {
         let audioBytes = 0;
         let usedLabel = '';
         let lastErr = '';
+        let urlsRefreshed = false;   // 403 自愈：整个 attach 只重新签名一次
         // 下载失败/转码失败/截断都换下一候选流重试——不同码率流可能是不同编码
         // （最低码率常用 HE-AAC，decodeAudioData 可能解不了——真实 bug：transcode
         // "Unable to decode audio data"），或不同 CDN 节点（坏文件/坏节点）。
@@ -910,10 +919,32 @@ async function onAttachPage() {
           }
           if (!dl?.ok || !dl.blob) {
             lastErr = 'ASR download failed: ' + (dl?.error || 'no blob');
-            // cookie 诊断：同 URL 一次成功一次 403，差异在请求上下文（登录态 cookie）。
-            // mid 登录流缺 SESSDATA 会 403——记录 biliCookie 是否非空，方便定位。
             const cookieDiag = ctx.biliCookie ? `cookie:${ctx.biliCookie.length}chars` : 'cookie:EMPTY';
-            console.warn('[ASR]', lastErr, `[${cookieDiag}]`, ci < candidates.length - 1 ? '— trying next candidate' : '');
+            console.warn('[ASR]', lastErr, `[${cookieDiag}]`);
+            // 播放地址过期的自愈重试：403（deadline 签名 URL 过期，CDN 无论 referer/
+            // cookie 都无条件 403）时自动在页内重拉一次 playurl 换全新签名 URL，
+            // 成功则替换候选列表从头重试——用户无需刷新页面。仅此一次；再失败才走
+            // 现有兜底（明示报错 + 回退原字幕）。
+            if (!urlsRefreshed && /403/.test(lastErr)) {
+              urlsRefreshed = true;
+              let fresh = null;
+              let refreshErr = '';
+              try {
+                const r = await sendMessage({ type: 'ASR_FRESH_URLS', tabId: currentTabId }).catch(() => null);
+                if (r?.ok && r?.data?.ok && Array.isArray(r.data.streams) && r.data.streams.length) fresh = r.data.streams;
+                else refreshErr = r?.data?.error || r?.error || 'refresh failed';
+              } catch (e2) { refreshErr = String((e2 && e2.message) || e2); }
+              if (fresh) {
+                console.log(`[ASR] playurl refreshed -> ${fresh.length} audio streams, retrying download`);
+                candidates.length = 0;
+                for (const s of fresh) {
+                  candidates.push({ url: s.url, label: s.label || '', codecs: s.codecs || '', id: s.id || 0 });
+                }
+                ci = -1;          // for 循环随后 ci++ 从 0 重跑（全新 URL）
+                continue;
+              }
+              console.warn('[ASR] playurl refresh failed, no retry:', refreshErr);
+            }
             if (isLast) throw new Error(lastErr);
             continue;
           }
@@ -944,12 +975,15 @@ async function onAttachPage() {
           }
           // Truncation check: uncompressed 16-bit PCM WAV (1 channel) → bytes =
           // sec * sampleRate * 2 (2 bytes/sample, 16-bit). wavDur ≈ audio seconds.
+          // 阈值对齐 buildAsrPendingCtx 的元数据校验（< 90% 视为截断流）：之前 50% 的
+          // 门槛放过了 62.5%（52:48 视频只出 33 分钟字幕）这类半截流——只有明显截断
+          // 才换流/失败，正常音轨（≥90%）不受影响。
           const wavDur = tr.wavBytes / ((tr.sampleRate || 16000) * 2);
-          const isShort = wantDurSec > 0 && wavDur < wantDurSec * 0.5;
+          const isShort = wantDurSec > 0 && wavDur < wantDurSec * 0.9;
           console.log('[ASR] transcoded -> WAV', tr.wavBytes, 'bytes, sampleRate', tr.sampleRate, '| wav dur ~', wavDur.toFixed(0), 's vs video', wantDurSec, 's', isShort ? '→ TRUNCATED' : '');
           if (isShort) {
             if (candidates.length > 1) {
-              console.warn('[ASR] stream too short (' + wavDur.toFixed(0) + 's < 50% of ' + wantDurSec + 's) — trying next candidate');
+              console.warn('[ASR] stream too short (' + wavDur.toFixed(0) + 's < 90% of ' + wantDurSec + 's) — trying next candidate');
               continue;
             }
             // 唯一候选也截断：静默附加部分字幕正是用户报告的 bug，必须失败回退
@@ -965,9 +999,13 @@ async function onAttachPage() {
           throw new Error(lastErr || 'ASR transcode failed: no usable audio stream');
         }
         if (usedLabel) console.log('[ASR] using audio stream:', usedLabel);
-        // 3. Upload the WAV to 方舟 Files API -> file_id.
+        // 4. 上传 → 转写。单次调用整段音频（流式）：火山文档只限制上传文件大小
+        // ≤512MB，没有“单次输出必须切分”的要求；切分方案的说话人编号不连续/边界
+        // 重复问题无法根治，已按决策移除，改为直传 + 日志 + 完整度兜底，复现时
+        // 靠日志正向定位。
         // XHR upload.onprogress gives a real percentage (fetch has none).
         showAttachProgress('上传音频中…（0%）');
+        const upStart = Date.now();
         const up = await uploadBlobToArk({
           blob: trans.wavBlob,
           filename: 'audio.wav',
@@ -977,7 +1015,7 @@ async function onAttachPage() {
             if (total) {
               showAttachProgress(`上传音频中…（${Math.round((done / total) * 100)}%）`);
             } else {
-              const secs = Math.round((Date.now() - trStart) / 1000);
+              const secs = Math.round((Date.now() - upStart) / 1000);
               showAttachProgress(`上传音频中…（已上传 ${(done / 1024 / 1024).toFixed(1)}MB，已等待 ${secs}s）`);
             }
           },
@@ -986,18 +1024,16 @@ async function onAttachPage() {
           throw new Error('ASR upload failed: ' + (up?.error || 'no fileId'));
         }
         console.log('[ASR] uploaded fileId', up.fileId, '| sent', up.bytes, '| Ark meta:', JSON.stringify({ upBytes: up.upBytes, upContentType: up.upContentType, upStatus: up.upStatus }));
-        showAttachProgress('转写音频中…（已上传，等待识别）');
-        // 实时等待反馈：poll + transcribe 都可能耗时较长（长音频处理 + 同步转写），
-        // 用一个 interval 每秒刷新已等待秒数，让用户知道仍在处理而非卡死。
+        // 实时等待反馈：poll + transcribe 都可能耗时较长（长音频处理 + 流式转写），
+        // 用一个 interval 每秒刷新当前阶段/已等待秒数，让用户知道仍在处理而非卡死。
         const waitStart = Date.now();
-        let stageLabel = '处理音频';
+        let stageLabel = '识别处理';
         const waitTimer = setInterval(() => {
           const secs = Math.round((Date.now() - waitStart) / 1000);
           showAttachProgress(`${stageLabel}中…（已等待 ${secs}s）`);
         }, 1000);
         try {
           // 2. Poll file status (sidepanel, has window)
-          stageLabel = '识别处理';
           const poll = await pollFileStatus(asr.baseUrl, asr.apiKey, up.fileId, {
             timeoutMs: asr.timeoutMs,
           });
@@ -1005,7 +1041,7 @@ async function onAttachPage() {
           if (!poll.ready) {
             throw new Error('ASR file processing failed: ' + (poll.error || ''));
           }
-          // 3. Transcribe via Responses API
+          // 3. Transcribe via Responses API（流式）
           stageLabel = '转写';
           const tr = await transcribeAudio({
             baseUrl: asr.baseUrl,
@@ -1013,12 +1049,28 @@ async function onAttachPage() {
             fileId: up.fileId,
             model: asr.model,
             language: asr.language,
-            // 总预算：长音频流式转写可能很久；10 分钟兜底防无限挂起。
-            // 流式内部另有 60s“无新数据”空闲超时，中途有数据会持续重置，
-            // 所以正常流式不会因为转写本身慢而被误杀。
-            signal: AbortSignal.timeout(10 * 60_000),
+            // 墙钟预算随视频时长缩放：单次转写整段音频所需时间 ≈ 音频时长 ÷ 转写
+            // 速度（实测 ≥3.3 倍实时）。给到「音频时长 ÷ 2」（2 倍实时速度的余量），
+            // 默认 10 分钟兜底、上限 45 分钟，防无限挂起；流式内部另有 60s 空闲超时。
+            signal: AbortSignal.timeout(Math.max(10 * 60_000, Math.min(45 * 60_000, Math.round((wantDurSec || 0) * 1000 / 2)))),
           });
+          if (tr.truncated) {
+            console.warn('[ASR] model output truncated:', tr.finishReason);
+            throw new Error(`ASR 转写被模型输出上限截断（${tr.finishReason || 'max_output_tokens'}）`);
+          }
           const fmt = formatAsrTranscript(tr.text);
+          // 完整度兜底：即使音频本身完整（WAV 校验过了）、模型也没报截断，只要转写
+          // 明显没覆盖到视频结尾（最后一句时间戳 < 视频 90%），说明输出被中途截断
+          // ——绝不允许静默存半截字幕，必须失败回退（纯文本 + toast）。
+          const endSec = transcriptEndSec(tr.text);
+          const incomplete = !!(wantDurSec > 0 && endSec != null && endSec < wantDurSec * 0.9);
+          if (incomplete) {
+            console.warn('[ASR] transcript incomplete: last stamp', endSec, 's < 90% of', wantDurSec, 's video');
+            throw new Error('ASR transcript is incomplete (' + (endSec == null ? '?' : endSec.toFixed(0)) + 's of ' + wantDurSec + 's video)');
+          }
+          if (endSec != null) {
+            console.log(`[ASR] transcript complete: last stamp ${endSec.toFixed(1)}s (${(wantDurSec > 0 ? ((endSec / wantDurSec) * 100).toFixed(0) : '?')}% of ${wantDurSec}s video)`);
+          }
           transcriptText = fmt.lines.join('\n');
           if (!transcriptText) {
             throw new Error('ASR returned empty transcript');
@@ -1041,9 +1093,20 @@ async function onAttachPage() {
       // Store the transcript (or fall back to the plain bilibili text).
       // ASR 字幕作为【增量】追加在视频元信息之后（像有字幕的视频 attach 一样保留
       // UP主/标题/播放量等元信息），而不是用字幕整体替换 ctx.text。
-      const confirmText = transcriptText
-        ? ctx.text + '\n\n## 字幕（ASR）\n\n' + transcriptText
-        : ctx.text || '';
+      // 例外：当用户选了「优先 ASR 解析字幕」（asr.subtitleSource === 'asr'）且该视频
+      // 原本就有字幕（ctx.noTranscript === false）时，ASR 字幕应【替换】低质量的
+      // 原字幕 —— 从 ctx.text 里剥掉原来的 `## 字幕` 块再追加 `## 字幕（ASR）`，
+      // 避免同一份内容两份字幕同时喂给模型。仅在 ASR 成功时执行剥除（ctx.text
+      // 本身保持原样），失败回退时原字幕原样保留。
+      let confirmText = ctx.text || '';
+      if (transcriptText) {
+        const preferAsr = ctx.asr?.subtitleSource === ASR_SUBTITLE_SOURCE.ASR;
+        const hadOriginalTranscript = ctx.noTranscript === false;
+        const baseText = (hadOriginalTranscript && preferAsr)
+          ? (ctx.text || '').replace(/\n\n## 字幕\n\n[\s\S]*$/, '').replace(/\s+$/, '')
+          : (ctx.text || '');
+        confirmText = baseText + '\n\n## 字幕（ASR）\n\n' + transcriptText;
+      }
       const confirmRes = await sendMessage({
         type: 'ATTACH_ASR_CONFIRM',
         text: confirmText,
@@ -1056,7 +1119,10 @@ async function onAttachPage() {
         const title = ctx.meta?.title || 'B站视频';
         const lineCount = transcriptText ? transcriptText.split('\n').length : 0;
         const bytesLabel = audioBytes > 0 ? `，${(audioBytes / 1024 / 1024).toFixed(1)}MB 音频` : '';
-        const subLabel = transcriptText ? `，${lineCount} 行字幕` : '（无字幕，已用视频信息代替）';
+        // ASR 失败时的回退标签要区分：有原字幕的视频保留原字幕，无字幕的视频才是纯视频信息。
+        const subLabel = transcriptText
+          ? `，${lineCount} 行字幕`
+          : (ctx.noTranscript === false ? '（ASR 失败，已保留原字幕）' : '（无字幕，已用视频信息代替）');
         appendAttachSystem(`📎 已附加 B站字幕："${title}"（ASR${bytesLabel}${subLabel}）`, null, confirmText);
       } else {
         appendError('ASR attach failed');
@@ -1558,6 +1624,9 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       outputTokens = 0;
       // Show token usage if the provider returned it
       if (m.usage) showTokenUsage(el, m.usage);
+      // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
+      // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
+      if (m.outputTruncated) showToast('回复已达模型输出长度上限，可回复「继续」续写', 'info');
       if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
       // Detect max-turns: agent hit the tool-call ceiling and is asking
       // the user to continue. Show a one-click Continue button.

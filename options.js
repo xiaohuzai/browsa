@@ -75,7 +75,20 @@ function applyAsr(cfg) {
   set('asrApiKey', a.apiKey);
   set('asrBaseUrl', a.baseUrl);
   set('asrModel', a.model);
-  set('asrLanguage', a.language);
+  const langSel = document.getElementById('asrLanguage');
+  if (langSel) {
+    const v = a.language || 'auto';
+    // 只选中列表里存在的选项；旧配置的未知语种（或空）回退到「自动检测」
+    //（保存时才会写回存储，applyAsr 不修改存储）。
+    if ([...langSel.options].some((o) => o.value === v)) langSel.value = v;
+    else langSel.value = 'auto';
+  }
+  const ssSel = document.getElementById('asrSubtitleSource');
+  if (ssSel) {
+    const v = a.subtitleSource || 'original';
+    if ([...ssSel.options].some((o) => o.value === v)) ssSel.value = v;
+    else ssSel.value = 'original';
+  }
 }
 
 async function saveAsr() {
@@ -83,7 +96,8 @@ async function saveAsr() {
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
   const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || 'https://ark.cn-beijing.volces.com/api/v3';
   const model = (document.getElementById('asrModel')?.value || '').trim() || 'doubao-seed-2-0-lite-260428';
-  const language = (document.getElementById('asrLanguage')?.value || '').trim() || 'zh';
+  const language = document.getElementById('asrLanguage')?.value || 'auto';
+  const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
   if (enabled && !apiKey) {
     flash('err', '启用 ASR 需要填写 API Key。');
     return;
@@ -97,7 +111,7 @@ async function saveAsr() {
     savedBaseUrl = normalizeArkBaseUrl(baseUrl);
     flash('err', `已把 Base URL 从 Agent Plan 端点自动改为标准版 ${savedBaseUrl}（api/plan/v3 没有文件上传）。`);
   }
-  cachedCfg.asr = { enabled, apiKey, baseUrl: savedBaseUrl, model, language };
+  cachedCfg.asr = { enabled, apiKey, baseUrl: savedBaseUrl, model, language, subtitleSource };
   await chrome.storage.local.set({ asr: cachedCfg.asr });
   flash('ok', `ASR ${enabled ? '已启用' : '已停用'}${enabled ? '（模型 ' + model + '）' : ''}。`);
 }

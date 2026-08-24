@@ -159,6 +159,44 @@ test('ATTACH_PAGE on a bilibili page WITH transcript: normal store path (no ASR)
   assert.match(history.history[0].content, /Mode: bilibili/);
 });
 
+test('ATTACH_PAGE on a bilibili page WITH transcript + ASR subtitleSource=asr: asr-pending handoff (replace low-quality subtitles)', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', subtitleSource: 'asr' },
+  });
+  Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, { transcript: '[00:01] 有字幕（但质量不高）' }), writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'asr-pending', 'subtitleSource=asr must override the has-transcript guard and hand off to ASR');
+  assert.equal(res.ctx.noTranscript, false, 'noTranscript stays false (video does have subtitles)');
+  assert.equal(res.ctx.asr.subtitleSource, 'asr', 'subtitleSource must flow through to the sidepanel');
+  assert.ok((res.ctx.text || '').length > 0, 'fallback text (with original subtitles) must be preserved for fail-open');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 0, 'asr-pending must not be stored to history yet');
+});
+
+test('ATTACH_PAGE on a bilibili page WITH transcript + ASR subtitleSource=original: no ASR handoff', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', subtitleSource: 'original' },
+  });
+  Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, { transcript: '[00:01] 有字幕' }), writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.notEqual(res.ctx.mode, 'asr-pending', 'with transcript + original preference, no ASR handoff');
+  assert.equal(res.ctx.mode, 'bilibili');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 1, 'normal store path');
+});
+
 test('ATTACH_PAGE on a subtitle-less bilibili page + ASR DISABLED: normal store path', async () => {
   const localArea = makeStorageArea({
     activeProvider: 'compatible',

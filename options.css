@@ -555,6 +555,22 @@ input[type="radio"] { accent-color: var(--accent); }
   border-radius: 3px;
   color: var(--fg-2);
 }
+.tip-bubble a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ── ASR 卡片底部的参考文档链接 ───────────────────────────────────────────── */
+.asr-doc-link {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--border-strong);
+  padding-bottom: 1px;
+}
+.asr-doc-link:hover {
+  text-decoration: underline;
+}
 
 /* ── Per-card status ─────────────────────────────────────────────────────── */
 .card-status {

@@ -70,7 +70,7 @@ let uploadedBlobSize = 0;
 globalThis.fetch = async (url, init) => {
   if (typeof url === 'string' && url.includes('bilivideo.com/audio/192.m4s')) {
     downloadCalls++;
-    return { ok: true, blob: async () => new Blob([new Uint8Array(44 * 1024 * 1024)]) };
+    return { ok: true, blob: async () => new Blob([new Uint8Array(1100 * 1024)]) };
   }
   if (typeof url === 'string' && url.endsWith('/files')) {
     uploadCalls++;
@@ -227,14 +227,14 @@ test('ASR pipeline failure falls back to the plain bilibili text via ATTACH_ASR_
 
 test('ASR retries with the next candidate when the lowest-bitrate stream decodes to a truncated WAV', async () => {
   // The decoded WAV duration must differ per candidate: small (64kbps) blob →
-  // ~0.5s (truncated), large (192kbps) blob → 3s (full). Override the decode
+  // ~0.5s (truncated), large (192kbps) blob → 4.7s (full). Override the decode
   // mock to return duration by input size, so the retry path is exercised.
   const OrigOAC = globalThis.OfflineAudioContext;
   globalThis.OfflineAudioContext = class {
     constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
     async decodeAudioData(buf) {
       const srcRate = 48000;
-      const seconds = buf.byteLength < 1024 * 1024 ? 0.5 : 3; // small blob → truncated
+      const seconds = buf.byteLength < 1024 * 1024 ? 0.5 : 4.7; // small blob → truncated; large blob → full (>= 90% of 5s)
       const length = Math.max(1, Math.round(srcRate * seconds));
       return {
         sampleRate: srcRate, length, numberOfChannels: 1,
@@ -254,7 +254,18 @@ test('ASR retries with the next candidate when the lowest-bitrate stream decodes
     }
     if (typeof url === 'string' && url.includes('bilivideo.com/audio/192.m4s')) {
       downloadCalls++;
-      return { ok: true, blob: async () => new Blob([new Uint8Array(44 * 1024 * 1024)]) }; // full 44MB
+      return { ok: true, blob: async () => new Blob([new Uint8Array(1100 * 1024)]) }; // full-length (≥1MB → decode mock returns 4.7s)
+    }
+    if (typeof url === 'string' && url.endsWith('/responses')) {
+      // Transcript must cover >= 90% of the 5s video (last stamp 4.6s) or the
+      // completeness guard rejects it as incomplete.
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'resp_1',
+          output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] 大家好\n[00:04.6] 欢迎收看' }] }]
+        })
+      };
     }
     return origFetch(url, init);
   };
@@ -266,8 +277,8 @@ test('ASR retries with the next candidate when the lowest-bitrate stream decodes
   dnrRemovedIds = [];
 
   // ctx: audioUrl = the truncated 64kbps stream, audioCandidates carry both,
-  // videoDurationSec = 5s. First candidate (64) decodes to 0.5s (< 50% of 5s)
-  // → must retry with 192, which decodes to 3s (>= 50%) → accepted.
+  // videoDurationSec = 5s. First candidate (64) decodes to 0.5s (< 90% of 5s)
+  // → must retry with 192, which decodes to 4.7s (>= 90%) → accepted.
   const origSendMessage = globalThis.chrome.runtime.sendMessage;
   globalThis.chrome.runtime.sendMessage = (msg, cb) => {
     if (msg.type === 'ATTACH_PAGE') {
@@ -300,8 +311,7 @@ test('ASR retries with the next candidate when the lowest-bitrate stream decodes
   await new Promise((r) => setTimeout(r, 400));
 
   // The 64kbps candidate decoded to a truncated 0.5s WAV → retry → download 192.
-  assert.equal(downloadCalls, 2, 'must re-download with the next candidate after truncation');
-  assert.equal(uploadCalls, 1, 'must upload only the full-length stream, not the truncated one');
+  assert.equal(downloadCalls, 2, 'must re-download with the next candidate after truncation');  assert.equal(uploadCalls, 1, 'must upload only the full-length stream, not the truncated one');
   assert.ok(sent.includes('ATTACH_ASR_CONFIRM'), 'must confirm after a successful retry');
   assert.ok(confirmed, 'confirm payload must be captured');
   assert.match(confirmed.text, /\[00:00\] 大家好/, 'transcript from the full-length stream must be attached');
@@ -330,7 +340,9 @@ test('ASR retries with the next candidate when transcode fails (decodeAudioData 
       // First decode (64kbps HE-AAC) throws; later decodes (192kbps AAC-LC) succeed.
       if (decodeCalls === 1) throw new DOMException('Unable to decode audio data');
       const srcRate = 48000;
-      const length = srcRate * 3;
+      // Successful (second) decode must be a full-length stream: 4.7s (>= 90% of
+      // the 5s video), or the 90% WAV-duration guard rejects it as truncated.
+      const length = srcRate * 4.7;
       return { sampleRate: srcRate, length, numberOfChannels: 1, getChannelData: () => new Float32Array(length) };
     }
     async close() {}
@@ -342,7 +354,18 @@ test('ASR retries with the next candidate when transcode fails (decodeAudioData 
   globalThis.fetch = async (url, init) => {
     if (typeof url === 'string' && (url.includes('bilivideo.com/audio/64.m4s') || url.includes('bilivideo.com/audio/192.m4s'))) {
       downloadCalls++;
-      return { ok: true, blob: async () => new Blob([new Uint8Array(44 * 1024 * 1024)]) };
+      return { ok: true, blob: async () => new Blob([new Uint8Array(1100 * 1024)]) };
+    }
+    if (typeof url === 'string' && url.endsWith('/responses')) {
+      // Transcript must cover >= 90% of the 5s video (last stamp 4.6s) or the
+      // completeness guard rejects it as incomplete.
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'resp_1',
+          output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] 大家好\n[00:04.6] 欢迎收看' }] }]
+        })
+      };
     }
     return origFetch2(url, init);
   };
@@ -393,6 +416,137 @@ test('ASR retries with the next candidate when transcode fails (decodeAudioData 
   globalThis.chrome.runtime.sendMessage = origSendMessage2;
   globalThis.fetch = origFetch2;
   globalThis.OfflineAudioContext = OrigOAC2;
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+});
+
+test('subtitleSource=asr: ASR transcript REPLACES the original low-quality subtitle block', async () => {
+  // Video HAS original subtitles (noTranscript: false) but the user chose
+  // subtitleSource 'asr' (prefer ASR). On success the confirm text must strip
+  // the original `## 字幕` block and append `## 字幕（ASR）` instead (so the model
+  // reads ONE transcript — the better ASR one — not both). ctx.text itself must
+  // stay intact so the fail-open fallback still has the original subtitles.
+  const origSend3 = globalThis.chrome.runtime.sendMessage;
+  globalThis.chrome.runtime.sendMessage = (msg, cb) => {
+    if (msg.type === 'ATTACH_PAGE') {
+      cb({ ok: true, data: { ok: true, ctx: {
+        meta: { url: 'https://www.bilibili.com/video/BV1xx411c7mD', title: '测试视频' },
+        mode: 'asr-pending',
+        audioUrl: 'https://bilivideo.com/audio/192.m4s',
+        biliCookie: 'buvid3=test-buvid',
+        noTranscript: false, // video HAS subtitles
+        text: '# 测试视频\n\n**UP主**: 小明\n\n## 字幕\n\n[00:00] 原有低质量字幕第一句\n[00:03] 原有低质量字幕第二句',
+        asr: { apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'asr' },
+      } } });
+      return;
+    }
+    origSend3(msg, cb);
+    if (msg.type === 'ATTACH_ASR_CONFIRM') confirmed = msg;
+  };
+
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+  dnrRemovedIds = [];
+  attachBtn.click();
+  await new Promise((r) => setTimeout(r, 100));
+
+  assert.ok(sent.includes('ATTACH_ASR_CONFIRM'), 'must confirm after the forced-ASR success');
+  assert.ok(confirmed, 'confirm payload must be captured');
+  // Original low-quality subtitle block must be GONE; ASR transcript present.
+  assert.doesNotMatch(confirmed.text, /原有低质量字幕/, 'original subtitle block must be stripped');
+  assert.match(confirmed.text, /# 测试视频/, 'video meta must be preserved');
+  assert.match(confirmed.text, /## 字幕（ASR）/);
+  assert.match(confirmed.text, /\[00:00\] 大家好/, 'ASR transcript must be the one the model reads');
+
+  // Restore mocks.
+  globalThis.chrome.runtime.sendMessage = origSend3;
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+});
+
+test('ASR transcript cut short (covers < 90% of video) is rejected, not silently stored', async () => {
+  // The exact recurrence the user hit: a 52:48 video whose transcript stops at
+  // ~33 min (last stamp < 90% of the video). The audio itself is full-length,
+  // so the WAV guard passes — the completeness guard (last transcript timestamp
+  // vs videoDurationSec) is what must catch it. Result: fail loudly → fall back
+  // to the plain bilibili text (no partial subtitle, no silent truncation).
+  const OrigOAC4 = globalThis.OfflineAudioContext;
+  globalThis.OfflineAudioContext = class {
+    constructor(ch, frames, rate) { this.channels = ch; this.frames = frames; this.sampleRate = rate; }
+    async decodeAudioData() {
+      const srcRate = 48000;
+      const length = srcRate * 5; // full-length 5s audio for a 5s video
+      return { sampleRate: srcRate, length, numberOfChannels: 1, getChannelData: () => new Float32Array(length) };
+    }
+    async close() {}
+    destination = {};
+    async startRendering() { return { getChannelData: () => new Float32Array(this.frames) }; }
+  };
+  const origFetch4 = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (typeof url === 'string' && (url.includes('bilivideo.com/audio/192.m4s') || url.includes('bilivideo.com/audio/64.m4s'))) {
+      return { ok: true, blob: async () => new Blob([new Uint8Array(1100 * 1024)]) };
+    }
+    if (typeof url === 'string' && url.endsWith('/responses')) {
+      // Transcript stops at 2s of a 5s video (40%) — incomplete, no terminal
+      // punctuation, exactly the "cut off mid-sentence" signature.
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'resp_1',
+          output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] 大家好\n[00:02] 中途被截断的半句' }] }]
+        })
+      };
+    }
+    return origFetch4(url, init);
+  };
+  const origSend4 = globalThis.chrome.runtime.sendMessage;
+  globalThis.chrome.runtime.sendMessage = (msg, cb) => {
+    if (msg.type === 'ATTACH_PAGE') {
+      cb({ ok: true, data: { ok: true, ctx: {
+        meta: { url: 'https://www.bilibili.com/video/BV1xx411c7mD', title: '测试视频' },
+        mode: 'asr-pending',
+        audioUrl: 'https://bilivideo.com/audio/192.m4s',
+        audioCandidates: [
+          { url: 'https://bilivideo.com/audio/192.m4s', label: '192 kbps', bandwidth: 192000, duration: 5, size: 0, codecs: 'mp4a.40.2' },
+        ],
+        videoDurationSec: 5,
+        biliCookie: 'buvid3=test-buvid',
+        noTranscript: true,
+        text: 'bilibili plain text fallback',
+        asr: { apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000 },
+      } } });
+      return;
+    }
+    origSend4(msg, cb);
+    if (msg.type === 'ATTACH_ASR_CONFIRM') confirmed = msg;
+  };
+  sent = [];
+  confirmed = null;
+  downloadCalls = 0;
+  uploadCalls = 0;
+  dnrRemovedIds = [];
+  attachBtn.click();
+  await new Promise((r) => setTimeout(r, 200));
+
+  // The partial transcript must NOT be stored as `## 字幕（ASR）`; the fallback
+  // keeps the plain bilibili text (meta only), and the user gets a toast, not a
+  // silently-short context. The 2s-of-5s stamp must not appear in the confirmed text.
+  assert.ok(confirmed, 'must still confirm (fail-open) so history gets a fallback');
+  assert.doesNotMatch(confirmed.text, /## 字幕（ASR）/, 'partial transcript must not be stored');
+  assert.doesNotMatch(confirmed.text, /中途被截断的半句/, 'cut-off transcript must not leak into history');
+  assert.match(confirmed.text, /bilibili plain text fallback/, 'fallback plain text is preserved');
+
+  // Restore mocks.
+  globalThis.chrome.runtime.sendMessage = origSend4;
+  globalThis.fetch = origFetch4;
+  globalThis.OfflineAudioContext = OrigOAC4;
   sent = [];
   confirmed = null;
   downloadCalls = 0;
