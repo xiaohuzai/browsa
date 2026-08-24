@@ -276,10 +276,11 @@ async function saveCard(name, card) {
 
 async function pingCard(name, card) {
   // "Configured" for the purposes of auto-switching the active provider
-  // means reachable, not just "has some baseUrl filled in" (Hermes ships
-  // with a non-empty default baseUrl, so a naive baseUrl check would never
-  // let you notice you'd forgotten to switch away from it). Capture the
-  // prior state before saveCard() below unconditionally clears it.
+  // means reachable, not just "has some baseUrl filled in" — a baseUrl check
+  // can never distinguish a provider you actually verified from one that's
+  // merely filled in (or left at a default that doesn't point anywhere
+  // useful). Capture the prior state before saveCard() below unconditionally
+  // clears it.
   const wasReachable = _pingState[name] === 'reachable';
 
   await saveCard(name, card);
