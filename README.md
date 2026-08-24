@@ -109,7 +109,7 @@ GitHub file pages (`github.com/…/blob/…`) are a special case: browsa fetches
 
 For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
 
-**Structured extraction** — works on any webpage; where Readability alone isn't enough (YouTube, Bilibili, 小红书, and more), browsa observes the page's own network requests and reads structured content directly — subtitles, comments, article source, quotes. No signing, no re-auth.
+**Structured extraction** — works on any webpage; where Readability alone isn't enough (YouTube, Bilibili, 小红书, and more), browsa observes the page's own network requests and reads structured content directly — subtitles, comments, article source, quotes. No signing, no re-auth. For videos with no subtitles at all, browsa can transcribe the audio automatically (ASR), so even those can be summarized with the same clickable `[mm:ss]` video notes.
 
 ---
 
