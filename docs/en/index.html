@@ -51,7 +51,7 @@
         <span class="chip">Chrome / Edge 114+</span>
         <span class="chip"><b>MIT</b> open source</span>
         <span class="chip"><b>800+</b> unit tests</span>
-        <span class="chip"><b>10</b> sites with deep extraction</span>
+        <span class="chip"><b>10+</b> sites with deep extraction</span>
       </div>
 
       <!-- Scenario switcher -->
@@ -313,7 +313,7 @@
           <p>A complete workflow for video — structured subtitles from YouTube and Bilibili:</p>
           <ul>
             <li>Replies carry clickable <code>[mm:ss]</code> timestamps that seek the video</li>
-            <li>Subtitle-less Bilibili videos can be transcribed locally (ASR)</li>
+            <li>Subtitle-less Bilibili videos can still be summarized — automatic ASR transcription</li>
             <li>Long transcripts auto-compressed into points, timestamps preserved</li>
           </ul>
         </div>
@@ -366,6 +366,7 @@
         <span class="site-chip reveal">Juejin<span class="en">article source</span></span>
         <span class="site-chip reveal">Zhihu<span class="en">articles/answers</span></span>
         <span class="site-chip reveal">X / Twitter<span class="en">tweets/replies</span></span>
+        <span class="site-chip reveal">Reddit<span class="en">posts/comments</span></span>
         <span class="site-chip reveal">Xueqiu<span class="en">quotes/posts</span></span>
         <span class="site-chip reveal">Xiaoyuzhou<span class="en">podcasts</span></span>
         <span class="site-chip reveal">Dedao<span class="en">articles</span></span>
@@ -386,43 +387,28 @@
         <h2>Install (developer mode)</h2>
         <p>browsa is an unpacked extension loaded via developer mode. About 5 minutes, free forever.</p>
       </div>
-      <div class="install-grid">
-        <div>
-          <div class="step">
-            <span class="no">1</span>
-            <div>
-              <h4>Get the code</h4>
-              <p><code>git clone</code> the repo, or download and unzip from <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>.</p>
-            </div>
+      <div class="install-steps">
+        <div class="step">
+          <span class="no">1</span>
+          <div>
+            <h4>Get the code</h4>
+            <p><code>git clone</code> the repo, or download and unzip from <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>.</p>
           </div>
-          <div class="step">
-            <span class="no">2</span>
-            <div>
-              <h4>Load the extension</h4>
-              <p>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → select the <code>browsa/</code> folder.</p>
-            </div>
+        </div>
+        <div class="step">
+          <span class="no">2</span>
+          <div>
+            <h4>Load the extension</h4>
+            <p>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → select the <code>browsa/</code> folder.</p>
           </div>
-          <div class="step">
-            <span class="no">3</span>
+        </div>
+        <div class="step">
+          <span class="no">3</span>
             <div>
               <h4>Configure and go</h4>
               <p>Press <code>Ctrl+Shift+H</code> to open the panel → in ⚙ Settings add a Base URL and API key → Ping to verify → start chatting.</p>
             </div>
           </div>
-        </div>
-        <div class="code-block reveal">
-          <span class="c-dot"></span>
-          <pre><span class="cm"># 1. Get the code</span>
-git clone <span class="pr">https://github.com/xiaohuzai/browsa.git</span>
-
-<span class="cm"># 2. Install deps (optional, dev only)</span>
-npm install
-
-<span class="cm"># 3. Run tests (800+)</span>
-npm test
-
-<span class="cm"># 4. Build the package → browsa-v&lt;version&gt;.zip</span>
-npm run package   <span class="ok"># or just load the unpacked folder</span></pre>
         </div>
       </div>
     </div>

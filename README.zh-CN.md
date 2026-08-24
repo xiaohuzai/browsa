@@ -4,6 +4,8 @@
 
 > **browsa** = **brow**ser **s**ide p**a**nel **A**I（浏览器侧边栏 AI）。在任何网页旁侧边栏中与 AI 对话——和你正在读的内容聊 LLM 智能体。
 
+> **官网**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — 功能亮点与界面示意（简体中文 · English）
+
 browsa 是一个 Chrome / Edge 扩展（Manifest V3）：在你当前打开的标签页旁打开一个聊天面板，附加页面内容，并从任意 OpenAI 兼容 API 流式接收回复。
 
 ```
@@ -107,7 +109,7 @@ GitHub 文件页（`github.com/…/blob/…`）是特例：browsa 直接抓取 `
 
 对于文本选择，在页面上划选文字，然后用**浮动工具栏**或**右键上下文菜单**（提问 Ask / 解释 Explain / 翻译 Translate / 总结 Summarize）。选择内容会自动发送，无需点击 📎。
 
-**结构化提取**——对任意网页都可用；在 Readability 不够用的站点（YouTube、Bilibili、小红书等），browsa 会观察页面自身的网络请求，直接读出结构化内容——字幕、评论、文章源码、行情——无需签名、无需重新认证。
+**结构化提取**——对任意网页都可用；在 Readability 不够用的站点（YouTube、Bilibili、小红书等），browsa 会观察页面自身的网络请求，直接读出结构化内容——字幕、评论、文章源码、行情——无需签名、无需重新认证。对于完全没有字幕的视频，browsa 还能自动做语音转写（ASR），让无字幕视频也能用同样的可点击 `[mm:ss]` 笔记来总结。
 
 ---
 

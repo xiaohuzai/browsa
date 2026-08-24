@@ -476,8 +476,7 @@ section{padding:88px 0;scroll-margin-top:64px}
 .site-note b{color:var(--ink-2);font-weight:600}
 
 /* ─── 安装 ──────────────────────────────────────────────────────────────── */
-.install-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
-.install-grid > *{min-width:0}
+.install-steps{max-width:680px}
 .step{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line-2)}
 .step:last-child{border-bottom:none}
 .step .no{
@@ -493,18 +492,6 @@ section{padding:88px 0;scroll-margin-top:64px}
   background:var(--paper-3);border:1px solid var(--line-2);padding:1px 6px;border-radius:5px;
 }
 .step p .link{color:var(--mark);text-decoration:underline;text-underline-offset:2px;font-weight:500}
-.code-block{
-  background:#14171f;border-radius:12px;padding:20px 22px;
-  border:1px solid #262b38;box-shadow:var(--shadow);
-}
-.code-block .c-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#232734;margin-bottom:14px}
-.code-block pre{
-  font-family:var(--mono);font-size:13px;line-height:1.85;color:#eef0ee;
-  overflow-x:auto;
-}
-.code-block .cm{color:#9aa0ab}
-.code-block .pr{color:#e0542c}
-.code-block .ok{color:#4ade80}
 
 /* ─── Footer ────────────────────────────────────────────────────────────── */
 footer{border-top:1px solid var(--line);padding:44px 0 52px;background:var(--paper-2)}
@@ -530,7 +517,6 @@ footer .container{display:flex;justify-content:space-between;align-items:center;
 @media (max-width:900px){
   .how-list{grid-template-columns:1fr}
   .feature-grid{grid-template-columns:1fr}
-  .install-grid{grid-template-columns:1fr;gap:28px}
   .bili-side,.yt-side{display:none}
   .pg-video,.pg-article,.pg-pdf{min-height:440px}
 }
