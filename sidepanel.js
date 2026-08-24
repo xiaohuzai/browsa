@@ -553,8 +553,8 @@ function populateProviderSelect(cfg) {
   // relative order), so a provider you've actually verified works doesn't
   // get buried below ones that are merely configured-but-unverified or
   // unconfigured. "Configured" (has a baseUrl) isn't a strong enough signal
-  // on its own — Hermes ships with a non-empty default baseUrl, so it would
-  // always sort first even if you never intended to use it.
+  // on its own — reachability (ping state) is, so that's what drives both
+  // the sort and the status label below.
   const providers = Object.keys(cfg.providers || {})
     .map((name, i) => ({ name, i }))
     .sort((a, b) => {

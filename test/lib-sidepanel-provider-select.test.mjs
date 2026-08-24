@@ -5,9 +5,8 @@
 // doesn't collide with other sidepanel test files' shared module-level state.
 //
 // "Configured" (has a baseUrl) is not a strong enough signal to sort on —
-// Hermes ships with a non-empty default baseUrl, so it would always sort
-// first even if the user never intended to use it. Reachable (a verified
-// ping) is the real signal.
+// merely filling in a baseUrl (or leaving a stale default) doesn't mean the
+// provider was ever verified. Reachable (a verified ping) is the real signal.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
