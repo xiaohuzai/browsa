@@ -23,19 +23,11 @@ browsa 是一个 Chrome / Edge 扩展（Manifest V3）：在你当前打开的�
 
 ```bash
 npm install          # 仅首次需要
-npm test             # 运行 789 个单元测试
+npm test             # 运行 800+ 个单元测试
 npm run package      # → browsa-v<version>.zip
 ```
 
-升级版本号后再打包：
-
-```bash
-npm version patch    # 修复 bug：      0.24.0 → 0.24.1
-npm version minor    # 新增功能：      0.24.0 → 0.25.0
-npm run package
-```
-
-`npm version` 会自动把版本号同步到 `package.json` 和 `manifest.json`。
+`npm version patch|minor` 会自动把版本号同步到 `package.json` 和 `manifest.json`。
 
 ---
 
@@ -115,24 +107,7 @@ GitHub 文件页（`github.com/…/blob/…`）是特例：browsa 直接抓取 `
 
 对于文本选择，在页面上划选文字，然后用**浮动工具栏**或**右键上下文菜单**（提问 Ask / 解释 Explain / 翻译 Translate / 总结 Summarize）。选择内容会自动发送，无需点击 📎。
 
----
-
-## 支持的站点（XHR 拦截）
-
-对于 Readability 效果较差的站点，browsa 会拦截浏览器自身的 API 调用并提取结构化内容——无需签名、无需重新认证，只是观察页面本来已经请求的内容。先打开页面等它完全加载，再发送第一条消息。
-
-| 站点 | 提取的内容 |
-|---|---|
-| **YouTube** | 标题、字幕、章节、简介、作者、观看/点赞数 |
-| **Bilibili** | 标题、AI 总结、字幕/文稿、音频 URL、视频数据 |
-| **小红书** | 笔记标题、简介、标签、图片、热门评论、数据 |
-| **掘金** | 完整文章 Markdown 源码 |
-| **知乎** | 专栏文章或某个问题的前 3 个回答 |
-| **Twitter / X** | 推文文本、作者、互动数据 |
-| **雪球** | 行情或帖子内容 |
-| **小宇宙** | 播客单集标题、简介、shownotes |
-| **得到** | 文章正文 |
-| **极客时间** | 文章正文 |
+**结构化提取**——对任意网页都可用；在 Readability 不够用的站点（YouTube、Bilibili、小红书等），browsa 会观察页面自身的网络请求，直接读出结构化内容——字幕、评论、文章源码、行情——无需签名、无需重新认证。
 
 ---
 
@@ -218,109 +193,23 @@ GitHub 文件页（`github.com/…/blob/…`）是特例：browsa 直接抓取 `
 
 ## 工作原理
 
-- **`background.js`**——MV3 服务工作线程。所有扩展消息的单一 `handle()` 消息路由器——仍是单一分发器，但最大的两个 case（`CHAT`、`SUBCHAT`）委托给 `lib/handlers/`。管理站点 XHR 缓存（按 `tabId` 键控）、通过每轮的 `browsa-chat`/`browsa-subchat` 端口流式传输、通过 `streamState`（`lib/state.js`）支持流式中途切换标签页，并在页面/视频附件超过配置的长度阈值时触发一个 fire-and-forget 的附件自动总结流程（`lib/handlers/attach-summarizer.js`）。
-- **`sidepanel.js`**——聊天 UI 编排器：初始化/发送/历史/审批-澄清卡片/截图裁剪。Markdown/Mermaid/Markmap/KaTeX/ECharts 渲染管线、会话抽屉、对话内搜索、多选、细聊侧边对话各是 `lib/sidepanel/` 下的一个模块。
-- **`lib/sidepanel/render.js`**——marked + DOMPurify + KaTeX + Mermaid + ECharts + Markmap + highlight.js 管线。流式增量通过 `reveal-pacer.js`（围绕 vendored `markstream-core` 包的薄封装）平滑显示；每条消息最终的 KaTeX 渲染会把公式多的消息卸载给 Web Worker（`katex-worker-client.js`/`katex.worker.js`），低于小批量阈值或 worker 失败时回退为同步渲染；Mermaid 的 SVG 输出会被净化（`sanitizeMermaidSvg`，来自 vendored `stream-markdown-parser` 包），时序图解析失败会用转义问题分号的方式自动重试（`mermaid-utils.js`）。三个图表 vendor 包（Mermaid/ECharts/Markmap）会在轮次开始的一刻被预取（`preloadChartVendors()`），因此会话中第一张图不会在需要渲染时才付出多 MB 冷加载的代价。
-- **`lib/page-extractor.js`**——把 Readability + Turndown 注入页面 MAIN world 用于 reader 模式。对 SPA 站点，使用匹配的内容脚本的 XHR 缓存。
-- **`lib/sidepanel/pdf-extractor.js`**——PDF 附件管线：先在专用 Worker 里尝试 `pdf-inspector-wasm`（完整版式/表格/标题重建），回退到纯文本 `pdf.js` 提取，并对两者做质量把关（空结果/扫描结果不会当作成功），之后调用方再回退到纯 URL 附件。
-- **`lib/openai-client.js`**——基于 fetch 的 SSE 流式客户端。支持 `/v1/chat/completions`（所有 provider）和 `/v1/runs`（Hermes——审批/澄清/工具进度事件，自动检测）。
-- **`lib/storage.js`**——`chrome.storage.local` 封装。全局扁平对话历史（非按标签页）、会话管理、脱敏规则。
-- **内容脚本**（`lib/content-scripts/`）——在 `document_start` 以 MAIN world 运行。包装 `window.fetch` 和 `XMLHttpRequest.prototype` 观察 SPA API 调用，并把结构化数据转发给后台。
-
----
-
-## 项目结构
-
-```
-browsa/
-├── manifest.json
-├── background.js                      # 服务工作线程 + 消息路由器（仅分发）
-├── sidepanel.{html,css,js}            # 聊天 UI 编排器
-├── options.{html,css,js}              # 设置页
-├── lib/
-│   ├── constants.js                   # 共享常量（PAGE_CONTEXT_PREFIX 等）
-│   ├── state.js                       # 共享流/审批状态 Map（background.js 使用）
-│   ├── openai-client.js               # SSE 流式客户端
-│   ├── page-extractor.js              # 内容提取 + 站点合成器
-│   ├── storage.js                     # chrome.storage 封装 + 会话管理
-│   ├── handlers/
-│   │   ├── chat-handler.js            # CHAT case 主体
-│   │   ├── subchat-handler.js         # SUBCHAT / SUBCHAT_ABORT case 主体
-│   │   └── attach-summarizer.js       # 自动压缩长页面/视频附件
-│   ├── markdown-chunker.js            # 结构感知的截断 + 分块（代码围栏/表格永不拆开）
-│   ├── sidepanel/                     # sidepanel.js 的功能模块
-│   │   ├── render.js                  # marked+DOMPurify+KaTeX+Mermaid+ECharts 管线
-│   │   ├── reveal-pacer.js            # 平滑显示封装（vendored markstream-core）
-│   │   ├── katex-threshold.js         # "值得卸载给 worker 吗"启发式判断
-│   │   ├── katex-worker-client.js     # 把公式批量发给 katex.worker.js，同步回退
-│   │   ├── katex.worker.js            # 专用 KaTeX 渲染 Worker
-│   │   ├── mermaid-utils.js           # 时序图分号修复 + 预览高度估算
-│   │   ├── pdf-extractor.js           # PDF 附件：wasm 优先/pdf.js 回退编排
-│   │   ├── pdf-inspector-worker-client.js # pdf-inspector-wasm Worker 客户端（粘滞失败，超时→null）
-│   │   ├── pdf-inspector.worker.js    # 运行 pdf-inspector-wasm 的 processPdf() 的专用 Worker
-│   │   ├── sessions-ui.js             # 会话抽屉
-│   │   ├── multiselect.js             # 批量删除模式
-│   │   ├── msg-search.js              # Ctrl+F 对话内搜索
-│   │   ├── detail-thread.js           # "划选文本 → 细聊"侧边对话
-│   │   ├── icons.js                   # ICONS SVG 图
-│   │   └── ui-utils.js                # $, escM, sendMessage, toast/confirm, 卡片工具
-│   ├── content-scripts/               # MAIN world XHR 拦截器 + ISOLATED world 工具栏
-│   │   ├── selection-toolbar.js       # 浮动工具栏（Shadow DOM）
-│   │   ├── xhs-content-script.js      # 小红书 XHR 拦截器
-│   │   ├── youtube-content-script.js  # YouTube 播放器 API 拦截器
-│   │   ├── bilibili-content-script.js # Bilibili 视频 API 拦截器
-│   │   ├── juejin-content-script.js   # 掘金文章拦截器
-│   │   ├── zhihu-content-script.js    # 知乎文章 / 问答拦截器
-│   │   ├── twitter-content-script.js  # Twitter/X GraphQL 拦截器
-│   │   ├── xueqiu-content-script.js   # 雪球行情/帖子拦截器
-│   │   ├── xiaoyuzhou-content-script.js # 小宇宙播客拦截器
-│   │   ├── dedao-content-script.js    # 得到拦截器
-│   │   └── geektime-content-script.js # 极客时间拦截器
-│   └── vendor/                        # 打包的第三方库
-│       ├── Readability.iife.js
-│       ├── Turndown.iife.js
-│       ├── marked.bundle.js
-│       ├── purify.bundle.js
-│       ├── katex.bundle.js
-│       ├── highlight.bundle.js
-│       ├── mermaid.bundle.js
-│       ├── echarts.bundle.js
-│       ├── markmap-lib.bundle.js       # Markdown → 思维导图树转换器
-│       ├── markmap-view.bundle.js      # d3-zoom 思维导图 SVG 渲染器
-│       ├── markstream-core.bundle.js   # 流式显示节奏控制器
-│       ├── stream-markdown-parser.bundle.js # Mermaid SVG 净化器
-│       ├── pdf.bundle.js               # pdf.js——PDF 文本提取回退
-│       ├── pdf.worker.bundle.js        # pdf.js 自带的 Worker
-│       ├── pdf_inspector_wasm.js       # pdf-inspector-wasm 胶水（wasm-bindgen）
-│       └── pdf_inspector_wasm_bg.wasm  # pdf-inspector-wasm 二进制——PDF 提取主力
-├── _locales/{en,zh_CN}/
-├── icons/
-├── build/
-│   ├── build.mjs                      # esbuild vendor 打包器
-│   └── package.mjs                    # 分发 zip 构建器
-├── test/                              # node:test 单元测试（789 个测试）
-└── check-compat.sh                    # MV3 / 静态兼容性检查
-```
+- **`background.js`**——MV3 服务工作线程，单一消息路由器；通过每轮端口流式传输，超大附件自动总结。
+- **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、细聊各在 `lib/sidepanel/` 下。
+- **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions` + Hermes `/v1/runs`）、`chrome.storage.local` 封装、内容脚本。
 
 ---
 
 ## 浏览器兼容性
 
-| 浏览器 | 状态 | 说明 |
-|---|---|---|
-| **Chrome 114+** | ✅ 支持 | 主要目标 |
-| **Edge 114+** | ✅ 支持 | 安装方式相同 |
-| **Brave 1.56+** | ✅ 应可运行 | 相同的 Chromium 内核 |
-| **Firefox** | ❌ 不支持 | 没有 `side_panel` API |
+Chrome / Edge 114+（主要目标）；Brave 1.56+ 应可运行（相同的 Chromium 内核）。Firefox 不支持（没有 `side_panel` API）。
 
 ---
 
 ## 安全
 
 - API key 只存在你自己的机器上的 `chrome.storage.local` 里——除了你配置的 `baseUrl` 之外，绝不会发送到任何地方。
-- PDF 附件完全在客户端解析（WebAssembly + pdf.js，都运行在侧边栏里）——文件字节绝不会上传到任何地方，只有提取出的文本会被发送给你配置的 provider。
-- LLM 回复在渲染前用 DOMPurify 净化，包括一个拦截 `data:image/svg+xml` 来源（可能携带自己的 `<script>`/事件处理器）的钩子，同时仍然允许正常的位图 `data:` 图片。
-- Mermaid 图的 SVG 输出在插入前会被净化（移除 `<script>`、事件处理器属性、危险 URL）——因为 Mermaid 的 `securityLevel:'loose'` 模式（图形标签内的 KaTeX 数学需要它）否则会允许任意 HTML 通过。
+- PDF 完全在客户端解析（WASM + pdf.js）——文件字节绝不离开你的设备，只有提取出的文本会发送给你配置的 provider。
+- LLM 回复在渲染前用 DOMPurify 净化（拦截 `data:image/svg+xml` 来源；Mermaid 的 SVG 输出会移除 `<script>` / 事件处理器属性）。
 - 内容脚本只观察网络请求，从不修改或阻断它们。
 
 ---
