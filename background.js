@@ -20,7 +20,7 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { extFromMime } from './lib/handlers/media-downloader.js';
-import { ASR_DEFAULTS } from './lib/handlers/attach-asr.js';
+import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -899,6 +899,51 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case 'ASR_FRESH_URLS': {
+      // 播放地址过期（deadline 签名 m4s URL，CDN 无条件 403）的自愈重试：在页内重调
+      // playurl API 换全新签名 URL。由 sidepanel 在下载 403 时触发一次；失败则返回
+      // 原因由 sidepanel 走现有兜底（明示报错），不在此抛错。
+      const { tabId } = msg;
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          files: ['lib/content-scripts/bilibili-content-script.js']
+        });
+        const [res] = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: async () => {
+            try {
+              const pi = window.__playinfo__?.data || window.__playinfo__;
+              const bvid = pi?.bvid || '';
+              const cid = pi?.cid || 0;
+              const freshFn = window.__browsaFetchFreshBilibiliStreams;
+              if (typeof freshFn !== 'function' || !bvid || !cid) {
+                return { ok: false, error: '脚本未注入或缺 bvid/cid（页面可能未播放过）' };
+              }
+              const fresh = await freshFn(bvid, cid);
+              const audios = (Array.isArray(fresh) ? fresh : []).filter((s) => s.type === 'audio' && s.url);
+              if (!audios.length) return { ok: false, error: 'playurl 返回空音频流' };
+              return { ok: true, streams: audios };
+            } catch (e) {
+              return { ok: false, error: String((e && e.message) || e) };
+            }
+          }
+        });
+        const r = res?.result;
+        if (r?.ok && Array.isArray(r.streams) && r.streams.length) {
+          console.log(`browsa: ASR_FRESH_URLS ok — ${r.streams.length} fresh audio streams`);
+          return { ok: true, data: { ok: true, streams: r.streams } };
+        }
+        console.warn('browsa: ASR_FRESH_URLS refresh failed:', r?.error || 'no result');
+        return { ok: true, data: { ok: false, error: r?.error || 'no result' } };
+      } catch (e) {
+        console.warn('browsa: ASR_FRESH_URLS executeScript failed:', e?.message);
+        return { ok: true, data: { ok: false, error: String((e && e.message) || e) } };
+      }
+    }
+
     case 'SAVE_SESSION':
     case 'GET_SESSIONS':
     case 'LOAD_SESSION':
@@ -1028,7 +1073,12 @@ async function handle(msg, sender) {
         // valid at handoff time. Detection keys off the structured noTranscript
         // flag (from synthesizeBilibiliResult), NOT the `## 字幕` text marker — auto
         // mode's silent Jina fallback can rewrite ctx.text and drop the marker.
-        if (ctx.mode === 'bilibili' && ctx.noTranscript && all.asr?.enabled) {
+        // `all.asr.subtitleSource === 'asr'` additionally forces the ASR handoff even
+        // for videos that ALREADY have subtitles (user opted to prefer ASR
+        // subtitles over low-quality originals — the strip/replace happens in the
+        // sidepanel at ATTACH_ASR_CONFIRM time, keeping ctx.text intact for the
+        // fail-open fallback).
+        if (ctx.mode === 'bilibili' && all.asr?.enabled && (ctx.noTranscript || all.asr.subtitleSource === ASR_SUBTITLE_SOURCE.ASR)) {
           const asrCtx = await buildAsrPendingCtx(tabId, ctx);
           if (asrCtx) return { ok: true, ctx: asrCtx };
         } else if (ctx.mode === 'bilibili' && ctx.noTranscript) {
@@ -1402,9 +1452,15 @@ async function buildAsrPendingCtx(tabId, ctx) {
               if (Array.isArray(fresh) && fresh.length > 0) {
                 return { streams: fresh, videoDurationSec };
               }
-            } catch (_) {}
+              // 刷新返回空流：把原因留给调用方（缓存已过期，不能再静默回退死 URL）。
+              return { streams: cached, videoDurationSec, asrExpiredError: 'fresh playurl 返回空流列表' };
+            } catch (e) {
+              // fresh playurl 失败（WBI 签名/网络/风控）时缓存已过期——不能静默
+              // 回退到死 URL 让用户白等 403 重试；原因必须传到 UI（toast + 日志）。
+              return { streams: cached, videoDurationSec, asrExpiredError: 'playurl 自动刷新失败：' + String((e && e.message) || e) };
+            }
           }
-          return { streams: cached, videoDurationSec };
+          return { streams: cached, videoDurationSec, asrExpiredError: '缓存流全部过期且无自动刷新可用（脚本未注入或缺 bvid/cid）' };
         } catch (_) { return { streams: [], videoDurationSec: 0 }; }
       }
     });
@@ -1466,6 +1522,12 @@ async function buildAsrPendingCtx(tabId, ctx) {
     }
     const all = await storage.getAll();
     const asr = { ...ASR_DEFAULTS, ...(all.asr || {}) };
+    // 缓存播放地址过期且自动刷新失败（真实复现：页面开太久，playurl 签名 URL 的
+    // deadline 已过期 → CDN 一律 403）。原因传入 ctx：sidepanel 会在下载前直接
+    // 明示给用户（不再无意义地重试死 URL），请其刷新视频页后重新 attach。
+    if (got && got.asrExpiredError) {
+      console.warn('browsa: ASR cached playurl expired, auto-refresh failed:', got.asrExpiredError);
+    }
     return Object.assign({}, ctx, {
       mode: 'asr-pending',
       audioUrl: audio.url,
@@ -1475,8 +1537,10 @@ async function buildAsrPendingCtx(tabId, ctx) {
       // 时长远小于视频总长（服务端 body 截断 / 元数据谎报），可换下一候选流重试。
       audioCandidates: candidateAudios,
       videoDurationSec: videoDurationSec || 0,
-      // 传给 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
+      // 传給 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
       biliCookie,
+      // 播放地址过期/刷新失败原因（无则空串）。
+      asrExpiredError: (got && got.asrExpiredError) || '',
       asr: {
         apiKey: asr.apiKey,
         baseUrl: asr.baseUrl,
@@ -1484,6 +1548,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
         language: asr.language,
         format: asr.format,
         timeoutMs: asr.timeoutMs,
+        subtitleSource: asr.subtitleSource || ASR_SUBTITLE_SOURCE.ORIGINAL,
       },
     });
   } catch (e) {

@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 
 import {
   downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono,
-  pollFileStatus, transcribeAudio, formatAsrTranscript, ASR_DEFAULTS, extFromMime, normalizeArkBaseUrl,
-  splitMp4Fragments
+  pollFileStatus, transcribeAudio, formatAsrTranscript, normalizeAsrTimestamps, transcriptEndSec,
+  ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, extFromMime, normalizeArkBaseUrl, splitMp4Fragments
 } from '../lib/handlers/attach-asr.js';
 
 // ---- downloadAndUploadAudio (MAIN-world injectable) ----
@@ -219,6 +219,43 @@ test('transcribeAudio: POSTs stream:true with input_audio.file_id and accumulate
   delete globalThis.fetch;
 });
 
+test('transcribeAudio: language "auto" omits the concrete hint and asks the model to auto-detect', async () => {
+  let body;
+  globalThis.fetch = async (url, init) => {
+    assert.match(url, /\/responses$/);
+    body = JSON.parse(init.body);
+    return makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  };
+  const res = await transcribeAudio({
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKey: 'k',
+    fileId: 'file-abc',
+    model: 'doubao-seed-2-0-lite-260428',
+    language: 'auto',
+    idleTimeoutMs: 1000,
+  });
+  assert.equal(res.text, '[00:00] 你好，世界。');
+  assert.doesNotMatch(body.instructions, /音频语种为/, 'auto must NOT inject a concrete language hint');
+  assert.match(body.instructions, /自动检测/, 'auto must tell the model to detect the language itself');
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: empty language also falls back to auto-detect (no concrete hint)', async () => {
+  let body;
+  globalThis.fetch = async (url, init) => {
+    assert.match(url, /\/responses$/);
+    body = JSON.parse(init.body);
+    return makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  };
+  const res = await transcribeAudio({
+    baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', language: '', idleTimeoutMs: 1000,
+  });
+  assert.equal(res.text, '[00:00] 你好，世界。');
+  assert.doesNotMatch(body.instructions, /音频语种为/, 'empty language must not inject a concrete hint');
+  assert.match(body.instructions, /自动检测/);
+  delete globalThis.fetch;
+});
+
 test('transcribeAudio: falls back to non-stream JSON response when body has no reader', async () => {
   globalThis.fetch = async () => ({
     ok: true,
@@ -253,6 +290,89 @@ test('transcribeAudio: network failure surfaces as transcribe fetch failed', asy
   delete globalThis.fetch;
 });
 
+test('transcribeAudio: sets a high max_output_tokens so long verbatim transcripts are not cut at the default output cap', async () => {
+  let body;
+  globalThis.fetch = async (url, init) => {
+    body = JSON.parse(init.body);
+    return makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  };
+  await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.ok(body.max_output_tokens > 0, 'must request a high output token budget for long-audio transcription');
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: returns truncated:true when the stream ends with response.completed status incomplete (max_output_tokens)', async () => {
+  const SSE_CUT = 'data: {"type":"response.completed","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}';
+  globalThis.fetch = async () => makeSseResponse(SSE_DELTA_1, SSE_CUT + '\n\n');
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.equal(res.text, '[00:00] 你好');
+  assert.equal(res.truncated, true, 'incomplete response.completed must flag the transcript as truncated');
+  assert.equal(res.finishReason, 'incomplete');
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: returns truncated:true when chat-compat finish_reason is length', async () => {
+  const SSE_LEN = 'data: {"choices":[{"finish_reason":"length"}]}';
+  globalThis.fetch = async () => makeSseResponse(SSE_DELTA_1, SSE_LEN + '\n\n');
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.equal(res.truncated, true);
+  assert.equal(res.finishReason, 'length');
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: non-stream fallback flags truncated when response status is incomplete', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: null,
+    json: async () => ({ id: 'resp_1', status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' },
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] 你好' }] }] })
+  });
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.equal(res.text, '[00:00] 你好');
+  assert.equal(res.truncated, true, 'non-stream incomplete status must be surfaced');
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: clean completion carries no truncated flag', async () => {
+  globalThis.fetch = async () => makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.equal(res.truncated, undefined, 'complete output must not be flagged as truncated');
+  delete globalThis.fetch;
+});
+
+// ---- transcriptEndSec ----
+
+test('transcriptEndSec: parses the last end timestamp of a range-format transcript (the doubao AI-subtitle style)', () => {
+  // The exact recurrence shape: a 52:48 video whose transcript stops at 33:25.
+  const raw = ['[00:00.00-00:07.12] 第一句', '[33:17.22-33:25.45] 中途被截断的半句'].join('\n');
+  assert.equal(transcriptEndSec(raw), 33 * 60 + 25.45);
+});
+
+test('transcriptEndSec: single [mm:ss] stamps use the stamp itself as the coverage point', () => {
+  assert.equal(transcriptEndSec('[00:00] 你好\n[05:30] 世界'), 5 * 60 + 30);
+});
+
+test('transcriptEndSec: handles [h:mm:ss] (over an hour) and fractional precision', () => {
+  assert.equal(transcriptEndSec('[1:02:03.500] 超过一小时'), 3600 + 2 * 60 + 3.5);
+  assert.equal(transcriptEndSec('[00:01.250-01:02:03.500] 长区间'), 3600 + 2 * 60 + 3.5);
+});
+
+test('transcriptEndSec: returns null when no timestamp is recognizable', () => {
+  assert.equal(transcriptEndSec(''), null);
+  assert.equal(transcriptEndSec('纯文本没有时间戳'), null);
+  assert.equal(transcriptEndSec(null), null);
+});
+
+test('transcriptEndSec: comma-separated ranges take the LAST timestamp as the coverage point (model drift 2026-08-24)', () => {
+  // 真实案例：行尾是 "[44:44, 49:59]" ——若不认逗号区间，完整性校验会误判覆盖只到 44:44
+  // （< 90%），把一份其实完整的字幕误拒；修后覆盖点到 49:59。
+  assert.equal(transcriptEndSec('[00:00] 开头\n[44:44, 49:59] 结尾'), 49 * 60 + 59);
+  assert.equal(transcriptEndSec('[00:00, 01:02:03.500] 跨界区间'), 3600 + 2 * 60 + 3.5);
+  assert.equal(transcriptEndSec('[10:00, 11:00, 12:00] 多段时间戳'), 12 * 60);
+  // 单时间戳行不受影响（回归）
+  assert.equal(transcriptEndSec('[00:00] 你好\n[05:30] 世界'), 5 * 60 + 30);
+});
+
 // ---- formatAsrTranscript ----
 
 test('formatAsrTranscript: keeps timestamped lines, drops meta lines', () => {
@@ -279,6 +399,41 @@ test('formatAsrTranscript: empty input -> empty result', () => {
   assert.deepEqual(formatAsrTranscript(null), { lines: [], usedTimestamps: 0 });
 });
 
+test('normalizeAsrTimestamps: range/fraction timestamps become a single start [mm:ss] (click-to-seek compatible)', () => {
+  // B站 AI 字幕式区间 + 小数（doubao 模型自发输出）→ 单起始格式
+  assert.equal(normalizeAsrTimestamps('[00:00.00-00:12.77] 一点六五万亿美元'), '[00:00] 一点六五万亿美元');
+  assert.equal(normalizeAsrTimestamps('[09:44.53-10:28.25] [说话人1] 他们Oracle也也有投资'), '[09:44] [说话人1] 他们Oracle也也有投资');
+  // 单时间戳带小数 → 秒向下取整
+  assert.equal(normalizeAsrTimestamps('[05:51.06] 认购倍数的这个问题'), '[05:51] 认购倍数的这个问题');
+  // 跨小时的区间取起点，保留 h:mm:ss
+  assert.equal(normalizeAsrTimestamps('[1:02:03.500-1:05:00.000] 超过一小时'), '[1:02:03] 超过一小时');
+  // 无小数的普通单/小时格式原样保留
+  assert.equal(normalizeAsrTimestamps('[00:12] 你好'), '[00:12] 你好');
+  assert.equal(normalizeAsrTimestamps('[1:02:03] 超过一小时'), '[1:02:03] 超过一小时');
+  // 非时间令牌不受影响
+  assert.equal(normalizeAsrTimestamps('[说话人1] 你好'), '[说话人1] 你好');
+  assert.equal(normalizeAsrTimestamps(''), '');
+  // 逗号区间（模型漂移真实案例 2026-08-24）：同样归一化为起始时刻
+  assert.equal(normalizeAsrTimestamps('[44:44, 49:59] 赞成观点'), '[44:44] 赞成观点');
+  assert.equal(normalizeAsrTimestamps('[10:00, 11:00, 12:00] 多段时间戳'), '[10:00] 多段时间戳');
+  assert.equal(normalizeAsrTimestamps('[1:02:03, 1:05:00] 超过一小时'), '[1:02:03] 超过一小时');
+  assert.equal(normalizeAsrTimestamps('[44:44 - 49:59] 空格连字符'), '[44:44] 空格连字符');
+  assert.equal(normalizeAsrTimestamps(null), '');
+});
+
+test('formatAsrTranscript: range-format input is normalized to single stamps and still counted', () => {
+  const raw = [
+    '[00:00.00-00:12.77] 第一句',
+    '- [05:51.06-06:11.72] [说话人2] 第二句',
+    '没有时间戳的纯文本行',
+  ].join('\n');
+  const { lines, usedTimestamps } = formatAsrTranscript(raw);
+  assert.equal(usedTimestamps, 2);
+  assert.equal(lines[0], '[00:00] 第一句');
+  assert.equal(lines[1], '[05:51] [说话人2] 第二句');
+  assert.equal(lines[2], '没有时间戳的纯文本行');
+});
+
 test('formatAsrTranscript: keeps speaker-labelled + punctuated sentence lines', () => {
   // 新 prompt 的典型输出：每句一行、带标点、可带 [说话人N] 前缀。时间戳仍在行首。
   const raw = [
@@ -302,6 +457,10 @@ test('formatAsrTranscript: keeps speaker-labelled + punctuated sentence lines', 
 test('ASR_DEFAULTS: baseUrl is the Ark /api/v3 endpoint (NOT openspeech)', () => {
   assert.equal(ASR_DEFAULTS.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3');
   assert.equal(ASR_DEFAULTS.model, 'doubao-seed-2-0-lite-260428');
+  assert.equal(ASR_DEFAULTS.language, 'zh');
+  assert.equal(ASR_DEFAULTS.subtitleSource, 'original', 'subtitle source must default to prefer the video\'s own subtitles');
+  assert.equal(ASR_SUBTITLE_SOURCE.ORIGINAL, 'original');
+  assert.equal(ASR_SUBTITLE_SOURCE.ASR, 'asr');
 });
 
 test('normalizeArkBaseUrl: rewrites the Agent Plan (api/plan) endpoint back to standard api/v3', () => {
