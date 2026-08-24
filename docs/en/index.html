@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>browsa — Side-panel AI for your browser</title>
+<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API or Hermes Agent.">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="#top" aria-label="browsa home">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#sites" class="hide-m">Sites</a>
+      <a href="#install">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" id="top">
+    <div class="container">
+      <p class="eyebrow">browser side-panel AI</p>
+      <h1>Read anywhere, <span class="mark">ask anywhere</span>.</h1>
+      <p class="lead">
+        browsa is a <strong>Chrome / Edge side-panel extension</strong>: no copy-pasting —
+        click <strong>📎</strong> to bring the current page into the conversation —
+        articles, subtitles, PDFs — and stream replies right next to it.
+      </p>
+      <div class="cta-group">
+        <a class="btn btn-primary" href="#install">
+          Install browsa <span class="kbd">Ctrl+Shift+H</span>
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">
+          View source ↗
+        </a>
+      </div>
+      <div class="hero-meta">
+        <span class="chip">Chrome / Edge 114+</span>
+        <span class="chip"><b>MIT</b> open source</span>
+        <span class="chip"><b>800+</b> unit tests</span>
+        <span class="chip"><b>10</b> sites with deep extraction</span>
+      </div>
+
+      <!-- Scenario switcher -->
+      <div class="scenarios">
+        <div class="scn-tabs" role="radiogroup" aria-label="Usage examples">
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-video" checked><span class="dot"></span><span>🎬 Watch video</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-article"><span class="dot"></span><span>📄 Read article</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>📕 Open PDF</span></label>
+        </div>
+
+        <!-- Scenario 1: Watch video (YouTube) -->
+        <figure class="window w-video" role="img" aria-label="browsa panel next to a YouTube video page">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">youtube.com</span>/watch?v=8jPQjjsBbIc</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-video">
+              <div class="yt-nav">
+                <span class="yt-logo"><i>▶</i>YouTube</span>
+                <span class="yt-search">Search…</span>
+                <span class="yt-avatar"></span>
+              </div>
+              <div class="yt-main">
+                <div class="yt-col">
+                  <div class="yt-player">
+                    <span class="badge">4K</span>
+                    <span class="play"></span>
+                    <div class="timeline"><div class="track"><div class="fill"></div></div></div>
+                  </div>
+                  <div class="yt-title">Blue Planet II · Episode 1 – One Ocean (full documentary)</div>
+                  <div class="yt-meta">
+                    <span class="yt-avatar2"></span>
+                    <span class="yt-channel">BBC Earth</span>
+                    <span class="yt-sub">Subscribe</span>
+                    <span>· 12M views · 5 days ago</span>
+                  </div>
+                  <div class="yt-desc">
+                    From the shallow seas to the abyss, explore the most hidden corners of the ocean:
+                    bioluminescent creatures, cooperative humpback hunting, and life in total darkness.
+                    We know less about our ocean than the surface of the Moon.
+                  </div>
+                </div>
+                <div class="yt-side">
+                  <div class="yt-thumb"><span class="v">18:42</span><span class="t">Blue Planet II · Ep.2 – The Deep</span></div>
+                  <div class="yt-caption">The Deep · 4.1M views</div>
+                  <div class="yt-thumb"><span class="v">21:07</span><span class="t">Ocean Bioluminescence Explained</span></div>
+                  <div class="yt-caption">Bioluminescence · 890K views</div>
+                  <div class="yt-thumb"><span class="v">15:30</span><span class="t">How Humpbacks Hunt with Bubble Nets</span></div>
+                  <div class="yt-caption">Bubble-net hunting · 2.3M views</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Attached: 《Blue Planet II》Ep.1 – One Ocean</div>
+                <div class="p-user"><span class="cmd">/summarize</span> key points, with timestamps</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Reading subtitles…</div>
+                  <div class="p-body">
+                    <div class="p-h">One Ocean · key moments</div>
+                    <p>🌊 Intro on the ocean's scale — we know it less than the Moon<span class="p-ts">[00:12]</span></p>
+                    <p>✨ Bioluminescence is widespread in the deep, for lures &amp; camouflage<span class="p-ts">[03:40]</span></p>
+                    <p>🐋 Humpbacks hunt cooperatively with bubble nets<span class="p-ts">[08:15]</span></p>
+                    <p>🐙 Abyssal life evolved extreme adaptations to pressure and dark<span class="p-ts">[11:48]</span></p>
+                    <p>🌍 Close: human activity is reshaping ocean ecosystems<span class="p-ts">[15:02]</span><span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Ask anything… use 📎 to attach current page</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">Video notes: replies carry clickable <code>[mm:ss]</code> timestamps — click to jump to that moment.</p>
+        </figure>
+
+        <!-- Scenario 2: Read article -->
+        <figure class="window w-article" role="img" aria-label="browsa panel next to a blog article">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">dev.to</span>/sidepanel-ai/read-anywhere-ask-anywhere</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-article">
+              <div class="art-nav">
+                <span class="art-logo" style="color:#0f0f0f">DEV</span>
+                <a>Posts</a><a>Podcasts</a><a>Videos</a><a>Tags</a>
+                <span class="art-search">Search articles…</span>
+              </div>
+              <div class="art-main">
+                <span class="art-tag" style="color:#57534e;background:rgba(87,83,78,.08)">AI · Browsers</span>
+                <div class="art-title">Bringing an AI copilot to the side of every page you read</div>
+                <div class="art-meta"><span class="art-avatar" style="background:#0f0f0f"></span><span>Sarah Dev · 12 min read</span></div>
+                <p class="art-p">Feeding a page's text to an LLM is easy; making it truly "understand" the page is hard. We use a three-layer cascade: Readability first for clean article text, then a DOM tree that keeps structure, then full text as a fallback. For major sites we read the structured data the page already loaded — subtitles, comments, article source.</p>
+                <div class="art-code"><span class="ac-line hl"></span><span class="ac-line"></span><span class="ac-line short"></span><span class="ac-line mid"></span></div>
+                <p class="art-p">No re-authentication, no third-party uploads — data flows only between your browser and your own backend.</p>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Attached: Bringing an AI copilot to every page you read</div>
+                <div class="p-user"><span class="cmd">/keypoints</span> what are the takeaways?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Reading article…</div>
+                  <div class="p-body">
+                    <div class="p-h">Takeaways</div>
+                    <p>🧠 Three-layer cascade: Readability → DOM tree → full text</p>
+                    <p>🕵️ Major sites read their own loaded data — no re-auth</p>
+                    <p>🔒 Data stays between your browser and your backend</p>
+                    <p>⚡ Articles, subtitles &amp; PDFs all covered<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Ask anything… use 📎 to attach current page</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">Articles: <code>/keypoints</code> extracts the essentials; the body is attached via the Readability cascade.</p>
+        </figure>
+
+        <!-- Scenario 3: Open PDF -->
+        <figure class="window w-pdf" role="img" aria-label="browsa panel next to a PDF viewer">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">arxiv.org</span>/pdf/1706.03762</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-pdf">
+              <div class="pdf-bar">
+                <span class="pdf-name">attention-is-all-you-need.pdf</span>
+                <span class="pdf-page">Page 1 / 15</span>
+                <span>100%</span>
+              </div>
+              <div class="pdf-paper">
+                <div class="pdf-title">Attention Is All You Need</div>
+                <div class="pdf-meta">Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, et al.</div>
+                <div class="pdf-abstract"><b>Abstract</b> — The dominant sequence transduction models are based on complex recurrent or convolutional neural networks… We propose a new simple network architecture, the Transformer, based solely on attention mechanisms.</div>
+                <div class="pdf-p">The Transformer dispenses with recurrence and allows for significantly more parallelization, cutting training time.</div>
+                <div class="pdf-figure">
+                  <div class="fig-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="fig-cap">Figure 1: The Transformer – model architecture</div>
+                </div>
+                <div class="pdf-p">It achieves state of the art on WMT 2014 English-to-German and English-to-French at a fraction of the training cost.</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Attached: PDF 《Attention Is All You Need》(15 pages · 6 figures)</div>
+                <div class="p-user">What's the core contribution?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Parsing PDF…</div>
+                  <div class="p-body">
+                    <div class="p-h">Core contribution</div>
+                    <p>⚙️ Transformer — attention-only, no recurrence or convolution</p>
+                    <p>⚡ Highly parallel, trains far faster than RNN/LSTM</p>
+                    <p>📊 Fig. 1 shows the architecture; Fig. 2–4 training &amp; BLEU results<span class="p-ts">Fig.1</span></p>
+                    <p>🏆 SOTA on both WMT 2014 tasks at lower training cost<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Ask anything… use 📎 to attach current page</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">PDFs: local WASM rebuilds tables / headings / layout; figure regions are cropped and captioned automatically.</p>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">how it works</p>
+        <h2>Three steps to talk to a webpage</h2>
+        <p>No window-switching, no copy-pasting. browsa sits quietly beside the page you're reading — like a margin note.</p>
+      </div>
+      <div class="how-list">
+        <div class="how reveal">
+          <span class="no">01</span>
+          <h3>Open the side panel <span class="tag">Ctrl+Shift+H</span></h3>
+          <p>Press the shortcut or click the toolbar icon on any page. The browsa panel appears on the right.</p>
+        </div>
+        <div class="how reveal">
+          <span class="no">02</span>
+          <h3>Attach the page <span class="tag">📎</span></h3>
+          <p>Click 📎 and the page content flows into the conversation — articles, subtitles, PDFs. Selected text can be asked about directly.</p>
+        </div>
+        <div class="how reveal">
+          <span class="no">03</span>
+          <h3>Stream replies <span class="tag">any backend</span></h3>
+          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API or Hermes Agent.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">features</p>
+        <h2>More than a chat box</h2>
+        <p>browsa puts "reading" and "asking" in the same place: long articles, videos, PDFs — the AI is right there.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature reveal">
+          <span class="f-tag">attach</span>
+          <h3>Attach the page</h3>
+          <p>Bring the current page into the conversation with one click — modes pick themselves:</p>
+          <ul>
+            <li>Auto cascade: Readability body → DOM tree → full text</li>
+            <li>📷 Screenshot mode, for multimodal models</li>
+            <li>PDF parsed locally: WASM rebuilds tables / headings / layout, figures auto-cropped</li>
+            <li>GitHub file pages pull raw source directly, skipping page cleanup</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">render</span>
+          <h3>Rich rendering</h3>
+          <p>Replies are more than plain text — all rendered locally, no external services:</p>
+          <ul>
+            <li>Markdown GFM + 40+ language syntax highlighting</li>
+            <li>LaTeX math (KaTeX, Web Worker accelerated)</li>
+            <li>Mermaid diagrams, ECharts, Markmap mind maps</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">video</span>
+          <h3>Video notes</h3>
+          <p>A complete workflow for video — structured subtitles from YouTube and Bilibili:</p>
+          <ul>
+            <li>Replies carry clickable <code>[mm:ss]</code> timestamps that seek the video</li>
+            <li>Subtitle-less Bilibili videos can be transcribed locally (ASR)</li>
+            <li>Long transcripts auto-compressed into points, timestamps preserved</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">provider</span>
+          <h3>Any backend</h3>
+          <p>No vendor lock-in — connect your own models:</p>
+          <ul>
+            <li>Hermes Agent: tool execution, approval for risky actions, progress display</li>
+            <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
+            <li>Ping to verify connectivity and capabilities</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">privacy</span>
+          <h3>Privacy first</h3>
+          <p>No account, no cloud, no data relay:</p>
+          <ul>
+            <li>API keys live only in local <code>chrome.storage</code></li>
+            <li>PDFs parsed entirely on-device — bytes never leave</li>
+            <li>Content goes only to the backend you configure</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">session</span>
+          <h3>Sessions</h3>
+          <p>Long conversations stay organized:</p>
+          <ul>
+            <li>Save / restore named sessions, export Markdown</li>
+            <li>Full-text in-conversation search (<code>Ctrl+F</code>)</li>
+            <li>"Detail-thread" any text in a reply without touching the main history</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sites -->
+  <section id="sites">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">supported sites</p>
+        <h2>It reads your webpages</h2>
+        <p>For these sites browsa reads the structured data the page already loaded — subtitles, comments, article source, quotes — instead of guessing.</p>
+      </div>
+      <div class="site-strip">
+        <span class="site-chip reveal">YouTube<span class="en">subtitles/chapters</span></span>
+        <span class="site-chip reveal">Bilibili<span class="en">subtitles/ASR/stats</span></span>
+        <span class="site-chip reveal">Xiaohongshu<span class="en">notes/comments</span></span>
+        <span class="site-chip reveal">Juejin<span class="en">article source</span></span>
+        <span class="site-chip reveal">Zhihu<span class="en">articles/answers</span></span>
+        <span class="site-chip reveal">X / Twitter<span class="en">tweets/replies</span></span>
+        <span class="site-chip reveal">Xueqiu<span class="en">quotes/posts</span></span>
+        <span class="site-chip reveal">Xiaoyuzhou<span class="en">podcasts</span></span>
+        <span class="site-chip reveal">Dedao<span class="en">articles</span></span>
+        <span class="site-chip reveal">GeekTime<span class="en">articles</span></span>
+      </div>
+      <p class="site-note">
+        <b>Observes, never hijacks:</b> extraction works by watching the browser's own requests — no re-authentication,
+        and nothing is uploaded to third parties. Every other webpage works too, just not as deeply.
+      </p>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">install</p>
+        <h2>Install (developer mode)</h2>
+        <p>browsa is an unpacked extension loaded via developer mode. About 5 minutes, free forever.</p>
+      </div>
+      <div class="install-grid">
+        <div>
+          <div class="step">
+            <span class="no">1</span>
+            <div>
+              <h4>Get the code</h4>
+              <p><code>git clone</code> the repo, or download and unzip from <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="no">2</span>
+            <div>
+              <h4>Load the extension</h4>
+              <p>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → select the <code>browsa/</code> folder.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="no">3</span>
+            <div>
+              <h4>Configure and go</h4>
+              <p>Press <code>Ctrl+Shift+H</code> to open the panel → in ⚙ Settings add a Base URL and API key → Ping to verify → start chatting.</p>
+            </div>
+          </div>
+        </div>
+        <div class="code-block reveal">
+          <span class="c-dot"></span>
+          <pre><span class="cm"># 1. Get the code</span>
+git clone <span class="pr">https://github.com/xiaohuzai/browsa.git</span>
+
+<span class="cm"># 2. Install deps (optional, dev only)</span>
+npm install
+
+<span class="cm"># 3. Run tests (800+)</span>
+npm test
+
+<span class="cm"># 4. Build the package → browsa-v&lt;version&gt;.zip</span>
+npm run package   <span class="ok"># or just load the unpacked folder</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+      <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
+      <a class="lang" href="../" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+
+<script src="../site.js"></script>
+</body>
+</html>
