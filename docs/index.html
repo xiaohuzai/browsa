@@ -50,7 +50,7 @@
         <span class="chip">Chrome / Edge 114+</span>
         <span class="chip"><b>MIT</b> 开源</span>
         <span class="chip"><b>800+</b> 单元测试</span>
-        <span class="chip"><b>10</b> 站点结构化提取</span>
+        <span class="chip"><b>10+</b> 站点结构化提取</span>
       </div>
 
       <!-- 场景切换器 -->
@@ -362,6 +362,7 @@
         <span class="site-chip reveal">掘金<span class="en">文章源码</span></span>
         <span class="site-chip reveal">知乎<span class="en">文章/回答</span></span>
         <span class="site-chip reveal">X / Twitter<span class="en">推文/回复</span></span>
+        <span class="site-chip reveal">Reddit<span class="en">帖子/评论</span></span>
         <span class="site-chip reveal">雪球<span class="en">行情/帖子</span></span>
         <span class="site-chip reveal">小宇宙<span class="en">播客</span></span>
         <span class="site-chip reveal">得到<span class="en">文章</span></span>
@@ -382,43 +383,27 @@
         <h2>安装（开发者模式）</h2>
         <p>browsa 是未打包扩展，通过开发者模式加载。整个过程约 5 分钟，不收取任何费用。</p>
       </div>
-      <div class="install-grid">
-        <div>
-          <div class="step">
-            <span class="no">1</span>
-            <div>
-              <h4>获取代码</h4>
-              <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压。</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="no">2</span>
-            <div>
-              <h4>加载扩展</h4>
-              <p>打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。</p>
-            </div>
-          </div>
-          <div class="step">
-            <span class="no">3</span>
-            <div>
-              <h4>配置并开始</h4>
-              <p>按 <code>Ctrl+Shift+H</code> 打开侧边栏 → ⚙ 设置里填入 Base URL 与 API Key → 点 Ping 验证 → 开聊。</p>
-            </div>
+      <div class="install-steps">
+        <div class="step">
+          <span class="no">1</span>
+          <div>
+            <h4>获取代码</h4>
+            <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压。</p>
           </div>
         </div>
-        <div class="code-block reveal">
-          <span class="c-dot"></span>
-          <pre><span class="cm"># 1. 获取代码</span>
-git clone <span class="pr">https://github.com/xiaohuzai/browsa.git</span>
-
-<span class="cm"># 2. 安装依赖（可选，仅开发用）</span>
-npm install
-
-<span class="cm"># 3. 跑测试（800+ 个）</span>
-npm test
-
-<span class="cm"># 4. 打发布包 → browsa-v&lt;version&gt;.zip</span>
-npm run package   <span class="ok"># 或直接加载已解压目录</span></pre>
+        <div class="step">
+          <span class="no">2</span>
+          <div>
+            <h4>加载扩展</h4>
+            <p>打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="no">3</span>
+          <div>
+            <h4>配置并开始</h4>
+            <p>按 <code>Ctrl+Shift+H</code> 打开侧边栏 → ⚙ 设置里填入 Base URL 与 API Key → 点 Ping 验证 → 开聊。</p>
+          </div>
         </div>
       </div>
     </div>

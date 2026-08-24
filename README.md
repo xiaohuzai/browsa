@@ -4,6 +4,8 @@
 
 > **browsa** = **brow**ser **s**ide p**a**nel **A**I. Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
 
+> **Website**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — feature highlights & interactive interface demos (English · 简体中文)
+
 browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
 
 ```

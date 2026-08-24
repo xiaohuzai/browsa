@@ -4,6 +4,8 @@
 
 > **browsa** = **brow**ser **s**ide p**a**nel **A**I（浏览器侧边栏 AI）。在任何网页旁侧边栏中与 AI 对话——和你正在读的内容聊 LLM 智能体。
 
+> **官网**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — 功能亮点与界面示意（简体中文 · English）
+
 browsa 是一个 Chrome / Edge 扩展（Manifest V3）：在你当前打开的标签页旁打开一个聊天面板，附加页面内容，并从任意 OpenAI 兼容 API 流式接收回复。
 
 ```
