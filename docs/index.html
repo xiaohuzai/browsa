@@ -1,558 +1,793 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>browsa - 浏览器侧边栏 AI 聊天</title>
-<meta name="description" content="browsa = browser side panel AI。Chrome/Edge 扩展，在任何网页旁打开 AI 对话面板，附带页面内容，流式回复。">
+<title>browsa — 浏览器侧边栏 AI</title>
+<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持任意 OpenAI 兼容 API 与 Hermes Agent。读到哪里，问到哪里。">
+<link rel="icon" type="image/png" href="icon48.png">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+/* ─────────────────────────────────────────────────────────────────────────
+   browsa 官网 · 简约风
+   设计语言直接取自产品自身（见 lib/theme.css）：冷纸白地面 + 校对红
+   （proofreader's mark）主色 + 高亮金黄（margin-note）点缀。布局与排版
+   延续产品“页边批注栏”的隐喻——单色 mono 眉题、细发丝线、克制的留白。
+   ───────────────────────────────────────────────────────────────────────── */
 :root{
-  --bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#3fb950;
-  --card:#161b22;--border:#30363d;--code:#1f2428;
+  --paper:   #f5f6f3;   /* 冷纸白，非暖米白（产品 light 模式 --bg） */
+  --paper-2: #ffffff;
+  --paper-3: #eceeea;
+  --ink:     #14171f;
+  --ink-2:   #3a3f4a;
+  --ink-dim: #5b6270;
+  --line:    #dfe2dc;
+  --line-2:  #e8eae5;
+  --mark:    #c2410c;   /* 校对红 —— 产品主色 */
+  --mark-deep:#9a3305;
+  --gold:    #926c0d;   /* 高亮金黄 —— margin-note 声音 */
+  --gold-ink:#6f5206;   /* 金黄的深色文字变体（保证小字号对比度） */
+  --radius:  12px;
+  --shadow:  0 1px 2px rgba(20,22,31,.04), 0 12px 32px rgba(20,22,31,.08);
+  --shadow-lg:0 2px 4px rgba(20,22,31,.06), 0 32px 80px rgba(20,22,31,.16);
+  --mono: ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Consolas,monospace;
+  --sans: -apple-system,BlinkMacSystemFont,"Segoe UI","Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
 }
+*{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;overflow-x:hidden}
-.container{max-width:1080px;margin:0 auto;padding:0 24px}
+body{
+  font-family:var(--sans);
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.7;
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:rgba(194,65,12,.14)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--mark);outline-offset:2px;border-radius:4px}
+.skip-link{
+  position:absolute;left:-999px;top:0;z-index:200;
+  background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:0 0 8px 0;
+}
+.skip-link:focus{left:0;color:#fff}
 
-/* Sticky nav */
-.nav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-.nav .container{display:flex;align-items:center;justify-content:space-between;padding:12px 24px}
-.nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;text-decoration:none;color:var(--fg)}
-.nav-brand img{width:24px;height:24px;border-radius:6px}
-.nav-links{display:flex;gap:24px;flex-wrap:wrap}
-.nav-links a{color:var(--muted);text-decoration:none;font-size:0.9rem;transition:color 0.2s}
-.nav-links a:hover{color:var(--accent)}
+.container{max-width:1040px;margin:0 auto;padding:0 28px}
 
-/* Hero */
-.hero{padding:72px 0 56px;text-align:center;position:relative}
-.hero::before{content:"";position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(88,166,255,0.08) 0%,transparent 70%);pointer-events:none}
-.logo{width:88px;height:88px;border-radius:20px;box-shadow:0 8px 32px rgba(88,166,255,0.3);margin-bottom:20px}
-.hero h1{font-size:3rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:14px;background:linear-gradient(135deg,#fff 0%,#58a6ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-lead{font-size:1.35rem;font-weight:600;color:var(--fg);max-width:640px;margin:0 auto 10px;line-height:1.4}
-.hero-lead em{color:var(--accent);font-style:normal}
-.hero-sub{font-size:1rem;color:var(--muted);max-width:560px;margin:0 auto 28px}
-.cta-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+/* ─── 顶栏 ─────────────────────────────────────────────────────────────── */
+.nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(245,246,243,.86);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+.nav .container{display:flex;align-items:center;justify-content:space-between;height:60px}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none}
+.brand img{width:24px;height:24px;border-radius:6px}
+.brand .wordmark{
+  font-family:var(--mono);font-size:14px;font-weight:600;
+  letter-spacing:.05em;color:var(--mark);
+}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{
+  color:var(--ink-dim);text-decoration:none;font-size:14px;
+  transition:color .15s ease;
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-links .nav-gh{font-weight:600;color:var(--ink)}
+.nav-links .nav-gh:hover{color:var(--mark)}
 
-/* Screenshot placeholder */
-.shot-frame{margin:48px auto 0;max-width:880px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(135deg,var(--card) 0%,var(--code) 100%);padding:0;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.4)}
-.shot-frame .shot-img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover}
-.shot-frame .shot-placeholder{width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:0.9rem}
-.shot-frame .shot-placeholder .big{font-size:3rem;opacity:0.4}
-.shot-caption{text-align:center;color:var(--muted);font-size:0.85rem;margin-top:12px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-size:0.95rem;font-weight:600;text-decoration:none;transition:all 0.2s;border:1px solid transparent}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#79b8ff;transform:translateY(-1px);box-shadow:0 4px 16px rgba(88,166,255,0.4)}
-.btn-secondary{background:var(--card);color:var(--fg);border-color:var(--border)}
-.btn-secondary:hover{border-color:var(--accent);transform:translateY(-1px)}
+/* ─── Hero ─────────────────────────────────────────────────────────────── */
+.hero{padding:96px 0 72px;text-align:center;position:relative;overflow:hidden}
+.hero::before{
+  content:"";position:absolute;top:-220px;left:50%;transform:translateX(-50%);
+  width:820px;height:460px;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 100%,rgba(194,65,12,.06),transparent 62%),
+    radial-gradient(ellipse at 12% 120%,rgba(146,108,13,.05),transparent 55%),
+    radial-gradient(ellipse at 88% 120%,rgba(146,108,13,.05),transparent 55%);
+}
+.eyebrow{
+  font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.08em;
+  color:var(--gold-ink);
+}
+.eyebrow::before{content:"// ";color:var(--gold)}
+.hero .eyebrow{margin-bottom:20px}
+.hero h1{
+  font-size:clamp(34px,5.6vw,58px);font-weight:800;letter-spacing:-.035em;
+  line-height:1.12;margin-bottom:22px;position:relative;
+}
+.hero h1 .mark{
+  color:var(--mark);
+  background:linear-gradient(transparent 62%,rgba(194,65,12,.16) 62%);
+  background-position:0 0;background-size:100% 100%;
+  padding:0 .08em;margin:0 -.08em;
+}
+.hero .lead{
+  max-width:600px;margin:0 auto 34px;
+  font-size:17px;color:var(--ink-2);line-height:1.8;
+}
+.hero .lead strong{color:var(--ink);font-weight:600}
+.cta-group{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:13px 26px;border-radius:10px;
+  font-size:15px;font-weight:600;text-decoration:none;
+  border:1px solid transparent;cursor:pointer;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease;
+}
+.btn-primary{background:var(--mark);color:#fff;box-shadow:0 4px 18px rgba(194,65,12,.28)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 26px rgba(194,65,12,.34)}
+.btn-primary .kbd{
+  font-family:var(--mono);font-size:12px;font-weight:500;
+  background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);
+  padding:1px 6px;border-radius:5px;
+}
+.btn-secondary{background:var(--paper-2);color:var(--ink);border-color:var(--line)}
+.btn-secondary:hover{border-color:var(--ink-2);transform:translateY(-1px)}
+.hero-meta{
+  margin-top:22px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;position:relative;
+}
+.chip{
+  font-size:12.5px;color:var(--ink-dim);
+  border:1px solid var(--line);background:var(--paper-2);
+  padding:4px 12px;border-radius:999px;white-space:nowrap;
+}
+.chip b{color:var(--ink);font-weight:600}
 
-/* Badges */
-.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:32px}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:0.8rem;color:var(--muted)}
-.badge .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2)}
+/* ─── 浏览器 mockup ─────────────────────────────────────────────────────── */
+.window{
+  margin:64px auto 0;max-width:980px;text-align:left;
+  background:var(--paper-2);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.win-bar{
+  display:flex;align-items:center;gap:14px;
+  padding:11px 16px;border-bottom:1px solid var(--line-2);background:var(--paper-3);
+}
+.win-dots{display:flex;gap:7px;flex-shrink:0}
+.win-dots i{width:11px;height:11px;border-radius:50%;display:block}
+.win-dots i:nth-child(1){background:#f6b1a8}
+.win-dots i:nth-child(2){background:#f0d28a}
+.win-dots i:nth-child(3){background:#a8d5a2}
+.win-url{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--paper-2);border:1px solid var(--line-2);
+  border-radius:8px;padding:5px 12px;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.win-url .lock{color:var(--ink-dim);opacity:.7}
+.win-url .host{color:var(--ink);font-weight:600}
+.win-body{display:flex;align-items:stretch}
 
-/* Section */
-section{padding:60px 0}
-.section-title{text-align:center;font-size:2rem;font-weight:700;margin-bottom:12px}
-.section-desc{text-align:center;color:var(--muted);margin-bottom:40px;max-width:600px;margin-left:auto;margin-right:auto}
+/* 左侧：B 站视频页 */
+.bili{flex:1;min-width:0;background:#fff;display:flex;flex-direction:column}
+.bili-nav{
+  display:flex;align-items:center;gap:14px;padding:9px 16px;
+  border-bottom:1px solid #f0f1f2;flex-shrink:0;
+}
+.bili-logo{font-family:var(--sans);font-weight:700;font-size:17px;color:#fb7299;letter-spacing:-.02em}
+.bili-nav a{font-size:12px;color:#757575;text-decoration:none}
+.bili-search{
+  flex:1;max-width:240px;margin-left:auto;background:#f1f2f3;border-radius:6px;
+  padding:4px 10px;font-size:11px;color:#b0b0b0;
+}
+.bili-main{padding:16px;display:flex;gap:16px;align-items:flex-start}
+.bili-col{flex:1;min-width:0}
+.bili-player{
+  position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;
+  background:linear-gradient(180deg,#15181c,#0d0f14);
+}
+.bili-player .play{
+  position:absolute;inset:0;margin:auto;width:52px;height:52px;border-radius:50%;
+  background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;
+}
+.bili-player .play::after{
+  content:"";border-left:16px solid #fff;border-top:10px solid transparent;
+  border-bottom:10px solid transparent;margin-left:5px;
+}
+.bili-player .timeline{position:absolute;left:0;right:0;bottom:0;padding:0 12px 10px}
+.bili-player .timeline .track{height:3px;background:rgba(255,255,255,.25);border-radius:2px;position:relative}
+.bili-player .timeline .track .fill{position:absolute;left:0;top:0;bottom:0;width:34%;background:#fb7299;border-radius:2px}
+.bili-player .badge{
+  position:absolute;top:10px;right:10px;background:rgba(0,0,0,.62);color:#fff;
+  font-size:9.5px;padding:2px 7px;border-radius:4px;font-family:var(--mono);
+}
+.bili-title{margin-top:12px;font-size:14.5px;font-weight:600;color:#18191c;line-height:1.5}
+.bili-meta{margin-top:7px;font-size:11.5px;color:#9499a0;display:flex;gap:10px;align-items:center}
+.bili-avatar{width:22px;height:22px;border-radius:50%;background:#fb7299;flex-shrink:0}
+.bili-desc{
+  margin-top:12px;font-size:11.5px;color:#61666d;line-height:1.8;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+.bili-side{width:150px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+.bili-thumb{border-radius:6px;overflow:hidden;background:#f1f2f3;aspect-ratio:16/9;position:relative}
+.bili-thumb:nth-child(1){background:linear-gradient(135deg,#2a3a5a,#15181c)}
+.bili-thumb:nth-child(2){background:linear-gradient(135deg,#3a5a3a,#15181c)}
+.bili-thumb:nth-child(3){background:linear-gradient(135deg,#5a3a4a,#15181c)}
+.bili-thumb .t{position:absolute;left:6px;right:6px;bottom:4px;font-size:9px;color:#fff;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bili-thumb .v{position:absolute;top:4px;right:5px;font-size:8.5px;color:#fff;background:rgba(0,0,0,.5);
+  padding:1px 4px;border-radius:3px;font-family:var(--mono)}
+.bili-caption{font-size:9.5px;color:#c0c4cc;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Flow */
-.flow{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;margin:40px 0}
-.flow-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 28px;text-align:center;min-width:160px}
-.flow-item .icon{font-size:2rem;margin-bottom:8px}
-.flow-item .label{font-size:0.9rem;color:var(--muted)}
-.flow-arrow{color:var(--accent);font-size:1.5rem}
+/* 右侧：browsa 侧边栏（复刻产品深色设计） */
+.panel{
+  width:300px;flex-shrink:0;display:flex;flex-direction:column;
+  background:#0d0f14;color:#eef0ee;border-left:1px solid #262b38;
+  font-size:12.5px;line-height:1.65;position:relative;
+}
+.panel::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 40% at 50% 0%,rgba(224,84,44,.05),transparent 60%);
+}
+.p-topbar{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;
+  border-bottom:1px solid #1e222c;position:relative;z-index:1;
+}
+.p-status{width:7px;height:7px;border-radius:50%;background:#e0542c;flex-shrink:0;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.p-wordmark{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.06em;
+  color:#e0542c;flex-shrink:0;
+}
+.p-provider{
+  flex:1;min-width:0;font-size:10.5px;color:#c7cbd1;background:#1b1f29;
+  border:1px solid #262b38;border-radius:6px;padding:4px 8px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.p-provider .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#4ade80;margin-right:5px;vertical-align:1px}
+.p-ico{width:16px;height:16px;border-radius:4px;background:#232734;flex-shrink:0}
+.p-msgs{
+  flex:1;padding:12px 10px 6px;display:flex;flex-direction:column;gap:10px;position:relative;z-index:1;
+}
+.p-sys{
+  align-self:center;font-size:10.5px;color:#9aa0ab;text-align:center;max-width:95%;
+  background:#14171f;border:1px solid #1e222c;border-radius:8px;padding:4px 10px;
+}
+.p-user{
+  align-self:flex-end;text-align:right;color:#c7cbd1;font-size:12px;padding:2px 2px;
+  max-width:88%;
+}
+.p-user .cmd{font-family:var(--mono);font-size:11.5px;color:#e0542c}
+.p-assist{
+  align-self:flex-start;border-left:2px solid #1e222c;padding:2px 2px 2px 10px;max-width:96%;
+}
+.p-tool{
+  display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:#d4a72c;
+  border-left:2px solid #d4a72c;border-radius:0 6px 6px 0;
+  background:rgba(27,31,41,.6);padding:3px 9px;font-style:italic;
+  animation:fadein .4s ease both;
+}
+.p-tool .spin{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(212,167,44,.3);border-top-color:#d4a72c;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.p-body{margin-top:8px}
+.p-body .p-h{font-size:12px;font-weight:600;color:#eef0ee;margin-bottom:4px}
+.p-body p{
+  font-size:11.5px;color:#c7cbd1;margin:5px 0;line-height:1.6;
+  animation:fadeup .5s ease both;
+}
+.p-ts{
+  display:inline-block;padding:0 .3em;margin:0 .08em;border-radius:5px;
+  color:#d4a72c;background:rgba(212,167,44,.12);font-size:.92em;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+}
+.p-cursor{display:inline-block;width:6px;height:12px;background:#e0542c;vertical-align:-1px;animation:cursorin 2.6s ease both;margin-left:2px}
+@keyframes cursorin{0%,78%{opacity:1}85%{opacity:0}100%{opacity:0}}
+@keyframes fadeup{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+/* 回复行错峰入场：tool 先出现，正文行逐行浮现 */
+.p-body p:nth-child(2){animation-delay:.9s}
+.p-body p:nth-child(3){animation-delay:1.15s}
+.p-body p:nth-child(4){animation-delay:1.4s}
+.p-body p:nth-child(5){animation-delay:1.65s}
+.p-body p:nth-child(6){animation-delay:1.9s}
+.p-composer{
+  margin:8px 10px 10px;padding:7px 7px 7px 12px;border-radius:14px;
+  background:#0d0f14;border:1.5px solid #262b38;
+  display:flex;align-items:center;gap:8px;position:relative;z-index:1;
+}
+.p-attach{width:16px;height:16px;border-radius:4px;border:1px solid #343a4a;flex-shrink:0}
+.p-input{flex:1;font-size:11px;color:#9aa0ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-send{width:24px;height:24px;border-radius:50%;background:#e0542c;flex-shrink:0;box-shadow:0 2px 8px rgba(224,84,44,.35)}
+.win-caption{
+  text-align:center;font-size:13px;color:var(--ink-dim);
+  margin-top:16px;padding:0 20px;
+}
+.win-caption code{font-family:var(--mono);font-size:12px;color:var(--gold-ink);background:rgba(146,108,13,.08);padding:1px 6px;border-radius:5px}
 
-/* Feature grid */
-.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
-.feature{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;transition:all 0.2s}
-.feature:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
-.feature .ficon{font-size:1.8rem;margin-bottom:12px}
-.feature h3{font-size:1.1rem;font-weight:600;margin-bottom:8px}
-.feature p{font-size:0.9rem;color:var(--muted);line-height:1.5}
-.feature ul{list-style:none;margin-top:8px}
-.feature ul li{font-size:0.85rem;color:var(--muted);padding:3px 0;padding-left:18px;position:relative}
-.feature ul li::before{content:"›";position:absolute;left:0;color:var(--accent)}
+/* ─── Section 通用 ─────────────────────────────────────────────────────── */
+section{padding:88px 0;scroll-margin-top:64px}
+.section-head{max-width:640px;margin-bottom:48px}
+.section-head h2{
+  font-size:clamp(26px,3.6vw,34px);font-weight:800;letter-spacing:-.02em;
+  line-height:1.2;margin-top:12px;
+}
+.section-head p{margin-top:14px;color:var(--ink-2);font-size:16px;line-height:1.8}
 
-/* Sites table */
-.sites-table{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:32px 0}
-.sites-table table{width:100%;border-collapse:collapse}
-.sites-table th,.sites-table td{padding:12px 20px;text-align:left;border-bottom:1px solid var(--border)}
-.sites-table th{background:var(--code);font-size:0.85rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em}
-.sites-table td{font-size:0.9rem}
-.sites-table td:first-child{font-weight:600}
-.sites-table tr:last-child td{border-bottom:none}
-.sites-table tr:hover{background:rgba(88,166,255,0.04)}
-
-/* Provider cards */
-.providers{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:32px}
-.provider{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
-.provider .ptype{display:inline-block;font-size:0.75rem;padding:2px 8px;border-radius:4px;margin-bottom:12px;font-weight:600}
-.provider .ptype.agent{background:rgba(63,185,80,0.15);color:var(--accent2)}
-.provider .ptype.llm{background:rgba(88,166,255,0.15);color:var(--accent)}
-.provider h3{font-size:1.05rem;margin-bottom:8px}
-.provider p{font-size:0.85rem;color:var(--muted)}
-
-/* Code block */
-.code-block{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:20px;margin:20px 0;overflow-x:auto}
-.code-block pre{font-family:"SF Mono",Consolas,"Liberation Mono",Menlo,monospace;font-size:0.85rem;line-height:1.6;color:var(--fg)}
-.code-block .comment{color:var(--muted)}
-.code-block .prompt{color:var(--accent2)}
-
-/* Install steps */
-.steps{counter-reset:step;margin:32px 0}
-.step{display:flex;gap:20px;padding:20px 0;border-bottom:1px solid var(--border)}
-.step:last-child{border-bottom:none}
-.step-num{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem}
-.step-content h4{font-size:1rem;margin-bottom:4px}
-.step-content p{font-size:0.9rem;color:var(--muted)}
-.step-content code{background:var(--code);padding:2px 6px;border-radius:4px;font-size:0.85rem;color:var(--accent)}
-
-/* Footer */
-footer{padding:40px 0;border-top:1px solid var(--border);text-align:center}
-footer .container{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
-footer .links{display:flex;gap:20px}
-footer a{color:var(--muted);text-decoration:none;font-size:0.9rem;transition:color 0.2s}
-footer a:hover{color:var(--accent)}
-footer .copyright{color:var(--muted);font-size:0.85rem}
-
-@media(max-width:768px){
-  .hero{padding:60px 0 40px}
-  .hero h1{font-size:2.2rem}
-  .hero-lead{font-size:1.05rem}
-  .flow{flex-direction:column}
-  .flow-arrow{transform:rotate(90deg)}
-  .nav-links{gap:16px}
-  .nav-links a{font-size:0.85rem}
+/* ─── 怎么用 · 三步 ─────────────────────────────────────────────────────── */
+.how-list{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.how{
+  background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:28px;position:relative;transition:transform .15s ease,border-color .15s ease;
+}
+.how:hover{transform:translateY(-2px);border-color:var(--line)}
+.how .no{
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--mark);
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border:1px solid rgba(194,65,12,.35);border-radius:8px;
+  background:rgba(194,65,12,.06);margin-bottom:16px;
+}
+.how h3{font-size:16px;font-weight:700;margin-bottom:8px}
+.how p{font-size:14px;color:var(--ink-2);line-height:1.75}
+.how .tag{
+  font-family:var(--mono);font-size:11px;color:var(--gold-ink);
+  background:rgba(146,108,13,.08);padding:2px 7px;border-radius:5px;margin-left:8px;
+  vertical-align:2px;font-weight:500;
 }
 
-/* Changelog */
-.changelog{max-width:760px;margin:32px auto 0}
-.cl-item{display:grid;grid-template-columns:90px 60px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);align-items:start}
-.cl-item:last-child{border-bottom:none}
-.cl-version{font-family:"SF Mono",Consolas,monospace;font-size:0.95rem;font-weight:700;color:var(--accent)}
-.cl-date{font-size:0.8rem;color:var(--muted);padding-top:2px}
-.cl-body{font-size:0.9rem;color:var(--fg);line-height:1.5}
-.cl-tag{display:inline-block;font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:8px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.05em}
-.cl-tag.feat{background:rgba(63,185,80,0.15);color:var(--accent2)}
-.cl-tag.fix{background:rgba(88,166,255,0.15);color:var(--accent)}
-.cl-body code{background:var(--code);padding:1px 5px;border-radius:3px;font-size:0.85rem;color:var(--accent)}
-@media(max-width:600px){
-  .cl-item{grid-template-columns:80px 1fr}
-  .cl-date{display:none}
+/* ─── 功能 ──────────────────────────────────────────────────────────────── */
+.feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.feature{
+  background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 28px;transition:transform .15s ease,border-color .15s ease;
+}
+.feature:hover{transform:translateY(-2px)}
+.feature .f-tag{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--gold-ink);
+  letter-spacing:.04em;display:block;margin-bottom:12px;
+}
+.feature .f-tag::before{content:"#";opacity:.55}
+.feature h3{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.feature p{font-size:14px;color:var(--ink-2);line-height:1.8}
+.feature p code,.feature li code{
+  font-family:var(--mono);font-size:12px;color:var(--ink);
+  background:var(--paper-3);border:1px solid var(--line-2);padding:1px 5px;border-radius:5px;
+}
+.feature ul{list-style:none;margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.feature ul li{
+  font-size:13.5px;color:var(--ink-2);padding-left:20px;position:relative;line-height:1.7;
+}
+.feature ul li::before{
+  content:"›";position:absolute;left:4px;color:var(--mark);font-weight:700;
+}
+
+/* ─── 站点 ──────────────────────────────────────────────────────────────── */
+.site-strip{
+  display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;
+}
+.site-chip{
+  font-size:13.5px;color:var(--ink-2);
+  background:var(--paper-2);border:1px solid var(--line);border-radius:9px;
+  padding:7px 14px;transition:border-color .15s ease,color .15s ease;
+}
+.site-chip:hover{border-color:var(--mark);color:var(--mark)}
+.site-chip .en{font-family:var(--mono);font-size:12px;color:var(--ink-dim);margin-left:6px}
+.site-note{
+  margin-top:22px;font-size:13.5px;color:var(--ink-dim);max-width:640px;line-height:1.8;
+}
+.site-note b{color:var(--ink-2);font-weight:600}
+
+/* ─── 安装 ──────────────────────────────────────────────────────────────── */
+.install-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.step{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line-2)}
+.step:last-child{border-bottom:none}
+.step .no{
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--mark);
+  flex-shrink:0;width:28px;height:28px;border:1px solid rgba(194,65,12,.35);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  background:rgba(194,65,12,.06);margin-top:2px;
+}
+.step h4{font-size:15px;font-weight:700;margin-bottom:4px}
+.step p{font-size:14px;color:var(--ink-2);line-height:1.75;overflow-wrap:anywhere}
+.install-grid > *{min-width:0}
+.step p code{
+  font-family:var(--mono);font-size:12.5px;color:var(--ink);
+  background:var(--paper-3);border:1px solid var(--line-2);padding:1px 6px;border-radius:5px;
+}
+.step p .link{color:var(--mark);text-decoration:underline;text-underline-offset:2px;font-weight:500}
+.code-block{
+  background:#14171f;border-radius:12px;padding:20px 22px;
+  border:1px solid #262b38;box-shadow:var(--shadow);
+}
+.code-block .c-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#232734;margin-bottom:14px}
+.code-block pre{
+  font-family:var(--mono);font-size:13px;line-height:1.85;color:#eef0ee;
+  overflow-x:auto;
+}
+.code-block .cm{color:#9aa0ab}
+.code-block .pr{color:#e0542c}
+.code-block .ok{color:#4ade80}
+
+/* ─── Footer ────────────────────────────────────────────────────────────── */
+footer{border-top:1px solid var(--line);padding:44px 0 52px;background:var(--paper-2)}
+footer .container{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.foot-brand{display:flex;align-items:center;gap:9px}
+.foot-brand img{width:20px;height:20px;border-radius:5px}
+.foot-brand .wordmark{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.05em;color:var(--mark)}
+.foot-links{display:flex;gap:22px;flex-wrap:wrap}
+.foot-links a{color:var(--ink-dim);text-decoration:none;font-size:13.5px;transition:color .15s ease}
+.foot-links a:hover{color:var(--mark)}
+.foot-meta{
+  width:100%;margin-top:20px;padding-top:18px;border-top:1px solid var(--line-2);
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+  font-size:12.5px;color:var(--ink-dim);
+}
+.foot-meta .mono{font-family:var(--mono);font-size:12px}
+
+/* 滚动显现（尊重 prefers-reduced-motion） */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* ─── 响应式 ────────────────────────────────────────────────────────────── */
+@media (max-width:900px){
+  .how-list{grid-template-columns:1fr}
+  .feature-grid{grid-template-columns:1fr}
+  .install-grid{grid-template-columns:1fr;gap:28px}
+  .bili-side{display:none}
+}
+@media (max-width:720px){
+  section{padding:64px 0}
+  .hero{padding:64px 0 48px}
+  .nav-links .hide-m{display:none}
+  .nav-links{gap:18px}
+  .bili{display:none}            /* 移动端只保留侧边栏，聚焦产品本身 */
+  .panel{width:100%;border-left:none}
+  .window{max-width:440px}
+  .container{padding:0 20px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001s !important;animation-delay:0s !important;transition-duration:.001s !important}
+  .reveal{opacity:1;transform:none}
+  .p-status{animation:none;opacity:.85}
+  .p-cursor{animation:none;opacity:0}
+  .p-tool .spin{animation:none}
 }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到主要内容</a>
 
-<nav class="nav">
+<header class="nav">
   <div class="container">
-    <a href="#" class="nav-brand">
-      <img src="icon48.png" alt="browsa">
-      <span>browsa</span>
+    <a class="brand" href="#top" aria-label="browsa 首页">
+      <img src="icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
     </a>
-    <div class="nav-links">
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="#how">怎么用</a>
       <a href="#features">功能</a>
-      <a href="#sites">站点</a>
-      <a href="#providers">Provider</a>
+      <a href="#sites" class="hide-m">站点</a>
       <a href="#install">安装</a>
-      <a href="#changelog">更新</a>
-      <a href="https://github.com/xiaohuzai/browsa">GitHub ↗</a>
-    </div>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
   </div>
-</nav>
+</header>
 
-<div class="hero">
-  <div class="container">
-    <img src="icon128.png" alt="browsa" class="logo">
-    <h1>browsa</h1>
-    <p class="hero-lead">读着长文档想问 AI？<em>不用切窗口，不用复制粘贴。</em></p>
-    <p class="hero-sub">浏览器侧边栏 AI，一键附带当前页面，流式对话。支持 Hermes、任意 OpenAI 兼容 API。</p>
-    <div class="cta-group">
-      <a href="#install" class="btn btn-primary">⚡ 5 分钟上手</a>
-      <a href="https://github.com/xiaohuzai/browsa" class="btn btn-secondary">⭐ GitHub 仓库</a>
-    </div>
-    <div class="badges">
-      <span class="badge"><span class="dot"></span> v0.28.2</span>
-      <span class="badge">Chrome / Edge MV3</span>
-      <span class="badge">MIT License</span>
-      <span class="badge">10+ 站点结构化提取</span>
-    </div>
-    <div class="shot-frame" id="hero-shot">
-      <!-- 截图位置：替换为真实截图 shots/main.png -->
-      <div class="shot-placeholder">
-        <div class="big">💬</div>
-        <div>主截图位 · 待添加 <code>shots/main.png</code></div>
-        <div style="font-size:0.8rem;opacity:0.7">建议：侧边栏对话 + Mermaid/代码高亮的完整场景</div>
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" id="top">
+    <div class="container">
+      <p class="eyebrow">browser side-panel AI</p>
+      <h1>读到哪里，<span class="mark">问到哪里</span>。</h1>
+      <p class="lead">
+        browsa 是一个 <strong>Chrome / Edge 侧边栏扩展</strong>：不用复制粘贴，点击 <strong>📎</strong>
+        就把当前页面带进对话——正文、字幕、PDF 都能读，回答在旁侧流式渲染。
+      </p>
+      <div class="cta-group">
+        <a class="btn btn-primary" href="#install">
+          安装 browsa <span class="kbd">Ctrl+Shift+H</span>
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">
+          查看源码 ↗
+        </a>
       </div>
-    </div>
-    <p class="shot-caption">browsa 在浏览器侧边栏中流式对话，自动附带当前页面内容</p>
-  </div>
-</div>
+      <div class="hero-meta">
+        <span class="chip"><b>v0.31.9</b></span>
+        <span class="chip">Chrome / Edge 114+</span>
+        <span class="chip"><b>MIT</b> 开源</span>
+        <span class="chip"><b>800+</b> 单元测试</span>
+        <span class="chip"><b>10</b> 站点结构化提取</span>
+      </div>
 
-<section>
-  <div class="container">
-    <h2 class="section-title">它是怎么工作的</h2>
-    <p class="section-desc">browsa 拦截你正在看的页面，把内容打包送给你的 LLM/Agent，流式显示回复——全程在侧边栏完成。</p>
-    <div class="flow">
-      <div class="flow-item">
-        <div class="icon">🌐</div>
-        <div class="label">当前网页</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-item">
-        <div class="icon">💬</div>
-        <div class="label">browsa 侧边栏</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-item">
-        <div class="icon">🤖</div>
-        <div class="label">你的 LLM / Agent</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-item">
-        <div class="icon">⚡</div>
-        <div class="label">流式回复</div>
-      </div>
-    </div>
-  </div>
-</section>
+      <figure class="window" role="img" aria-label="browsa 侧边栏在 B 站视频页旁对话的界面示意">
+        <div class="win-bar">
+          <span class="win-dots"><i></i><i></i><i></i></span>
+          <span class="win-url">
+            <span class="lock">🔒</span>
+            <span class="host">bilibili.com</span>/video/BV1aX4y1E7b9
+          </span>
+        </div>
+        <div class="win-body">
+          <!-- 左侧：B 站视频页 -->
+          <div class="bili">
+            <div class="bili-nav">
+              <span class="bili-logo">bilibili</span>
+              <a>首页</a><a>番剧</a><a>直播</a><a>会员购</a>
+              <span class="bili-search">搜索视频 / 直播 / 用户…</span>
+            </div>
+            <div class="bili-main">
+              <div class="bili-col">
+                <div class="bili-player">
+                  <span class="badge">4K · 修复</span>
+                  <span class="play"></span>
+                  <div class="timeline"><div class="track"><div class="fill"></div></div></div>
+                </div>
+                <div class="bili-title">《蓝色星球 II》第 1 集 · 海洋深处 | 双语精讲（完整版）</div>
+                <div class="bili-meta">
+                  <span class="bili-avatar"></span>
+                  <span>纪录片字幕组</span><span>·</span><span>124.6万播放</span><span>·</span><span>3.2万赞</span>
+                </div>
+                <div class="bili-desc">
+                  从海面到深渊，本集深入探索海洋中最隐秘的角落：会发光的深海生物、协作捕食的座头鲸、
+                  以及生活在黑暗中的奇异生物。人类对海洋的了解，仍不及对月球表面的了解。
+                </div>
+              </div>
+              <div class="bili-side">
+                <div class="bili-thumb"><span class="v">18:42</span><span class="t">《蓝色星球 II》第 2 集 · 深海</span></div>
+                <div class="bili-caption">第 2 集 · 深海 · 1002 播放</div>
+                <div class="bili-thumb"><span class="v">21:07</span><span class="t">海洋生物发光之谜：深海里的「霓虹」</span></div>
+                <div class="bili-caption">海洋生物发光之谜 · 88 播放</div>
+                <div class="bili-thumb"><span class="v">15:30</span><span class="t">座头鲸的协作捕食战术</span></div>
+                <div class="bili-caption">座头鲸协作捕食 · 231 播放</div>
+              </div>
+            </div>
+          </div>
 
-<section id="why">
-  <div class="container">
-    <h2 class="section-title">为什么选 browsa</h2>
-    <p class="section-desc">跟同类侧边栏 AI 对比，browsa 解决的是"数据自主 + 工具能力"这两个痛点。</p>
-    <div class="sites-table">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:26%">能力</th>
-            <th>browsa</th>
-            <th>普通 SaaS 侧边栏</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>API 后端</td><td><strong>自带</strong>（Hermes / OpenAI 兼容）</td><td>厂商锁定</td></tr>
-          <tr><td>订阅费</td><td><strong>免费</strong>，MIT 开源</td><td>月付 $10-20</td></tr>
-          <tr><td>工具执行</td><td><strong>能跑 bash、读写文件、搜索</strong>（Agent Provider）</td><td>通常不能</td></tr>
-          <tr><td>站点结构化提取</td><td><strong>10+ 站点</strong>拦截 XHR，拿到字幕、转录、评论</td><td>仅正文文本</td></tr>
-          <tr><td>数据流向</td><td>你的 API Key 直发后端，<strong>不经第三方</strong></td><td>经厂商服务器</td></tr>
-          <tr><td>Mermaid / ECharts / LaTeX</td><td><strong>全支持</strong>，Web Worker 加速</td><td>部分支持或无</td></tr>
-          <tr><td>会话管理</td><td>本地存储、命名、导出 Markdown、全文搜索</td><td>云端存储为主</td></tr>
-        </tbody>
-      </table>
+          <!-- 右侧：browsa 侧边栏 -->
+          <div class="panel">
+            <div class="p-topbar">
+              <span class="p-status"></span>
+              <span class="p-wordmark">browsa</span>
+              <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+              <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+            </div>
+            <div class="p-msgs">
+              <div class="p-sys">📎 已附加：「《蓝色星球 II》第 1 集 · 海洋深处」</div>
+              <div class="p-user"><span class="cmd">/summarize</span> 用中文总结要点，给每段标注时间</div>
+              <div class="p-assist">
+                <div class="p-tool"><span class="spin"></span> 正在读取字幕…</div>
+                <div class="p-body">
+                  <div class="p-h">海洋深处 · 要点</div>
+                  <p>🌊 开篇引入海洋的广袤与未知，人类对它的了解不足对月球表面<span class="p-ts">[00:12]</span></p>
+                  <p>✨ 深海生物发光普遍存在，用于诱捕、伪装与求偶<span class="p-ts">[03:40]</span></p>
+                  <p>🐋 座头鲸以气泡网协作捕食，是海洋中最复杂的合作行为之一<span class="p-ts">[08:15]</span></p>
+                  <p>🐙 深渊生物演化出极端适应性：耐压、发光、吞下比自身大的猎物<span class="p-ts">[11:48]</span></p>
+                  <p>🌍 结尾呼吁：海洋生态正被人类活动深刻改变<span class="p-ts">[15:02]</span><span class="p-cursor"></span></p>
+                </div>
+              </div>
+            </div>
+            <div class="p-composer">
+              <span class="p-attach"></span>
+              <span class="p-input">Ask anything… use 📎 to attach current page</span>
+              <span class="p-send"></span>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <p class="win-caption">
+        视频笔记：回复自带可点击的 <code>[mm:ss]</code> 时间戳，点击直接跳到视频对应位置。
+      </p>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="features">
-  <div class="container">
-    <h2 class="section-title">核心功能</h2>
-    <p class="section-desc">不只是一个聊天框--browsa 是一个完整的阅读辅助工作站。</p>
-    <div class="feature-grid">
-      <div class="feature">
-        <div class="ficon">💬</div>
-        <h3>流式对话</h3>
-        <p>Token 逐字显示，Esc 中断。支持 think 块折叠、消息编辑重发、细聊侧线对话。</p>
+  <!-- 怎么用 -->
+  <section id="how">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">how it works</p>
+        <h2>三步，开始和网页对话</h2>
+        <p>不换窗口，不复制粘贴。browsa 安静地停在你正在读的页面旁边，像页边批注一样。</p>
       </div>
-      <div class="feature">
-        <div class="ficon">📎</div>
-        <h3>页面内容附带</h3>
-        <p>Auto 模式用 Mozilla Readability 提取正文，截图模式发可见区域 PNG 给多模态模型。</p>
-      </div>
-      <div class="feature">
-        <div class="ficon">🎨</div>
-        <h3>富文本渲染</h3>
-        <ul>
-          <li>Markdown GFM + 40+ 语言代码高亮</li>
-          <li>LaTeX 公式（KaTeX Web Worker 加速）</li>
-          <li>Mermaid 流程图、ECharts 图表</li>
-          <li>Diff 语法高亮</li>
-        </ul>
-      </div>
-      <div class="feature">
-        <div class="ficon">🔍</div>
-        <h3>站点结构化提取</h3>
-        <p>对 10+ 站点拦截 XHR 提取结构化内容，不靠 Readability 猜测——见下表。</p>
-      </div>
-      <div class="feature">
-        <div class="ficon">🎛️</div>
-        <h3>多 Provider 支持</h3>
-        <p>Hermes Agent（含工具执行）、任意 OpenAI 兼容 API。Ping 按钮一键检测。</p>
-      </div>
-      <div class="feature">
-        <div class="ficon">⌨️</div>
-        <h3>快捷操作</h3>
-        <ul>
-          <li>Slash 命令：<code>/summarize</code> <code>/translate</code> 等</li>
-          <li>选中文字浮窗：Ask / Explain / 翻译 / 摘要</li>
-          <li>右键菜单：选中文字直接发问</li>
-        </ul>
-      </div>
-      <div class="feature">
-        <div class="ficon">📂</div>
-        <h3>会话管理</h3>
-        <p>命名保存会话、浏览历史、导出 Markdown、会话内全文搜索（Ctrl+F）、多选批量删除。</p>
-      </div>
-      <div class="feature">
-        <div class="ficon">⚙️</div>
-        <h3>精细配置</h3>
-        <ul>
-          <li>域名规则：不同站点不同系统提示</li>
-          <li>Mask 规则：正则脱敏手机号等</li>
-          <li>回复语言、最大字符数、llms.txt</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="sites">
-  <div class="container">
-    <h2 class="section-title">支持的站点</h2>
-    <p class="section-desc">对这些站点，browsa 直接拦截浏览器 API 调用提取结构化内容——无需登录、无需重新认证。</p>
-    <div class="sites-table">
-      <table>
-        <thead>
-          <tr><th>站点</th><th>提取的内容</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>YouTube</td><td>标题、字幕转录、章节、描述、作者、播放量/点赞</td></tr>
-          <tr><td>Bilibili</td><td>标题、AI 摘要、字幕/转录、音频 URL、视频统计</td></tr>
-          <tr><td>小红书</td><td>笔记标题、描述、标签、图片、热门评论、统计</td></tr>
-          <tr><td>掘金</td><td>完整文章 Markdown 源码</td></tr>
-          <tr><td>知乎</td><td>专栏文章 或 问题 Top 3 回答</td></tr>
-          <tr><td>Twitter / X</td><td>推文文本、作者、互动统计</td></tr>
-          <tr><td>雪球</td><td>股票行情 或 帖子内容</td></tr>
-          <tr><td>小宇宙</td><td>播客标题、描述、show notes</td></tr>
-          <tr><td>得到</td><td>文章正文</td></tr>
-          <tr><td>极客时间</td><td>文章正文</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section id="providers">
-  <div class="container">
-    <h2 class="section-title">支持的 Provider</h2>
-    <p class="section-desc">分两类：Agent Provider 能执行工具（bash、文件操作、网络搜索），LLM Provider 只做对话。</p>
-    <div class="providers">
-      <div class="provider">
-        <span class="ptype agent">🤖 AGENT</span>
-        <h3>Hermes Agent</h3>
-        <p>自托管 AI Agent，内置工具（web 搜索、终端、文件操作、记忆、技能）。用 <code>/v1/runs</code> API，支持工具进度展示和危险操作审批。</p>
-      </div>
-      <div class="provider">
-        <span class="ptype llm">💬 LLM</span>
-        <h3>OpenAI 兼容</h3>
-        <p>任何 <code>/v1/chat/completions</code> 端点：OpenAI、Anthropic、Ollama、Groq、LiteLLM 等。需指定 Model ID。</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="changelog">
-  <div class="container">
-    <h2 class="section-title">最近更新</h2>
-    <p class="section-desc">browsa 发版很勤，最近一个月内连续 10+ 个版本。下面是主要功能演进，完整历史见 <a href="https://github.com/xiaohuzai/browsa/releases" style="color:var(--accent)">Releases</a>。</p>
-    <div class="changelog">
-      <div class="cl-item">
-        <div class="cl-version">v0.28.2</div>
-        <div class="cl-date">07-21</div>
-        <div class="cl-body">
-          <span class="cl-tag fix">fix</span>
-          DOM 树模式提取遇到无 &lt;p&gt; 包裹的裸文本段落（常见于富文本编辑器渲染的付费文章站）时正文被静默丢弃；DOM 树模式完全不提取 &lt;img&gt; 导致图片引用丢失；历史消息后台渲染升级会清空消息操作按钮（复制/引用/折叠）；PDF wasm 高精度解析引擎因 Worker 内部误用 chrome.* API 从未真正生效，一直静默降级为纯文本兜底
+      <div class="how-list">
+        <div class="how reveal">
+          <span class="no">01</span>
+          <h3>打开侧边栏 <span class="tag">Ctrl+Shift+H</span></h3>
+          <p>在任意网页按快捷键，或点工具栏图标。browsa 侧边栏随即出现在页面右侧。</p>
         </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.28.2</div>
-        <div class="cl-date">07-21</div>
-        <div class="cl-body">
-          <span class="cl-tag fix">fix</span>
-          8 项代码整理（站点消息表驱动化、handler 拆分、provider 解析/SW 保活等重复逻辑去重、测试 mock 共享化）、
-          PDF 解析 Worker 预热（消除首次点击附件时的 WASM 冷编译延迟）、打包脚本误打包大文件的问题
+        <div class="how reveal">
+          <span class="no">02</span>
+          <h3>附带当前页面 <span class="tag">📎</span></h3>
+          <p>点击 📎，页面内容自动进入对话：正文、字幕、PDF 都能读。选中的文字也能直接提问。</p>
         </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.28.0</div>
-        <div class="cl-date">07-20</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          侧边栏视觉重设计（页边注解隐喻的配色/品牌字/顶栏状态指示点）；<span class="cl-tag fix">fix</span>
-          流式恢复代码去重（onSend / 断线重连共用同一套 DONE 处理逻辑，消除两处漏改风险）、多处硬编码错误色统一为设计 token、浅色模式对比度修正
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.27.0</div>
-        <div class="cl-date">07-19</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          PDF 附件抽取升级为 pdf-inspector-wasm 优先（表格/标题/多栏结构重建，纯本地 WASM），pdf.js 纯文本兜底；PDF 客户端文本抽取、提取前页面清理（cookie 横幅/展开/懒加载滚动/虚拟滚动列表捕获）、Turndown GFM 表格支持、DOM 相关性重排序、附件中断进度提示、长 PDF 附件自动摘要
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.26.0</div>
-        <div class="cl-date">07-18</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          Markmap 思维导图渲染、超长附件自动摘要、图表渲染性能优化
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.6</div>
-        <div class="cl-date">07-16</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          Provider 下拉按可达性排序，首次 Ping 成功自动切换活跃 Provider
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.5</div>
-        <div class="cl-date">07-15</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          提取同源 iframe 和 open shadow-DOM 内容
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.4</div>
-        <div class="cl-date">07-14</div>
-        <div class="cl-body">
-          <span class="cl-tag fix">fix</span>
-          DOMPurify 属性过滤 bug、流式光标泄漏、think 块实时 Markdown 渲染
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.3</div>
-        <div class="cl-date">07-14</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          提取质量加固（剔除隐藏元素、重复结构标记、小红书重定位）+ 测试覆盖
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.1</div>
-        <div class="cl-date">07-10</div>
-        <div class="cl-body">
-          <span class="cl-tag fix">fix</span>
-          PDF 内容检测 + 中日韩粗体渲染
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.25.0</div>
-        <div class="cl-date">07-06</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          统一设计系统、标题+列表 prompt 规则、消息折叠
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.24.34</div>
-        <div class="cl-date">07-06</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          细聊（detail-thread）-- 选中回复中的任意文字开启独立侧线对话
-        </div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-version">v0.24.21</div>
-        <div class="cl-date">07-04</div>
-        <div class="cl-body">
-          <span class="cl-tag feat">feat</span>
-          迁移到 Hermes <code>/v1/runs</code> API，支持工具调用进度 + 危险操作审批
+        <div class="how reveal">
+          <span class="no">03</span>
+          <h3>流式回答 <span class="tag">任意后端</span></h3>
+          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 OpenAI 兼容 API 或 Hermes Agent。</p>
         </div>
       </div>
     </div>
-    <p style="text-align:center;margin-top:24px">
-      <a href="https://github.com/xiaohuzai/browsa/releases" class="btn btn-secondary">查看全部 Release →</a>
-    </p>
-  </div>
-</section>
+  </section>
 
-<section id="install">
-  <div class="container">
-    <h2 class="section-title">安装指南</h2>
-    <p class="section-desc">browsa 是未打包扩展，通过开发者模式加载。</p>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <h4>Clone 或下载仓库</h4>
-          <p><code>git clone https://github.com/xiaohuzai/browsa.git</code> 或从 Releases 下载 zip</p>
-        </div>
+  <!-- 功能 -->
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">features</p>
+        <h2>它不只是一个聊天框</h2>
+        <p>browsa 把「读」和「问」放在同一个界面：读长文、看视频、翻 PDF 时，AI 就在旁边。</p>
       </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <h4>打开扩展管理页</h4>
-          <p>Chrome 访问 <code>chrome://extensions</code>，Edge 访问 <code>edge://extensions</code></p>
+      <div class="feature-grid">
+        <div class="feature reveal">
+          <span class="f-tag">attach</span>
+          <h3>页面附带</h3>
+          <p>一键把当前页面带进对话，多个模式自动选择：</p>
+          <ul>
+            <li>Auto 智能级联：Readability 正文 → DOM 树 → 全文</li>
+            <li>📷 截图模式，把可见区域发给多模态模型</li>
+            <li>PDF 本地解析：WASM 重建表格 / 标题 / 版式，图片区域自动裁剪</li>
+            <li>GitHub 文件页直接取 raw 源码，不走页面清理</li>
+          </ul>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <h4>启用开发者模式</h4>
-          <p>页面右上角打开「Developer mode」开关</p>
+        <div class="feature reveal">
+          <span class="f-tag">render</span>
+          <h3>富文本渲染</h3>
+          <p>回答不止是纯文本——全部在本地渲染，不依赖任何服务：</p>
+          <ul>
+            <li>Markdown GFM + 40+ 语言代码高亮</li>
+            <li>LaTeX 公式（KaTeX Web Worker 加速）</li>
+            <li>Mermaid 流程图、ECharts 图表、Markmap 思维导图</li>
+          </ul>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <h4>加载 unpacked</h4>
-          <p>点击「Load unpacked」→ 选择 <code>browsa/</code> 目录</p>
+        <div class="feature reveal">
+          <span class="f-tag">video</span>
+          <h3>视频笔记</h3>
+          <p>面向视频的完整工作流——YouTube 与 B 站字幕结构化提取：</p>
+          <ul>
+            <li>回复自带可点击的 <code>[mm:ss]</code> 时间戳，点击直达对应画面</li>
+            <li>无字幕的 B 站视频，可在本地转写（ASR）</li>
+            <li>自动把长字幕压缩成要点，保留原时间标记</li>
+          </ul>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-content">
-          <h4>打开侧边栏</h4>
-          <p>按 <code>Ctrl+Shift+H</code> 或点击工具栏图标</p>
+        <div class="feature reveal">
+          <span class="f-tag">provider</span>
+          <h3>任意后端</h3>
+          <p>不用厂商锁定，连你自己的模型：</p>
+          <ul>
+            <li>Hermes Agent：工具执行、危险操作审批、进度展示</li>
+            <li>任意 OpenAI 兼容 API：OpenAI、Ollama、LiteLLM…</li>
+            <li>Ping 一键检测连通性与模型能力</li>
+          </ul>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-content">
-          <h4>配置 Provider</h4>
-          <p>点击 ⚙ Settings，选一个 Provider，填 Base URL + API Key，点 Ping 验证</p>
+        <div class="feature reveal">
+          <span class="f-tag">privacy</span>
+          <h3>隐私优先</h3>
+          <p>无账号、无云端、无数据中转：</p>
+          <ul>
+            <li>API Key 只存在本地 <code>chrome.storage</code></li>
+            <li>PDF 全程本地解析，字节不出设备</li>
+            <li>内容只发给你自己配置的后端地址</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">session</span>
+          <h3>会话管理</h3>
+          <p>长对话也能从容整理：</p>
+          <ul>
+            <li>保存 / 恢复命名会话，导出 Markdown</li>
+            <li>会话内全文搜索（<code>Ctrl+F</code>）</li>
+            <li>选中回复中的任意文字「细聊」，不污染主对话</li>
+          </ul>
         </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section>
-  <div class="container">
-    <h2 class="section-title">Slash 命令</h2>
-    <p class="section-desc">在输入框打 <code>/</code> 触发补全，所有命令都能追加额外指令。</p>
-    <div class="code-block">
-<pre><span class="comment"># 摘要并聚焦方法论</span>
-/summarize focus on the methodology
-
-<span class="comment"># 翻译但保留技术术语英文</span>
-/translate keep technical terms in English
-
-<span class="prompt">/summarize</span>   3-5 条要点摘要
-<span class="prompt">/translate</span>  翻译成中文
-<span class="prompt">/rewrite</span>    更简洁的重写，保留所有事实
-<span class="prompt">/explain</span>    用简单语言给初学者解释
-<span class="prompt">/outline</span>    仅标题的嵌套大纲
-<span class="prompt">/keypoints</span>  前 5 条关键信息</pre>
+  <!-- 站点 -->
+  <section id="sites">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">supported sites</p>
+        <h2>读得懂你的网页</h2>
+        <p>对以下站点，browsa 直接读取页面已加载的结构化数据——字幕、评论、正文、行情——而不是靠猜。</p>
+      </div>
+      <div class="site-strip">
+        <span class="site-chip reveal">YouTube<span class="en">字幕/章节</span></span>
+        <span class="site-chip reveal">Bilibili<span class="en">字幕/ASR/统计</span></span>
+        <span class="site-chip reveal">小红书<span class="en">笔记/评论</span></span>
+        <span class="site-chip reveal">掘金<span class="en">文章源码</span></span>
+        <span class="site-chip reveal">知乎<span class="en">文章/回答</span></span>
+        <span class="site-chip reveal">X / Twitter<span class="en">推文/回复</span></span>
+        <span class="site-chip reveal">雪球<span class="en">行情/帖子</span></span>
+        <span class="site-chip reveal">小宇宙<span class="en">播客</span></span>
+        <span class="site-chip reveal">得到<span class="en">文章</span></span>
+        <span class="site-chip reveal">极客时间<span class="en">文章</span></span>
+      </div>
+      <p class="site-note">
+        <b>不劫持、不改动：</b>这些站点通过拦截浏览器自身发起的请求来提取内容，就像在旁边「看」——
+        无需重新认证，也不向第三方上传任何东西。
+      </p>
     </div>
-  </div>
-</section>
+  </section>
+
+  <!-- 安装 -->
+  <section id="install">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">install</p>
+        <h2>安装（开发者模式）</h2>
+        <p>browsa 是未打包扩展，通过开发者模式加载。整个过程约 5 分钟，不收取任何费用。</p>
+      </div>
+      <div class="install-grid">
+        <div>
+          <div class="step">
+            <span class="no">1</span>
+            <div>
+              <h4>获取代码</h4>
+              <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压。</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="no">2</span>
+            <div>
+              <h4>加载扩展</h4>
+              <p>打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="no">3</span>
+            <div>
+              <h4>配置并开始</h4>
+              <p>按 <code>Ctrl+Shift+H</code> 打开侧边栏 → ⚙ 设置里填入 Base URL 与 API Key → 点 Ping 验证 → 开聊。</p>
+            </div>
+          </div>
+        </div>
+        <div class="code-block reveal">
+          <span class="c-dot"></span>
+          <pre><span class="cm"># 1. 获取代码</span>
+git clone <span class="pr">https://github.com/xiaohuzai/browsa.git</span>
+
+<span class="cm"># 2. 安装依赖（可选，仅开发用）</span>
+npm install
+
+<span class="cm"># 3. 跑测试（800+ 个）</span>
+npm test
+
+<span class="cm"># 4. 打发布包 → browsa-v&lt;version&gt;.zip</span>
+npm run package   <span class="ok"># 或直接加载已解压目录</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
 
 <footer>
   <div class="container">
-    <div class="links">
-      <a href="https://github.com/xiaohuzai/browsa">GitHub</a>
-      <a href="https://github.com/xiaohuzai/browsa/releases">Releases</a>
-      <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md">文档</a>
-      <a href="https://github.com/xiaohuzai/browsa/issues">Issues</a>
+    <div class="foot-brand">
+      <img src="icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
     </div>
-    <div class="copyright">MIT License · browsa v0.28.2</div>
+    <div class="foot-links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md" target="_blank" rel="noopener">文档</a>
+      <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa v0.31.9 · MIT License</span>
+    </div>
   </div>
 </footer>
 
+<script>
+/* 滚动显现 —— 极简，尊重系统减少动态效果 */
+(function(){
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    els.forEach(function(el){ el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(function(el){ io.observe(el); });
+})();
+</script>
 </body>
 </html>
