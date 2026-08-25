@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult } from '../lib/site-synthesizers.js';
+import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult } from '../lib/site-synthesizers.js';
 
 const fakeMeta = (url) => ({ url, title: 'Test', articleTitle: 'Test' });
 
@@ -121,4 +121,11 @@ test('synthesizeRedditResult: emits title, meta line, body, and a ## 评论 comm
 test('synthesizeRedditResult: degrades gracefully when post/comments are missing', () => {
   const result = synthesizeRedditResult({}, fakeMeta('https://www.reddit.com/'));
   assert.equal(result.text, '', 'empty input -> empty text, no throw');
+});
+
+test('synthesizeYouTubeResult: sets the structured noTranscript flag when there is no transcript (ASR detection)', () => {
+  const noSubs = synthesizeYouTubeResult({ videoId: 'abc', title: 'T', author: 'A', lengthSeconds: 0, shortDescription: '', transcript: null }, fakeMeta('https://www.youtube.com/watch?v=abc'));
+  assert.equal(noSubs.noTranscript, true, 'no transcript -> noTranscript=true so ASR detection keys off the structured flag (Jina fallback can rewrite the text marker)');
+  const withSubs = synthesizeYouTubeResult({ videoId: 'abc', title: 'T', author: 'A', lengthSeconds: 0, shortDescription: '', transcript: '[00:00] hi' }, fakeMeta('https://www.youtube.com/watch?v=abc'));
+  assert.equal(withSubs.noTranscript, false, 'with transcript -> noTranscript=false');
 });

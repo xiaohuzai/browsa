@@ -865,15 +865,18 @@ async function handle(msg, sender) {
       // two-step handoff. The transcript is a `[mm:ss] text` block which, when
       // stamped with videoSrc below, becomes clickable seek links in the
       // rendered reply (linkifyTimestamps).
-      const { text, metaUrl, metaTitle } = msg;
+      const { text, metaUrl, metaTitle, platform } = msg;
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
       let finalText = text;
+      // 原始平台由 sidepanel 透传（bilibili / youtube）——决定 mode、videoSrc.platform
+      // 和日志标签。缺省回退 bilibili（兼容旧调用/测试）。
+      const asrPlatform = (platform === 'youtube') ? 'youtube' : 'bilibili';
       const asrCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
-        mode: 'bilibili',
+        mode: asrPlatform,
         text: `${finalText}\n\nNote: ${VIDEO_NOTE_HINT}`,
-        format: 'bilibili-asr',
+        format: `${asrPlatform}-asr`,
       };
       const contextText = buildPageContextText(asrCtx);
       const historyEntry = { role: 'user', content: contextText };
@@ -881,14 +884,14 @@ async function handle(msg, sender) {
       // links (same platform/url/tabId shape as ATTACH_PAGE stamps on video
       // page-contexts).
       historyEntry.videoSrc = {
-        platform: 'bilibili',
+        platform: asrPlatform,
         url: metaUrl || '',
         tabId: msg.tabId ?? null,
       };
       const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
       if (willSummarize) historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
-      console.log(`browsa[bg]: bilibili asr attached — ${finalText.length} chars`);
+      console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars`);
       if (willSummarize) {
         maybeSummarizeAttachment({
           attachId: historyEntry.attachId,
@@ -903,8 +906,55 @@ async function handle(msg, sender) {
       // 播放地址过期（deadline 签名 m4s URL，CDN 无条件 403）的自愈重试：在页内重调
       // playurl API 换全新签名 URL。由 sidepanel 在下载 403 时触发一次；失败则返回
       // 原因由 sidepanel 走现有兜底（明示报错），不在此抛错。
-      const { tabId } = msg;
+      // bilibili 重调 playurl（bvid/cid + WBI 签名）；youtube 重调 /player（新 PO token）。
+      const { tabId, platform } = msg;
       try {
+        if (platform === 'youtube') {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            files: ['lib/content-scripts/youtube-content-script.js']
+          });
+          const [res] = await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            // videoId parsed INSIDE the func from window.location (never the
+            // service-worker closure — executeScript re-evaluates func in the
+            // page, closures don't survive serialization; the countImages lesson).
+            func: async () => {
+              const freshFn = window.__browsaFetchFreshYouTubeStreams;
+              const vid = (() => {
+                try { return new URLSearchParams(window.location.search).get('v') || ''; }
+                catch (_) { return ''; }
+              })();
+              if (typeof freshFn !== 'function' || !vid) {
+                return { ok: false, error: '脚本未注入或缺 videoId' };
+              }
+              // Prefer pot-bearing audio streams from the page's real player
+              // response (pot-less ANDROID URLs 403 — real test 2026-08-25).
+              try {
+                const potStreams = (typeof window.__browsaGetPlayerAudioStreams === 'function')
+                  ? window.__browsaGetPlayerAudioStreams(vid)
+                  : [];
+                if (Array.isArray(potStreams) && potStreams.length > 0) {
+                  const usable = potStreams.filter((s) => s.url && s.hasPot);
+                  if (usable.length > 0) return { ok: true, streams: usable };
+                }
+              } catch (_) {}
+              const fresh = await freshFn(vid);
+              const audios = (Array.isArray(fresh.streams) ? fresh.streams : []).filter((s) => s.type === 'audio' && s.url);
+              if (!audios.length) return { ok: false, error: 'player 返回空音频流' };
+              return { ok: true, streams: audios };
+            }
+          });
+          const r = res?.result;
+          if (r?.ok && Array.isArray(r.streams) && r.streams.length) {
+            console.log(`browsa: ASR_FRESH_URLS(youtube) ok — ${r.streams.length} fresh audio streams`);
+            return { ok: true, streams: r.streams };
+          }
+          console.warn('browsa: ASR_FRESH_URLS(youtube) refresh failed:', r?.error || 'no result');
+          return { ok: false, error: r?.error || 'no result' };
+        }
         await chrome.scripting.executeScript({
           target: { tabId },
           world: 'MAIN',
@@ -934,13 +984,13 @@ async function handle(msg, sender) {
         const r = res?.result;
         if (r?.ok && Array.isArray(r.streams) && r.streams.length) {
           console.log(`browsa: ASR_FRESH_URLS ok — ${r.streams.length} fresh audio streams`);
-          return { ok: true, data: { ok: true, streams: r.streams } };
+          return { ok: true, streams: r.streams };
         }
         console.warn('browsa: ASR_FRESH_URLS refresh failed:', r?.error || 'no result');
-        return { ok: true, data: { ok: false, error: r?.error || 'no result' } };
+        return { ok: false, error: r?.error || 'no result' };
       } catch (e) {
         console.warn('browsa: ASR_FRESH_URLS executeScript failed:', e?.message);
-        return { ok: true, data: { ok: false, error: String((e && e.message) || e) } };
+        return { ok: false, error: String((e && e.message) || e) };
       }
     }
 
@@ -1078,11 +1128,26 @@ async function handle(msg, sender) {
         // subtitles over low-quality originals — the strip/replace happens in the
         // sidepanel at ATTACH_ASR_CONFIRM time, keeping ctx.text intact for the
         // fail-open fallback).
-        if (ctx.mode === 'bilibili' && all.asr?.enabled && (ctx.noTranscript || all.asr.subtitleSource === ASR_SUBTITLE_SOURCE.ASR)) {
+        // Bilibili / YouTube video WITHOUT subtitles + ASR enabled: hand off to
+        // sidepanel for the ASR pipeline (download audio in page-world -> upload to 火山方舟
+        // Files API -> poll -> Responses API transcript). Deferred storage until
+        // ATTACH_ASR_CONFIRM, mirroring the pdf-pending handoff. The audio stream
+        // URL is read fresh via the MAIN-world-exposed reader so the signed URL is
+        // valid at handoff time. Detection keys off the structured noTranscript
+        // flag (from synthesizeBilibiliResult / synthesizeYouTubeResult), NOT the
+        // `## 字幕`/`*(No captions...)*` text marker — auto mode's silent Jina
+        // fallback can rewrite ctx.text and drop the marker.
+        // `all.asr.subtitleSource === 'asr'` additionally forces the ASR handoff even
+        // for videos that ALREADY have subtitles (user opted to prefer ASR
+        // subtitles over low-quality originals — the strip/replace happens in the
+        // sidepanel at ATTACH_ASR_CONFIRM time, keeping ctx.text intact for the
+        // fail-open fallback).
+        const isVideoPlatform = ctx.mode === 'bilibili' || ctx.mode === 'youtube';
+        if (isVideoPlatform && all.asr?.enabled && (ctx.noTranscript || all.asr.subtitleSource === ASR_SUBTITLE_SOURCE.ASR)) {
           const asrCtx = await buildAsrPendingCtx(tabId, ctx);
           if (asrCtx) return { ok: true, ctx: asrCtx };
-        } else if (ctx.mode === 'bilibili' && ctx.noTranscript) {
-          // Bilibili video WITHOUT subtitles AND ASR not enabled: keep the
+        } else if (isVideoPlatform && ctx.noTranscript) {
+          // Video WITHOUT subtitles AND ASR not enabled: keep the
           // current behavior (plain video-info attach) but flag the ctx so
           // the sidepanel can hint that this video has no subtitles and
           // that enabling ASR would auto-transcribe it.
@@ -1402,71 +1467,146 @@ function withVideoNote(ctx) {
 
 async function buildAsrPendingCtx(tabId, ctx) {
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      files: ['lib/content-scripts/bilibili-content-script.js']
-    });
-    const [res] = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      // Prefer __playinfo__ cached URLs (SSR-picked CDN nodes, fastest) — only
-      // fall back to the fresh playurl API when the cached URL is expired
-      // (deadline signature → 403). For ASR we only need the audio stream, and
-      // we want the LOWEST bitrate one (smallest/fastest download — quality is
-      // irrelevant, it gets transcoded to 16kHz mono WAV for Ark anyway). BUT a
-      // truncated/short stream (a real user bug: 100+ min video → only ~20 min
-      // of subtitles) must be rejected — each stream carries a `duration` (sec)
-      // that we compare against the video's true length.
-      func: async () => {
-        try {
-          const cached = (typeof window.__browsaGetBilibiliStreams === 'function')
-            ? window.__browsaGetBilibiliStreams()
-            : [];
-          // Expiry is detected by parsing the `deadline` query param from the
-          // signed URL itself (a network probe is unreliable — B站 CDN may
-          // answer 200 to a plain GET for an already-expired URL, only the
-          // actual media download 403s). No deadline param → assume valid.
-          const isLive = (u) => {
-            try {
-              const m = /[?&]deadline=(\d+)/.exec(u);
-              return !m || (parseInt(m[1], 10) * 1000) > Date.now() + 5 * 60_000;
-            } catch (_) { return true; }
-          };
-          // Video true length (sec) from __playinfo__ SSR data — the reference
-          // for detecting truncated audio streams.
-          const pi = window.__playinfo__?.data || window.__playinfo__;
-          const videoDurationSec = (pi?.duration || 0) > 0 ? pi.duration : 0;
-          const cachedAudio = cached
-            .filter(s => s.type === 'audio' && s.url && isLive(s.url))
-            .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
-          if (cachedAudio) return { streams: cached, videoDurationSec };
-          // Cached audio empty or expired — fall back to fresh playurl API
-          // (re-signs a brand-new URL with a fresh deadline, no page refresh).
-          const bvid = pi?.bvid || '';
-          const cid = pi?.cid || 0;
-          const freshFn = window.__browsaFetchFreshBilibiliStreams;
-          if (typeof freshFn === 'function' && bvid && cid) {
-            try {
-              const fresh = await freshFn(bvid, cid);
-              if (Array.isArray(fresh) && fresh.length > 0) {
-                return { streams: fresh, videoDurationSec };
+    // --- Platform dispatch: Bilibili vs YouTube ---
+    // Both paths produce a list of audio stream candidates + the video's true
+    // length (sec); the shared stream-selection logic below picks the best one.
+    let got = null;
+    if (ctx.mode === 'youtube') {
+      // YouTube: no passive playurl cache like B站's __playinfo__ — the audio
+      // stream must come from a FRESH /youtubei/v1/player response (ANDROID
+      // client) so the PO token / signature in the URL is valid at download
+      // time. ytInitialPlayerResponse goes stale after SPA navigation and
+      // carries no guarantee of freshness, so we always re-fetch here.
+      // NOTE: the videoId is parsed INSIDE the injected func from
+      // window.location (never captured from the service-worker closure) —
+      // chrome.scripting.executeScript serializes func via toString() and
+      // re-evaluates it in the page, so closure variables are NOT available
+      // (the countImages lesson). A closure-captured videoId is undefined in
+      // the page, the fresh fetch returns no streams, and buildAsrPendingCtx
+      // silently falls through to the normal store path.
+      const videoId = (() => {
+        try { return new URLSearchParams(new URL(ctx.meta?.url).search).get('v') || ''; }
+        catch (_) { return ''; }
+      })();
+      if (!videoId) return null;
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        files: ['lib/content-scripts/youtube-content-script.js']
+      });
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: async () => {
+          const fn = window.__browsaFetchFreshYouTubeStreams;
+          if (typeof fn !== 'function') return { streams: [], videoDurationSec: 0, asrExpiredError: '脚本未注入 __browsaFetchFreshYouTubeStreams' };
+          // videoId from the live page URL — NOT a closure capture (see note above).
+          const vid = (() => {
+            try { return new URLSearchParams(window.location.search).get('v') || ''; }
+            catch (_) { return ''; }
+          })();
+          if (!vid) return { streams: [], videoDurationSec: 0, asrExpiredError: '页面 URL 无 videoId' };
+          // 1) Prefer the pot-bearing audio streams captured from the page's REAL
+          // player response (handlePlayerResponse caches them). These carry a valid
+          // PO token — the pot-less ANDROID POST (fetchFreshYouTubeStreams) returns
+          // URLs that googlevideo 403s (real test 2026-08-25). Only pot URLs stand a
+          // chance of being downloadable outside the player context.
+          try {
+            const potStreams = (typeof window.__browsaGetPlayerAudioStreams === 'function')
+              ? window.__browsaGetPlayerAudioStreams(vid)
+              : [];
+            if (Array.isArray(potStreams) && potStreams.length > 0) {
+              const usable = potStreams.filter((s) => s.url && s.hasPot);
+              if (usable.length > 0) {
+                console.log(`browsa: ASR using ${usable.length} captured pot audio streams`);
+                return { streams: usable, videoDurationSec: 0 };
               }
-              // 刷新返回空流：把原因留给调用方（缓存已过期，不能再静默回退死 URL）。
-              return { streams: cached, videoDurationSec, asrExpiredError: 'fresh playurl 返回空流列表' };
-            } catch (e) {
-              // fresh playurl 失败（WBI 签名/网络/风控）时缓存已过期——不能静默
-              // 回退到死 URL 让用户白等 403 重试；原因必须传到 UI（toast + 日志）。
-              return { streams: cached, videoDurationSec, asrExpiredError: 'playurl 自动刷新失败：' + String((e && e.message) || e) };
             }
+          } catch (_) {}
+          // 2) Fall back to the fresh ANDROID /player POST (pot-less — likely 403,
+          // but kept for the case where no pot capture exists yet).
+          try {
+            const r = await fn(vid);
+            if (Array.isArray(r.streams) && r.streams.length > 0) return r;
+            return { streams: [], videoDurationSec: r.videoDurationSec || 0, asrExpiredError: 'player 返回空音频流列表' };
+          } catch (e) {
+            return { streams: [], videoDurationSec: 0, asrExpiredError: 'player 自动刷新失败：' + String((e && e.message) || e) };
           }
-          return { streams: cached, videoDurationSec, asrExpiredError: '缓存流全部过期且无自动刷新可用（脚本未注入或缺 bvid/cid）' };
-        } catch (_) { return { streams: [], videoDurationSec: 0 }; }
-      }
-    });
-    const got = (res?.result && Array.isArray(res.result.streams)) ? res.result : null;
-    const streams = got ? got.streams : (Array.isArray(res?.result) ? res.result : []);
-    const videoDurationSec = got ? (got.videoDurationSec || 0) : 0;
+        }
+      });
+      got = (res?.result && Array.isArray(res.result.streams)) ? res.result : null;
+      if (!got) return null;
+    } else {
+      // Bilibili: existing behavior — prefer cached __playinfo__ URLs, fall
+      // back to fresh playurl API on expiry. (Unchanged from before the
+      // youtube branch; kept in its own else for clarity.)
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        files: ['lib/content-scripts/bilibili-content-script.js']
+      });
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        // Prefer __playinfo__ cached URLs (SSR-picked CDN nodes, fastest) — only
+        // fall back to the fresh playurl API when the cached URL is expired
+        // (deadline signature → 403). For ASR we only need the audio stream, and
+        // we want the LOWEST bitrate one (smallest/fastest download — quality is
+        // irrelevant, it gets transcoded to 16kHz mono WAV for Ark anyway). BUT a
+        // truncated/short stream (a real user bug: 100+ min video → only ~20 min
+        // of subtitles) must be rejected — each stream carries a `duration` (sec)
+        // that we compare against the video's true length.
+        func: async () => {
+          try {
+            const cached = (typeof window.__browsaGetBilibiliStreams === 'function')
+              ? window.__browsaGetBilibiliStreams()
+              : [];
+            // Expiry is detected by parsing the `deadline` query param from the
+            // signed URL itself (a network probe is unreliable — B站 CDN may
+            // answer 200 to a plain GET for an already-expired URL, only the
+            // actual media download 403s). No deadline param → assume valid.
+            const isLive = (u) => {
+              try {
+                const m = /[?&]deadline=(\d+)/.exec(u);
+                return !m || (parseInt(m[1], 10) * 1000) > Date.now() + 5 * 60_000;
+              } catch (_) { return true; }
+            };
+            // Video true length (sec) from __playinfo__ SSR data — the reference
+            // for detecting truncated audio streams.
+            const pi = window.__playinfo__?.data || window.__playinfo__;
+            const videoDurationSec = (pi?.duration || 0) > 0 ? pi.duration : 0;
+            const cachedAudio = cached
+              .filter(s => s.type === 'audio' && s.url && isLive(s.url))
+              .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0))[0];
+            if (cachedAudio) return { streams: cached, videoDurationSec };
+            // Cached audio empty or expired — fall back to fresh playurl API
+            // (re-signs a brand-new URL with a fresh deadline, no page refresh).
+            const bvid = pi?.bvid || '';
+            const cid = pi?.cid || 0;
+            const freshFn = window.__browsaFetchFreshBilibiliStreams;
+            if (typeof freshFn === 'function' && bvid && cid) {
+              try {
+                const fresh = await freshFn(bvid, cid);
+                if (Array.isArray(fresh) && fresh.length > 0) {
+                  return { streams: fresh, videoDurationSec };
+                }
+                // 刷新返回空流：把原因留给调用方（缓存已过期，不能再静默回退死 URL）。
+                return { streams: cached, videoDurationSec, asrExpiredError: 'fresh playurl 返回空流列表' };
+              } catch (e) {
+                // fresh playurl 失败（WBI 签名/网络/风控）时缓存已过期——不能静默
+                // 回退到死 URL 让用户白等 403 重试；原因必须传到 UI（toast + 日志）。
+                return { streams: cached, videoDurationSec, asrExpiredError: 'playurl 自动刷新失败：' + String((e && e.message) || e) };
+              }
+            }
+            return { streams: cached, videoDurationSec, asrExpiredError: '缓存流全部过期且无自动刷新可用（脚本未注入或缺 bvid/cid）' };
+          } catch (_) { return { streams: [], videoDurationSec: 0 }; }
+        }
+      });
+      got = (res?.result && Array.isArray(res.result.streams)) ? res.result : null;
+      if (!got) return null;
+    }
+    const streams = got.streams || [];
+    const videoDurationSec = got.videoDurationSec || 0;
     const audioCandidates = streams
       .filter((s) => s.type === 'audio' && s.url)
       .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0));
@@ -1508,15 +1648,20 @@ async function buildAsrPendingCtx(tabId, ctx) {
       duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '', id: s.id || 0,
     }));
     if (!audio) return null;
-    // 读完整 B站 cookie（含 HttpOnly 的 SESSDATA），传给 sidepanel 在下载前经 DNR
-    // 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
+    // 读完整平台 cookie（含 HttpOnly 的 SESSDATA / SID），传给 sidepanel 在下载前经
+    // DNR 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
     // onSendHeaders 捕获页面播放器真实请求的完整 cookie（含 HttpOnly），而
-    // document.cookie 读不到 HttpOnly。登录态/大会员 m4s 流缺 SESSDATA 会 403。
+    // document.cookie 读不到 HttpOnly。登录态/大会员 m4s 流缺 SESSDATA 会 403，
+    // YouTube 的 googlevideo 下载也带 cookie（SID/SSID/VISITOR_INFO1_LIVE 等）。
     // chrome.cookies 权限 + <all_urls> host_permissions 才能读 HttpOnly cookie。
-    let biliCookie = '';
+    // 早期假设 YouTube 靠 URL 里的 PO token（pot）免 cookie —— 实机测试（2026-08-25）
+    // 证明不行：扩展上下文直接 fetch googlevideo 一律 403（chrome-extension origin
+    // 被拒），必须像 B 站一样 DNR 注入 Referer+Origin+Cookie。
+    let platformCookie = '';
+    const cookieUrl = ctx.mode === 'bilibili' ? 'https://www.bilibili.com' : 'https://www.youtube.com';
     try {
-      const cookies = await chrome.cookies.getAll({ url: 'https://www.bilibili.com' });
-      biliCookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+      const cookies = await chrome.cookies.getAll({ url: cookieUrl });
+      platformCookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
     } catch (e) {
       console.warn('browsa: chrome.cookies.getAll failed', e?.message);
     }
@@ -1525,11 +1670,14 @@ async function buildAsrPendingCtx(tabId, ctx) {
     // 缓存播放地址过期且自动刷新失败（真实复现：页面开太久，playurl 签名 URL 的
     // deadline 已过期 → CDN 一律 403）。原因传入 ctx：sidepanel 会在下载前直接
     // 明示给用户（不再无意义地重试死 URL），请其刷新视频页后重新 attach。
-    if (got && got.asrExpiredError) {
+    if (got.asrExpiredError) {
       console.warn('browsa: ASR cached playurl expired, auto-refresh failed:', got.asrExpiredError);
     }
     return Object.assign({}, ctx, {
       mode: 'asr-pending',
+      // 保留原始平台（bilibili / youtube），sidepanel 据此决定 DNR 规则、下载头、
+      // 平台文案和自愈路径。
+      asrPlatform: ctx.mode,
       audioUrl: audio.url,
       audioLabel: audio.label || '',
       audioCodec: audio.codecs || '', audioId: audio.id || 0,
@@ -1538,9 +1686,9 @@ async function buildAsrPendingCtx(tabId, ctx) {
       audioCandidates: candidateAudios,
       videoDurationSec: videoDurationSec || 0,
       // 传給 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
-      biliCookie,
+      biliCookie: platformCookie,
       // 播放地址过期/刷新失败原因（无则空串）。
-      asrExpiredError: (got && got.asrExpiredError) || '',
+      asrExpiredError: got.asrExpiredError || '',
       asr: {
         apiKey: asr.apiKey,
         baseUrl: asr.baseUrl,
