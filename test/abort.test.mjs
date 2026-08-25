@@ -173,13 +173,13 @@ test('CHAT handler catches AbortError and does NOT append to history', async () 
     'appendToHistory for assistant must appear AFTER the abort-return; abort returns early, skipping it');
 });
 
-// --------------- openai-client reader cancellation ----------------------------
+// --------------- llm-client reader cancellation ----------------------------
 
-test('openai-client reader loop respects the AbortSignal', async () => {
+test('llm-client reader loop respects the AbortSignal', async () => {
   // Simulate an SSE stream that hangs after the first chunk. The
   // chatStream() promise must resolve (or reject) within tens of ms
   // after we abort, not block forever on reader.read().
-  const { chatStream, ProviderNetworkError } = await import('../lib/openai-client.js');
+  const { chatStream, ProviderNetworkError } = await import('../lib/llm-client.js');
 
   // Build a fake fetch that returns a ReadableStream we control.
   const encoder = new TextEncoder();
@@ -201,7 +201,7 @@ test('openai-client reader loop respects the AbortSignal', async () => {
       // Hold the chunk open indefinitely
     },
     cancel(reason) {
-      // reader.cancel() from openai-client's abort listener lands here.
+      // reader.cancel() from llm-client's abort listener lands here.
       // This is what unblocks the pending pull().
       if (pullResolve) pullResolve();
     }
@@ -251,8 +251,8 @@ test('openai-client reader loop respects the AbortSignal', async () => {
   assert.ok(dt < 200, `abort should unblock reader within 200ms, took ${dt}ms`);
 });
 
-test('openai-client reader loop: pre-aborted signal throws AbortError immediately', async () => {
-  const { chatStream } = await import('../lib/openai-client.js');
+test('llm-client reader loop: pre-aborted signal throws AbortError immediately', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
 
   const encoder = new TextEncoder();
   const fakeStream = new ReadableStream({

@@ -34,7 +34,7 @@ function mockFetchWithStream(blocks) {
 }
 
 test('chatStream: approval.request invokes onApproval with the parsed payload', async () => {
-  const { chatStream } = await import('../lib/openai-client.js');
+  const { chatStream } = await import('../lib/llm-client.js');
   mockFetchWithStream([
     { event: 'approval.request', data: { tool: 'terminal', command: 'rm -rf /tmp/x', approval_id: 'appr_1', run_id: 'run_9', risk_level: 'high' } },
     { data: { choices: [{ delta: { content: 'done' } }] } },
@@ -55,7 +55,7 @@ test('chatStream: approval.request invokes onApproval with the parsed payload', 
 });
 
 test('chatStream: hermes.approval.request (legacy event name alias) also invokes onApproval', async () => {
-  const { chatStream } = await import('../lib/openai-client.js');
+  const { chatStream } = await import('../lib/llm-client.js');
   mockFetchWithStream([
     { event: 'hermes.approval.request', data: { tool: 'execute_code', approval_id: 'appr_2' } },
     { data: { choices: [{ delta: { content: 'ok' } }] } },
@@ -73,7 +73,7 @@ test('chatStream: hermes.approval.request (legacy event name alias) also invokes
 });
 
 test('chatStream: clarification.request invokes onClarify, not onApproval', async () => {
-  const { chatStream } = await import('../lib/openai-client.js');
+  const { chatStream } = await import('../lib/llm-client.js');
   mockFetchWithStream([
     { event: 'clarification.request', data: { question: 'Which file?', clarify_id: 'clar_1' } },
     { data: { choices: [{ delta: { content: 'ok' } }] } },
@@ -94,7 +94,7 @@ test('chatStream: clarification.request invokes onClarify, not onApproval', asyn
 });
 
 test('chatStream: without onApproval/onClarify callbacks, approval events are safely ignored (no crash, delta still flows)', async () => {
-  const { chatStream } = await import('../lib/openai-client.js');
+  const { chatStream } = await import('../lib/llm-client.js');
   mockFetchWithStream([
     { event: 'approval.request', data: { tool: 'terminal' } },
     { data: { choices: [{ delta: { content: 'still works' } }] } },

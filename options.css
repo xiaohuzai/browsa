@@ -324,29 +324,20 @@ details.provider-group[open] > .provider-group-header::before {
   margin-top: 1px;
 }
 
-/* ── Provider inference params ───────────────────────────────────────────── */
-.provider-params-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-.provider-param-label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* ── API style select (compact) ─────────────────────────────────────────── */
+.provider .row .api-style-select {
   font-size: 12px;
-  color: var(--fg-2);
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
 }
-/* Override .row label specificity (0,1,1) — these labels need auto width, not 180px */
-.provider-params-row label {
-  min-width: auto;
-  flex: 0 0 auto;
-  color: var(--fg-2);
-  font-size: 12px;
+.provider .row .api-style-select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
-.provider-param-label input { font-size: 12px; }
-
 /* ── Action row ──────────────────────────────────────────────────────────── */
 .provider .row.action-row {
   align-items: center;

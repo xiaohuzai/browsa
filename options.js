@@ -1,7 +1,7 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
-import { ping, getCapabilities } from './lib/openai-client.js';
+import { ping, getCapabilities } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 
 const $ = (id) => document.getElementById(id);
@@ -181,19 +181,15 @@ function buildProviderCard(name, cfg) {
     ${showModel ? `
     <div class="row">
       <label>Model ID
-        <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o, qwen3.6-plus-anthropic" />
+        <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o, claude-3-5-sonnet" />
       </label>
     </div>` : ''}
-    <div class="row provider-params-row">
-      <label class="provider-param-label">Temperature
-        <input data-k="temperature" type="number" min="0" max="2" step="0.1"
-               value="${escapeAttr(cfg.temperature != null ? String(cfg.temperature) : '')}"
-               placeholder="default" style="width:72px" />
-      </label>
-      <label class="provider-param-label">Max tokens
-        <input data-k="maxTokens" type="number" min="0" step="256"
-               value="${escapeAttr(cfg.maxTokens ? String(cfg.maxTokens) : '')}"
-               placeholder="unlimited" style="width:96px" />
+    <div class="row">
+      <label>API
+        <select data-k="apiStyle" class="api-style-select">
+          ${['chat', 'responses', 'anthropic'].map(s => `
+            <option value="${s}"${(cfg.apiStyle || 'chat') === s ? ' selected' : ''}>${apiStyleLabel(s)}</option>`).join('')}
+        </select>
       </label>
     </div>
     <div class="row action-row">
@@ -236,15 +232,8 @@ function readCard(card) {
       out[k] = el.checked;
     } else if (el.type === 'number') {
       const v = el.value.trim();
-      if (k === 'temperature') {
-        if (v === '') { out[k] = null; }
-        else { const f = parseFloat(v); out[k] = isNaN(f) ? null : Math.min(2, Math.max(0, f)); }
-      } else if (k === 'maxTokens') {
-        if (v === '') { out[k] = 0; }
-        else { const n = parseInt(v, 10); out[k] = (!isNaN(n) && n > 0) ? n : 0; }
-      } else {
-        out[k] = v === '' ? null : (isNaN(parseFloat(v)) ? null : parseFloat(v));
-      }
+      if (v === '') { out[k] = null; }
+      else { const f = parseFloat(v); out[k] = isNaN(f) ? null : f; }
     } else {
       out[k] = el.value;
     }
@@ -294,7 +283,7 @@ async function pingCard(name, card) {
 
   flashCard(card, '', 'Pinging…');
   try {
-    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -411,8 +400,17 @@ function applyLlmsTxt() {
 }
 
 function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
+  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible', anthropic: 'Anthropic' };
   return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function apiStyleLabel(style) {
+  const map = {
+    chat: 'Chat Completions (/v1/chat/completions)',
+    responses: 'Responses API (/v1/responses)',
+    anthropic: 'Anthropic Messages (/v1/messages)',
+  };
+  return map[style] || style;
 }
 
 function flash(cls, text) {

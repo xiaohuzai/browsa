@@ -1,5 +1,5 @@
 // test/options-provider-ping.test.mjs — real execution test of options.js's
-// provider ping flow, plus direct tests of lib/openai-client.js's ping()/
+// provider ping flow, plus direct tests of lib/llm-client.js's ping()/
 // getCapabilities() (previously zero coverage anywhere in the suite).
 //
 // This is the highest-stakes untested surface in the codebase per project
@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
 
-// --------------- direct tests of lib/openai-client.js's ping()/getCapabilities() ---
+// --------------- direct tests of lib/llm-client.js's ping()/getCapabilities() ---
 
 function mockFetchSequence(handlers) {
   // handlers: array of (url, opts) => response-like object | throws
@@ -35,7 +35,7 @@ function mockFetchSequence(handlers) {
 }
 
 test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models call)', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   let modelsCalled = false;
   mockFetchSequence([
     (url) => { assert.ok(url.endsWith('/health')); return { ok: true }; },
@@ -47,7 +47,7 @@ test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models ca
 });
 
 test('ping(): no model, with apiKey — verifies auth via /v1/models even if /health passed', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   const calledUrls = [];
   mockFetchSequence([
     (url) => { calledUrls.push(url); return { ok: true }; },
@@ -60,7 +60,7 @@ test('ping(): no model, with apiKey — verifies auth via /v1/models even if /he
 });
 
 test('ping(): no model, /health fails but /v1/models succeeds — still ok (non-standard server)', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   mockFetchSequence([
     () => { throw new Error('ECONNREFUSED'); },
     () => ({ ok: true, json: async () => ({ data: [] }) }),
@@ -70,7 +70,7 @@ test('ping(): no model, /health fails but /v1/models succeeds — still ok (non-
 });
 
 test('ping(): no model, /v1/models returns non-ok — throws ProviderAPIError with status text', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   mockFetchSequence([
     () => { throw new Error('no health endpoint'); },
     () => ({ ok: false, status: 401, text: async () => 'Unauthorized' }),
@@ -82,7 +82,7 @@ test('ping(): no model, /v1/models returns non-ok — throws ProviderAPIError wi
 });
 
 test('ping(): model configured — sends a real max_tokens:1 request, not /v1/models', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   let sawModelsCall = false;
   let capturedBody = null;
   globalThis.fetch = async (url, opts) => {
@@ -102,8 +102,42 @@ test('ping(): model configured — sends a real max_tokens:1 request, not /v1/mo
   assert.equal(capturedBody.stream, false);
 });
 
+test('ping(): apiStyle responses — verifies via /v1/responses with input + max_output_tokens:1', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  let capturedBody = null;
+  let capturedUrl = null;
+  globalThis.fetch = async (url, opts) => {
+    capturedUrl = String(url);
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, text: async () => '' };
+  };
+  const result = await ping({ baseUrl: 'http://test', apiKey: 'k', model: 'gpt-5', apiStyle: 'responses' });
+  assert.equal(result, 'ok');
+  assert.equal(capturedUrl, 'http://test/v1/responses');
+  assert.equal(capturedBody.model, 'gpt-5');
+  assert.equal(capturedBody.input, 'hi', 'responses uses input, not messages');
+  assert.equal(capturedBody.max_output_tokens, 1);
+});
+
+test('ping(): apiStyle anthropic — verifies via /v1/messages with max_tokens:1 (Anthropic requires it)', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  let capturedBody = null;
+  let capturedUrl = null;
+  globalThis.fetch = async (url, opts) => {
+    capturedUrl = String(url);
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, text: async () => '' };
+  };
+  const result = await ping({ baseUrl: 'http://test', apiKey: 'k', model: 'claude-3-5', apiStyle: 'anthropic' });
+  assert.equal(result, 'ok');
+  assert.equal(capturedUrl, 'http://test/v1/messages');
+  assert.equal(capturedBody.model, 'claude-3-5');
+  assert.deepEqual(capturedBody.messages, [{ role: 'user', content: 'hi' }]);
+  assert.equal(capturedBody.max_tokens, 1);
+});
+
 test('ping(): model configured, server returns non-ok — throws ProviderAPIError', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => 'model not found' });
   await assert.rejects(
     () => ping({ baseUrl: 'http://test', apiKey: 'k', model: 'nonexistent-model' }),
@@ -112,7 +146,7 @@ test('ping(): model configured, server returns non-ok — throws ProviderAPIErro
 });
 
 test('ping(): network error on the model-configured path throws ProviderNetworkError', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => { throw new Error('DNS resolution failed'); };
   await assert.rejects(
     () => ping({ baseUrl: 'http://test', apiKey: 'k', model: 'gpt-4o' }),
@@ -121,12 +155,12 @@ test('ping(): network error on the model-configured path throws ProviderNetworkE
 });
 
 test('ping(): throws ProviderConfigError when baseUrl is missing', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   await assert.rejects(() => ping({ baseUrl: '', apiKey: '' }));
 });
 
 test('getCapabilities(): returns parsed JSON on success', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async (url) => {
     assert.ok(String(url).endsWith('/v1/capabilities'));
     return { ok: true, json: async () => ({ features: { run_submission: true, run_events_sse: true } }) };
@@ -136,21 +170,21 @@ test('getCapabilities(): returns parsed JSON on success', async () => {
 });
 
 test('getCapabilities(): returns null (not throw) on a non-ok response — non-Hermes servers lack this endpoint', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => ({ ok: false, status: 404 });
   const caps = await getCapabilities({ baseUrl: 'http://test', apiKey: 'k' });
   assert.equal(caps, null);
 });
 
 test('getCapabilities(): returns null on a network error', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => { throw new Error('offline'); };
   const caps = await getCapabilities({ baseUrl: 'http://test', apiKey: 'k' });
   assert.equal(caps, null);
 });
 
 test('getCapabilities(): returns null immediately when baseUrl is missing (no fetch)', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   let called = false;
   globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
   const caps = await getCapabilities({ baseUrl: '', apiKey: 'k' });
@@ -193,14 +227,37 @@ function findProviderCard(name) {
   // Provider cards don't carry the raw provider-map key as a DOM attribute,
   // so locate by the prettyProviderName() label options.js renders instead.
   const cards = [...document.querySelectorAll('.provider')];
-  const labels = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
+  const labels = { hermes: 'Hermes', compatible: 'OpenAI-compatible', anthropic: 'Anthropic' };
   const target = labels[name] || name;
   return cards.find((c) => c.querySelector('.name')?.textContent === target);
 }
 
-test('options.js: init() rendered both default provider cards without throwing', () => {
+test('options.js: init() rendered all default provider cards without throwing', () => {
   const cards = document.querySelectorAll('.provider');
-  assert.equal(cards.length, 2, 'hermes, compatible');
+  assert.equal(cards.length, 3, 'hermes, compatible, anthropic');
+});
+
+test('options.js: provider cards no longer expose Temperature / Max tokens fields', () => {
+  const cards = document.querySelectorAll('.provider');
+  for (const card of cards) {
+    assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field removed');
+    assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field removed');
+  }
+});
+
+test('options.js: each provider card exposes an apiStyle select; anthropic defaults to anthropic, others to chat', () => {
+  const hermesCard = findProviderCard('hermes');
+  const compatibleCard = findProviderCard('compatible');
+  const anthropicCard = findProviderCard('anthropic');
+  for (const card of [hermesCard, compatibleCard, anthropicCard]) {
+    const sel = card.querySelector('[data-k="apiStyle"]');
+    assert.ok(sel, 'each provider card must expose an apiStyle select');
+    assert.ok(sel.querySelector('option[value="chat"]'), 'must offer chat option');
+    assert.ok(sel.querySelector('option[value="responses"]'), 'must offer responses option');
+    assert.ok(sel.querySelector('option[value="anthropic"]'), 'must offer anthropic option');
+  }
+  assert.equal(compatibleCard.querySelector('[data-k="apiStyle"]').value, 'chat', 'compatible defaults to chat');
+  assert.equal(anthropicCard.querySelector('[data-k="apiStyle"]').value, 'anthropic', 'anthropic defaults to anthropic');
 });
 
 test('options.js: LLM provider (compatible) card shows a Model ID field; agent providers (hermes) do not', () => {
