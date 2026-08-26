@@ -56,7 +56,19 @@ test('getAll() returns full defaults when storage is empty', async () => {
   assert.deepEqual(all.history, []);
   assert.equal(all.contextMode, 'auto');
   assert.ok(all.providers.hermes, 'default hermes provider must be present');
-  assert.ok(all.providers.compatible);
+  assert.equal(all.providers.hermes.alias, 'Hermes Agent', 'the built-in agent provider is named Hermes Agent');
+  assert.equal(all.providers.compatible, undefined, 'no OpenAI-compatible preset — LLM providers are user-added');
+  assert.equal(all.providers.anthropic, undefined, 'no Anthropic preset — LLM providers are user-added');
+  assert.equal(all.providers['llm-1'], undefined, 'no default LLM card — the LLM group starts empty and is filled via Add Provider');
+});
+
+test('getAll() does not resurrect a deleted LLM provider (empty LLM group stays empty)', async () => {
+  reset();
+  // Simulate a user who deleted every LLM card: storage holds only hermes.
+  await localArea.set({ providers: { hermes: { baseUrl: 'http://h' } } });
+  const all = await storage.getAll();
+  const llmNames = Object.entries(all.providers).filter(([, p]) => (p.type || 'llm') === 'llm').map(([k]) => k);
+  assert.deepEqual(llmNames, [], 'deleted LLM providers must stay deleted across reloads');
 });
 
 test('getAll() deep-merges a stored provider with defaults (new fields survive old saved configs)', async () => {

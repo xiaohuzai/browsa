@@ -68,7 +68,7 @@ hermes gateway
 # → [API Server] API server listening on http://127.0.0.1:8642
 ```
 
-**4. Configure browsa** — open ⚙ Settings, select the **hermes** provider:
+**4. Configure browsa** — open ⚙ Settings, select the **Hermes Agent** provider. It only needs a Base URL and API key — its own `/v1/runs` protocol is used automatically (no API-type dropdown).
 
 | Field | Value |
 |---|---|
@@ -78,19 +78,21 @@ hermes gateway
 **5. Ping** to verify. `/v1/runs` support is auto-detected and enabled automatically.
 
 ---
-### 💬 OpenAI-compatible LLM
+### 💬 LLM Providers
 
-Any endpoint that speaks `/v1/chat/completions` — OpenAI, Anthropic, Ollama, Groq, LiteLLM, etc.
+Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`) — OpenAI, Anthropic, Ollama, Groq, LiteLLM, etc.
 
-**Configure browsa** — open ⚙ Settings, configure the **OpenAI-compatible** provider:
+**Configure browsa** — open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**, or use **＋ Add Provider** anytime to add more, then configure:
 
 | Field | Value |
 |---|---|
+| Alias | a name you choose (e.g. "My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple providers stay distinguishable |
 | Base URL | e.g. `https://api.openai.com` |
 | API Key | your API key |
-| Model ID | **required** — e.g. `gpt-4o`, `claude-sonnet-4-6` |
+| Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) |
+| API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-**Ping** validates connectivity and verifies the model ID is accepted by the server.
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable). Use **Ping** to verify connectivity and auto-detect capabilities; the first provider you verify is automatically set as active.
 
 ---
 

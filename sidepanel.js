@@ -567,21 +567,27 @@ function populateProviderSelect(cfg) {
   for (const name of providers) {
     const opt = document.createElement('option');
     opt.value = name;
+    opt.dataset.display = displayProviderName(name, cfg.providers[name]);
     const configured = !!(cfg.providers[name]?.baseUrl?.trim());
     let status;
     if (!configured)               status = 'not set';
     else if (pingStates[name] === 'reachable')   status = '● reachable';
     else if (pingStates[name] === 'unreachable') status = '○ unreachable';
     else                           status = 'not pinged';
-    opt.textContent = `${prettyProviderName(name)} — ${status}`;
+    opt.textContent = `${displayProviderName(name, cfg.providers[name])} — ${status}`;
     if (name === cfg.activeProvider) opt.selected = true;
     providerSel.appendChild(opt);
   }
 }
 
-function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
-  return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
+// Show the user-set alias when present; fall back to a readable internal name.
+function displayProviderName(name, pcfg) {
+  const alias = pcfg?.alias;
+  if (alias && alias.trim()) return alias.trim();
+  if (name === 'hermes') return 'Hermes Agent';
+  const m = /^llm-(\d+)$/.exec(name);
+  if (m) return `LLM ${m[1]}`;
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -1451,7 +1457,8 @@ async function openSettingsPage() {
 async function onProviderChange() {
   const name = providerSel.value;
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
-  showToast(`Switched to ${prettyProviderName(name)}`, 'success');
+  const opt = providerSel.selectedOptions[0];
+  showToast(`Switched to ${opt?.dataset?.display || displayProviderName(name)}`, 'success');
 }
 
 async function onContextModeChange() {

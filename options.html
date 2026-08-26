@@ -21,7 +21,10 @@
           <h2>AI Providers</h2>
         </div>
         <div class="card-body">
-          <p class="hint">Configure LLM providers: Hermes (agent), OpenAI-compatible (Chat Completions / Responses API), or Anthropic Messages. The active provider is used for all conversations. Use <b>Ping</b> to verify connectivity.</p>
+          <div class="hint-line">
+            <span class="hint">Configure your AI providers.</span>
+            <span class="tip" tabindex="0">?<span class="tip-bubble"><b>Hermes Agent</b> is the built-in agent backend — just fill in Base URL + API key (its own /v1/runs protocol is used automatically).<br><br><b>LLM providers</b>: any endpoint speaking OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages. Give each an Alias so multiple configs stay distinguishable. Use <b>Ping</b> to verify connectivity.</span></span>
+          </div>
           <div id="providers"></div>
         </div>
       </section>
@@ -99,7 +102,7 @@
               <input type="checkbox" id="thoughtAutoCollapse" />
               <span>Auto-collapse thinking blocks</span>
             </label>
-            <div class="card-actions">
+                        <div class="card-actions">
               <button data-act="save-chat-prefs" class="primary">Save</button>
               <span id="chat-prefs-status" class="card-status"></span>
             </div>
@@ -113,72 +116,68 @@
           <div class="card-body">
             <label class="toggle-row">
               <input type="checkbox" id="asrEnabled" />
-              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">B 站无字幕视频 attach 时，下载音频 → 自动转码为 16kHz 单声道 WAV（方舟无法直接处理 B 站 m4s）→ 上传火山方舟录音文件识别（ASR）生成字幕。需要先开通方舟的音频理解模型并获取 <b>标准版 API Key</b>。<br><br><b>仅支持 B 站</b>：YouTube 的音频流被 PO token 反爬限制，无法从浏览器下载（2026-08-25 实测），YouTube 视频使用自带字幕。</span></span></span>
+              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">仅支持 B 站</span></span></span>
             </label>
 
-            <div class="row mt-12">
-              <label for="asrSubtitleSource">
-                <span class="field-title">字幕来源<span class="tip" tabindex="0">?<span class="tip-bubble">视频同时有自带字幕和 ASR 转写结果时，以哪个为准：<br>· <b>优先视频自带字幕</b>：有字幕就不动，只有无字幕时才用 ASR 补齐；<br>· <b>优先 ASR 解析字幕</b>：始终用 ASR 转写并<b>替换</b>原字幕（适合原字幕错字/漏句/翻译生硬的视频，会增加一次方舟转写消耗）。</span></span></span>
-                <select id="asrSubtitleSource" class="mt-4">
-                  <option value="original">优先视频自带字幕</option>
-                  <option value="asr">优先 ASR 解析字幕</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="row mt-12">
-              <label for="asrApiKey">
-                <span class="field-title">API Key<span class="tip" tabindex="0">?<span class="tip-bubble">必须是 <b>标准版方舟 API Key</b>（方舟控制台 → API Key 管理里创建）。<b>不要用 Agent Plan / Coding Agent 套餐的 key</b>——实测确认编程套餐不含任何音频理解模型，上传报 404、音频输入报 “audio input is not supported”，无法转写。判断方法：标准 key 能在 <code>…/api/v3</code> 上认证（填错会在转写时报鉴权错误）。</span></span></span>
-                <input id="asrApiKey" type="password" class="mt-4" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
-              </label>
-            </div>
-
-            <div class="row mt-12">
-              <label for="asrBaseUrl">
-                <span class="field-title">Base URL<span class="tip" tabindex="0">?<span class="tip-bubble">必须用标准版端点 <code>…/api/v3</code>（Files API 上传只在此端点上）。如果填了 Agent Plan 的 <code>…/api/plan/v3</code>，保存时会自动规整回 <code>…/api/v3</code>（套餐端点没有文件上传能力）。</span></span></span>
-                <input id="asrBaseUrl" type="text" class="mt-4" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
-              </label>
-            </div>
-
-            <div class="row mt-12">
-              <label for="asrModel">
-                <span class="field-title">模型 ID</span>
-                <input id="asrModel" type="text" class="mt-4" placeholder="doubao-seed-2-0-lite-260428" />
-              </label>
-            </div>
-
-            <div class="row mt-12">
-              <label for="asrLanguage">
-                <span class="field-title">语种<span class="tip" tabindex="0">?<span class="tip-bubble">音频的主要语种。选<b>自动检测</b>时让模型自行判断；否则给模型一个语种提示（如 zh / en / ja / ko），有助于多语种混排时优先识别所选语种。参考：<a href="https://ark.volcengine.com/region:cn-beijing/docs/82379/2377589?lang=zh" target="_blank" rel="noopener noreferrer">火山方舟录音文件识别文档</a>。</span></span></span>
-                <select id="asrLanguage" class="mt-4">
-                  <option value="auto">自动检测（Auto）</option>
-                  <option value="zh">中文（简体）</option>
-                  <option value="zh-TW">中文（繁体）</option>
-                  <option value="en">English</option>
-                  <option value="ja">日本語</option>
-                  <option value="ko">한국어</option>
-                  <option value="ru">Русский</option>
-                  <option value="fr">Français</option>
-                  <option value="de">Deutsch</option>
-                  <option value="es">Español</option>
-                  <option value="it">Italiano</option>
-                  <option value="pt">Português</option>
-                  <option value="th">ไทย</option>
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="id">Bahasa Indonesia</option>
-                  <option value="ar">العربية</option>
-                </select>
-              </label>
+            <div class="fields">
+              <div class="field">
+                <label for="asrSubtitleSource">
+                  <span class="field-title">字幕来源</span>
+                  <select id="asrSubtitleSource">
+                    <option value="original">优先视频自带字幕</option>
+                    <option value="asr">优先 ASR 解析字幕</option>
+                  </select>
+                </label>
+              </div>
+              <div class="field">
+                <label for="asrLanguage">
+                  <span class="field-title">语种</span>
+                  <select id="asrLanguage">
+                    <option value="auto">自动检测（Auto）</option>
+                    <option value="zh">中文（简体）</option>
+                    <option value="zh-TW">中文（繁体）</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="ko">한국어</option>
+                    <option value="ru">Русский</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="es">Español</option>
+                    <option value="it">Italiano</option>
+                    <option value="pt">Português</option>
+                    <option value="th">ไทย</option>
+                    <option value="vi">Tiếng Việt</option>
+                    <option value="id">Bahasa Indonesia</option>
+                    <option value="ar">العربية</option>
+                  </select>
+                </label>
+              </div>
+              <div class="field">
+                <label for="asrApiKey">
+                  <span class="field-title">API Key</span>
+                  <input id="asrApiKey" type="password" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
+                </label>
+              </div>
+              <div class="field">
+                <label for="asrBaseUrl">
+                  <span class="field-title">Base URL<span class="tip" tabindex="0">?<span class="tip-bubble">用标准版 <code>…/api/v3</code>：实测 Agent Plan 的 <code>…/api/plan/v3</code> 不支持文件上传（Files API）。</span></span></span>
+                  <input id="asrBaseUrl" type="text" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
+                </label>
+              </div>
+              <div class="field field-full">
+                <label for="asrModel">
+                  <span class="field-title">模型 ID</span>
+                  <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
+                </label>
+              </div>
             </div>
 
             <div class="card-actions">
               <button data-act="save-asr" class="primary">Save</button>
             </div>
-            <div class="row mt-12">
-              <a class="asr-doc-link" href="https://ark.volcengine.com/region:cn-beijing/docs/82379/2377589?lang=zh" target="_blank" rel="noopener noreferrer">
-                📖 为什么要这样配置？→ 火山方舟录音文件识别文档
-              </a>
-            </div>
+            <a class="asr-doc-link" href="https://ark.volcengine.com/region:cn-beijing/docs/82379/2377589?lang=zh" target="_blank" rel="noopener noreferrer">
+              📖 为什么要这样配置？→ 火山方舟录音文件识别文档
+            </a>
           </div>
         </section>
 
