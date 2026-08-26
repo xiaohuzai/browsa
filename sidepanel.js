@@ -567,21 +567,27 @@ function populateProviderSelect(cfg) {
   for (const name of providers) {
     const opt = document.createElement('option');
     opt.value = name;
+    opt.dataset.display = displayProviderName(name, cfg.providers[name]);
     const configured = !!(cfg.providers[name]?.baseUrl?.trim());
     let status;
     if (!configured)               status = 'not set';
     else if (pingStates[name] === 'reachable')   status = '● reachable';
     else if (pingStates[name] === 'unreachable') status = '○ unreachable';
     else                           status = 'not pinged';
-    opt.textContent = `${prettyProviderName(name)} — ${status}`;
+    opt.textContent = `${displayProviderName(name, cfg.providers[name])} — ${status}`;
     if (name === cfg.activeProvider) opt.selected = true;
     providerSel.appendChild(opt);
   }
 }
 
-function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
-  return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
+// Show the user-set alias when present; fall back to a readable internal name.
+function displayProviderName(name, pcfg) {
+  const alias = pcfg?.alias;
+  if (alias && alias.trim()) return alias.trim();
+  if (name === 'hermes') return 'Hermes Agent';
+  const m = /^llm-(\d+)$/.exec(name);
+  if (m) return `LLM ${m[1]}`;
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -822,16 +828,38 @@ async function onAttachPage() {
       // 走回退（用户刷新视频页后重新 attach 即可，刷新 = 重新拉 playurl = 新签名）。
       if (ctx.asrExpiredError) {
         console.warn('[ASR] expired playurl, auto-refresh failed:', ctx.asrExpiredError);
-        throw new Error('B站播放地址已过期且自动刷新失败（' + ctx.asrExpiredError + '）——请刷新视频页面后重新附加');
+        throw new Error(`${platformLabel}播放地址已过期且自动刷新失败（${ctx.asrExpiredError}）——请刷新视频页面后重新附加`);
       }
       let transcriptText = '';
       let audioBytes = 0;
+      // 原始平台（bilibili / youtube）——由 buildAsrPendingCtx 写入 ctx.asrPlatform。
+      // 决定：是否注册 DNR Referer/Cookie 注入规则（仅 bilibili）、下载请求头、
+      // 403 自愈路径和平台文案。
+      const platform = ctx.asrPlatform || 'bilibili';
+      // 平台显示名（错误/toast/确认标签共用）。
+      const platformLabel = platform === 'youtube' ? 'YouTube' : 'B站';
       const dnrRuleId = Math.floor(Math.random() * 4_999_999) + 1;
       try {
-        // 0. Register a session DNR rule injecting the bilibili.com Referer
-        // onto B站 CDN requests so the signed m4s download isn't 403'd (the
+        // 0. Bilibili ONLY: register a session DNR rule injecting the bilibili.com
+        // Referer onto B站 CDN requests so the signed m4s download isn't 403'd (the
         // extension context's own Referer is chrome-extension://..., which the
         // CDN rejects). Mirrors background.js's DOWNLOAD_MEDIA rule exactly.
+        // YouTube skips this entirely: googlevideo auth rides in the URL's PO token
+        // (pot) + works from any context — no Referer/cookie injection needed.
+        // 0. Register a session DNR rule injecting the platform CDN's required
+        // headers onto the audio download so it isn't 403'd. The extension
+        // context's own Origin is chrome-extension://... — both CDNs reject it.
+        // Mirrors background.js's DOWNLOAD_MEDIA rule exactly.
+        //   Bilibili: Referer bilibili.com + cookie (bilivideo CDN checks Referer;
+        //             SameSite cookie needs DNR set — credentials:'include' can't
+        //             carry them cross-site).
+        //   YouTube:  Referer youtube.com + Origin youtube.com + cookie. 实机测试
+        //             (2026-08-25) 证明 googlevideo 从扩展上下文 fetch 一律 403
+        //             （chrome-extension origin 被拒）——早期假设 pot 在 URL 里就够
+        //             是错误的；必须像 B 站一样 DNR 注入 Referer+Origin+Cookie。
+        const dnrReferer = platform === 'youtube' ? 'https://www.youtube.com' : 'https://www.bilibili.com';
+        const dnrOrigin = platform === 'youtube' ? 'https://www.youtube.com' : 'chrome-extension://' + chrome.runtime.id;
+        const dnrUrlFilter = platform === 'youtube' ? 'googlevideo' : 'bilivideo';
         await chrome.declarativeNetRequest.updateSessionRules({
           removeRuleIds: [dnrRuleId],
           addRules: [{
@@ -840,13 +868,15 @@ async function onAttachPage() {
             action: {
               type: 'modifyHeaders',
               // Cookie 注入对齐 cat-catch 的 setHeaders：跨源（chrome-extension:// →
-              // bilivideo.cn）带 SameSite cookie 的唯一可靠方式就是 DNR set。
-              // credentials:'include' 在扩展 fetch 里带不上 B站 cookie（SameSite=Lax
-              // 跨站不带，且触发 CORS 预检）。biliCookie 是 buildAsrPendingCtx 在
-              // MAIN world 同源读到的 document.cookie（含 buvid 族；HttpOnly 读不到，
-              // 见 background.js buildAsrPendingCtx 注释）。
+              // CDN）带 SameSite cookie 的唯一可靠方式就是 DNR set。platformCookie
+              // 是 buildAsrPendingCtx 用 chrome.cookies.getAll 读到的完整 cookie
+              //（含 HttpOnly，见 background.js buildAsrPendingCtx 注释）。
               requestHeaders: [
-                { header: 'referer', operation: 'set', value: 'https://www.bilibili.com' },
+                { header: 'referer', operation: 'set', value: dnrReferer },
+                // YouTube 的 googlevideo 拒绝 chrome-extension origin——必须改成
+                // youtube.com（实测 403 根因之一）。B站 bilivideo 不校验 Origin，
+                // 原样保留扩展 origin 不影响（与旧行为一致）。
+                { header: 'origin', operation: 'set', value: dnrOrigin },
                 ...(ctx.biliCookie ? [{ header: 'cookie', operation: 'set', value: ctx.biliCookie }] : []),
               ]
             },
@@ -855,22 +885,21 @@ async function onAttachPage() {
               // cat-catch setRequestHeaders 的 initiatorDomains:[chrome.runtime.id]
               // 做法，确保规则命中 sidepanel 的 fetch 而不是误伤页面请求。
               initiatorDomains: [chrome.runtime.id],
-              // 'bilivideo' (substring) covers BOTH .com and .cn CDN hosts:
-              // real downloads hit mcdn.bilivideo.cn / upos-sz-*.bilivideo.com
-              // etc., and a rule scoped to 'bilivideo.com' silently misses the
-              // .cn mirrors (403 — a real bug found via live testing 2026-08-15).
-              urlFilter: 'bilivideo',
-              // Full list (same as DOWNLOAD_MEDIA): the B站 CDN 302-redirects
-              // the download to mirror hosts (upos-sz-a -> upos-sz-b), and a
-              // redirect keeps the original request's resourceType, so every
-              // type must be listed to survive the redirect with the injected
-              // Referer intact.
+              // 'bilivideo' covers BOTH .com and .cn B站 CDN hosts; 'googlevideo'
+              // covers YouTube's CDN. A rule scoped to a single host silently
+              // misses mirrors (403 — a real bug found via live testing 2026-08-15).
+              urlFilter: dnrUrlFilter,
+              // Full list (same as DOWNLOAD_MEDIA): the CDN 302-redirects
+              // the download to mirror hosts, and a redirect keeps the original
+              // request's resourceType, so every type must be listed to survive
+              // the redirect with the injected Referer intact.
               resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'webtransport', 'webbundle', 'other']
             }
           }]
         });
-        // 1. Download the m4s bytes (extension context, DNR-injected Referer).
-        // Download can be slow (CDN node assignment) — show a real percentage
+        // 1. Download the audio bytes (extension context, DNR-injected Referer /
+        // Origin / Cookie — both platforms). Download can be slow (CDN node
+        // assignment) — show a real percentage
         // from the streamed bytes when a total is knowable, else elapsed time.
         // Truncation guard: 一个真实 bug 中最低码率流只给了 ~20min（视频 100+min），
         // 转码后按实际 WAV 时长与视频总长比对，明显偏短则换下一候选流重试。
@@ -903,8 +932,14 @@ async function onAttachPage() {
           }, 1000);
           let dl;
           try {
+            // DNR rule above injects the platform's Referer/Origin/Cookie at the
+            // network layer for BOTH platforms. The fetch-level headers only carry
+            // Range (helps CDNs accept the request): bilibili's downloadAudioBytes
+            // default adds a bilibili Referer (redundant with DNR but harmless);
+            // youtube must NOT send that bilibili Referer, so pass Range only.
             dl = await downloadAudioBytes({
               audioUrl: cand.url,
+              ...(platform === 'youtube' ? { headers: { Range: 'bytes=0-' } } : {}),
               onProgress: (done, total) => {
                 if (total) {
                   showAttachProgress(`下载音频中…（${Math.round((done / total) * 100)}%）`);
@@ -930,12 +965,15 @@ async function onAttachPage() {
               let fresh = null;
               let refreshErr = '';
               try {
-                const r = await sendMessage({ type: 'ASR_FRESH_URLS', tabId: currentTabId }).catch(() => null);
-                if (r?.ok && r?.data?.ok && Array.isArray(r.data.streams) && r.data.streams.length) fresh = r.data.streams;
+                const r = await sendMessage({ type: 'ASR_FRESH_URLS', tabId: currentTabId, platform, videoUrl: ctx.meta?.url || '' }).catch(() => null);
+                // background 的 onMessage 把 handle() 返回值包成 {ok, data: result}，而
+                // ASR_FRESH_URLS 现在返回扁平 {ok, streams}（曾嵌套 {data:{ok,streams}}
+                // 导致这里永远解析不到——2026-08-25 实机发现，bilibili/youtube 自愈都受影响）。
+                if (r?.data?.ok && Array.isArray(r.data.streams) && r.data.streams.length) fresh = r.data.streams;
                 else refreshErr = r?.data?.error || r?.error || 'refresh failed';
               } catch (e2) { refreshErr = String((e2 && e2.message) || e2); }
               if (fresh) {
-                console.log(`[ASR] playurl refreshed -> ${fresh.length} audio streams, retrying download`);
+                console.log(`[ASR] ${platform} streams refreshed -> ${fresh.length} audio streams, retrying download`);
                 candidates.length = 0;
                 for (const s of fresh) {
                   candidates.push({ url: s.url, label: s.label || '', codecs: s.codecs || '', id: s.id || 0 });
@@ -1079,10 +1117,17 @@ async function onAttachPage() {
           clearInterval(waitTimer);
         }
       } catch (e) {
-        console.warn('[ASR] pipeline failed, falling back to plain bilibili text:', e?.message);
+        console.warn(`[ASR] pipeline failed, falling back to plain ${platformLabel} text:`, e?.message);
         console.warn('[ASR] stack:', e?.stack);
         // 明确告知失败（而不是静默 fallback）——长等待后用户需要知道是失败而非卡死。
-        showToast(`ASR 转写失败：${e?.message || '未知错误'}（已回退为视频信息）`, 'error');
+        // YouTube 特判：googlevideo 的 PO token 反爬让扩展上下文无法下载音频（403）——
+        // 这不是配置/网络问题，是 YouTube 侧限制（cat-catch 也一样下不了）。有自带字幕
+        // 的 YouTube 视频会回退用自带字幕（其实足够），只有无字幕的才真是视频信息。
+        const msg403 = /403/.test(e?.message || '');
+        const fallbackLabel = (platform === 'youtube' && msg403)
+          ? (ctx.noTranscript === false ? '已回退使用自带字幕（YouTube 限制了音频下载）' : '已回退为视频信息（YouTube 限制了音频下载）')
+          : '已回退为视频信息';
+        showToast(`ASR 转写失败：${e?.message || '未知错误'}（${fallbackLabel}）`, 'error');
       } finally {
         // Remove the Referer-injection rule now that the download is done.
         // (A download that never started, a throw, or a success all land here.)
@@ -1112,18 +1157,19 @@ async function onAttachPage() {
         text: confirmText,
         metaUrl: ctx.meta?.url || '',
         metaTitle: ctx.meta?.title || '',
+        platform,
         tabId: currentTabId,
       }).catch(() => null);
       if (confirmRes?.ok) {
         nextHistoryIdx++;
-        const title = ctx.meta?.title || 'B站视频';
+        const title = ctx.meta?.title || (platform === 'youtube' ? 'YouTube视频' : 'B站视频');
         const lineCount = transcriptText ? transcriptText.split('\n').length : 0;
         const bytesLabel = audioBytes > 0 ? `，${(audioBytes / 1024 / 1024).toFixed(1)}MB 音频` : '';
         // ASR 失败时的回退标签要区分：有原字幕的视频保留原字幕，无字幕的视频才是纯视频信息。
         const subLabel = transcriptText
           ? `，${lineCount} 行字幕`
           : (ctx.noTranscript === false ? '（ASR 失败，已保留原字幕）' : '（无字幕，已用视频信息代替）');
-        appendAttachSystem(`📎 已附加 B站字幕："${title}"（ASR${bytesLabel}${subLabel}）`, null, confirmText);
+        appendAttachSystem(`📎 已附加 ${platformLabel}字幕："${title}"（ASR${bytesLabel}${subLabel}）`, null, confirmText);
       } else {
         appendError('ASR attach failed');
       }
@@ -1135,11 +1181,12 @@ async function onAttachPage() {
     const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
     // For auto mode, show which sub-mode was actually used
     const modeLabel = mode === 'auto' ? `auto/${ctx?.autoMode || 'reader'}` : mode;
-    // Bilibili video without subtitles + ASR not enabled: tell the user the
+    // Video without subtitles + ASR not enabled: tell the user the
     // current behavior (plain video-info attach, no transcription) and how
-    // to opt into automatic subtitle transcription.
+    // to opt into automatic subtitle transcription. Mode-specific label so the
+    // hint reads naturally for B站 vs YouTube.
     const noTranscriptHint = ctx.noTranscriptHint
-      ? '⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。'
+      ? `⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。`
       : undefined;
     appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '', undefined, noTranscriptHint);
   } catch (e) {
@@ -1410,7 +1457,8 @@ async function openSettingsPage() {
 async function onProviderChange() {
   const name = providerSel.value;
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
-  showToast(`Switched to ${prettyProviderName(name)}`, 'success');
+  const opt = providerSel.selectedOptions[0];
+  showToast(`Switched to ${opt?.dataset?.display || displayProviderName(name)}`, 'success');
 }
 
 async function onContextModeChange() {

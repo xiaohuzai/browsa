@@ -1,5 +1,5 @@
 // test/runs-api.test.mjs
-// Unit tests for runsApiStream() (lib/openai-client.js) — the Hermes /v1/runs
+// Unit tests for runsApiStream() (lib/llm-client.js) — the Hermes /v1/runs
 // client added to replace /v1/responses. Covers the event types that
 // responses-stream.test.mjs does NOT: approval, clarification, run_id
 // propagation, failure/cancellation, and tool progress formatting.
@@ -42,7 +42,7 @@ function mockFetchWithEvents(events, { runIdOverride } = {}) {
 }
 
 test('runsApiStream: onRunId fires with the run_id before the events fetch', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([{ event: 'run.completed', data: { output: 'ok' } }]);
 
   let seenRunId = null;
@@ -56,7 +56,7 @@ test('runsApiStream: onRunId fires with the run_id before the events fetch', asy
 });
 
 test('runsApiStream: sessionId is sent as X-Hermes-Session-Id/-Key headers and session_id body field on both requests', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   const calls = mockFetchWithEvents([{ event: 'run.completed', data: { output: 'ok' } }]);
 
   await runsApiStream({
@@ -76,7 +76,7 @@ test('runsApiStream: sessionId is sent as X-Hermes-Session-Id/-Key headers and s
 });
 
 test('runsApiStream: omits session headers/body field entirely when no sessionId is given', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   const calls = mockFetchWithEvents([{ event: 'run.completed', data: { output: 'ok' } }]);
 
   await runsApiStream({ baseUrl: 'http://test', apiKey: 'sk-1', input: 'hi' });
@@ -89,7 +89,7 @@ test('runsApiStream: omits session headers/body field entirely when no sessionId
 });
 
 test('runsApiStream: throws ProviderAPIError when POST /v1/runs returns no run_id', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([], { runIdOverride: {} }); // no run_id, no id
 
   await assert.rejects(
@@ -99,7 +99,7 @@ test('runsApiStream: throws ProviderAPIError when POST /v1/runs returns no run_i
 });
 
 test('runsApiStream: approval.request invokes onApproval with the run_id attached', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([
     { event: 'approval.request', data: { tool: 'terminal', command: 'rm -rf /tmp/x', approval_id: 'appr_1', risk_level: 'high' } },
     { event: 'run.completed', data: { output: '' } },
@@ -118,7 +118,7 @@ test('runsApiStream: approval.request invokes onApproval with the run_id attache
 });
 
 test('runsApiStream: clarification.request (and clarify.request alias) invokes onClarify', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
 
   for (const eventName of ['clarification.request', 'clarify.request']) {
     mockFetchWithEvents([
@@ -139,7 +139,7 @@ test('runsApiStream: clarification.request (and clarify.request alias) invokes o
 });
 
 test('runsApiStream: run.failed rejects with the server-provided error message', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([
     { event: 'run.failed', data: { error: 'tool execution crashed' } },
   ]);
@@ -151,7 +151,7 @@ test('runsApiStream: run.failed rejects with the server-provided error message',
 });
 
 test('runsApiStream: run.cancelled rejects with an AbortError', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([
     { event: 'run.cancelled', data: {} },
   ]);
@@ -163,7 +163,7 @@ test('runsApiStream: run.cancelled rejects with an AbortError', async () => {
 });
 
 test('runsApiStream: tool.started formats name + first string arg as a preview', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([
     { event: 'tool.started', data: { name: 'terminal', args: { command: 'ls -la /very/long/path/that/should/get/truncated/eventually/because/it/is/way/too/long/for/one/line' } } },
     { event: 'run.completed', data: { output: '' } },
@@ -181,7 +181,7 @@ test('runsApiStream: tool.started formats name + first string arg as a preview',
 });
 
 test('runsApiStream: tool.completed appends a checkmark or cross depending on is_error', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   mockFetchWithEvents([
     { event: 'tool.completed', data: { name: 'search', is_error: false } },
     { event: 'tool.completed', data: { name: 'terminal', is_error: true } },
@@ -208,7 +208,7 @@ test('runsApiStream: tool.completed appends a checkmark or cross depending on is
 // out of the string's true end, breaking button rendering too.
 
 test('runsApiStream: reasoning.available that echoes the already-streamed message is NOT re-emitted (regression)', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   const longMessage = '我来帮你整理一份详细的文字版。这是一篇 87 分钟的深度对谈，信息密度很高，涉及了很多话题和细节，需要完整梳理出来给你看看究竟发生了什么。';
 
   mockFetchWithEvents([
@@ -231,7 +231,7 @@ test('runsApiStream: reasoning.available that echoes the already-streamed messag
 });
 
 test('runsApiStream: reasoning.available with genuinely distinct short reasoning is still emitted', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
 
   mockFetchWithEvents([
     { event: 'reasoning.available', data: { text: 'Let me check the tool results before answering.' } },
@@ -256,7 +256,7 @@ test('runsApiStream: SHORT reasoning.available echoes (per-step narration) are a
   // echoed via reasoning.available throughout a long task — only the final,
   // long consolidated message happened to be long enough to get caught by
   // the original fix. Every short burst must be caught too.
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
   const short1 = '好的，我来出一版详细的。我先把你的飞书知识库结构摸清楚，再写。';
   const short2 = '工具被拦了，我换成正常的shell调用。';
 

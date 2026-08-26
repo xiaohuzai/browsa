@@ -93,7 +93,9 @@ main {
   border-top: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 0;
-  overflow: hidden;
+  /* overflow visible, not hidden: the ? tooltip bubbles (which open below
+     their icon and can be taller than the card) must never be clipped. */
+  overflow: visible;
 }
 
 .card-header {
@@ -130,6 +132,13 @@ main {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--fg-2);
+}
+/* ── Hint line + inline ? tooltip (reuses .tip/.tip-bubble from ASR card) ── */
+.hint-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 .card-actions {
   display: flex;
@@ -202,6 +211,12 @@ details.provider-group[open] > .provider-group-header::before {
   width: 3px;
   background: transparent;
   transition: background 0.15s;
+}
+/* Red accent bar on hover AND on the active card — same focus affordance for
+   both Agent and LLM groups (marks what you're currently focused on). */
+.provider:not(.active):hover::before {
+  background: var(--accent);
+  opacity: 0.45;
 }
 .provider.active::before {
   background: var(--accent);
@@ -324,33 +339,117 @@ details.provider-group[open] > .provider-group-header::before {
   margin-top: 1px;
 }
 
-/* ── Provider inference params ───────────────────────────────────────────── */
-.provider-params-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-  flex-wrap: wrap;
+/* ── Compact 2-col fields grid (provider cards + ASR card) ─────────────── */
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
 }
-.provider-param-label {
+.provider .fields {
+  padding-left: 8px;
+  margin-bottom: 8px;
+}
+.field {
+  min-width: 0;
+}
+.field.field-full {
+  grid-column: 1 / -1;
+}
+.field label {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 12px;
-  color: var(--fg-2);
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
 }
-/* Override .row label specificity (0,1,1) — these labels need auto width, not 180px */
-.provider-params-row label {
-  min-width: auto;
-  flex: 0 0 auto;
-  color: var(--fg-2);
-  font-size: 12px;
+.field input[type="text"],
+.field input[type="password"],
+.field select {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.provider-param-label input { font-size: 12px; }
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
 
+/* ── API style select (compact) ─────────────────────────────────────────── */
+.provider .row .api-style-select {
+  font-size: 12px;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+}
+.provider .row .api-style-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 /* ── Action row ──────────────────────────────────────────────────────────── */
 .provider .row.action-row {
   align-items: center;
   margin-top: 4px;
+}
+
+/* ── Add-provider button + provider delete button ───────────────────────── */
+.add-provider-btn {
+  align-self: center;
+  margin: 8px auto 4px;
+  padding: 6px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.add-provider-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+
+.provider-h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.provider-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.provider-delete:hover {
+  color: var(--err);
+  background: var(--err-bg, rgba(220,50,50,0.12));
 }
 
 /* ── Textarea ────────────────────────────────────────────────────────────── */
@@ -488,13 +587,12 @@ input[type="radio"] { accent-color: var(--accent); }
 }
 
 /* ── Hover tooltips (? icon) ────────────────────────────────────────────── */
-/* Used by the ASR card: explanatory text that used to be long inline .hint
-   paragraphs now lives in a ? bubble revealed on hover/focus, keeping the
-   card visually consistent with the other .row/.toggle-row cards. The bubble
-   opens to the RIGHT of the icon (vertically centered) so .card's overflow:
-   hidden never clips it at the top/bottom edge. */
+/* Explanatory text lives in a ? bubble revealed on hover/focus. The bubble
+   opens BELOW the icon (left-aligned to it), and .card uses overflow: visible
+   so tall bubbles are never clipped by the card's edges. */
 .field-title {
-  display: inline; /* keep "API Key ?" on one line inside the flex-column .row label */
+  display: inline-flex;
+  align-items: center; /* keep "API Key ?" on one line, icon baseline-aligned */
 }
 .tip {
   position: relative;
@@ -523,14 +621,16 @@ input[type="radio"] { accent-color: var(--accent); }
 .tip .tip-bubble {
   display: none;
   position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
+  left: 0;
+  top: calc(100% + 8px);
   max-width: 300px;
   min-width: 180px;
-  background: var(--surface-2, #23262e);
-  color: var(--fg);
-  border: 1px solid var(--border-strong);
+  /* Fixed high-contrast dark bubble + light text — do NOT tie to theme
+     variables: under some themes --fg resolves dark, making dark-on-dark
+     tooltip text unreadable (real user report 2026-08-26). */
+  background: #1e2126;
+  color: #e6e8eb;
+  border: 1px solid #3a3f47;
   border-radius: 8px;
   padding: 9px 11px;
   font-size: 12px;
@@ -539,24 +639,24 @@ input[type="radio"] { accent-color: var(--accent); }
   text-align: left;
   letter-spacing: 0;
   white-space: normal;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35);
   z-index: 100;
 }
 .tip:hover .tip-bubble,
 .tip:focus-visible .tip-bubble {
   display: block;
 }
-.tip-bubble b { color: var(--fg-2); font-weight: 600; }
+.tip-bubble b { color: #f0f2f5; font-weight: 600; }
 .tip-bubble code {
   font-family: ui-monospace, "SF Mono", monospace;
   font-size: 11px;
-  background: var(--border);
+  background: #343a43;
   padding: 1px 4px;
   border-radius: 3px;
-  color: var(--fg-2);
+  color: #e6e8eb;
 }
 .tip-bubble a {
-  color: var(--accent);
+  color: #6ea8ff;
   text-decoration: underline;
 }
 

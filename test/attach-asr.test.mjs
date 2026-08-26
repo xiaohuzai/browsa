@@ -32,8 +32,9 @@ function makeStorageArea(initial = {}) {
 }
 
 const BILI_URL = 'https://www.bilibili.com/video/BV1xx411c7mD';
+const YT_URL = 'https://www.youtube.com/watch?v=abc123XYZ';
 
-function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStreams = true } = {}) {
+function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStreams = true, ytTranscript = null, ytHasStreams = true, pageUrl = BILI_URL } = {}) {
   const sessionArea = makeStorageArea();
   return {
     runtime: {
@@ -48,8 +49,8 @@ function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStr
     tabs: {
       onActivated: { addListener: () => {} },
       onRemoved: { addListener: () => {} },
-      query: async () => [{ id: 1, url: BILI_URL, title: 'Test Video' }],
-      get: async (id) => ({ id, url: BILI_URL, title: 'Test Video', favIconUrl: '' }),
+      query: async () => [{ id: 1, url: pageUrl, title: 'Test Video' }],
+      get: async (id) => ({ id, url: pageUrl, title: 'Test Video', favIconUrl: '' }),
     },
     sidePanel: { setOptions: () => {}, setPanelBehavior: async () => {} },
     webNavigation: {
@@ -71,6 +72,13 @@ function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStr
             bvid: 'BV1xx411c7mD', title: 'Test Video', upMid: 1, cid: 999,
             duration: 300, desc: 'some description', stat: {},
             ...(transcript ? { transcript } : {}),
+          } }];
+        }
+        if (body.includes('activeYouTubeFetch')) {
+          return [{ result: {
+            videoId: 'abc123XYZ', title: 'YouTube Test Video', author: 'Test Channel',
+            lengthSeconds: 300, shortDescription: 'desc',
+            ...(ytTranscript ? { transcript: ytTranscript } : {}),
           } }];
         }
         // The asr-pending ctx builder re-reads audio streams via the exposed reader.
@@ -97,15 +105,37 @@ function makeChrome(localArea, { transcript = null, hasAudio = true, hasFreshStr
               }
             : { streams: [], videoDurationSec: 0 } }];
         }
+        // YouTube fresh audio-stream fetch for ASR (window.__browsaFetchFreshYouTubeStreams).
+        if (body.includes('__browsaFetchFreshYouTubeStreams')) {
+          if (!ytHasStreams) {
+            return [{ result: { streams: [], videoDurationSec: 300, asrExpiredError: 'player 返回空音频流列表' } }];
+          }
+          return [{ result: {
+            streams: [
+              { type: 'audio', label: '128 kbps', url: 'https://rr2---sn.googlevideo.com/videoplayback?pot=abc&itag=140', bandwidth: 128000, hasAudio: true, duration: 0, size: 4_800_000, codecs: 'mp4a.40.2', id: 140 },
+              { type: 'audio', label: '70 kbps', url: 'https://rr2---sn.googlevideo.com/videoplayback?pot=def&itag=139', bandwidth: 70000, hasAudio: true, duration: 0, size: 2_600_000, codecs: 'opus', id: 139 },
+            ],
+            videoDurationSec: 300,
+          } }];
+        }
         return [{ result: { text: 'mock content', rawTextLength: 12, wasCapped: false } }];
       },
     },
     cookies: {
-      getAll: async () => [
-        { name: 'SESSDATA', value: 'test-sessdata-httpOnly' },
-        { name: 'buvid3', value: 'test-buvid' },
-        { name: 'buvid4', value: 'test-buvid4' },
-      ],
+      getAll: async ({ url }) => {
+        if (String(url).includes('youtube.com')) {
+          return [
+            { name: 'SID', value: 'yt-sid-httpOnly' },
+            { name: 'VISITOR_INFO1_LIVE', value: 'yt-visitor' },
+            { name: 'CONSENT', value: 'yt-consent' },
+          ];
+        }
+        return [
+          { name: 'SESSDATA', value: 'test-sessdata-httpOnly' },
+          { name: 'buvid3', value: 'test-buvid' },
+          { name: 'buvid4', value: 'test-buvid4' },
+        ];
+      },
     },
     storage: { onChanged: { addListener: () => {} }, local: localArea, session: sessionArea },
     alarms: { create: () => {}, onAlarm: { addListener: () => {} } },
@@ -419,4 +449,131 @@ test('ASR stream selection: AAC-LC preferred, bitrate ties broken by lower bandw
   const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
   assert.equal(res.ok, true);
   assert.equal(res.ctx.audioUrl, 'https://bilivideo.com/audio/132.m4s', 'among AAC-LC streams of equal decodability, the lowest bitrate wins (fastest download)');
+});
+
+test('ATTACH_PAGE on a subtitle-less YouTube page + ASR enabled: returns asr-pending with a FRESH googlevideo audio URL', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', language: 'zh', format: 'audio/x-m4a' },
+  });
+  Object.defineProperty(globalThis, 'chrome', {
+    value: makeChrome(localArea, { pageUrl: YT_URL, ytTranscript: null }),
+    writable: true, configurable: true,
+  });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.equal(res.ctx.mode, 'asr-pending');
+  assert.equal(res.ctx.asrPlatform, 'youtube', 'the original platform must survive the asr-pending rewrite (sidepanel needs it for DNR/headers/labels)');
+  // YouTube has NO passive __playinfo__ cache — the audio URL MUST come from a
+  // fresh /player response (window.__browsaFetchFreshYouTubeStreams), so the PO
+  // token in the URL is valid at download time.
+  assert.match(res.ctx.audioUrl, /googlevideo\.com\/videoplayback\?pot=/, 'must come from the fresh /player fetch with a PO token in the URL');
+  assert.equal(res.ctx.asr.apiKey, 'ark-key');
+  assert.equal(res.ctx.asr.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3');
+  assert.equal(res.ctx.noTranscript, true, 'YouTube synthesis must set the structured noTranscript flag');
+  assert.equal(res.ctx.biliCookie, 'SID=yt-sid-httpOnly; VISITOR_INFO1_LIVE=yt-visitor; CONSENT=yt-consent', 'must read the YouTube cookie set (googlevideo download needs SID/VISITOR_INFO1_LIVE etc. injected via DNR — 2026-08-25: plain fetch of googlevideo 403s without them)');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 0, 'asr-pending must not be stored to history yet');
+});
+
+test('ATTACH_PAGE on a YouTube page WITH transcript: normal store path (no ASR)', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  Object.defineProperty(globalThis, 'chrome', {
+    value: makeChrome(localArea, { pageUrl: YT_URL, ytTranscript: '[00:01] hello world' }),
+    writable: true, configurable: true,
+  });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.notEqual(res.ctx.mode, 'asr-pending', 'with transcript there must be no ASR handoff');
+  assert.equal(res.ctx.mode, 'youtube');
+  assert.equal(res.ctx.noTranscript, false, 'noTranscript flag must be false when a transcript exists');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 1, 'normal store path stores the youtube attach');
+  assert.match(history.history[0].content, /Mode: youtube/);
+});
+
+test('ATTACH_PAGE on a subtitle-less YouTube page + ASR enabled but NO audio stream: falls through to normal store', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  Object.defineProperty(globalThis, 'chrome', {
+    value: makeChrome(localArea, { pageUrl: YT_URL, ytHasStreams: false }),
+    writable: true, configurable: true,
+  });
+  const { handle } = await import('../background.js');
+  const tabId = nextTabId++;
+  const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+  assert.equal(res.ok, true);
+  assert.notEqual(res.ctx.mode, 'asr-pending', 'no audio stream -> no ASR handoff');
+  const history = await localArea.get('history');
+  assert.equal((history.history || []).length, 1, 'falls through to normal store');
+});
+
+test('ATTACH_ASR_CONFIRM: stores the transcript with platform=youtube stamped on videoSrc', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+  });
+  Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, {}), writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  const res = await handle({
+    type: 'ATTACH_ASR_CONFIRM',
+    text: '[00:00] Hello\n[00:05] Welcome to this video',
+    metaUrl: YT_URL,
+    metaTitle: 'YouTube Test Video',
+    platform: 'youtube',
+    tabId: 1,
+  }, {});
+  assert.equal(res.ok, true);
+  const history = await localArea.get('history');
+  const entry = history.history[history.history.length - 1];
+  assert.match(entry.content, /\[00:00\] Hello/);
+  assert.match(entry.content, /Mode: youtube/);
+  assert.ok(entry.videoSrc, 'videoSrc must be stamped so [mm:ss] is clickable');
+  assert.equal(entry.videoSrc.platform, 'youtube', 'videoSrc.platform must reflect the actual platform (SEEK_VIDEO platform dispatch)');
+  assert.equal(entry.videoSrc.url, YT_URL);
+});
+
+test('ASR_FRESH_URLS returns a FLAT {ok, streams} so the onMessage data: wrap leaves r.data.streams readable', async () => {
+  const localArea = makeStorageArea({});
+  const chromeMock = makeChrome(localArea, {});
+  // The default mock returns {streams} (the __browsaFetchFreshYouTubeStreams
+  // shape), but ASR_FRESH_URLS' handler func returns {ok:true, streams} and the
+  // background checks res.result.ok. Override to return the handler's shape.
+  const origExecute = chromeMock.scripting.executeScript;
+  chromeMock.scripting.executeScript = async (opts) => {
+    if (opts.files) return [{ result: undefined }];
+    if ((opts.func?.toString() || '').includes('__browsaFetchFreshYouTubeStreams')) {
+      return [{ result: { ok: true, streams: [{ type: 'audio', url: 'https://rr.googlevideo.com/videoplayback?pot=fresh', bandwidth: 64000 }] } }];
+    }
+    return origExecute(opts);
+  };
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const { handle } = await import('../background.js');
+  // Simulate what the sidepanel sees: handle() result wrapped by the onMessage
+  // listener as { ok: true, data: result }. The handler must return flat
+  // { ok: true, streams } (NOT { ok: true, data: { ok: true, streams } }) so
+  // after the wrap r.data.streams is the array — a real bug where the nested
+  // data made the 403 self-heal never fire for bilibili OR youtube (2026-08-25).
+  const result = await handle({ type: 'ASR_FRESH_URLS', tabId: 1, platform: 'youtube', videoUrl: YT_URL }, {});
+  const wrapped = { ok: true, data: result };
+  assert.equal(wrapped.data.ok, true, 'handler must succeed');
+  assert.ok(Array.isArray(wrapped.data.streams), 'sidepanel reads r.data.streams — must be the array (flat return)');
+  assert.ok(wrapped.data.streams.length > 0, 'must return the fresh audio streams');
+  assert.equal(wrapped.data.streams[0].type, 'audio');
 });

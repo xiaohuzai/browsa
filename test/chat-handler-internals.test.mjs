@@ -545,4 +545,94 @@ test('buildHermesTurn: null/undefined msg -> empty input, built history', async 
   assert.deepEqual(out.conversationHistory, [{ role: 'user', content: 'hi' }]);
 });
 
+// --------------- buildResponsesInput (OpenAI /v1/responses) ---------------
+
+let _buildResponsesInput;
+async function buildResponsesInput(msg, history) {
+  if (!_buildResponsesInput) {
+    ({ buildResponsesInput: _buildResponsesInput } = await import('../lib/handlers/chat-handler.js'));
+  }
+  return _buildResponsesInput(msg, history);
+}
+
+test('buildResponsesInput: prior history in input_text/input_image parts + current turn appended', async () => {
+  const out = await buildResponsesInput(
+    { userText: 'now', images: ['data:image/png;base64,CUR'] },
+    [
+      { role: 'user', content: 'prior text' },
+      { role: 'assistant', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,PRIOR' } }] },
+    ],
+  );
+  // Prior turns: plain text stays a string, image-only turn becomes input_image.
+  assert.deepEqual(out[0], { role: 'user', content: 'prior text' });
+  assert.equal(out[1].content[0].type, 'input_image');
+  assert.equal(out[1].content[0].image_url, 'data:image/png;base64,PRIOR');
+  // Current turn: text + pasted images in one user input.
+  assert.equal(out[2].role, 'user');
+  assert.equal(out[2].content[0].type, 'input_text');
+  assert.equal(out[2].content[0].text, 'now');
+  assert.equal(out[2].content[1].type, 'input_image');
+  assert.equal(out[2].content[1].image_url, 'data:image/png;base64,CUR');
+});
+
+test('buildResponsesInput: no images -> current turn is a plain string', async () => {
+  const out = await buildResponsesInput({ userText: 'hi' }, []);
+  assert.deepEqual(out, [{ role: 'user', content: 'hi' }]);
+});
+
+// --------------- buildAnthropicMessages (Anthropic /v1/messages) -----------
+
+let _buildAnthropicMessages;
+async function buildAnthropicMessages(msg, history) {
+  if (!_buildAnthropicMessages) {
+    ({ buildAnthropicMessages: _buildAnthropicMessages } = await import('../lib/handlers/chat-handler.js'));
+  }
+  return _buildAnthropicMessages(msg, history);
+}
+
+test('buildAnthropicMessages: text turns pass through as strings; system-only content dropped', async () => {
+  const out = await buildAnthropicMessages(
+    { userText: 'hello', images: [] },
+    [
+      { role: 'system', content: 'not a real message for Anthropic' },
+      { role: 'user', content: 'prior' },
+      { role: 'assistant', content: 'reply' },
+    ],
+  );
+  // System messages must NOT appear in the Anthropic messages array (system is
+  // a top-level field, not a message).
+  assert.equal(out.length, 3, 'system dropped, user + assistant + current user');
+  assert.deepEqual(out[0], { role: 'user', content: 'prior' });
+  assert.deepEqual(out[1], { role: 'assistant', content: 'reply' });
+  assert.deepEqual(out[2], { role: 'user', content: 'hello' });
+});
+
+test('buildAnthropicMessages: data: URL images become base64 image blocks; non-data URLs skipped', async () => {
+  const out = await buildAnthropicMessages(
+    { userText: 'look', images: ['data:image/png;base64,QUJD', 'https://not-a-data-url.example/x.png'] },
+    [],
+  );
+  const content = out[0].content;
+  assert.equal(content[0].type, 'text');
+  assert.equal(content[0].text, 'look');
+  assert.deepEqual(content[1], {
+    type: 'image',
+    source: { type: 'base64', media_type: 'image/png', data: 'QUJD' },
+  });
+  assert.equal(content.length, 2, 'non-data-URL image must be skipped (Anthropic needs base64)');
+});
+
+test('buildAnthropicMessages: history image_url data URLs convert to base64 image blocks too', async () => {
+  const out = await buildAnthropicMessages(
+    { userText: 'q', images: [] },
+    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,WFla' } }, { type: 'text', text: 'note' }] }],
+  );
+  const content = out[0].content;
+  assert.equal(content[0].type, 'image', 'parts keep the original array order (image came first)');
+  assert.equal(content[0].source.media_type, 'image/jpeg');
+  assert.equal(content[0].source.data, 'WFla');
+  assert.equal(content[1].type, 'text');
+  assert.equal(content[1].text, 'note');
+});
+
 

@@ -1,5 +1,5 @@
 // test/options-provider-ping.test.mjs — real execution test of options.js's
-// provider ping flow, plus direct tests of lib/openai-client.js's ping()/
+// provider ping flow, plus direct tests of lib/llm-client.js's ping()/
 // getCapabilities() (previously zero coverage anywhere in the suite).
 //
 // This is the highest-stakes untested surface in the codebase per project
@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
 
-// --------------- direct tests of lib/openai-client.js's ping()/getCapabilities() ---
+// --------------- direct tests of lib/llm-client.js's ping()/getCapabilities() ---
 
 function mockFetchSequence(handlers) {
   // handlers: array of (url, opts) => response-like object | throws
@@ -35,7 +35,7 @@ function mockFetchSequence(handlers) {
 }
 
 test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models call)', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   let modelsCalled = false;
   mockFetchSequence([
     (url) => { assert.ok(url.endsWith('/health')); return { ok: true }; },
@@ -47,7 +47,7 @@ test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models ca
 });
 
 test('ping(): no model, with apiKey — verifies auth via /v1/models even if /health passed', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   const calledUrls = [];
   mockFetchSequence([
     (url) => { calledUrls.push(url); return { ok: true }; },
@@ -60,7 +60,7 @@ test('ping(): no model, with apiKey — verifies auth via /v1/models even if /he
 });
 
 test('ping(): no model, /health fails but /v1/models succeeds — still ok (non-standard server)', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   mockFetchSequence([
     () => { throw new Error('ECONNREFUSED'); },
     () => ({ ok: true, json: async () => ({ data: [] }) }),
@@ -70,7 +70,7 @@ test('ping(): no model, /health fails but /v1/models succeeds — still ok (non-
 });
 
 test('ping(): no model, /v1/models returns non-ok — throws ProviderAPIError with status text', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   mockFetchSequence([
     () => { throw new Error('no health endpoint'); },
     () => ({ ok: false, status: 401, text: async () => 'Unauthorized' }),
@@ -82,7 +82,7 @@ test('ping(): no model, /v1/models returns non-ok — throws ProviderAPIError wi
 });
 
 test('ping(): model configured — sends a real max_tokens:1 request, not /v1/models', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   let sawModelsCall = false;
   let capturedBody = null;
   globalThis.fetch = async (url, opts) => {
@@ -102,8 +102,42 @@ test('ping(): model configured — sends a real max_tokens:1 request, not /v1/mo
   assert.equal(capturedBody.stream, false);
 });
 
+test('ping(): apiStyle responses — verifies via /v1/responses with input + max_output_tokens:1', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  let capturedBody = null;
+  let capturedUrl = null;
+  globalThis.fetch = async (url, opts) => {
+    capturedUrl = String(url);
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, text: async () => '' };
+  };
+  const result = await ping({ baseUrl: 'http://test', apiKey: 'k', model: 'gpt-5', apiStyle: 'responses' });
+  assert.equal(result, 'ok');
+  assert.equal(capturedUrl, 'http://test/v1/responses');
+  assert.equal(capturedBody.model, 'gpt-5');
+  assert.equal(capturedBody.input, 'hi', 'responses uses input, not messages');
+  assert.equal(capturedBody.max_output_tokens, 1);
+});
+
+test('ping(): apiStyle anthropic — verifies via /v1/messages with max_tokens:1 (Anthropic requires it)', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  let capturedBody = null;
+  let capturedUrl = null;
+  globalThis.fetch = async (url, opts) => {
+    capturedUrl = String(url);
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, text: async () => '' };
+  };
+  const result = await ping({ baseUrl: 'http://test', apiKey: 'k', model: 'claude-3-5', apiStyle: 'anthropic' });
+  assert.equal(result, 'ok');
+  assert.equal(capturedUrl, 'http://test/v1/messages');
+  assert.equal(capturedBody.model, 'claude-3-5');
+  assert.deepEqual(capturedBody.messages, [{ role: 'user', content: 'hi' }]);
+  assert.equal(capturedBody.max_tokens, 1);
+});
+
 test('ping(): model configured, server returns non-ok — throws ProviderAPIError', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => 'model not found' });
   await assert.rejects(
     () => ping({ baseUrl: 'http://test', apiKey: 'k', model: 'nonexistent-model' }),
@@ -112,7 +146,7 @@ test('ping(): model configured, server returns non-ok — throws ProviderAPIErro
 });
 
 test('ping(): network error on the model-configured path throws ProviderNetworkError', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => { throw new Error('DNS resolution failed'); };
   await assert.rejects(
     () => ping({ baseUrl: 'http://test', apiKey: 'k', model: 'gpt-4o' }),
@@ -121,12 +155,12 @@ test('ping(): network error on the model-configured path throws ProviderNetworkE
 });
 
 test('ping(): throws ProviderConfigError when baseUrl is missing', async () => {
-  const { ping } = await import('../lib/openai-client.js');
+  const { ping } = await import('../lib/llm-client.js');
   await assert.rejects(() => ping({ baseUrl: '', apiKey: '' }));
 });
 
 test('getCapabilities(): returns parsed JSON on success', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async (url) => {
     assert.ok(String(url).endsWith('/v1/capabilities'));
     return { ok: true, json: async () => ({ features: { run_submission: true, run_events_sse: true } }) };
@@ -136,21 +170,21 @@ test('getCapabilities(): returns parsed JSON on success', async () => {
 });
 
 test('getCapabilities(): returns null (not throw) on a non-ok response — non-Hermes servers lack this endpoint', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => ({ ok: false, status: 404 });
   const caps = await getCapabilities({ baseUrl: 'http://test', apiKey: 'k' });
   assert.equal(caps, null);
 });
 
 test('getCapabilities(): returns null on a network error', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   globalThis.fetch = async () => { throw new Error('offline'); };
   const caps = await getCapabilities({ baseUrl: 'http://test', apiKey: 'k' });
   assert.equal(caps, null);
 });
 
 test('getCapabilities(): returns null immediately when baseUrl is missing (no fetch)', async () => {
-  const { getCapabilities } = await import('../lib/openai-client.js');
+  const { getCapabilities } = await import('../lib/llm-client.js');
   let called = false;
   globalThis.fetch = async () => { called = true; return { ok: true, json: async () => ({}) }; };
   const caps = await getCapabilities({ baseUrl: '', apiKey: 'k' });
@@ -189,29 +223,142 @@ await import('../options.js');
 // -> ... ), same convention as sidepanel.js. Let it settle before driving the UI.
 await new Promise((r) => setTimeout(r, 50));
 
-function findProviderCard(name) {
-  // Provider cards don't carry the raw provider-map key as a DOM attribute,
-  // so locate by the prettyProviderName() label options.js renders instead.
+function findProviderCard(displayName) {
+  // Cards are located by their rendered title (the alias or default name),
+  // since the raw provider-map key is opaque and never shown in the DOM.
   const cards = [...document.querySelectorAll('.provider')];
-  const labels = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
-  const target = labels[name] || name;
-  return cards.find((c) => c.querySelector('.name')?.textContent === target);
+  return cards.find((c) => c.querySelector('.name')?.textContent === displayName);
 }
 
-test('options.js: init() rendered both default provider cards without throwing', () => {
-  const cards = document.querySelectorAll('.provider');
-  assert.equal(cards.length, 2, 'hermes, compatible');
+function providerCards() {
+  return [...document.querySelectorAll('.provider')];
+}
+
+function clickAddProvider() {
+  const btn = document.querySelector('.add-provider-btn');
+  assert.ok(btn, 'an Add Provider button must be present');
+  btn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+}
+
+// Add a fresh blank LLM card and return it. On a fresh install a render-only
+// "reserved slot" (LLM 1) is shown — so the first card is created by filling
+// in the reserved slot's baseUrl and Saving it (committing it to storage as
+// `llm-1`). "＋ Add Provider" is always available; once at least one LLM
+// provider exists it appends a NEW card below the existing ones.
+// renderProviders() re-renders asynchronously after each storage write, so
+// the caller must await this helper.
+async function addLlmCard() {
+  const reserved = document.querySelector('.provider.reserved');
+  if (reserved) {
+    reserved.querySelector('[data-k="baseUrl"]').value = 'http://reserved-' + Math.random().toString(36).slice(2);
+    reserved.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+    const committed = findProviderCard('LLM 1');
+    assert.ok(committed, 'saving the reserved slot must commit it as a real LLM 1 card');
+    return committed;
+  }
+  clickAddProvider();
+  await new Promise((r) => setTimeout(r, 10));
+  const cards = providerCards();
+  return cards[cards.length - 1];
+}
+
+test('options.js: init() renders the Hermes Agent card plus a reserved empty LLM slot', () => {
+  const cards = providerCards();
+  assert.equal(cards.length, 2, 'Hermes Agent + one reserved empty LLM slot');
+  assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes Agent card present');
+  const reserved = document.querySelector('.provider.reserved');
+  assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
+  assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
+  assert.equal(reserved.querySelector('[data-act="delete"]'), null, 'the reserved slot has no delete button (nothing persisted yet)');
+  assert.equal(document.querySelector('.add-provider-btn') != null, true, 'Add Provider button is always present — even with the reserved slot');
 });
 
-test('options.js: LLM provider (compatible) card shows a Model ID field; agent providers (hermes) do not', () => {
-  const compatibleCard = findProviderCard('compatible');
-  const hermesCard = findProviderCard('hermes');
-  assert.ok(compatibleCard.querySelector('[data-k="model"]'), 'OpenAI-compatible must show Model ID');
-  assert.ok(!hermesCard.querySelector('[data-k="model"]'), 'Hermes must NOT show Model ID');
+test('options.js: configuring + saving the reserved slot does NOT auto-create an extra empty card', async () => {
+  // User report: after filling the reserved LLM 1 and saving, no new LLM2 may
+  // appear on its own — the slot is consumed and new empties only come from
+  // an explicit "＋ Add Provider" click, placed BELOW the configured one.
+  const reserved = document.querySelector('.provider.reserved');
+  assert.ok(reserved, 'reserved slot is showing on fresh install');
+  reserved.querySelector('[data-k="alias"]').value = 'My OpenAI';
+  reserved.querySelector('[data-k="baseUrl"]').value = 'http://openai';
+  reserved.querySelector('[data-k="model"]').value = 'gpt-4o';
+  reserved.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+
+  assert.equal(document.querySelector('.provider.reserved'), null, 'the reserved slot is consumed once a provider is committed');
+  const names = providerCards().map((c) => c.querySelector('.name').textContent);
+  assert.deepEqual(names, ['Hermes Agent', 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
+
+  // Now an explicit Add appends a new card BELOW the configured one.
+  clickAddProvider();
+  await new Promise((r) => setTimeout(r, 10));
+  const after = providerCards().map((c) => c.querySelector('.name').textContent);
+  assert.deepEqual(after, ['Hermes Agent', 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
+  const added = providerCards()[providerCards().length - 1];
+  assert.ok(added.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
+});
+
+test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own /v1/runs protocol needs no configuration)', () => {
+  const hermesCard = findProviderCard('Hermes Agent');
+  assert.ok(hermesCard, 'Hermes Agent card present');
+  assert.ok(hermesCard.querySelector('[data-k="baseUrl"]'), 'agent card exposes Base URL');
+  assert.ok(hermesCard.querySelector('[data-k="apiKey"]'), 'agent card exposes API key');
+  // No protocol dropdown: Hermes Agent speaks its own /v1/runs protocol.
+  assert.equal(hermesCard.querySelector('[data-k="apiStyle"]'), null, 'agent cards must NOT expose an apiStyle select');
+  // No Alias / Model fields, no delete button (fixed, not user-configurable beyond url+key).
+  assert.equal(hermesCard.querySelector('[data-k="alias"]'), null, 'agent cards have no alias field');
+  assert.equal(hermesCard.querySelector('[data-k="model"]'), null, 'agent cards have no model field');
+  assert.equal(hermesCard.querySelector('[data-act="delete"]'), null, 'agent cards are not removable');
+});
+
+test('options.js: provider cards no longer expose Temperature / Max tokens fields', async () => {
+  const card = await addLlmCard();
+  assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field removed');
+  assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field removed');
+});
+
+test('options.js: adding a provider appends a new LLM card with alias + protocol select + delete', async () => {
+  // Commit the reserved slot as the first provider first — only once at least
+  // one LLM provider exists does the Add button appear and append a new card.
+  await addLlmCard();
+  const before = providerCards().length;
+  const card = await addLlmCard();
+  assert.equal(providerCards().length, before + 1, 'Add Provider appends a card');
+  const sel = card.querySelector('[data-k="apiStyle"]');
+  assert.ok(sel, 'each LLM card exposes an apiStyle select');
+  assert.ok(sel.querySelector('option[value="chat"]'), 'must offer chat option');
+  assert.ok(sel.querySelector('option[value="responses"]'), 'must offer responses option');
+  assert.ok(sel.querySelector('option[value="anthropic"]'), 'must offer anthropic option');
+  assert.equal(sel.value, 'chat', 'a fresh LLM provider defaults to chat');
+  assert.ok(card.querySelector('[data-k="alias"]'), 'LLM cards expose an Alias field');
+  assert.ok(card.querySelector('[data-k="model"]'), 'LLM cards expose a Model ID field');
+  assert.ok(card.querySelector('[data-act="delete"]'), 'LLM cards expose a delete button');
+});
+
+test('options.js: each added provider can pick its own protocol (anthropic etc.) and the select persists on Save', async () => {
+  const card = await addLlmCard();
+  const sel = card.querySelector('[data-k="apiStyle"]');
+  sel.value = 'anthropic';
+  card.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const providersSet = setCalls.filter((c) => c.providers).pop();
+  const added = Object.values(providersSet.providers).find((p) => p.type === 'llm' && p.apiStyle === 'anthropic');
+  assert.ok(added, 'a provider configured with anthropic protocol must be persisted');
+});
+
+test('options.js: the Alias field is persisted on Save', async () => {
+  const card = await addLlmCard();
+  card.querySelector('[data-k="alias"]').value = '我的 Claude';
+  card.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const providersSet = setCalls.filter((c) => c.providers).pop();
+  const added = Object.values(providersSet.providers).find((p) => p.type === 'llm' && p.alias === '我的 Claude');
+  assert.ok(added, 'alias must be persisted');
 });
 
 test('options.js: pinging an LLM provider with no Model ID set is rejected before any network call', async () => {
-  const card = findProviderCard('compatible');
+  const card = await addLlmCard();
   card.querySelector('[data-k="baseUrl"]').value = 'http://test-llm';
   card.querySelector('[data-k="model"]').value = '';
   let fetchCalled = false;
@@ -225,7 +372,7 @@ test('options.js: pinging an LLM provider with no Model ID set is rejected befor
 });
 
 test('options.js: pinging an agent provider (Hermes) with no model set proceeds anyway (no Model ID requirement)', async () => {
-  const card = findProviderCard('hermes');
+  const card = findProviderCard('Hermes Agent');
   card.querySelector('[data-k="baseUrl"]').value = 'http://test-hermes';
   let healthCalled = false;
   globalThis.fetch = async (url) => {
@@ -243,7 +390,7 @@ test('options.js: pinging an agent provider (Hermes) with no model set proceeds 
 });
 
 test('options.js: successful ping with run_submission+run_events_sse capabilities sets isHermes=true and persists it', async () => {
-  const card = findProviderCard('compatible');
+  const card = await addLlmCard();
   card.querySelector('[data-k="baseUrl"]').value = 'http://test-runs-capable';
   card.querySelector('[data-k="model"]').value = 'my-model';
   globalThis.fetch = async (url, opts) => {
@@ -262,12 +409,14 @@ test('options.js: successful ping with run_submission+run_events_sse capabilitie
   assert.match(card.querySelector('.card-status').textContent, /runs:✓/);
   const providersSets = setCalls.filter((c) => c.providers);
   const last = providersSets[providersSets.length - 1];
-  assert.equal(last.providers.compatible.isHermes, true,
+  const allLlm = Object.values(last.providers).filter((p) => p.type === 'llm');
+  const llm = allLlm[allLlm.length - 1]; // the freshly added + pinged one
+  assert.equal(llm.isHermes, true,
     'isHermes must reflect run_submission && run_events_sse, not the generic responses_api field');
 });
 
 test('options.js: capabilities missing run_events_sse (only run_submission) does NOT set isHermes', async () => {
-  const card = findProviderCard('compatible');
+  const card = await addLlmCard();
   card.querySelector('[data-k="baseUrl"]').value = 'http://test-partial-caps';
   card.querySelector('[data-k="model"]').value = 'my-model';
   globalThis.fetch = async (url) => {
@@ -287,7 +436,7 @@ test('options.js: capabilities missing run_events_sse (only run_submission) does
 });
 
 test('options.js: a failed ping sets the unreachable badge and shows the error message', async () => {
-  const card = findProviderCard('hermes');
+  const card = findProviderCard('Hermes Agent');
   card.querySelector('[data-k="baseUrl"]').value = 'http://unreachable-host';
   globalThis.fetch = async () => { throw new Error('ECONNREFUSED'); };
 
@@ -298,47 +447,63 @@ test('options.js: a failed ping sets the unreachable badge and shows the error m
   assert.match(card.querySelector('.provider-badge').textContent, /unreachable/);
 });
 
-// --------------- auto-switch active provider on first successful ping ------
-// Hermes ships with a non-empty default baseUrl, so "has a baseUrl" is never
-// a strong enough signal that the user actually intends to use a provider.
-// "Reachable" (a real, successful ping) is the strong signal instead — the
-// first time a provider goes from not-reachable to reachable, it becomes
-// the active provider, so filling in and verifying e.g. OpenAI-compatible
-// doesn't silently leave the dropdown pointed at whatever was active before.
+test('options.js: deleting an LLM provider removes it (card count decreases by one)', async () => {
+  // Commit the reserved slot as the first provider, then Add a second one so
+  // there is a genuinely added (and deletable) card to remove.
+  const first = await addLlmCard();
+  assert.equal(first.querySelector('[data-act="delete"]') != null, true, 'a committed provider becomes deletable');
+  const before = providerCards().length;
+  const card = await addLlmCard();
+  assert.equal(providerCards().length, before + 1, 'add grew the list by one');
+  assert.equal(card.querySelector('[data-act="delete"]') != null, true);
+  card.querySelector('[data-act="delete"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(providerCards().length, before, 'delete shrank the list back by one');
+  assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes is never removed');
+});
 
-test('options.js: first successful ping on a not-yet-reachable provider auto-switches the active provider', async () => {
-  // By this point in the file: the earlier 'failed ping' test left hermes
-  // unreachable, and a later compatible ping made compatible the active
-  // provider. So hermes is a not-reachable, non-active provider -- pinging
-  // it successfully is the first transition to reachable, which must make
-  // it the active provider.
-  const card = findProviderCard('hermes');
-  card.querySelector('[data-k="baseUrl"]').value = 'http://test-hermes-auto';
+test('options.js: an agent provider (Hermes) has no delete button and cannot be removed', () => {
+  const hermesCard = findProviderCard('Hermes Agent');
+  assert.equal(hermesCard.querySelector('[data-act="delete"]'), null);
+});
+
+test('options.js: removing the active LLM provider falls back to Hermes as the active provider', async () => {
+  // Make an added LLM provider active via a successful first ping (the
+  // auto-switch path), then delete it: activeProvider must fall back to
+  // 'hermes' so there is always a valid active provider.
+  const card = await addLlmCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-llm-active-del';
+  card.querySelector('[data-k="model"]').value = 'my-model';
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.endsWith('/health')) return { ok: true };
+    if (u.includes('/v1/chat/completions')) return { ok: true, text: async () => '' };
     if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
     return { ok: true, json: async () => ({}) };
   };
-
-  setCalls.length = 0;
   card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
 
-  const activeProviderSets = setCalls.filter((c) => 'activeProvider' in c);
-  assert.equal(activeProviderSets.length, 1, 'a successful first-time ping must persist the new active provider exactly once');
-  assert.equal(activeProviderSets[0].activeProvider, 'hermes');
-  assert.ok(card.classList.contains('active'), 'the pinged card must visually become the active one');
-  assert.match(card.querySelector('.card-status').textContent, /set as active provider/);
+  card.querySelector('[data-act="delete"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const activeSets = setCalls.filter((c) => 'activeProvider' in c);
+  assert.equal(activeSets[activeSets.length - 1].activeProvider, 'hermes',
+    'deleting the active LLM provider must fall back to Hermes');
 });
 
-test('options.js: re-pinging an already-reachable provider does not steal active-provider status from a different provider', async () => {
-  // The auto-switch test above left hermes reachable AND active, and
-  // compatible already reachable (from the earlier ping tests). Re-pinging
-  // compatible (already reachable, not active) must NOT steal the active
-  // status away from hermes.
-  const card = findProviderCard('compatible');
-  card.querySelector('[data-k="baseUrl"]').value = 'http://test-compatible-reping';
+// --------------- auto-switch active provider on first successful ping ------
+// Hermes ships with an empty baseUrl by default, so "has a baseUrl" is never
+// a strong enough signal that the user actually intends to use a provider.
+// "Reachable" (a real, successful ping) is the strong signal instead -- the
+// first time a provider goes from not-reachable to reachable, it becomes
+// the active provider, so filling in and verifying an added LLM provider
+// doesn't silently leave the dropdown pointed at whatever was active before.
+
+test('options.js: first successful ping on a not-yet-reachable provider auto-switches the active provider', async () => {
+  // A freshly added LLM provider starts not-reachable and not-active.
+  // Pinging it successfully is the first transition to reachable, which
+  // must make it the active provider.
+  const card = await addLlmCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-llm-auto';
   card.querySelector('[data-k="model"]').value = 'my-model';
   globalThis.fetch = async (url) => {
     const u = String(url);
@@ -352,5 +517,37 @@ test('options.js: re-pinging an already-reachable provider does not steal active
   await new Promise((r) => setTimeout(r, 20));
 
   const activeProviderSets = setCalls.filter((c) => 'activeProvider' in c);
-  assert.equal(activeProviderSets.length, 0, 're-pinging an already-reachable provider must not change the active provider');
+  assert.equal(activeProviderSets.length, 1, 'a successful first-time ping must persist the new active provider exactly once');
+  assert.notEqual(activeProviderSets[0].activeProvider, 'hermes', 'the added LLM provider became active');
+  assert.ok(card.classList.contains('active'), 'the pinged card must visually become the active one');
+  assert.match(card.querySelector('.card-status').textContent, /set as active provider/);
+});
+
+test('options.js: re-pinging an already-reachable provider does not steal active-provider status from a different provider', async () => {
+  // A first successful ping on a fresh LLM provider makes it active (auto
+  // switch); a SECOND ping on the now-already-reachable provider must NOT
+  // change the active provider again.
+  const card = await addLlmCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://test-llm-reping';
+  card.querySelector('[data-k="model"]').value = 'my-model';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/v1/chat/completions')) return { ok: true, text: async () => '' };
+    if (u.endsWith('/v1/capabilities')) return { ok: false, status: 404 };
+    return { ok: true, json: async () => ({}) };
+  };
+
+  // First ping: fresh provider -> becomes reachable -> auto-switch active.
+  setCalls.length = 0;
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const first = setCalls.filter((c) => 'activeProvider' in c);
+  assert.equal(first.length, 1, 'first successful ping must switch the active provider once');
+
+  // Second ping: already reachable -> must NOT change the active provider.
+  setCalls.length = 0;
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const second = setCalls.filter((c) => 'activeProvider' in c);
+  assert.equal(second.length, 0, 're-pinging an already-reachable provider must not change the active provider');
 });

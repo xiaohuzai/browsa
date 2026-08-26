@@ -48,7 +48,7 @@ function mockFetchWithEvents(events) {
 }
 
 test('runsApiStream: reasoning block does not swallow a tool-turn final answer (regression)', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
 
   // Thinking text is deliberately longer than the final answer, which is
   // exactly the shape that triggered the bug: full.length (padded by the
@@ -80,7 +80,7 @@ test('runsApiStream: reasoning block does not swallow a tool-turn final answer (
 });
 
 test('runsApiStream: plain delta-only turn (no thinking, no tools) is unaffected', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
 
   mockFetchWithEvents([
     { event: 'message.delta', data: { delta: 'Hello' } },
@@ -101,7 +101,7 @@ test('runsApiStream: plain delta-only turn (no thinking, no tools) is unaffected
 });
 
 test('runsApiStream: partial deltas before tools, remainder streamed after (no duplication, no loss)', async () => {
-  const { runsApiStream } = await import('../lib/openai-client.js');
+  const { runsApiStream } = await import('../lib/llm-client.js');
 
   mockFetchWithEvents([
     { event: 'message.delta', data: { delta: 'Pre-tool text. ' } },

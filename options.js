@@ -1,7 +1,7 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
-import { ping, getCapabilities } from './lib/openai-client.js';
+import { ping, getCapabilities } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,6 +11,10 @@ const statusEl = $('status');
 // Stroke-style SVG (matches sidepanel.js's ICONS.close) used instead of the
 // "✕" emoji-range glyph so it renders identically across OS/font.
 const ICON_CLOSE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
+// Template for a freshly-added LLM provider card (user fills in url/key/
+// model/alias and picks the protocol, then hits Save).
+const BLANK_LLM = { type: 'llm', alias: '', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, apiStyle: 'chat', temperature: null, maxTokens: 0 };
 
 let cachedCfg = null;
 const _pingState = {}; // name → 'reachable' | 'unreachable', persists across re-renders
@@ -122,7 +126,7 @@ function renderProviders() {
 
   const groups = [
     { type: 'agent', label: '🤖 Agent Providers', desc: 'Full agent backend — tool execution, file access, multi-step tasks' },
-    { type: 'llm',   label: '💬 LLM Providers',   desc: 'Language model endpoint — conversation only' },
+    { type: 'llm',   label: '💬 LLM Providers',   desc: 'Language model endpoint — add as many as you like; each picks its own wire protocol' },
   ];
 
   for (const group of groups) {
@@ -131,7 +135,9 @@ function renderProviders() {
 
     const details = document.createElement('details');
     details.className = 'provider-group';
-    if (hasActive) details.open = true; // auto-expand the group with the active provider
+    // Auto-expand the group that holds the active provider, any group that
+    // has content, AND the LLM group itself — the LLM group is always open.
+    if (hasActive || entries.length > 0 || group.type === 'llm') details.open = true;
 
     const summary = document.createElement('summary');
     summary.className = 'provider-group-header';
@@ -144,16 +150,39 @@ function renderProviders() {
       details.appendChild(buildProviderCard(name, cfg));
     }
 
+    if (group.type === 'llm') {
+      // The reserved empty "LLM 1" slot only exists while there are NO LLM
+      // providers at all (fresh install / every card deleted). It is
+      // render-only — NOT persisted — so the sidebar dropdown never lists an
+      // unconfigured "LLM 1 — not set". The moment any provider is committed,
+      // the slot is consumed and never comes back on its own.
+      if (entries.length === 0) {
+        details.appendChild(buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true }));
+      }
+      // "＋ Add Provider" is always available and is the ONLY way to create
+      // new empty cards; they append BELOW the already-configured ones.
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'add-provider-btn';
+      addBtn.textContent = '＋ Add Provider';
+      addBtn.addEventListener('click', () => addProvider());
+      details.appendChild(addBtn);
+    }
+
     providersEl.appendChild(details);
   }
 }
 
-function buildProviderCard(name, cfg) {
+function buildProviderCard(name, cfg, opts = {}) {
+  const reserved = !!opts.reserved; // render-only empty slot (not yet persisted)
   const card = document.createElement('div');
-  card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '');
+  card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '') + (reserved ? ' reserved' : '');
+  card.dataset.name = name;
 
   const isConfigured = !!(cfg.baseUrl?.trim());
-  const showModel = (cfg.type || 'llm') === 'llm'; // Agent providers (Hermes) don't expose Model ID
+  const isAgent = (cfg.type || 'llm') === 'agent';
+  const showModel = !isAgent; // Agent providers (Hermes) don't expose Model ID
+  const displayName = prettyProviderName(name);
 
   // Restore ping state from memory
   const pinged = _pingState[name];
@@ -161,46 +190,52 @@ function buildProviderCard(name, cfg) {
   const badgeTxt  = pinged === 'reachable' ? '● reachable' : pinged === 'unreachable' ? '● unreachable' : (isConfigured ? '○ not pinged' : '○ not set');
 
   card.innerHTML = `
-    <h3 class="provider-h3" title="Click to set as active provider">
-      <span class="name">${escapeHtml(prettyProviderName(name))}</span>
+    <h3 class="provider-h3" title="${reserved ? 'Reserved empty slot — configure and Save to commit it' : 'Click to set as active provider'}">
+      <span class="name">${escapeHtml(displayName)}</span>
       <span class="provider-badge ${badgeCls}">${badgeTxt}</span>
+      ${!isAgent && !reserved ? `<button type="button" class="provider-delete" data-act="delete" title="Remove this provider">${ICON_CLOSE}</button>` : ''}
     </h3>
-    <div class="row">
-      <label>Base URL
-        <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" />
-      </label>
-    </div>
-    <div class="row">
-      <label>API key
-        <div class="apikey-wrap">
-          <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
-          <button type="button" class="apikey-toggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
-        </div>
-      </label>
-    </div>
-    ${showModel ? `
-    <div class="row">
-      <label>Model ID
-        <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o, qwen3.6-plus-anthropic" />
-      </label>
-    </div>` : ''}
-    <div class="row provider-params-row">
-      <label class="provider-param-label">Temperature
-        <input data-k="temperature" type="number" min="0" max="2" step="0.1"
-               value="${escapeAttr(cfg.temperature != null ? String(cfg.temperature) : '')}"
-               placeholder="default" style="width:72px" />
-      </label>
-      <label class="provider-param-label">Max tokens
-        <input data-k="maxTokens" type="number" min="0" step="256"
-               value="${escapeAttr(cfg.maxTokens ? String(cfg.maxTokens) : '')}"
-               placeholder="unlimited" style="width:96px" />
-      </label>
+    <div class="fields">
+    ${!isAgent ? `
+      <div class="field">
+        <label>Alias
+          <input data-k="alias" type="text" value="${escapeAttr(cfg.alias || '')}" placeholder="e.g. My OpenAI" />
+        </label>
+      </div>` : ''}
+      <div class="field">
+        <label>Base URL
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" />
+        </label>
+      </div>
+      <div class="field">
+        <label>API key
+          <div class="apikey-wrap">
+            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
+            <button type="button" class="apikey-toggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
+          </div>
+        </label>
+      </div>
+      ${showModel ? `
+      <div class="field">
+        <label>Model ID
+          <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" />
+        </label>
+      </div>` : ''}
+      ${!isAgent ? `
+      <div class="field field-full">
+        <label>API
+          <select data-k="apiStyle" class="api-style-select">
+            ${['chat', 'responses', 'anthropic'].map(s => `
+              <option value="${s}"${(cfg.apiStyle || 'chat') === s ? ' selected' : ''}>${apiStyleLabel(s)}</option>`).join('')}
+          </select>
+        </label>
+      </div>` : ''}
     </div>
     <div class="row action-row">
       <button data-act="save">Save</button>
       <button data-act="ping">Ping</button>
       <button data-act="reset">Reset</button>
-      <span class="card-status"></span>
+      <span class="card-status">${reserved ? 'Empty slot — configure and Save' : ''}</span>
     </div>
   `;
 
@@ -224,6 +259,8 @@ function buildProviderCard(name, cfg) {
   card.querySelector('button[data-act="save"]').addEventListener('click', () => saveCard(name, card));
   card.querySelector('button[data-act="ping"]').addEventListener('click', () => pingCard(name, card));
   card.querySelector('button[data-act="reset"]').addEventListener('click', () => resetCard(name, card));
+  const delBtn = card.querySelector('button[data-act="delete"]');
+  if (delBtn) delBtn.addEventListener('click', () => removeProvider(name));
 
   return card;
 }
@@ -236,15 +273,8 @@ function readCard(card) {
       out[k] = el.checked;
     } else if (el.type === 'number') {
       const v = el.value.trim();
-      if (k === 'temperature') {
-        if (v === '') { out[k] = null; }
-        else { const f = parseFloat(v); out[k] = isNaN(f) ? null : Math.min(2, Math.max(0, f)); }
-      } else if (k === 'maxTokens') {
-        if (v === '') { out[k] = 0; }
-        else { const n = parseInt(v, 10); out[k] = (!isNaN(n) && n > 0) ? n : 0; }
-      } else {
-        out[k] = v === '' ? null : (isNaN(parseFloat(v)) ? null : parseFloat(v));
-      }
+      if (v === '') { out[k] = null; }
+      else { const f = parseFloat(v); out[k] = isNaN(f) ? null : f; }
     } else {
       out[k] = el.value;
     }
@@ -263,7 +293,11 @@ function flashCard(card, cls, text) {
 
 async function saveCard(name, card) {
   const data = readCard(card);
-  cachedCfg.providers[name] = { ...cachedCfg.providers[name], ...data };
+  const wasReserved = !cachedCfg.providers[name];
+  // Merge the blank-LLM template as the base so a reserved (render-only,
+  // not-yet-persisted) card keeps type/stream/isHermes/temperature/...
+  // defaults on first Save; real providers just override their own values.
+  cachedCfg.providers[name] = { ...BLANK_LLM, ...(cachedCfg.providers[name] || {}), ...data };
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
   chrome.storage.local.get('pingStates', ({ pingStates }) => {
@@ -271,6 +305,12 @@ async function saveCard(name, card) {
     delete updated[name];
     chrome.storage.local.set({ pingStates: updated });
   });
+  if (wasReserved) {
+    // The reserved empty slot just became a real provider: re-render so it
+    // loses the dashed "reserved" styling and gains its delete button.
+    renderProviders();
+    card = document.querySelector(`.provider[data-name="${name}"]`) || card;
+  }
   flashCard(card, 'ok', '✓ Saved');
 }
 
@@ -284,6 +324,9 @@ async function pingCard(name, card) {
   const wasReachable = _pingState[name] === 'reachable';
 
   await saveCard(name, card);
+  // saveCard() re-renders when a reserved slot is committed — re-query so
+  // the DOM ref below stays attached to a live card.
+  card = document.querySelector(`.provider[data-name="${name}"]`) || card;
   const cfg = cachedCfg.providers[name];
 
   // Only LLM providers require a model ID
@@ -294,7 +337,7 @@ async function pingCard(name, card) {
 
   flashCard(card, '', 'Pinging…');
   try {
-    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -354,9 +397,61 @@ function setBadge(card, state, name) {
 }
 
 async function resetCard(name, card) {
+  const cfg = cachedCfg.providers[name];
+  if (!cfg) return;
   const fresh = await storage.getAll();
-  cachedCfg.providers[name] = fresh.providers[name];
+  const isAgent = (cfg.type || 'llm') === 'agent';
+  // Hermes resets to its shipped blank default; every LLM card resets to a
+  // blank template — a user-added card's "stored default" is just its own
+  // current value, so restoring that would be a no-op.
+  cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
   await chrome.storage.local.set({ providers: cachedCfg.providers });
+  renderProviders();
+}
+
+// Add a brand-new (empty) LLM provider with a unique internal key. The user
+// fills in url/key/model/alias and picks the protocol, then hits Save. The
+// internal key is opaque (never shown); the Alias is what identifies the
+// provider in the sidebar dropdown.
+async function addProvider() {
+  // Readable internal key: llm-1, llm-2, ... (skip any taken). On a fresh
+  // install the reserved slot is llm-1, so the first Add materializes it as a
+  // real card; later Adds append llm-2, llm-3, ... below existing providers.
+  let n = 1;
+  while (cachedCfg.providers[`llm-${n}`]) n++;
+  const name = `llm-${n}`;
+  cachedCfg.providers[name] = { ...BLANK_LLM };
+  await chrome.storage.local.set({ providers: cachedCfg.providers });
+  renderProviders();
+  // Auto-expand + focus the alias field of the newly added card so the user
+  // can immediately type a name.
+  const cards = document.querySelectorAll('.provider');
+  const last = cards[cards.length - 1];
+  if (last) {
+    if (last.scrollIntoView) last.scrollIntoView({ block: 'center' });
+    const alias = last.querySelector('[data-k="alias"]');
+    if (alias) { alias.focus(); alias.select(); }
+  }
+}
+
+// Remove an LLM provider. Agent providers (Hermes) are never removable. If
+// the removed one was the active provider, fall back to hermes so there is
+// always a valid active provider.
+async function removeProvider(name) {
+  const cfg = cachedCfg.providers[name];
+  if (!cfg || (cfg.type || 'llm') === 'agent') return;
+  delete cachedCfg.providers[name];
+  delete _pingState[name];
+  await chrome.storage.local.set({ providers: cachedCfg.providers });
+  chrome.storage.local.get('pingStates', ({ pingStates }) => {
+    const updated = { ...(pingStates || {}) };
+    delete updated[name];
+    chrome.storage.local.set({ pingStates: updated });
+  });
+  if (cachedCfg.activeProvider === name) {
+    cachedCfg.activeProvider = 'hermes';
+    await chrome.storage.local.set({ activeProvider: 'hermes' });
+  }
   renderProviders();
 }
 
@@ -411,8 +506,23 @@ function applyLlmsTxt() {
 }
 
 function prettyProviderName(name) {
-  const map = { hermes: 'Hermes', compatible: 'OpenAI-compatible' };
-  return map[name] || name.charAt(0).toUpperCase() + name.slice(1);
+  // Prefer the user-set alias so multiple configured providers stay
+  // distinguishable; fall back to a readable form of the internal key.
+  const alias = cachedCfg?.providers?.[name]?.alias;
+  if (alias && alias.trim()) return alias.trim();
+  if (name === 'hermes') return 'Hermes Agent';
+  const m = /^llm-(\d+)$/.exec(name);
+  if (m) return `LLM ${m[1]}`;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function apiStyleLabel(style) {
+  const map = {
+    chat: 'Chat Completions (/v1/chat/completions)',
+    responses: 'Responses API (/v1/responses)',
+    anthropic: 'Anthropic Messages (/v1/messages)',
+  };
+  return map[style] || style;
 }
 
 function flash(cls, text) {

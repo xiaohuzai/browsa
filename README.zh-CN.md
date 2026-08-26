@@ -78,19 +78,21 @@ hermes gateway
 **5. 点击 Ping 验证**。会自动检测并启用 `/v1/runs` 支持。
 
 ---
-### 💬 OpenAI 兼容 LLM
+### 💬 LLM Providers
 
-任何支持 `/v1/chat/completions` 的端点——OpenAI、Anthropic、Ollama、Groq、LiteLLM 等。
+任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点——OpenAI、Anthropic、Ollama、Groq、LiteLLM 等。
 
-**配置 browsa**——打开 ⚙ 设置，配置 **OpenAI 兼容** provider：
+**配置 browsa**——打开 ⚙ 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**，或随时用 **＋ Add Provider** 添加更多，然后配置：
 
 | 字段 | 值 |
 |---|---|
+| Alias | 你起的名字（例如「My OpenAI」「本地模型」）——显示在侧边栏下拉框中，方便区分多个 provider |
 | Base URL | 例如 `https://api.openai.com` |
 | API Key | 你的 API key |
 | Model ID | **必填**——例如 `gpt-4o`、`claude-sonnet-4-6` |
+| API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
-**点击 Ping** 验证连通性并确认服务端接受该模型 ID。
+想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。用卡片上的 **✕** 删除（内置 Hermes 智能体卡片固定不可删）。用 **Ping** 验证连通性并自动检测能力；第一个验证通过的 provider 会自动设为当前激活。
 
 ---
 
