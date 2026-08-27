@@ -81,6 +81,28 @@ test('ping(): no model, /v1/models returns non-ok — throws ProviderAPIError wi
   );
 });
 
+test('ping(): /health ok + /v1/models 404 — trust /health (Hermes/OpenViking: no model listing, traffic on /v1/runs)', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  mockFetchSequence([
+    () => ({ ok: true }),                                   // /health
+    () => ({ ok: false, status: 404, text: async () => 'Not Found' }), // /v1/models
+  ]);
+  const result = await ping({ baseUrl: 'http://test', apiKey: 'sk-123' });
+  assert.equal(result, 'ok');
+});
+
+test('ping(): /v1/models 404 WITHOUT a passing /health — still throws (no corroboration)', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  mockFetchSequence([
+    () => { throw new Error('no health endpoint'); },
+    () => ({ ok: false, status: 404, text: async () => 'Not Found' }),
+  ]);
+  await assert.rejects(
+    () => ping({ baseUrl: 'http://test', apiKey: 'sk-123' }),
+    (e) => { assert.match(e.message, /404/); return true; }
+  );
+});
+
 test('ping(): model configured — sends a real max_tokens:1 request, not /v1/models', async () => {
   const { ping } = await import('../lib/llm-client.js');
   let sawModelsCall = false;

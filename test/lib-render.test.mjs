@@ -141,9 +141,18 @@ test('renderSafe renders $...$ LaTeX via KaTeX', async () => {
 test('renderSafe extracts <think> blocks into a collapsible <details class="think-block">', async () => {
   const html = await renderSafe('<think>reasoning here</think>final answer');
   assert.match(html, /<details class="think-block"[^>]*>/);
-  assert.match(html, /<summary>Thinking…<\/summary>/);
+  // Done-state label (the live "Thinking…" element only exists mid-stream —
+  // a permanent progress label on finished messages reads as still-in-flight).
+  assert.match(html, /<summary>Thought process<\/summary>/);
   assert.match(html, /reasoning here/);
   assert.match(html, /final answer/);
+});
+
+test('renderSafe drops whitespace-only think blocks instead of rendering an empty collapsible', async () => {
+  const html = await renderSafe('你好！<think>\n</think>');
+  assert.doesNotMatch(html, /think-block/, 'an empty think must not leave an empty "thinking" shell');
+  assert.doesNotMatch(html, /<details/);
+  assert.match(html, /你好！/);
 });
 
 test('renderSafe respects setThoughtAutoCollapse(true) by omitting the open attribute', async () => {

@@ -119,5 +119,6 @@
   "transcriptSearchPlaceholder": { "message": "Search transcript…", "description": "Transcript drawer search input" },
   "transcriptNote": { "message": "Insert note at playback position", "description": "Transcript drawer note-capture button tooltip" },
   "followPlayback": { "message": "Jump to playback", "description": "Transcript drawer floating pill after manual scroll" },
-  "transcriptEmpty": { "message": "No transcript in this conversation.", "description": "Transcript drawer empty state" }
+  "transcriptEmpty": { "message": "No transcript in this conversation.", "description": "Transcript drawer empty state" },
+  "thinkDoneTitle": { "message": "Thought process", "description": "Collapsible think-block summary on a finished message" }
 }
