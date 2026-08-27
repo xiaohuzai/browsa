@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — Side-panel AI for your browser">
-<meta property="og:description" content="Bring the current page into the conversation — articles, videos, PDFs. Your own models or agent: open source, no subscription, no account.">
+<meta property="og:description" content="Bring the current page into the conversation — articles, videos, PDFs. Your own models or agent: open source, no subscription, no markup.">
 <meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
 <meta property="og:url" content="https://xiaohuzai.github.io/browsa/">
 <meta property="og:type" content="website">
@@ -59,7 +59,7 @@
       </div>
       <div class="hero-meta">
         <span class="chip"><b>MIT</b> open source</span>
-        <span class="chip">No subscription · no account</span>
+        <span class="chip">No subscription · no markup</span>
         <span class="chip"><b>10+</b> sites with deep extraction</span>
       </div>
 
@@ -389,23 +389,22 @@
   </section>
 
   <!-- Install -->
-  <!-- Reversed plate: Your Keys -->
-  <section id="keys" class="keys">
+  <!-- Your Keys -->
+  <section id="keys">
     <div class="container">
-      <div class="keys-slab reveal">
-        <div class="keys-copy">
-          <p class="eyebrow">your keys, your agent</p>
-          <h2>Your keys. Your models. <em>Your agent.</em></h2>
-          <p>browsa sells no subscription, asks for no account, takes no markup. It simply moves your own model endpoints into the side panel — cloud, local, or self-hosted.</p>
-          <ul class="keys-list">
-            <li><span class="tick">✓</span><span><b>No account, no telemetry.</b> Install and go — nothing ever flows through us.</span></li>
-            <li><span class="tick">✓</span><span><b>API keys stay local</b>, sent only to the endpoints you configure.</span></li>
-            <li><span class="tick">✓</span><span><b>Ollama / LM Studio local models</b> — fully offline works too.</span></li>
-            <li><span class="tick">✓</span><span><b>Real agents</b>: tool execution, live progress, approval before risky actions.</span></li>
-          </ul>
-          <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — risky actions require approval first</p>
-        </div>
-        <div class="prov-board" role="img" aria-label="Provider settings illustration: OpenAI, Claude, Ollama and a Hermes agent">
+      <div class="section-head">
+        <p class="eyebrow">your keys, your agent</p>
+        <h2>Your keys. Your models. <em>Your agent.</em></h2>
+        <p>browsa sells no subscription, asks for no account, takes no markup. It simply moves your own model endpoints into the side panel — cloud, local, or self-hosted.</p>
+      </div>
+      <div class="keys-grid">
+        <ul class="keys-list reveal">
+          <li><span class="tick">›</span><span><b>No account, no telemetry.</b> Install and go — nothing ever flows through us.</span></li>
+          <li><span class="tick">›</span><span><b>API keys stay local</b>, sent only to the endpoints you configure.</span></li>
+          <li><span class="tick">›</span><span><b>Ollama / LM Studio local models</b> — fully offline works too.</span></li>
+          <li><span class="tick">›</span><span><b>Real agents</b>: tool execution, live progress, approval before risky actions.</span></li>
+        </ul>
+        <div class="prov-board reveal" role="img" aria-label="Provider settings illustration: OpenAI, Claude, Ollama and a Hermes agent">
           <div class="prov-card">
             <span class="prov-ava pa-openai">O</span>
             <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
@@ -428,6 +427,7 @@
           </div>
         </div>
       </div>
+      <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — risky actions require approval first</p>
     </div>
   </section>
 

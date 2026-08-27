@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="icon48.png">
 <link rel="stylesheet" href="site.css">
 <meta property="og:title" content="browsa — 浏览器侧边栏 AI">
-<meta property="og:description" content="把当前页面带进对话：文章、视频、PDF 都能读。接你自己的模型或智能体——开源、无订阅、无账号。">
+<meta property="og:description" content="把当前页面带进对话：文章、视频、PDF 都能读。接你自己的模型或智能体——开源、无订阅、无中间商。">
 <meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
 <meta property="og:url" content="https://xiaohuzai.github.io/browsa/">
 <meta property="og:type" content="website">
@@ -58,7 +58,7 @@
       </div>
       <div class="hero-meta">
         <span class="chip"><b>MIT</b> 开源</span>
-        <span class="chip">无订阅 · 无账号</span>
+        <span class="chip">无订阅 · 无中间商</span>
         <span class="chip"><b>10+</b> 站点深度提取</span>
       </div>
 
@@ -385,23 +385,22 @@
     </div>
   </section>
 
-  <!-- 反转页：Your Keys —— BYOK 是产品最大的差异点，给它一整块墨色 -->
-  <section id="keys" class="keys">
+  <!-- Your Keys —— BYOK 定位（与其它小节同一套视觉原则） -->
+  <section id="keys">
     <div class="container">
-      <div class="keys-slab reveal">
-        <div class="keys-copy">
-          <p class="eyebrow">your keys, your agent</p>
-          <h2>你的钥匙，你的模型，<em>你的智能体</em>。</h2>
-          <p>browsa 不卖订阅、不设账号、不加价。它只是把你自己的模型接口搬进侧边栏——云端的、本地的、自建的，都行。</p>
-          <ul class="keys-list">
-            <li><span class="tick">✓</span><span><b>无账号、无遥测。</b>安装即用，没有任何数据流经我们。</span></li>
-            <li><span class="tick">✓</span><span><b>API Key 只存本地</b>，只发往你自己配置的端点。</span></li>
-            <li><span class="tick">✓</span><span><b>Ollama / LM Studio 本地模型</b>——完全离线也能用。</span></li>
-            <li><span class="tick">✓</span><span><b>接真智能体</b>：工具执行、过程直播、危险操作先审批。</span></li>
-          </ul>
-          <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — 危险操作会先弹审批卡片再执行</p>
-        </div>
-        <div class="prov-board" role="img" aria-label="Provider 设置示意：OpenAI、Claude、Ollama 与 Hermes 智能体">
+      <div class="section-head">
+        <p class="eyebrow">your keys, your agent</p>
+        <h2>你的钥匙，你的模型，<em>你的智能体</em>。</h2>
+        <p>browsa 不卖订阅、不设账号、不加价。它只是把你自己的模型接口搬进侧边栏——云端的、本地的、自建的，都行。</p>
+      </div>
+      <div class="keys-grid">
+        <ul class="keys-list reveal">
+          <li><span class="tick">›</span><span><b>无账号、无遥测。</b>安装即用，没有任何数据流经我们。</span></li>
+          <li><span class="tick">›</span><span><b>API Key 只存本地</b>，只发往你自己配置的端点。</span></li>
+          <li><span class="tick">›</span><span><b>Ollama / LM Studio 本地模型</b>——完全离线也能用。</span></li>
+          <li><span class="tick">›</span><span><b>接真智能体</b>：工具执行、过程直播、危险操作先审批。</span></li>
+        </ul>
+        <div class="prov-board reveal" role="img" aria-label="Provider 设置示意：OpenAI、Claude、Ollama 与 Hermes 智能体">
           <div class="prov-card">
             <span class="prov-ava pa-openai">O</span>
             <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
@@ -419,11 +418,12 @@
           </div>
           <div class="prov-card active">
             <span class="prov-ava pa-hermes">H</span>
-            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · 工具执行 · 审批流</span></span>
+            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · 工具执行 · 危险操作先审批</span></span>
             <span class="prov-badge pb-ok">reachable</span>
           </div>
         </div>
       </div>
+      <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — 危险操作会先弹审批卡片再执行</p>
     </div>
   </section>
 

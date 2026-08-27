@@ -1,0 +1,50 @@
+name: Pages Deploy
+
+# 官网正式发布：main 的 docs/ 有改动时，构建并部署到 GitHub Pages。
+#
+# 前提：仓库 Settings → Pages → Build and deployment → Source 必须是
+# 「GitHub Actions」（已切换）。legacy 的 main 分支自动构建在此模式下停用，
+# 本 workflow 是唯一的生产发布通道。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages            # 与 GitHub 的生产部署组同名，旧的构建自动让位
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy docs to Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages (enable workflow build source if needed)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload docs
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

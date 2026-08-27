@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────────
    browsa 官网 · 「活校样」设计
    概念：整页是一份被校对君批阅过的印刷底稿 —— 冷纸白地面、四角裁切标记、
-   §编号小节、页边的金色手写批注；中段嵌一块墨色「反转页」承载 BYOK 定位。
+   §编号小节，全部小节共享同一套纸面视觉原则。
    设计语言仍取自产品 lib/theme.css：冷纸白 / 校对红 / 高亮金黄 / mono 字标。
    中文 index.html 与英文 en/index.html 共享；语言差异走 html[lang]。
    ───────────────────────────────────────────────────────────────────────── */
@@ -458,6 +458,7 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
   line-height:1.2;margin-top:12px;
 }
 .section-head p{margin-top:14px;color:var(--ink-2);font-size:16px;line-height:1.8}
+.section-head h2 em{font-style:normal;color:var(--mark)}
 
 /* ─── 怎么用 · 三步 ─────────────────────────────────────────────────────── */
 .how-list{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
@@ -506,79 +507,59 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
   content:"›";position:absolute;left:4px;color:var(--mark);font-weight:700;
 }
 
-/* ─── 反转页：Your Keys（BYOK 定位主角） ───────────────────────────────── */
-.keys{padding:20px 0}
-.keys-slab{
-  position:relative;overflow:hidden;
-  background:
-    radial-gradient(ellipse 720px 340px at 82% 115%,rgba(224,84,44,.10),transparent 60%),
-    radial-gradient(ellipse 480px 260px at 12% -20%,rgba(212,167,44,.07),transparent 60%),
-    var(--night);
-  color:var(--night-fg);
-  border-radius:24px;padding:72px 64px;
-  display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center;
+/* ─── Your Keys（BYOK 定位） —— 与其它小节同一套视觉语法 ──────────────────
+   曾经做成墨色「反转页」想制造节奏，但并列小节应当遵循同一原则：单独一节
+   反色不会被读成强调，只会被读成突兀。收回，回到纸面。 */
+.keys-grid{
+  display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+  gap:48px;align-items:center;
 }
-/* 反转页也是正文的一章 —— § 序号必须连续显示（此前 keys 只计数不显示，
-   install 的序号从 §03 直接跳到 §05，被用户抓了个正着） */
-.keys-copy .eyebrow{color:var(--gold-lit);display:block;margin-bottom:14px}
-.keys-copy .eyebrow::before{
-  content:"§" counter(sec,decimal-leading-zero);
-  color:var(--gold-lit);letter-spacing:.06em;margin-right:10px;
-}
-.keys-copy h2{
-  font-size:clamp(26px,3.4vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.25;
-}
-.keys-copy h2 em{font-style:normal;color:var(--mark-lit)}
-.keys-copy>p{margin-top:16px;color:var(--night-dim);font-size:15.5px;line-height:1.85;max-width:44ch}
-.keys-list{list-style:none;margin-top:26px;display:flex;flex-direction:column;gap:12px}
+.keys-list{list-style:none;margin:0;display:flex;flex-direction:column;gap:14px}
 .keys-list li{
   display:flex;gap:11px;align-items:flex-start;
-  font-size:14.5px;color:#c7cbd1;line-height:1.7;
+  font-size:14.5px;color:var(--ink-2);line-height:1.75;
 }
-.keys-list li b{color:var(--night-fg);font-weight:600}
-.keys-list .tick{
-  font-family:var(--mono);color:var(--mark-lit);font-weight:700;flex-shrink:0;
-  transform:translateY(-1px);
-}
+.keys-list li b{color:var(--ink);font-weight:600}
+.keys-list .tick{font-family:var(--mono);color:var(--mark);font-weight:700;flex-shrink:0}
 .keys-footnote{
-  margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--night-dim);
+  margin-top:26px;font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
   letter-spacing:.02em;
 }
-.keys-footnote .dot-ok{display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:7px;vertical-align:1px}
+.keys-footnote .dot-ok{display:inline-block;width:6px;height:6px;border-radius:50%;background:#16a34a;margin-right:7px;vertical-align:1px}
 
-/* Provider 卡片组：产品设置页的缩微重绘 */
 .prov-board{
-  background:var(--night-2);border:1px solid var(--night-line);border-radius:16px;
-  padding:18px;box-shadow:0 32px 80px rgba(0,0,0,.45);
+  background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow);
   display:flex;flex-direction:column;gap:10px;position:relative;
 }
 .prov-board::before{
   content:"settings — providers";
   font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--night-dim);display:block;margin-bottom:4px;
+  color:var(--ink-dim);display:block;margin-bottom:4px;
 }
 .prov-card{
-  background:var(--night);border:1px solid var(--night-3);border-radius:10px;
+  background:var(--paper-2);border:1px solid var(--line-2);border-radius:10px;
   padding:12px 14px;display:flex;align-items:center;gap:12px;
+  transition:border-color .15s ease, background .15s ease;
 }
-.prov-card.active{border-color:rgba(224,84,44,.4);background:color-mix(in srgb,var(--mark-lit) 5%,var(--night))}
+.prov-card:hover{border-color:var(--line)}
+.prov-card.active{border-color:rgba(194,65,12,.4);background:color-mix(in srgb,var(--mark) 4%,var(--paper-2))}
 .prov-ava{
   width:26px;height:26px;border-radius:8px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;
 }
-.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--mark-lit)}
+.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--mark)}
 .prov-info{flex:1;min-width:0}
-.prov-name{display:block;font-size:13px;font-weight:600;color:var(--night-fg);line-height:1.3}
-.prov-model{display:block;font-family:var(--mono);font-size:10.5px;color:var(--night-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prov-name{display:block;font-size:13px;font-weight:600;color:var(--ink);line-height:1.3}
+.prov-model{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prov-badge{
   flex-shrink:0;font-family:var(--mono);font-size:10px;font-weight:600;
   padding:3px 9px;border-radius:999px;letter-spacing:.03em;
 }
 .pb-ok{color:#166534;background:rgba(74,222,128,.14)}
-html[lang] .pb-ok{color:#4ade80}
-.pb-off{color:#f0685a;background:rgba(240,104,90,.12)}
-.pb-idle{color:var(--gold-lit);background:rgba(212,167,44,.12)}
+.pb-off{color:#991b1b;background:rgba(240,104,90,.12)}
+.pb-idle{color:var(--gold-ink);background:rgba(146,108,13,.12)}
 
 /* ─── 站点 ──────────────────────────────────────────────────────────────── */
 .site-strip{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
@@ -641,7 +622,7 @@ footer .container{display:flex;justify-content:space-between;align-items:center;
   .feature-grid{grid-template-columns:1fr}
   .bili-side,.yt-side{display:none}
   .pg-video,.pg-article,.pg-pdf{min-height:440px}
-  .keys-slab{grid-template-columns:1fr;gap:36px;padding:48px 32px}
+  .keys-grid{grid-template-columns:1fr}
 }
 @media (max-width:720px){
   section{padding:64px 0}
@@ -655,7 +636,6 @@ footer .container{display:flex;justify-content:space-between;align-items:center;
   .container{padding:0 20px}
   .win-bar{gap:10px}
   .scn-tabs{margin-top:32px}
-  .keys-slab{padding:40px 22px;border-radius:18px}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
