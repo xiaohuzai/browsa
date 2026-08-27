@@ -25,3 +25,8 @@ python3 -m http.server 8931     # 仓库根目录起服务
 ```
 
 预览环境的 shim 只覆盖了 UI 初始化所需的 API；发消息、附件等交互需要按需扩展 shim。
+
+## 官网预览
+
+官网也是零依赖静态页：双击 `docs/index.html` 直接看；或 `python3 -m http.server 8080 --directory docs`。
+发布由 `.github/workflows/pages-deploy.yml` 在 main 的 docs/ 变更时自动部署（Pages 源已切到 GitHub Actions 模式）。GitHub Pages 无公开的 PR 预览能力（deploy-pages preview 是 alpha），PR 阶段请用本地预览。
