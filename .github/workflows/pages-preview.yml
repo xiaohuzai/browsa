@@ -31,6 +31,11 @@ jobs:
     name: Deploy docs preview
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # deploy-pages 硬性要求 deployment job 声明 environment（preview 部署
+    # 同样走 github-pages environment，缺了会 400 "Missing environment"）
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
