@@ -48,8 +48,6 @@
   --gold-dim:     rgba(212,167,44,0.12);
   --gold-hover:   rgba(212,167,44,0.20);
 
-  --user-bg:      #241811;
-  --user-border:  rgba(224,84,44,0.30);
   --error:        #f0685a;
   --warn:         #e0b23a;
   --success:      #4ade80;
@@ -107,8 +105,6 @@
     --gold-dim:     rgba(146,108,13,0.10);
     --gold-hover:   rgba(146,108,13,0.16);
 
-    --user-bg:      #fdf1ea;
-    --user-border:  rgba(194,65,12,0.22);
     --error:        #c0392b;
     --warn:         #926c0d; /* same contrast fix as --gold above — was #a3790f */
 
