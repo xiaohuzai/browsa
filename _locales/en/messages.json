@@ -50,5 +50,45 @@
   "noChunks": {
     "message": "(no chunks received — check Service Worker DevTools)",
     "description": "Hint when no streaming chunks arrive"
-  }
+  },
+
+  "quickSummarize": { "message": "Summarize", "description": "Quick action: summarize the attached page" },
+  "quickKeypoints": { "message": "Key Points", "description": "Quick action: extract key points" },
+  "quickExplain": { "message": "Explain", "description": "Quick action: explain simply" },
+  "quickTranslate": { "message": "Translate", "description": "Quick action: translate to reply language" },
+  "quickOutline": { "message": "Outline", "description": "Quick action: nested heading outline" },
+  "quickbarToggle": { "message": "Show/hide quick actions", "description": "Quickbar collapse toggle tooltip" },
+
+  "sessionsTitle": { "message": "Session History", "description": "Sessions drawer title" },
+  "sessionsNew": { "message": "＋ New session", "description": "New session button" },
+  "sessionsSearchPlaceholder": { "message": "Search sessions…", "description": "Sessions search input placeholder" },
+  "sessionsEmpty": { "message": "No saved sessions yet.", "description": "Empty sessions list" },
+  "sessionsEmptyHint": { "message": "Start a new session to archive this conversation.", "description": "Empty sessions list hint" },
+  "sessionsNoMatch": { "message": "No sessions match your search.", "description": "Sessions search miss" },
+  "sessionsClearAll": { "message": "Clear all sessions", "description": "Clear-all button title" },
+  "sessionsClose": { "message": "Close", "description": "Close drawer" },
+
+  "searchPlaceholder": { "message": "Search messages…", "description": "Message search input placeholder" },
+  "searchPrev": { "message": "Previous (Shift+Enter)", "description": "Search previous match" },
+  "searchNext": { "message": "Next (Enter)", "description": "Search next match" },
+  "searchClose": { "message": "Close (Esc)", "description": "Close search" },
+  "searchBtnTitle": { "message": "Search messages (Ctrl+F)", "description": "Search button tooltip" },
+  "multiselectTitle": { "message": "Select messages", "description": "Multiselect toggle tooltip" },
+  "newChatTitle": { "message": "New conversation (Ctrl+K)", "description": "Clear/new chat button tooltip" },
+  "attachTitle": { "message": "Attach current page to conversation", "description": "Attach button tooltip" },
+  "providerLabel": { "message": "AI provider", "description": "Provider select aria-label" },
+  "cancelStream": { "message": "Stop generating", "description": "Send button while streaming" },
+  "contextAuto": { "message": "Auto", "description": "Auto context mode" },
+  "contextAria": { "message": "Context mode", "description": "Context mode group aria-label" },
+  "mediaDownload": { "message": "Download audio/video", "description": "Media download button label/tooltip" },
+  "toolbarHide": { "message": "Hide on this page", "description": "Selection toolbar close button" },
+  "toolbarHideConfirm": { "message": "Hide toolbar on this page?", "description": "Selection toolbar hide confirmation question" },
+  "toolbarHideHint": { "message": "It won't show again until you reload.", "description": "Selection toolbar hide confirmation hint" },
+  "toolbarCancel": { "message": "Cancel", "description": "Confirm dialog cancel" },
+  "toolbarConfirmHide": { "message": "Hide", "description": "Confirm dialog hide action" },
+  "toolbarAsk": { "message": "Ask", "description": "Selection toolbar: ask about the selection" },
+  "toolbarExplain": { "message": "Explain", "description": "Selection toolbar: explain the selection" },
+  "toolbarTranslate": { "message": "Translate", "description": "Selection toolbar: translate the selection" },
+  "toolbarSummarize": { "message": "Summarize", "description": "Selection toolbar: summarize the selection" },
+  "toolbarAria": { "message": "browsa quick actions", "description": "Selection toolbar aria-label" }
 }

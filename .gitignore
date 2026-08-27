@@ -44,3 +44,6 @@ browsa.bundle
 dev-preview/shots/
 # dev-preview 生成页（node dev-preview/gen.mjs 再生）
 dev-preview/*.preview.html
+
+# CWS 商店截图（上传 Chrome Web Store 用，本地生成不入库）
+store-assets/

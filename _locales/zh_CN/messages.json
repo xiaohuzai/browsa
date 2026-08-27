@@ -12,15 +12,15 @@
     "description": "Action button tooltip"
   },
   "settingsTooltip": {
-    "message": "设置 (provider / API key)",
+    "message": "设置（Provider / API Key）",
     "description": "Settings button tooltip"
   },
   "contextLabel": {
-    "message": "上下文:",
+    "message": "上下文：",
     "description": "Context mode label"
   },
   "contextReader": {
-    "message": "读者模式",
+    "message": "正文",
     "description": "Mozilla Readability mode"
   },
   "contextFull": {
@@ -28,7 +28,7 @@
     "description": "Full body innerText mode"
   },
   "contextSelected": {
-    "message": "选区",
+    "message": "选中文本",
     "description": "Selected text mode"
   },
   "contextScreenshot": {
@@ -40,7 +40,7 @@
     "description": "Auto-attach checkbox"
   },
   "inputPlaceholder": {
-    "message": "向你的代理提个问题… (Enter 发送，Shift+Enter 换行)",
+    "message": "问点什么… 点 📎 附加当前页面",
     "description": "Composer placeholder"
   },
   "sendButton": {
@@ -48,7 +48,155 @@
     "description": "Send button"
   },
   "noChunks": {
-    "message": "(未收到流式响应 — 请检查 Service Worker DevTools)",
+    "message": "（未收到任何流式数据——请检查 Service Worker DevTools）",
     "description": "Hint when no streaming chunks arrive"
+  },
+  "quickSummarize": {
+    "message": "总结",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "要点",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "解释",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "翻译",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "大纲",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "显示/隐藏快捷操作",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "会话历史",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ 新会话",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "搜索会话…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "还没有保存的会话。",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "新建会话即可归档当前对话。",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "没有匹配的会话。",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "清空全部会话",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "关闭",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "搜索消息…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "上一条 (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "下一条 (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "关闭 (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "搜索消息 (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "多选消息",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "新建对话 (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "把当前页面附加进对话",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "AI Provider",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "停止生成",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "自动",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "上下文模式",
+    "description": "Context mode group aria-label"
+  },
+  "mediaDownload": {
+    "message": "下载音频/视频",
+    "description": "Media download button label/tooltip"
+  },
+  "toolbarHide": {
+    "message": "本页隐藏",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "在本页隐藏工具栏？",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "刷新页面前不再显示。",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "取消",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "隐藏",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "提问",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "解释",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "翻译",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "总结",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "browsa 快捷操作",
+    "description": "Selection toolbar aria-label"
   }
 }

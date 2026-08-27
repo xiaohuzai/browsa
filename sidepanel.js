@@ -87,7 +87,31 @@ const slashSuggestEl = $('slash-suggest');
 
 init();
 
+// ─── i18n: fill static UI from _locales at init ─────────────────────────────
+// Static markup carries data-i18n* attributes; chrome.i18n resolves them against
+// the browser UI language. No-op when chrome.i18n is absent (dev preview harness).
+function applyI18n() {
+  if (typeof chrome === 'undefined' || !chrome.i18n) return;
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    const v = chrome.i18n.getMessage(el.dataset.i18n);
+    if (v) el.textContent = v;
+  }
+  for (const el of document.querySelectorAll('[data-i18n-title]')) {
+    const v = chrome.i18n.getMessage(el.dataset.i18nTitle);
+    if (v) el.title = v;
+  }
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) {
+    const v = chrome.i18n.getMessage(el.dataset.i18nAria);
+    if (v) el.setAttribute('aria-label', v);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) {
+    const v = chrome.i18n.getMessage(el.dataset.i18nPlaceholder);
+    if (v) el.placeholder = v;
+  }
+}
+
 async function init() {
+  applyI18n();
   // Get current tab id (used for per-tab history)
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   currentTabId = tab?.id;
@@ -1335,7 +1359,7 @@ function setStreamingUI(on) {
     sendBtn.innerHTML = STOP_ICON;
     sendBtn.classList.add('is-stopping');
     sendBtn.disabled = false;
-    sendBtn.title = 'Stop (Esc)';
+    sendBtn.title = (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage('cancelStream')) || 'Stop (Esc)';
     setStatusDotState('streaming');
   } else {
     sendBtn.innerHTML = SEND_ICON;

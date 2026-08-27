@@ -459,27 +459,6 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
 }
 .section-head p{margin-top:14px;color:var(--ink-2);font-size:16px;line-height:1.8}
 
-/* ─── 页边批注（≥1320px 出现，HTML 零改动，按节定位） ───────────────────── */
-@media (min-width:1320px){
-  #how::after,
-  #sites::after,
-  #install::after{
-    position:absolute;left:calc(50% + 548px);top:96px;width:170px;
-    font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--gold-ink);
-    opacity:.75;text-align:left;user-select:none;pointer-events:none;
-  }
-  #how::after{
-    content:"↩ 快捷键在手\A 不离开当前页";
-    white-space:pre-line;border-top:1px solid var(--gold);padding-top:8px;
-  }
-  #sites::after{
-    content:"← 只观察\A 从不改动请求";
-    white-space:pre-line;border-left:1px solid var(--gold);padding-left:8px;
-  }
-  html[lang="en"] #how::after{content:"↩ one shortcut,\A never leave the tab"}
-  html[lang="en"] #sites::after{content:"← observe only,\A requests never modified"}
-}
-
 /* ─── 怎么用 · 三步 ─────────────────────────────────────────────────────── */
 .how-list{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .how{
@@ -539,8 +518,13 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
   border-radius:24px;padding:72px 64px;
   display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center;
 }
+/* 反转页也是正文的一章 —— § 序号必须连续显示（此前 keys 只计数不显示，
+   install 的序号从 §03 直接跳到 §05，被用户抓了个正着） */
 .keys-copy .eyebrow{color:var(--gold-lit);display:block;margin-bottom:14px}
-.keys-copy .eyebrow::before{content:"// ";color:var(--gold-lit)}
+.keys-copy .eyebrow::before{
+  content:"§" counter(sec,decimal-leading-zero);
+  color:var(--gold-lit);letter-spacing:.06em;margin-right:10px;
+}
 .keys-copy h2{
   font-size:clamp(26px,3.4vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.25;
 }
@@ -585,8 +569,8 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
 }
 .pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--mark-lit)}
 .prov-info{flex:1;min-width:0}
-.prov-name{font-size:13px;font-weight:600;color:var(--night-fg);line-height:1.3}
-.prov-model{font-family:var(--mono);font-size:10.5px;color:var(--night-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prov-name{display:block;font-size:13px;font-weight:600;color:var(--night-fg);line-height:1.3}
+.prov-model{display:block;font-family:var(--mono);font-size:10.5px;color:var(--night-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prov-badge{
   flex-shrink:0;font-family:var(--mono);font-size:10px;font-weight:600;
   padding:3px 9px;border-radius:999px;letter-spacing:.03em;
