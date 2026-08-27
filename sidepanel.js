@@ -2349,7 +2349,11 @@ async function seekVideo(vs, seconds) {
   if (vs?.tabId) {
     try {
       const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds });
-      if (res?.ok) return true;
+      // background envelopes every reply as { ok, data } — res.ok is just
+      // "the handler didn't throw" and is true even when the seek itself
+      // failed (tab gone / no <video>). The inner data.ok is the real
+      // verdict; reading the outer one silently disabled the ?t= fallback.
+      if (res?.data?.ok) return true;
     } catch (_) {}
   }
   if (vs?.url) {

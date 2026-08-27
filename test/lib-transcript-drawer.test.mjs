@@ -80,12 +80,16 @@ afterEach(() => {
 });
 
 function init(vs, times = []) {
-  // times: queued GET_VIDEO_TIME responses, drained FIFO; falls back to {ok:false}
+  // times: queued GET_VIDEO_TIME handler returns, drained FIFO; falls back to
+  // {ok:false}. The stub wraps them in the REAL background envelope
+  // ({ ok, data }) — tick() must read res.data.{ok,time}, and a stub that
+  // returned the handler payload bare is exactly how the v0.32.1
+  // "always jumps to the first line" regression slipped past these tests.
   T.__TRANSCRIPT_TESTING__.reset();
   T.initTranscriptDrawer({
     sendMessage: async (msg) => {
       sent.push(msg);
-      return times.length ? times.shift() : { ok: false };
+      return { ok: true, data: times.length ? times.shift() : { ok: false } };
     },
     onSeek: () => {},
     onNote: () => {},
@@ -199,7 +203,7 @@ test('row click hands the timestamp to onSeek; live selection suppresses seek', 
   const seeks = [];
   T.__TRANSCRIPT_TESTING__.reset();
   T.initTranscriptDrawer({
-    sendMessage: async () => ({ ok: false }),
+    sendMessage: async () => ({ ok: true, data: { ok: false } }),
     onSeek: (s, v) => seeks.push([s, v]),
     onNote: () => {},
     getSource: async () => ({ raw: RAW, videoSrc: vs }),

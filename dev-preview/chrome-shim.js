@@ -81,9 +81,12 @@
         return { ok: true, data: {} };
       }
       // Transcript drawer: scripted playback position (7:30 → the [07:42]
-      // chapter row is the "live" one) + always-succeeding seek.
-      case 'GET_VIDEO_TIME': return { ok: true, time: seedConfig.__videoTime ?? 450, paused: false };
-      case 'SEEK_VIDEO': return { ok: true };
+      // chapter row is the "live" one) + always-succeeding seek. Responses
+      // mirror the REAL background envelope ({ ok, data } — data is the
+      // handler's return value); unwrapped shapes here are how v0.32.1's
+      // playback-follow worked in preview but pinned to line 1 on-device.
+      case 'GET_VIDEO_TIME': return { ok: true, data: { ok: true, time: seedConfig.__videoTime ?? 450, paused: false } };
+      case 'SEEK_VIDEO': return { ok: true, data: { ok: true } };
       default: return { ok: true, data: {} };
     }
   }
