@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>隐私政策 — browsa</title>
+<meta name="description" content="browsa 隐私政策：不收集、不上传、无账号。数据只存在你的浏览器里，网络请求只发往你自己配置的端点。">
+<link rel="icon" type="image/png" href="icon48.png">
+<link rel="stylesheet" href="site.css">
+<style>
+  .legal{max-width:760px;margin:0 auto;padding:56px 28px 96px}
+  .legal h1{font-size:clamp(26px,4vw,36px);font-weight:800;letter-spacing:-.02em;margin:8px 0 6px}
+  .legal .updated{font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+  .legal h2{font-size:18px;font-weight:700;margin:34px 0 10px;padding-top:18px;border-top:1px solid var(--line-2)}
+  .legal p,.legal li{font-size:14.5px;color:var(--ink-2);line-height:1.85}
+  .legal ul{margin:8px 0 0 20px}
+  .legal li{margin:5px 0}
+  .legal code{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--paper-3);border:1px solid var(--line-2);padding:1px 6px;border-radius:5px}
+  .legal b{color:var(--ink)}
+  .legal .callout{
+    margin:22px 0;padding:14px 18px;border-radius:var(--radius);
+    background:rgba(194,65,12,.05);border-left:3px solid var(--mark);
+    font-size:14.5px;color:var(--ink-2);
+  }
+  .back{font-family:var(--mono);font-size:12.5px;color:var(--mark);text-decoration:none;display:inline-block;margin-bottom:22px}
+</style>
+</head>
+<body>
+<main class="legal">
+  <a class="back" href="./">← 返回 browsa 首页</a>
+  <p class="eyebrow">privacy policy</p>
+  <h1>隐私政策</h1>
+  <p class="updated">生效日期：2026-08-27 · 适用范围：browsa 浏览器扩展及官网</p>
+
+  <div class="callout">
+    一句话版本：<b>browsa 不收集任何数据。</b>没有账号体系，没有统计埋点，没有我们自己的服务器。你的对话、设置和 API Key 都只保存在你自己的浏览器里。
+  </div>
+
+  <h2>我们收集什么</h2>
+  <p><b>什么都不收集。</b>browsa 不包含任何遥测、分析或追踪代码，不会把任何使用数据、页面内容或个人信息发送给开发者或任何第三方服务。这一点可以通过公开源代码审计验证：<a href="https://github.com/xiaohuzai/browsa" style="color:var(--mark)">github.com/xiaohuzai/browsa</a>（MIT 协议）。</p>
+
+  <h2>数据存在哪里</h2>
+  <ul>
+    <li>对话历史、会话存档、Provider 配置、API Key 等<b>全部只存储在浏览器的本地存储</b>（<code>chrome.storage.local</code>）中，保留在你的设备上。</li>
+    <li>卸载扩展即全部删除；清除浏览器数据同样会删除它们。</li>
+    <li>browsa 不做任何形式的云同步。</li>
+  </ul>
+
+  <h2>网络请求发往哪里</h2>
+  <p>browsa 只在你主动操作时发起网络请求，且<b>目的地只有你自己配置的端点</b>：</p>
+  <ul>
+    <li><b>AI 对话：</b>发送到你自己在设置里填写的 Provider 地址（如 OpenAI、Anthropic 或任意 OpenAI 兼容 API、本地 Ollama）。请求由你的浏览器直接发给该端点，<b>不经过任何中间服务器</b>。</li>
+    <li><b>语音转写（可选功能）：</b>若你在设置中启用 ASR 并填入火山方舟的 Key，音频会在本地转码后由浏览器直传该服务进行转写；未启用则此功能完全不运行。</li>
+    <li><b>站点内容提取：</b>通过拦截浏览器自身已加载的数据读取字幕、正文等，不做额外登录，也不上传内容到第三方。</li>
+    <li><b>媒体下载：</b>仅在你点击下载时按需建立连接。</li>
+  </ul>
+
+  <h2>权限用途说明</h2>
+  <ul>
+    <li><code>&lt;all_urls&gt;</code> / <code>tabs</code> / <code>scripting</code>：用于在你点击 📎 时读取当前页面的可读内容、注入只读提取脚本，以及点击时间戳时跳转视频进度。仅在你主动操作时运行。</li>
+    <li><code>cookies</code>：只读，且仅在下载某平台音视频流时读取该平台的登录态以携带你的下载凭证。</li>
+    <li><code>declarativeNetRequest</code>：临时会话级规则，为显式请求的媒体下载注入 Referer 头；规则随浏览器会话结束自动清除。</li>
+    <li><code>downloads</code>：保存你明确选择下载的媒体文件。</li>
+    <li><code>storage</code>：上述本地数据存储。</li>
+  </ul>
+
+  <h2>子处理器与第三方</h2>
+  <p>browsa 本身没有任何后端与子处理器。你需要自行遵守你所配置的 AI 服务商的隐私条款；使用本地模型（如 Ollama）时，对话完全不出设备。</p>
+
+  <h2>未成年人</h2>
+  <p>browsa 不面向特定年龄群体收集信息，也因不收集任何信息而无从涉及未成年人数据。</p>
+
+  <h2>变更与联系</h2>
+  <p>政策如有实质性变更，会在本页更新并修改生效日期。有任何疑问请提 Issue：<a href="https://github.com/xiaohuzai/browsa/issues" style="color:var(--mark)">github.com/xiaohuzai/browsa/issues</a>。</p>
+</main>
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a class="lang" href="en/privacy.html" lang="en">Privacy Policy (English)</a>
+    </div>
+    <div class="foot-meta"><span>browser side-panel AI · 读到哪里，问到哪里</span><span class="mono">MIT License</span></div>
+  </div>
+</footer>
+</body>
+</html>

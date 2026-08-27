@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — browsa</title>
+<meta name="description" content="browsa privacy policy: no collection, no uploads, no accounts. Your data stays in your browser; network requests go only to endpoints you configure.">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<style>
+  .legal{max-width:760px;margin:0 auto;padding:56px 28px 96px}
+  .legal h1{font-size:clamp(26px,4vw,36px);font-weight:800;letter-spacing:-.02em;margin:8px 0 6px}
+  .legal .updated{font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+  .legal h2{font-size:18px;font-weight:700;margin:34px 0 10px;padding-top:18px;border-top:1px solid var(--line-2)}
+  .legal p,.legal li{font-size:14.5px;color:var(--ink-2);line-height:1.85}
+  .legal ul{margin:8px 0 0 20px}
+  .legal li{margin:5px 0}
+  .legal code{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--paper-3);border:1px solid var(--line-2);padding:1px 6px;border-radius:5px}
+  .legal b{color:var(--ink)}
+  .legal .callout{
+    margin:22px 0;padding:14px 18px;border-radius:var(--radius);
+    background:rgba(194,65,12,.05);border-left:3px solid var(--mark);
+    font-size:14.5px;color:var(--ink-2);
+  }
+  .back{font-family:var(--mono);font-size:12.5px;color:var(--mark);text-decoration:none;display:inline-block;margin-bottom:22px}
+</style>
+</head>
+<body>
+<main class="legal">
+  <a class="back" href="./">← back to browsa</a>
+  <p class="eyebrow">privacy policy</p>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Effective date: August 27, 2026 · Applies to the browsa browser extension and this website</p>
+
+  <div class="callout">
+    The one-line version: <b>browsa collects nothing.</b> No accounts, no analytics, no servers of ours. Your conversations, settings, and API keys live only inside your own browser.
+  </div>
+
+  <h2>What we collect</h2>
+  <p><b>Nothing.</b> browsa contains no telemetry, analytics, or tracking code of any kind. No usage data, page content, or personal information is ever sent to the developer or to any third-party service on our side. You can audit this claim — the source is public under the MIT license at <a href="https://github.com/xiaohuzai/browsa" style="color:var(--mark)">github.com/xiaohuzai/browsa</a>.</p>
+
+  <h2>Where data lives</h2>
+  <ul>
+    <li>Chat history, saved sessions, provider configs, and API keys are stored <b>exclusively in your browser's local storage</b> (<code>chrome.storage.local</code>) on your device.</li>
+    <li>Uninstalling the extension removes everything; clearing browser data removes it too.</li>
+    <li>browsa performs no cloud sync of any kind.</li>
+  </ul>
+
+  <h2>Where network requests go</h2>
+  <p>browsa only makes network requests when you act, and <b>only to destinations you configure yourself</b>:</p>
+  <ul>
+    <li><b>AI chat:</b> requests are sent by your browser directly to the provider address you entered in Settings (OpenAI, Anthropic, any OpenAI-compatible API, or local Ollama). They never pass through an intermediary server.</li>
+    <li><b>Speech transcription (optional):</b> only if you enable ASR and enter your own Volcengine Ark key — audio is transcoded locally, then uploaded by your browser straight to that service. If disabled, nothing runs.</li>
+    <li><b>Site extraction:</b> reads data the page itself already loaded (subtitles, article bodies) — no re-authentication, no uploading to third parties.</li>
+    <li><b>Media downloads:</b> connections open on demand, only when you click download.</li>
+  </ul>
+
+  <h2>Permission usage</h2>
+  <ul>
+    <li><code>&lt;all_urls&gt;</code> / <code>tabs</code> / <code>scripting</code>: to read readable content from the page when you click 📎, inject read-only extraction scripts, and seek videos when you click a timestamp. Runs only on your action.</li>
+    <li><code>cookies</code>: read-only, used solely to carry your login context when downloading a media stream from that platform.</li>
+    <li><code>declarativeNetRequest</code>: temporary session-scoped rules that add a Referer header for explicitly requested media downloads; rules clear with the browser session.</li>
+    <li><code>downloads</code>: saves media you explicitly chose to download.</li>
+    <li><code>storage</code>: the local data described above.</li>
+  </ul>
+
+  <h2>Subprocessors and third parties</h2>
+  <p>browsa has no backend and therefore no subprocessors. You remain responsible for the privacy terms of the AI providers you configure; with local models such as Ollama, conversations never leave your device at all.</p>
+
+  <h2>Children</h2>
+  <p>browsa collects no information from anyone of any age — there is no data to concern minors.</p>
+
+  <h2>Changes &amp; contact</h2>
+  <p>Material changes will be posted on this page with an updated effective date. Questions? Open an issue at <a href="https://github.com/xiaohuzai/browsa/issues" style="color:var(--mark)">github.com/xiaohuzai/browsa/issues</a>.</p>
+</main>
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a class="lang" href="../privacy.html" lang="zh-CN">隐私政策（中文）</a>
+    </div>
+    <div class="foot-meta"><span>browser side-panel AI · read anywhere, ask anywhere</span><span class="mono">MIT License</span></div>
+  </div>
+</footer>
+</body>
+</html>
