@@ -1,19 +1,13 @@
 name: Pages Preview
 
-# 官网（docs/）的发布前预览。
+# 官网（docs/）的发布前预览：PR 打开/更新时，把 docs/ 部署为一次
+# 「preview 部署」——拿到独立的临时 URL，不碰正式站点。
 #
-# 为什么不用 actions/deploy-pages 的 preview:true：那要求 Pages 走
-# "GitHub Actions" 构建源，而本仓库 Pages 配置为 legacy（Deploy from
-# branch: main /docs）——preview 部署会被 400 拒绝：
-#   "Invalid deployment branch and no branch protection rules set in the
-#    environment. Deployments are only allowed from main"
-# 实测踩坑后改为 rossjrw/pr-preview-action：把 docs/ 推到 gh-pages 分支的
-# pr-<编号>/ 子目录，预览地址 https://xiaohuzai.github.io/browsa/pr-<编号>/
-# （gh-pages 上的正式根目录仍由 main 的 legacy 自动构建发布，两条通道
-# 互不覆盖——legacy 构建源只认 main 分支的 /docs，从不同步 gh-pages）。
-#
-# 预览链接出现在两处：本 job 的 step summary，以及 PR 的 Deployments 侧栏。
-# PR 关闭时自动清掉对应子目录。
+# 注意：preview 部署要求 Pages 构建源为 GitHub Actions（legacy 的
+# Deploy-from-branch 会 400："Deployments are only allowed from main"，
+# 实测踩过）。生产发布见 pages-deploy.yml。
+# 预览链接在本 job 的 step summary 和 PR 的 Deployments 侧栏；PR 更新时
+# 自动替换，合并/关闭后 GitHub 按部署保留策略回收。
 
 on:
   pull_request:
@@ -21,10 +15,12 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'docs/**'
+      - '.github/workflows/pages-preview.yml'
 
 permissions:
-  contents: write          # 推 gh-pages 预览子目录
-  pull-requests: write     # 在 PR 上写 comment / deployment status
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages-preview-${{ github.event.pull_request.number }}
@@ -39,35 +35,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy preview to gh-pages pr-<num>/
-        uses: rossjrw/pr-preview-action@v1
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs
+        uses: actions/upload-pages-artifact@v3
         with:
-          source-dir: docs
-          preview-branch: gh-pages
-          umbrella-dir: pr
-          action: deploy
+          path: docs
+
+      - name: Deploy preview
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          preview: true
 
       - name: Write preview URL to job summary
         run: |
           echo "## 🔀 官网预览已就绪" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**https://xiaohuzai.github.io/browsa/pr-${{ github.event.pull_request.number }}/**" >> $GITHUB_STEP_SUMMARY
+          echo "本次 PR 的 docs/ 预览地址（独立 URL，不影响正式站点）：" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> 正式站点只在 PR 合并进 main 后更新；本预览与正式站互不影响。" >> $GITHUB_STEP_SUMMARY
-
-  cleanup:
-    name: Remove preview on close
-    if: github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Remove preview dir
-        uses: rossjrw/pr-preview-action@v1
-        with:
-          source-dir: docs
-          preview-branch: gh-pages
-          umbrella-dir: pr
-          action: remove
+          echo "**${{ steps.deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 正式站点只在 PR 合并进 main 后由 pages-deploy.yml 更新。" >> $GITHUB_STEP_SUMMARY
