@@ -1,0 +1,59 @@
+name: Pages Preview
+
+# 官网（docs/）的发布前预览：PR 打开或更新时，把 docs/ 部署为一次
+# 「预览部署」（deploy-pages 的 preview 模式），拿到独立的临时 URL，
+# 不影响正式的 GitHub Pages 站点。合并进 main 后正式站点才更新。
+# 预览链接的位置：PR 页面 → Checks → "Pages Preview" job 内的
+# summary，或 PR Conversation 侧栏 Deployments 区域。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages-preview.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Deploy docs preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pages-preview-pr-${{ github.event.pull_request.number }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy preview
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          preview: true
+
+      - name: Write preview URL to job summary
+        run: |
+          echo "## 🔀 官网预览已就绪" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "本次 PR 的 docs/ 预览地址（不影响正式站点）：" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**${{ steps.deployment.outputs.page_url }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 正式站点只在 PR 合并进 main 后更新。" >> $GITHUB_STEP_SUMMARY
