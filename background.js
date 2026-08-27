@@ -519,6 +519,28 @@ async function handle(msg, sender) {
       }
     }
 
+    case 'GET_VIDEO_TIME': {
+      // Read the video tab's current playback position (for the transcript
+      // drawer's playback-follow highlight). Mirrors SEEK_VIDEO's element
+      // lookup so both agree on which <video> is the target.
+      const tabId = msg.tabId;
+      if (!tabId) return { ok: false, error: 'no tabId' };
+      try {
+        const [res] = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: () => {
+            const v = document.querySelector('#movie_player video, #bilibili-player video, video');
+            if (!v) return { ok: false };
+            return { ok: true, time: v.currentTime || 0, paused: !!v.paused };
+          },
+        });
+        return res?.result || { ok: false };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
+
     case 'GET_MEDIA_STREAMS':
       return handleGetMediaStreams(msg);
 

@@ -28,6 +28,9 @@
       <button id="multiselect-toggle" class="iconbtn" data-i18n-aria="multiselectTitle" data-i18n-title="multiselectTitle">
         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
       </button>
+      <button id="transcript-btn" class="iconbtn" hidden data-i18n-aria="transcriptBtnTitle" data-i18n-title="transcriptBtnTitle">
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5.5A2.5 2.5 0 014.5 3h11A2.5 2.5 0 0118 5.5v7a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 012 12.5v-7zm2 4a.75.75 0 01.75-.75h3.5a.75.75 0 010 1.5h-3.5A.75.75 0 014 9.5zm7.75-.75a.75.75 0 000 1.5h2.5a.75.75 0 000-1.5h-2.5zM4 12.5a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 014 12.5zm4.75-.75a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clip-rule="evenodd"/></svg>
+      </button>
       <button id="settings" class="iconbtn" data-i18n-aria="settingsTooltip" data-i18n-title="settingsTooltip">
         <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       </button>
@@ -49,6 +52,30 @@
         <input type="search" class="sessions-search" data-i18n-placeholder="sessionsSearchPlaceholder" data-i18n-aria="sessionsSearchPlaceholder" />
       </div>
       <div id="sessions-list" class="sessions-list"></div>
+    </div>
+
+    <!-- Transcript drawer (slides in from the right) — clickable [mm:ss] rows
+         from the attached video transcript, with playback-follow highlight.
+         The topbar button stays hidden unless the conversation carries a
+         videoSrc-stamped attachment. -->
+    <div id="transcript-drawer" class="transcript-drawer" hidden role="dialog" aria-labelledby="transcript-drawer-title">
+      <div class="transcript-drawer-header">
+        <span id="transcript-drawer-title" class="transcript-drawer-title" data-i18n="transcriptTitle">Transcript</span>
+        <button id="transcript-note" class="iconbtn" data-i18n-aria="transcriptNote" data-i18n-title="transcriptNote">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </button>
+        <button id="transcript-close" class="iconbtn" data-i18n-title="sessionsClose">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+        </button>
+      </div>
+      <div class="transcript-search-row">
+        <input id="transcript-search" class="transcript-search" type="search" data-i18n-placeholder="transcriptSearchPlaceholder" data-i18n-aria="transcriptSearchPlaceholder" />
+        <button id="transcript-search-prev" class="msg-search-nav" data-i18n-title="searchPrev">↑</button>
+        <button id="transcript-search-next" class="msg-search-nav" data-i18n-title="searchNext">↓</button>
+        <span id="transcript-search-count" class="msg-search-count"></span>
+      </div>
+      <div id="transcript-list" class="transcript-list" tabindex="0"></div>
+      <button id="transcript-follow" class="transcript-follow-pill" hidden data-i18n="followPlayback">Jump to playback</button>
     </div>
 
     <!-- Diagnostics banner -->

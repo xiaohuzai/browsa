@@ -80,6 +80,10 @@
         if (s) s.pinned = !!msg.pinned;
         return { ok: true, data: {} };
       }
+      // Transcript drawer: scripted playback position (7:30 → the [07:42]
+      // chapter row is the "live" one) + always-succeeding seek.
+      case 'GET_VIDEO_TIME': return { ok: true, time: seedConfig.__videoTime ?? 450, paused: false };
+      case 'SEEK_VIDEO': return { ok: true };
       default: return { ok: true, data: {} };
     }
   }

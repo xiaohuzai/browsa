@@ -113,5 +113,11 @@
   "sessionsToday": { "message": "Today", "description": "Sessions drawer time bucket" },
   "sessionsYesterday": { "message": "Yesterday", "description": "Sessions drawer time bucket" },
   "sessionsWeek": { "message": "This week", "description": "Sessions drawer time bucket" },
-  "sessionsEarlier": { "message": "Earlier", "description": "Sessions drawer time bucket" }
+  "sessionsEarlier": { "message": "Earlier", "description": "Sessions drawer time bucket" },
+  "transcriptBtnTitle": { "message": "Transcript", "description": "Topbar button: open transcript drawer" },
+  "transcriptTitle": { "message": "Transcript", "description": "Transcript drawer header title" },
+  "transcriptSearchPlaceholder": { "message": "Search transcript…", "description": "Transcript drawer search input" },
+  "transcriptNote": { "message": "Insert note at playback position", "description": "Transcript drawer note-capture button tooltip" },
+  "followPlayback": { "message": "Jump to playback", "description": "Transcript drawer floating pill after manual scroll" },
+  "transcriptEmpty": { "message": "No transcript in this conversation.", "description": "Transcript drawer empty state" }
 }

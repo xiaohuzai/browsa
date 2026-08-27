@@ -221,5 +221,11 @@
   "sessionsToday": { "message": "今天", "description": "Sessions drawer time bucket" },
   "sessionsYesterday": { "message": "昨天", "description": "Sessions drawer time bucket" },
   "sessionsWeek": { "message": "本周", "description": "Sessions drawer time bucket" },
-  "sessionsEarlier": { "message": "更早", "description": "Sessions drawer time bucket" }
+  "sessionsEarlier": { "message": "更早", "description": "Sessions drawer time bucket" },
+  "transcriptBtnTitle": { "message": "字幕面板", "description": "Topbar button: open transcript drawer" },
+  "transcriptTitle": { "message": "字幕", "description": "Transcript drawer header title" },
+  "transcriptSearchPlaceholder": { "message": "搜索字幕…", "description": "Transcript drawer search input" },
+  "transcriptNote": { "message": "记一笔（当前播放行）", "description": "Transcript drawer note-capture button tooltip" },
+  "followPlayback": { "message": "回到播放位置", "description": "Transcript drawer floating pill after manual scroll" },
+  "transcriptEmpty": { "message": "当前会话没有字幕。", "description": "Transcript drawer empty state" }
 }

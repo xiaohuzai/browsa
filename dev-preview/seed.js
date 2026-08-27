@@ -17,9 +17,30 @@ window.__BROWSA_PREVIEW_SEED = {
     url: 'https://www.bilibili.com/video/BV1preview',
   },
   history: [
+    {
+      role: 'user',
+      content: `[Page context attached by browsa]
+
+## 视频信息
+
+标题：【4K】2026 前端趋势分享会
+UP主：前端晚自习
+播放量：128,442
+
+## 字幕
+
+[00:02] 大家好，欢迎来到 2026 前端趋势分享会。
+[00:15] 第一位讲者会聊本地优先架构在今年的落地情况。
+[01:24] 核心观点：本地优先正在从理念走向基础设施，同步引擎成为新的数据库中间层。
+[07:42] 框架动向：React Compiler 进入稳定版，Vue 的 Vapor Mode 开始落地，Svelte 持续迭代 Runes。
+[23:10] 工具链方面，Rust 已经全面接管构建层，从打包器到格式化工具。
+[38:05] 最后的圆桌环节讨论了 2026 年的前端比拼的是运行时之外的能力。`,
+      videoSrc: { platform: 'bilibili', url: 'https://www.bilibili.com/video/BV1preview', tabId: 7 },
+    },
     { role: 'user', content: '帮我总结一下这个视频的内容，做好笔记' },
     {
       role: 'assistant',
+      videoSrc: { platform: 'bilibili', url: 'https://www.bilibili.com/video/BV1preview', tabId: 7 },
       content: `<think>用户附带了B站视频字幕，需要生成带时间戳的结构化笔记。按章节组织，保留原始时间戳。</think>\n# 视频笔记：2026 前端趋势分享会 [00:00]\n\n## 一、核心观点 [01:24]\n\n三位讲者都提到：**本地优先（Local-first）** 正在从理念走向基础设施。\n\n- 同步引擎成为新的「数据库中间层」\n- CRDT 已不再是学术玩具\n- 边缘渲染与本地缓存边界模糊\n\n## 二、框架动向 [07:42]\n\n| 框架 | 动向 | 关键词 |\n|---|---|---|
 | React | Compiler 稳定版 | 自动记忆化 |
 | Vue | Vapor Mode 落地 | 去虚拟 DOM |

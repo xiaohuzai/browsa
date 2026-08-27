@@ -25,6 +25,10 @@ import {
   closeSessionsDrawer, clearAllSessions
 } from './lib/sidepanel/sessions-ui.js';
 import {
+  initTranscriptDrawer, refreshTranscriptSource, openTranscriptDrawer,
+  closeTranscriptDrawer, isOpenTranscriptDrawer, formatTs
+} from './lib/sidepanel/transcript-drawer.js';
+import {
   initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
   deleteSelectedMessages
 } from './lib/sidepanel/multiselect.js';
@@ -161,12 +165,28 @@ async function init() {
   providerSel.addEventListener('change', onProviderChange);
 
 
-  $('sessions-btn')?.addEventListener('click', openSessionsDrawer);
+  $('sessions-btn')?.addEventListener('click', () => { closeTranscriptDrawer(); openSessionsDrawer(); });
   document.getElementById('sessions-close')?.addEventListener('click', closeSessionsDrawer);
   $('sessions-new')?.addEventListener('click', newSession);
   // Sessions drawer: search and clear-all wired once here to avoid stacking listeners
   document.querySelector('.sessions-search')?.addEventListener('input', onSessionSearch);
   $('sessions-clear-all')?.addEventListener('click', clearAllSessions);
+  // Transcript drawer — same right-side slot as the sessions drawer, so the
+  // two are mutually exclusive. No backdrop by design (usable while watching).
+  $('transcript-btn')?.addEventListener('click', () => {
+    if (isOpenTranscriptDrawer()) { closeTranscriptDrawer(); return; }
+    closeSessionsDrawer();
+    openTranscriptDrawer();
+  });
+  initTranscriptDrawer({
+    sendMessage,
+    onSeek: (seconds, vs) => seekVideo(vs, seconds),
+    onNote: noteFromTranscript,
+    getSource: getVideoTranscriptSource,
+  });
+  // renderHistory() ran before the drawer's deps existed, so its own
+  // refresh was a no-op — rescan now that getSource is wired.
+  refreshTranscriptSource();
   settingsBtn.addEventListener('click', openSettingsPage);
   clearBtn.addEventListener('click', clearChatHistory);
   ctxRadios.forEach((r) => r.addEventListener('change', onContextModeChange));
@@ -254,6 +274,7 @@ async function init() {
       if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
       if (isInMultiSelectMode()) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
+      if (isOpenTranscriptDrawer()) { closeTranscriptDrawer(); return; }
       if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== inputEl) {
@@ -541,7 +562,10 @@ async function init() {
   $('multiselect-toggle')?.addEventListener('click', () => {
     if (isInMultiSelectMode()) exitMultiSelect(); else enterMultiSelect();
   });
-  $('multiselect-delete')?.addEventListener('click', deleteSelectedMessages);
+  $('multiselect-delete')?.addEventListener('click', async () => {
+    await deleteSelectedMessages();
+    refreshTranscriptSource(); // 删的可能正是字幕附件条目
+  });
   $('multiselect-cancel')?.addEventListener('click', exitMultiSelect);
 
   // Queued follow-ups dock (mounted just above the composer) + draft
@@ -1245,6 +1269,7 @@ async function onAttachPage() {
       }).catch(() => null);
       if (confirmRes?.ok) {
         nextHistoryIdx++;
+        refreshTranscriptSource(); // 字幕进历史了，抽屉按钮可能该亮出来
         const title = ctx.meta?.title || (platform === 'youtube' ? 'YouTube视频' : 'B站视频');
         const lineCount = transcriptText ? transcriptText.split('\n').length : 0;
         const bytesLabel = audioBytes > 0 ? `，${(audioBytes / 1024 / 1024).toFixed(1)}MB 音频` : '';
@@ -1260,6 +1285,7 @@ async function onAttachPage() {
     }
 
     nextHistoryIdx++; // page context stored in ATTACH_PAGE handler
+    refreshTranscriptSource(); // 视频页上下文带 videoSrc，抽屉按钮可能该亮出来
     const charCount = ctx?.truncated?.textLength ?? (ctx?.text?.length || 0);
     const charLabel = charCount > 0 ? `，${charCount.toLocaleString()} 字符` : '，内容为空';
     // For auto mode, show which sub-mode was actually used
@@ -1346,6 +1372,7 @@ async function newSession() {
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
   images.length = 0; refreshImageStrip(); // clear any pending image attachments
   closeSessionsDrawer();
+  refreshTranscriptSource(); // 会话切走了，字幕按钮隐藏、抽屉复位
   inputEl.focus();
 }
 
@@ -1364,6 +1391,7 @@ async function clearChatHistory() {
   isUserScrolledUp = false;
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
   images.length = 0; refreshImageStrip();
+  refreshTranscriptSource(); // 字幕随历史一起清掉了
   showToast('Conversation cleared', 'success');
 }
 
@@ -2301,22 +2329,67 @@ function appendUser(text, imageDataUrls) {
 // Click a [mm:ss] marker in a video-note reply -> seek the source video tab's
 // <video> in place; fall back to opening the original video at ?t=N when the
 // tab is gone or has no <video> (user closed/navigated away from it).
+// Shared with the transcript drawer's row clicks via seekVideo(vs, seconds).
 async function onTimestampClick(ts) {
+  // A live text selection means the user was dragging across text, not
+  // aiming at the marker — seeking then would be a surprise (same guard as
+  // youtube-digest's transcript rows).
+  const sel = typeof window.getSelection === 'function' ? window.getSelection() : null;
+  if (sel && !sel.isCollapsed) return;
   const seconds = Number(ts.dataset.s) || 0;
   const msgEl = ts.closest('.msg');
   let vs = null;
   try { vs = msgEl ? JSON.parse(msgEl.dataset.videoSrc || 'null') : null; } catch (_) {}
+  await seekVideo(vs, seconds);
+}
+
+// Seek the given video source ({platform,url,tabId}) to `seconds`. Returns
+// true when a seek path (in-place or new tab) was taken.
+async function seekVideo(vs, seconds) {
   if (vs?.tabId) {
     try {
       const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds });
-      if (res?.ok) return;
+      if (res?.ok) return true;
     } catch (_) {}
   }
   if (vs?.url) {
     chrome.tabs.create({ url: appendTimeParam(vs.url, seconds) });
-  } else {
-    showToast('视频源已失效，无法跳转');
+    return true;
   }
+  showToast('视频源已失效，无法跳转');
+  return false;
+}
+
+// Transcript drawer source scan: the LAST user history entry stamped with
+// videoSrc (ATTACH_PAGE on a video page, or ATTACH_ASR_CONFIRM). Its content
+// carries the `## 字幕` block as [mm:ss] lines.
+async function getVideoTranscriptSource() {
+  try {
+    const { history } = await chrome.storage.local.get('history');
+    const list = Array.isArray(history) ? history : [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m?.role === 'user' && m.videoSrc && typeof m.content === 'string') {
+        return { raw: m.content, videoSrc: m.videoSrc };
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+// Transcript drawer 「记一笔」: turn the line being played (−3s reaction
+// offset applied in pickNoteLine) into a timestamped draft in the composer.
+// The user adds their reaction on top and sends; the [mm:ss] stays clickable.
+function noteFromTranscript(seconds, line) {
+  if (seconds == null || !line) {
+    showToast('还没有可用的播放位置或字幕行');
+    return;
+  }
+  const note = `[${formatTs(seconds)}] 「${line.label ? line.label + ' ' : ''}${line.text}」`;
+  inputEl.value = inputEl.value ? `${inputEl.value}\n${note}` : note;
+  updateComposerInfo();
+  inputEl.focus();
+  inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
 }
 
 // Append/replace a seek-to-time param on a video URL. YouTube (watch?v=…&t=N)
@@ -2398,6 +2471,8 @@ function addMsgActions(el, getRaw) {
       }
     } finally {
       deleteLock = false;
+      // 删掉的可能是带 videoSrc 的字幕附件——顶栏按钮的可见性要重算。
+      refreshTranscriptSource();
     }
   });
 
@@ -3147,6 +3222,9 @@ async function renderHistory() {
   // even before the full upgrade resolves.
   addCodeCopyButtons();
   scrollToBottom(true);
+  // Whether this conversation carries a video transcript decides the
+  // transcript-drawer button's visibility — rescan after every history load.
+  refreshTranscriptSource();
 
   // Upgrade all assistant bubbles to the full renderSafe() output (KaTeX
   // math, proper think-block handling, etc.) in the BACKGROUND — deliberately
