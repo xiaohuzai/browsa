@@ -17,18 +17,18 @@
            setStatusDotState(). -->
       <span id="status-dot" class="status-dot" aria-hidden="true"></span>
       <span class="wordmark" aria-hidden="true">browsa</span>
-      <select id="provider" class="provider" aria-label="AI provider"></select>
-      <button id="sessions-btn" class="iconbtn" aria-label="Session history" title="Session history">
+      <select id="provider" class="provider" data-i18n-aria="providerLabel"></select>
+      <button id="sessions-btn" class="iconbtn" data-i18n-aria="sessionsTitle" data-i18n-title="sessionsTitle">
         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
       </button>
 
-      <button id="search-btn" class="iconbtn" aria-label="Search messages" title="Search messages (Ctrl+F)">
+      <button id="search-btn" class="iconbtn" data-i18n-aria="searchBtnTitle" data-i18n-title="searchBtnTitle">
         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
       </button>
-      <button id="multiselect-toggle" class="iconbtn" aria-label="Select messages" title="Select messages">
+      <button id="multiselect-toggle" class="iconbtn" data-i18n-aria="multiselectTitle" data-i18n-title="multiselectTitle">
         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
       </button>
-      <button id="settings" class="iconbtn" aria-label="Settings" title="Settings">
+      <button id="settings" class="iconbtn" data-i18n-aria="settingsTooltip" data-i18n-title="settingsTooltip">
         <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       </button>
     </header>
@@ -36,17 +36,17 @@
     <!-- Sessions drawer (slides in from the right) -->
     <div id="sessions-drawer" class="sessions-drawer" hidden role="dialog" aria-labelledby="sessions-drawer-title">
       <div class="sessions-drawer-header">
-        <span id="sessions-drawer-title" class="sessions-drawer-title">Session History</span>
-        <button id="sessions-clear-all" class="iconbtn sessions-clear-all-btn" title="Clear all sessions">
+        <span id="sessions-drawer-title" class="sessions-drawer-title" data-i18n="sessionsTitle">Session History</span>
+        <button id="sessions-clear-all" class="iconbtn sessions-clear-all-btn" data-i18n-title="sessionsClearAll">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482 41.03 41.03 0 00-2.365-.298V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/></svg>
         </button>
-        <button id="sessions-close" class="iconbtn" title="Close">
+        <button id="sessions-close" class="iconbtn" data-i18n-title="sessionsClose">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
         </button>
       </div>
       <div class="sessions-drawer-actions">
-        <button id="sessions-new" class="sessions-new-btn">＋ New session</button>
-        <input type="search" class="sessions-search" placeholder="Search sessions…" aria-label="Search sessions" />
+        <button id="sessions-new" class="sessions-new-btn" data-i18n="sessionsNew">＋ New session</button>
+        <input type="search" class="sessions-search" data-i18n-placeholder="sessionsSearchPlaceholder" data-i18n-aria="sessionsSearchPlaceholder" />
       </div>
       <div id="sessions-list" class="sessions-list"></div>
     </div>
@@ -56,11 +56,11 @@
 
     <!-- In-conversation search bar (Ctrl+F) -->
     <div id="msg-search-bar" class="msg-search-bar" hidden role="search">
-      <input id="msg-search-input" class="msg-search-input" type="search" placeholder="Search messages…" aria-label="Search messages" />
+      <input id="msg-search-input" class="msg-search-input" type="search" data-i18n-placeholder="searchPlaceholder" data-i18n-aria="searchPlaceholder" />
       <span id="msg-search-count" class="msg-search-count"></span>
-      <button id="msg-search-prev" class="msg-search-nav" title="Previous (Shift+Enter)">↑</button>
-      <button id="msg-search-next" class="msg-search-nav" title="Next (Enter)">↓</button>
-      <button id="msg-search-close" class="msg-search-close" title="Close (Esc)">
+      <button id="msg-search-prev" class="msg-search-nav" data-i18n-title="searchPrev">↑</button>
+      <button id="msg-search-next" class="msg-search-nav" data-i18n-title="searchNext">↓</button>
+      <button id="msg-search-close" class="msg-search-close" data-i18n-title="searchClose">
         <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
       </button>
     </div>
@@ -76,15 +76,15 @@
     <main id="messages" class="messages" role="log" aria-live="polite" aria-atomic="false"></main>
 
     <!-- Quick action pills -->
-    <div class="quickbar" id="quickbar" role="toolbar" aria-label="Quick actions">
-      <button id="quickbar-toggle" class="quickbar-toggle" aria-label="Toggle quick actions" title="Show/hide quick actions">
+    <div class="quickbar" id="quickbar" role="toolbar" data-i18n-aria="quickbarAria">
+      <button id="quickbar-toggle" class="quickbar-toggle" data-i18n-aria="quickbarToggle" data-i18n-title="quickbarToggle">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
       </button>
-      <button class="qa-btn" data-cmd="/summarize" title="Summarize the page">Summarize</button>
-      <button class="qa-btn" data-cmd="/keypoints" title="Extract key points">Key Points</button>
-      <button class="qa-btn" data-cmd="/explain" title="Explain the content">Explain</button>
-      <button class="qa-btn" data-cmd="/translate" title="Translate to Chinese">→ 中文</button>
-      <button class="qa-btn" data-cmd="/outline" title="Show outline">Outline</button>
+      <button class="qa-btn" data-cmd="/summarize" data-i18n="quickSummarize">Summarize</button>
+      <button class="qa-btn" data-cmd="/keypoints" data-i18n="quickKeypoints">Key Points</button>
+      <button class="qa-btn" data-cmd="/explain" data-i18n="quickExplain">Explain</button>
+      <button class="qa-btn qa-btn-ico" data-cmd="/translate" data-i18n-title="quickTranslate">译</button>
+      <button class="qa-btn" data-cmd="/outline" data-i18n="quickOutline">Outline</button>
     </div>
 
     <!-- Slash command autocomplete -->
@@ -94,17 +94,17 @@
     <footer class="composer">
       <div id="imagepreviews" class="imagepreviews"></div>
       <div class="composer-box">
-        <button id="clear" class="attachbtn" aria-label="New conversation" title="New conversation (Ctrl+K)">
+        <button id="clear" class="attachbtn" data-i18n-aria="newChatTitle" data-i18n-title="newChatTitle">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
         </button>
-        <button id="attach" class="attachbtn" aria-label="Attach current page" title="Attach current page to conversation">
+        <button id="attach" class="attachbtn" data-i18n-aria="attachTitle" data-i18n-title="attachTitle">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
         <label for="input" class="visually-hidden">Message</label>
         <textarea
           id="input"
           rows="1"
-          placeholder="Ask anything… use 📎 to attach current page"
+          data-i18n-placeholder="inputPlaceholder" placeholder="Ask anything… use 📎 to attach current page"
           aria-label="Message"
         ></textarea>
         <button id="send" class="sendbtn" aria-label="Send">
@@ -113,12 +113,12 @@
       </div>
       <!-- Context mode + page link -->
       <div class="composer-footer">
-        <div class="ctx-group" role="group" aria-label="Context mode">
-          <label class="ctx-pill" title="Auto: Reader → DOM → Full (smart cascade)"><input type="radio" name="ctx" value="auto" />Auto</label>
+        <div class="ctx-group" role="group" data-i18n-aria="contextAria">
+          <label class="ctx-pill" data-i18n-title="contextAuto"><input type="radio" name="ctx" value="auto" /><span data-i18n="contextAuto">Auto</span></label>
           <label class="ctx-pill" title="Capture screenshot"><input type="radio" name="ctx" value="screenshot" /><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></label>
         </div>
         <a id="pagemeta" class="pagemeta" target="_blank" title=""></a>
-        <button id="mediadl" class="attachbtn mediadl" hidden aria-label="Download audio/video" title="Download audio/video">
+        <button id="mediadl" class="attachbtn mediadl" hidden data-i18n-aria="mediaDownload" data-i18n-title="mediaDownload">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
       </div>

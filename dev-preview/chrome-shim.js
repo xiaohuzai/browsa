@@ -83,6 +83,23 @@
       openOptionsPage: noop,
       lastError: undefined,
     },
+    // i18n: resolve against the REAL _locales files so the preview shows what a
+    // real browser would. Default zh-CN; add ?lang=en to preview the English UI.
+    i18n: {
+      getUILanguage() { return new URLSearchParams(location.search).get('lang') === 'en' ? 'en-US' : 'zh-CN'; },
+      getMessage(key) {
+        if (!i18nCache) {
+          try {
+            const lang = this.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en';
+            const x = new XMLHttpRequest();
+            x.open('GET', `../_locales/${lang}/messages.json`, false); // sync OK in preview
+            x.send();
+            i18nCache = JSON.parse(x.responseText);
+          } catch (_) { i18nCache = {}; }
+        }
+        return (i18nCache[key] || {}).message || '';
+      },
+    },
     storage: {
       local: storageLocal,
       session: { get: async () => ({}), set: noop, remove: noop },
@@ -99,4 +116,5 @@
     action: { setBadgeText: noop },
     scripting: { executeScript: async () => [{ result: null }] },
   };
+  let i18nCache = null;
 })();
