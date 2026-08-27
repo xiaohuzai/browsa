@@ -164,7 +164,13 @@ main {
 
 .provider-group-header {
   padding: 9px 14px;
-  background: var(--surface-2, var(--border));
+  /* An elevated surface strip distinct from both the page (--bg) and the
+     hairline-gap grid of cards (--border) — NOT the border color itself:
+     an earlier `var(--surface-2, var(--border))` reference pointed at a
+     token that was never defined in theme.css, so the header silently fell
+     back to --border and read as a heavy gray band continuous with the
+     group's separator-grid background. */
+  background: var(--bg-3);
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -188,6 +194,7 @@ details.provider-group[open] > .provider-group-header::before {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--fg);
+  white-space: nowrap; /* keep "LLM Providers" on one line next to its description */
 }
 
 .provider-group-desc {
@@ -392,7 +399,7 @@ details.provider-group[open] > .provider-group-header::before {
   padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--bg); /* same ground as every other input on the cards */
   color: var(--fg);
 }
 .provider .row .api-style-select:focus {
@@ -408,22 +415,27 @@ details.provider-group[open] > .provider-group-header::before {
 /* ── Add-provider button + provider delete button ───────────────────────── */
 .add-provider-btn {
   align-self: center;
-  margin: 8px auto 4px;
-  padding: 6px 16px;
+  /* Full-width quiet footer row of the LLM group. The pill used to float on
+     the group's --border gap-grid fill, which read as a disabled gray strip
+     around it; sitting flush on a card surface with a top hairline matches
+     the group header band instead. */
+  margin: 0;
+  width: 100%;
+  padding: 10px;
   font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
   background: var(--surface);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .add-provider-btn:hover {
-  border-color: var(--accent);
   color: var(--accent);
-  background: var(--accent-bg);
+  background: var(--accent-hover, var(--accent-bg));
 }
 
 
@@ -504,6 +516,10 @@ button.primary:hover {
 
 /* Active radio on label */
 input[type="radio"] { accent-color: var(--accent); }
+/* Native range track/thumb defaults to UA blue otherwise — the font-size
+   slider was the one control left on browser default, clashing with the
+   red/gold palette. */
+input[type="range"] { accent-color: var(--accent); }
 
 /* ── Radio group ─────────────────────────────────────────────────────────── */
 .radio-group {
@@ -580,7 +596,21 @@ input[type="radio"] { accent-color: var(--accent); }
   width: 140px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.inline-field input:focus {
+/* Same treatment for selects — without this the Reply language dropdown in
+   the System prompt card rendered with the browser-native (white, dark-mode
+   clashing) chrome instead of the theme's input surface. */
+.inline-field select {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.inline-field input:focus,
+.inline-field select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-bg);

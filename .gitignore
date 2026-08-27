@@ -39,3 +39,8 @@ browsa.bundle
 
 # Pi channel transcripts (Feishu chat logs) - local only, never commit
 .pi/
+
+# dev-preview 截图产物（本地对比用，不入库）
+dev-preview/shots/
+# dev-preview 生成页（node dev-preview/gen.mjs 再生）
+dev-preview/*.preview.html

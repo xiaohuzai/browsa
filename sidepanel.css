@@ -34,8 +34,12 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  background: var(--bg-2);
+  padding: 10px 12px 9px;
+  /* Same ground as the messages area — the topbar reads as content floating
+     on the panel with only a hairline beneath it, not as another stacked
+     gray band (the old --bg-2 fill made three competing surface tones
+     visible above the first message). */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -71,9 +75,9 @@ body {
    hidden at 50% opacity behind the empty-state selector. */
 .wordmark {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.09em;
   color: var(--accent);
   flex-shrink: 0;
   user-select: none;
@@ -82,9 +86,9 @@ body {
 .provider {
   flex: 1;
   padding: 5px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  background: var(--bg-3);
+  background: var(--bg-2);
   color: var(--fg);
   font: inherit;
   font-size: 12px;
@@ -144,21 +148,24 @@ body {
   display: block;
   color: var(--accent);
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 22px;
+  font-size: 27px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
   text-align: center;
-  opacity: 0.5;
-  margin-bottom: 8px;
+  /* Highlighter-gold underline — the wordmark sitting on a quiet gold rule,
+     like a proofreader's mark on the margin. */
+  border-bottom: 2px solid color-mix(in srgb, var(--gold) 32%, transparent);
+  padding: 0 6px 7px;
+  margin-bottom: 12px;
 }
 .messages:not(:has(.msg))::after {
   content: 'Ask anything about the current page';
   display: block;
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: center;
-  opacity: 0.4;
-  letter-spacing: 0.02em;
+  opacity: 0.75;
+  letter-spacing: 0.01em;
   font-weight: 400;
 }
 
@@ -179,13 +186,18 @@ body {
 /* User message — no bubble, right-aligned clean text */
 .msg.user {
   align-self: flex-end;
-  background: transparent;
-  border: none;
-  padding: 4px 2px;
+  /* Whisper-quiet warm chip: a ~5% accent tint over the raised surface —
+     the user's line reads as a pinned margin note instead of ghost text,
+     without ever approaching a full chat-app bubble. The small bottom-right
+     radius breaks the symmetry, pointing the note back at the margin. */
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  padding: 7px 12px;
   color: var(--fg-2);
   white-space: pre-wrap;
   font-size: var(--msg-font-size);
-  text-align: right;
+  text-align: left;
   max-width: 88%;
 }
 
@@ -196,10 +208,10 @@ body {
   border: none;
   /* Hairline scan anchor: assistant replies have no bubble/background, so
      without this the only "who said this" signal is text color + alignment.
-     Kept deliberately faint (--border-soft, not accent) to stay a quiet
-     guide rather than turning this back into a bubble. */
-  border-left: 2px solid var(--border-soft);
-  padding: 4px 2px 4px 10px;
+     Kept deliberately faint — a hint of the proofreader's red in the rail
+     ties it to the brand without turning this back into a bubble. */
+  border-left: 2px solid color-mix(in srgb, var(--accent) 26%, var(--border-soft));
+  padding: 4px 2px 4px 12px;
   max-width: 96%;
 }
 .msg.assistant::after {
@@ -668,7 +680,9 @@ body {
   color: var(--fg-2);
   background: var(--accent-dim);
   border-radius: 0 var(--radius) var(--radius) 0;
-  font-style: italic;
+  /* No font-style:italic — CJK has no true italics, so browsers synthesize
+     obliques that render Chinese glyphs as ugly slanted strokes. The red
+     bar + tint already carry the "quoted" signal. */
 }
 .msg.assistant code {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
@@ -682,9 +696,11 @@ body {
 .msg.assistant pre {
   position: relative;
   margin: 0.6em 0;
-  padding: 12px 14px;
-  padding-top: 30px;
-  background: var(--bg-2);
+  padding: 34px 14px 12px;
+  /* A slightly-lifted panel with a faint header band: the top 34px sits a
+     touch deeper than the code body, giving the language label a strip to
+     live on instead of floating over the first code line. */
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg-4) 55%, var(--bg-2)), rgba(0,0,0,0) 34px), var(--bg-2);
   color: var(--fg-2);
   border-radius: var(--radius);
   overflow-x: auto;
@@ -696,13 +712,15 @@ body {
 .msg.assistant pre::before {
   content: attr(data-lang);
   position: absolute;
-  top: 7px; left: 14px;
-  font-size: 10px;
+  top: 9px; left: 14px;
+  font-size: 9px;
   font-family: ui-monospace, monospace;
-  color: var(--accent);
-  opacity: 0.65;
-  text-transform: lowercase;
-  letter-spacing: 0.3px;
+  /* Language label as annotation content — highlighter gold per the
+     two-accent rule (the old accent-red at 65% competed with actual
+     interactive elements and read as a second "error" tone in the block). */
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 @media (prefers-color-scheme: light) {
   .msg.assistant pre { background: #f5f2ec; color: #2d2a22; }
@@ -720,6 +738,7 @@ body {
   text-align: left;
 }
 .msg.assistant th { background: var(--bg-3); font-weight: 600; font-size: 0.92em; }
+.msg.assistant tbody tr:nth-child(even) { background: color-mix(in srgb, var(--fg) 2.5%, transparent); }
 .msg.assistant hr { border: 0; border-top: 1px solid var(--border); margin: 0.6em 0; }
 .msg.assistant img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 0.3em 0; }
 
@@ -962,9 +981,9 @@ math[display="block"] {
 .qa-btn {
   flex-shrink: 0;
   padding: 4px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: 999px;
-  background: transparent;
+  background: var(--bg-2);
   color: var(--fg-dim);
   font: inherit;
   font-size: 11.5px;
@@ -1006,8 +1025,12 @@ math[display="block"] {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 12px 10px;
-  background: var(--bg-2);
+  padding: 9px 12px 11px;
+  /* Material inversion: the footer sits on the panel ground and the input
+     box is the raised element (raised box on quiet ground reads as "this is
+     the one thing you interact with" — the old bg-2 footer under a bg box
+     was a gray band with a hole in it). */
+  background: var(--bg);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -1017,14 +1040,16 @@ math[display="block"] {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 7px 7px 7px 12px;
+  box-shadow: var(--shadow-sm);
   transition: border-color var(--t), box-shadow var(--t);
 }
 .composer-box:focus-within {
   border-color: var(--accent);
+  background: var(--bg-3);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 

@@ -11,6 +11,10 @@
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 
+<span class="cropmark cm-tl" aria-hidden="true"></span>
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · MIT</span>
+
 <header class="nav">
   <div class="container">
     <a class="brand" href="#top" aria-label="browsa home">
@@ -109,7 +113,7 @@
               <div class="p-topbar">
                 <span class="p-status"></span>
                 <span class="p-wordmark">browsa</span>
-                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · reachable</span>
                 <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
               </div>
               <div class="p-msgs">
@@ -163,7 +167,7 @@
               <div class="p-topbar">
                 <span class="p-status"></span>
                 <span class="p-wordmark">browsa</span>
-                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · reachable</span>
                 <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
               </div>
               <div class="p-msgs">
@@ -219,7 +223,7 @@
               <div class="p-topbar">
                 <span class="p-status"></span>
                 <span class="p-wordmark">browsa</span>
-                <span class="p-provider"><span class="dot"></span>hermes · 101.47.17.208:8642</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · reachable</span>
                 <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
               </div>
               <div class="p-msgs">
@@ -380,6 +384,48 @@
   </section>
 
   <!-- Install -->
+  <!-- Reversed plate: Your Keys -->
+  <section id="keys" class="keys">
+    <div class="container">
+      <div class="keys-slab reveal">
+        <div class="keys-copy">
+          <p class="eyebrow">your keys, your agent</p>
+          <h2>Your keys. Your models. <em>Your agent.</em></h2>
+          <p>browsa sells no subscription, asks for no account, takes no markup. It simply moves your own model endpoints into the side panel — cloud, local, or self-hosted.</p>
+          <ul class="keys-list">
+            <li><span class="tick">✓</span><span><b>No account, no telemetry.</b> Install and go — nothing ever flows through us.</span></li>
+            <li><span class="tick">✓</span><span><b>API keys stay local</b>, sent only to the endpoints you configure.</span></li>
+            <li><span class="tick">✓</span><span><b>Ollama / LM Studio local models</b> — fully offline works too.</span></li>
+            <li><span class="tick">✓</span><span><b>Real agents</b>: tool execution, live progress, approval before risky actions.</span></li>
+          </ul>
+          <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — risky actions require approval first</p>
+        </div>
+        <div class="prov-board" role="img" aria-label="Provider settings illustration: OpenAI, Claude, Ollama and a Hermes agent">
+          <div class="prov-card">
+            <span class="prov-ava pa-openai">O</span>
+            <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
+            <span class="prov-badge pb-ok">reachable</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-claude">C</span>
+            <span class="prov-info"><span class="prov-name">Claude</span><span class="prov-model">claude-sonnet · /v1/messages</span></span>
+            <span class="prov-badge pb-idle">not pinged</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-ollama">L</span>
+            <span class="prov-info"><span class="prov-name">Ollama (local)</span><span class="prov-model">localhost:11434 · qwen3:32b</span></span>
+            <span class="prov-badge pb-ok">offline ok</span>
+          </div>
+          <div class="prov-card active">
+            <span class="prov-ava pa-hermes">H</span>
+            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approvals</span></span>
+            <span class="prov-badge pb-ok">reachable</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="install">
     <div class="container">
       <div class="section-head">
