@@ -29,8 +29,15 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 // fails to load.
 const py = `
 import os, sys, zipfile
-root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test"}
-exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "CLAUDE.md"}
+root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test",
+    # Dev-only trees: preview harness + its screenshot library (gitignored),
+    # CWS store screenshots (gitignored), and the github.io website sources.
+    # None of these load in the browser as part of the extension. A real
+    # incident (2026-08-28, v0.32.0): ~6MB of accumulated dev screenshots in
+    # dev-preview/shots were silently swept in, bloating the zip from ~5.5MB
+    # to 11.8MB -- same failure mode as the loose-PDF exclusion below.
+    "dev-preview", "store-assets", "docs"}
+exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "CLAUDE.md", "skills-lock.json"}
 # Dev/editor dot-directories (.pi channel transcripts, .claude local config,
 # .github workflows, .vscode, ...) must never ship in a distribution zip --
 # they can contain Feishu chat transcripts and local secrets. Handled below
