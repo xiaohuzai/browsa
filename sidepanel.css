@@ -532,6 +532,72 @@ body {
   max-width: 100%;
 }
 
+/* Error card form: classified headline + clamped raw + collapsible raw text.
+   Same error red family as the compact form, just given room to breathe when
+   there's real content behind it. */
+.msg.error.has-detail {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 12px;
+  border-left: 2px solid var(--error);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  text-align: left;
+}
+.err-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.err-icon { flex-shrink: 0; }
+.err-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.err-detail {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--fg-dim) 55%, var(--error));
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.err-more { font-size: 11.5px; }
+.err-more summary {
+  cursor: pointer;
+  color: color-mix(in srgb, var(--error) 70%, var(--fg-dim));
+  user-select: none;
+  list-style: none;
+}
+.err-more summary:hover { text-decoration: underline; }
+.err-more summary::-webkit-details-marker { display: none; }
+.err-more pre {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--error) 9%, transparent);
+  border-radius: var(--radius-sm);
+}
+.err-copy-btn {
+  align-self: flex-end;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
+  color: var(--error);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.err-copy-btn:hover { border-color: var(--error); }
+/* When the full raw block is open, hide the clamped duplicate above it. */
+.msg.error.has-detail:has(.err-more[open]) .err-detail { display: none; }
+
 .tool-progress {
   display: flex;
   align-items: center;
@@ -1018,6 +1084,58 @@ math[display="block"] {
 .quickbar-toggle:hover { color: var(--fg); }
 .quickbar.collapsed .qa-btn { display: none; }
 .quickbar.collapsed .quickbar-toggle svg { transform: rotate(180deg); }
+
+/* ─── Follow-up queue dock (mid-stream sends wait here) ────────────────────── */
+.followups-dock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 0;
+  flex-wrap: wrap;
+}
+.followups-dock[hidden] { display: none; }
+.followups-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.followup-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 70px);
+  background: var(--hover-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 4px 2px 9px;
+}
+.followup-text {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-size: 11.5px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 1px 0;
+}
+.followup-text:hover { color: var(--accent); }
+.followup-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 50%;
+}
+.followup-remove:hover { color: var(--error); background: var(--hover-bg); }
 
 /* ─── Composer ──────────────────────────────────────────────────────────────── */
 .composer {
@@ -1656,6 +1774,37 @@ code.language-patch {
 }
 .session-export-btn:hover { color: var(--accent); }
 .session-del-btn:hover { color: var(--err); }
+
+/* Pin toggle — same icon-button family as export/delete; pinned rows tint
+   the name gold (timestamp/canonical-content accent) instead of inventing a
+   new color, and lose their delete button entirely in the markup. */
+.session-pin-btn.active { color: var(--gold); }
+.session-pin-btn.active svg { fill: var(--gold-dim); }
+.session-item.pinned .session-item-name { color: var(--gold); }
+/* Two-step armed delete: first click flips the trash to "sure?" red for 2s. */
+.session-del-btn.armed {
+  color: #fff;
+  background: var(--error);
+}
+/* Content-only search hit: tiny dot after the date; full context on hover. */
+.session-content-hit {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 5px;
+  vertical-align: 1px;
+}
+/* Group labels inside the drawer: Pinned band + Today/Yesterday/… buckets. */
+.sessions-group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 14px 2px;
+}
 .session-rename-input {
   font-size: 12px;
   font-weight: 500;

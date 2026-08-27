@@ -776,6 +776,7 @@ async function handle(msg, sender) {
     case 'LOAD_SESSION':
     case 'DELETE_SESSION':
     case 'RENAME_SESSION':
+    case 'PIN_SESSION':
     case 'CLEAR_ALL_SESSIONS':
     case 'GET_SESSION_FULL':
       return handleSession(msg);

@@ -12,6 +12,14 @@ import {
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
 import { initMediaDownload } from './lib/sidepanel/media-download.js';
+import { classifyErrorText } from './lib/sidepanel/error-classifier.js';
+import {
+  initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups
+} from './lib/sidepanel/followups.js';
+import {
+  attachDraftPersistence, restoreComposerState, pushInputHistory,
+  handleHistoryNav, resetHistoryNav, clearPersistedDraft
+} from './lib/sidepanel/composer-state.js';
 import {
   initSessionsUI, getSessionsDrawer, openSessionsDrawer, onSessionSearch,
   closeSessionsDrawer, clearAllSessions
@@ -28,6 +36,11 @@ import {
   ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
+
+// i18n convenience — EN fallback keeps jsdom tests chrome-free.
+function _t(key, fallback) {
+  return (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
+}
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
 // sidepanel.js-owned UI concerns that lib/render.js deliberately doesn't
@@ -201,13 +214,22 @@ async function init() {
       }
       if (e.key === 'Escape') { hideSlashSuggest(); return; }
     }
-    // Send shortcut: Enter (default) or Shift+Enter
+    // ↑/↓ input-history recall (blocked while the slash panel is open)
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+        handleHistoryNav(e, () => slashSuggestEl && !slashSuggestEl.hidden)) {
+      e.preventDefault();
+      updateComposerInfo();
+      return;
+    }
+    // Send shortcut: Enter (default) or Shift+Enter. `!e.repeat` guards
+    // against held-key double-fire — repeats would now stack queued
+    // follow-ups instead of just re-sending.
     if (sendShortcut === 'shift-enter') {
-      if (e.key === 'Enter' && e.shiftKey && !e.isComposing) {
+      if (e.key === 'Enter' && e.shiftKey && !e.isComposing && !e.repeat) {
         e.preventDefault(); onSend();
       }
     } else {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.repeat) {
         e.preventDefault(); onSend();
       }
     }
@@ -521,6 +543,43 @@ async function init() {
   });
   $('multiselect-delete')?.addEventListener('click', deleteSelectedMessages);
   $('multiselect-cancel')?.addEventListener('click', exitMultiSelect);
+
+  // Queued follow-ups dock (mounted just above the composer) + draft
+  // persistence so unsent text survives the panel being torn down.
+  initFollowups({
+    mountEl: document.querySelector('.composer'),
+    sendNow: (text) => { resetHistoryNav(inputEl); inputEl.value = text; updateComposerInfo(); onSend(); },
+  });
+  attachDraftPersistence(inputEl);
+  restoreComposerState(inputEl).catch(() => {});
+
+  // Scroll anchoring across disclosure toggles (think blocks, folded
+  // replies): remember the toggling element's viewport position at
+  // pointerdown, compare after the toggle lands, compensate scrollTop —
+  // content the user was reading doesn't jump (Cherry Studio's
+  // useScrollAnchor pattern).
+  let disclosureAnchor = null;
+  const _disclosureTarget = (e) => {
+    const t = e.target.closest('.think-block > summary, .fold-btn');
+    if (!t) return null;
+    const el = t.closest('.think-block') || t.closest('.msg') || t;
+    return { t, el };
+  };
+  messagesEl.addEventListener('pointerdown', (e) => {
+    const hit = _disclosureTarget(e);
+    disclosureAnchor = hit ? { ...hit, top: hit.el.getBoundingClientRect().top } : null;
+  }, true);
+  messagesEl.addEventListener('click', (e) => {
+    if (!disclosureAnchor) return;
+    const hit = _disclosureTarget(e);
+    const anchor = disclosureAnchor;
+    disclosureAnchor = null;
+    if (!hit || hit.t !== anchor.t) return;
+    const rect = hit.el.getBoundingClientRect();
+    if (!rect.height) return; // fully collapsed away — nothing sensible to anchor to
+    const delta = rect.top - anchor.top;
+    if (Math.abs(delta) >= 2) messagesEl.scrollTop += delta;
+  });
 
   inputEl.focus();
 }
@@ -1370,9 +1429,27 @@ function setStreamingUI(on) {
   }
 }
 
+/**
+ * Auto-drain one queued follow-up when a turn finishes normally (DONE).
+ * Runs a tick late so DONE's DOM cleanup settles first, and is guarded
+ * against clobbering newer user intent: skipped while the composer holds
+ * text (retry/edit flows park content there) or a new turn already started.
+ * User-canceled streams never reach DONE, so Esc-to-stop keeps the queue.
+ */
+function maybeDrainFollowups() {
+  setTimeout(() => {
+    if (!hasQueuedFollowups() || activeController) return;
+    if (inputEl.value.trim()) return;
+    const next = takeFirstFollowup();
+    if (!next) return;
+    inputEl.value = next;
+    updateComposerInfo();
+    onSend();
+  }, 50);
+}
+
 function cancelStream() {
-  if (!activeController) return;
-  activeController.cancelled = true;
+  if (!activeController) return;  activeController.cancelled = true;
   const wasResumed = activeController.resumed === true;
   const port = activeController.port;
   // Capture these BEFORE touching the port below — port.disconnect() can
@@ -1715,6 +1792,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       activeController = null;
       sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
       reconcileHistoryIdx(); // detect + correct auto-trim drift (fire-and-forget)
+      maybeDrainFollowups();
       afterDone?.(el);
 
     } else if (m.type === 'ERROR') {
@@ -1755,6 +1833,18 @@ async function onSend() {
     return;
   }
 
+  // Mid-stream send (Enter/quick chip while a reply is still streaming):
+  // starting a second parallel CHAT would put two ports on the same tabId —
+  // the two replies fight over one chunk feed and corrupt history indices.
+  // Queue it instead; the dock above the composer drains automatically when
+  // this turn finishes (maybeDrainFollowups in the DONE branch).
+  if (activeController && !activeController.cancelled) {
+    enqueueFollowup(rawText);
+    inputEl.value = '';
+    updateComposerInfo();
+    return;
+  }
+
   const slashExpanded = expandSlash(rawText);
   const text = slashExpanded || rawText;
 
@@ -1781,10 +1871,13 @@ async function onSend() {
 
   // User bubble — show the original slash command, not the expanded prompt
   lastSentRaw = rawText;
+  pushInputHistory(rawText); // ↑ recall list
   const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
   const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
   userBubble.dataset.hidx = nextHistoryIdx++;  // user turn stored in background CHAT handler
   inputEl.value = '';
+  clearPersistedDraft();
+  updateComposerInfo();
   setStreamingUI(true);
 
   // Placeholder assistant bubble
@@ -2325,6 +2418,19 @@ function addMsgActions(el, getRaw) {
 
   // Copy — only for assistant messages
   if (el.classList.contains('assistant')) {
+    // Regenerate — truncate back to the user turn and re-run it (the same
+    // flow edit&resend uses, just without letting the user touch the text).
+    const regenBtn = document.createElement('button');
+    regenBtn.className = 'msg-action-icon';
+    regenBtn.title = _t('regenTitle', 'Regenerate response');
+    regenBtn.innerHTML = ICONS.retry;
+    regenBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ub = findPrevUserBubble(el);
+      if (ub) regenerateReply(ub);
+    });
+    buttons.push(regenBtn);
+
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-icon copy-icon';
     copyBtn.title = 'Copy response';
@@ -2362,6 +2468,55 @@ function addMsgActions(el, getRaw) {
 
   wrap.append(...buttons);
   el.appendChild(wrap);
+}
+
+/**
+ * Find the user bubble a reply answers to, skipping the streaming-era
+ * siblings that live between them (think blocks, tool-progress lines,
+ * token-usage chips, action rows).
+ */
+function findPrevUserBubble(el) {
+  const SKIP = new Set(['token-usage', 'tool-progress', 'live-think', 'msg-action-row']);
+  let p = el.previousElementSibling;
+  while (p) {
+    if (p.classList.contains('user')) return p;
+    if ([...SKIP].some((c) => p.classList.contains(c)) || p.tagName === 'DETAILS') { p = p.previousElementSibling; continue; }
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Regenerate: cancel any stream, truncate stored history from the user turn
+ * onward, drop the reply (and anything after it) from the DOM, re-send the
+ * SAME user text. Inline images attached to the original turn are not
+ * replayed — same limitation edit&resend has; text-only turns are exact.
+ */
+async function regenerateReply(userBubble) {
+  const idx = parseInt(userBubble.dataset.hidx, 10);
+  if (isNaN(idx)) return;
+  const raw = (userBubble.dataset.raw || userBubble.querySelector('.msg-text')?.textContent || '').trim();
+  if (!raw) return;
+
+  if (activeController && !activeController.cancelled) cancelStream();
+  await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+  let sib = userBubble.nextElementSibling;
+  while (sib) {
+    const next = sib.nextElementSibling;
+    sib.remove();
+    sib = next;
+  }
+  nextHistoryIdx = idx;
+
+  // onSend() reads the composer as its input source; preserve whatever is
+  // parked there and restore after the regenerated turn has been handed off.
+  const savedDraft = inputEl.value;
+  inputEl.value = raw;
+  try {
+    await onSend();
+  } finally {
+    inputEl.value = savedDraft;
+  }
 }
 
 /**
@@ -2793,10 +2948,70 @@ function appendMsgAction(bubbleEl, label, onClick, icon) {
   bubbleEl.insertAdjacentElement('afterend', row);
 }
 
+/**
+ * Error display (Cherry Studio's ErrorBlock pattern): a known failure class
+ * leads with one human headline, the raw provider message is clamped below
+ * and stays collapsible for the full copyable text. Short unmatched notices
+ * ('No active tab.', selection hints) keep the old compact single-line form
+ * — a card around "please select text again" would be noise.
+ */
 function appendError(text) {
   const el = document.createElement('div');
   el.className = 'msg error';
-  el.textContent = '⚠ ' + text;
+  const raw = String(text ?? '');
+
+  const cls = classifyErrorText(raw);
+  if (!cls && raw.length <= 80) {
+    el.textContent = '⚠ ' + raw;
+    messagesEl.appendChild(el);
+    scrollToBottom(true);
+    setStatusDotState('error');
+    return;
+  }
+  el.classList.add('has-detail');
+
+  const head = document.createElement('div');
+  head.className = 'err-head';
+  const icon = document.createElement('span');
+  icon.className = 'err-icon';
+  icon.textContent = '⚠';
+  const title = document.createElement('span');
+  title.className = 'err-title';
+  title.textContent = _t(cls?.key || 'errGeneric', cls ? '' : 'Something went wrong');
+  head.append(icon, title);
+  el.appendChild(head);
+
+  if (raw) {
+    const detail = document.createElement('div');
+    detail.className = 'err-detail';
+    detail.textContent = raw;
+    el.appendChild(detail);
+
+    const more = document.createElement('details');
+    more.className = 'err-more';
+    const summary = document.createElement('summary');
+    summary.textContent = _t('errRawToggle', 'Raw error');
+    const pre = document.createElement('pre');
+    pre.textContent = raw;
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'err-copy-btn';
+    copyBtn.textContent = _t('copyLabel', 'Copy');
+    copyBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        await _copyText(raw);
+        copyBtn.textContent = '✓';
+      } catch (_) {
+        copyBtn.textContent = '✗';
+      }
+      setTimeout(() => { copyBtn.textContent = _t('copyLabel', 'Copy'); }, 1500);
+    });
+    more.append(summary, pre, copyBtn);
+    el.appendChild(more);
+  }
+
   messagesEl.appendChild(el);
   scrollToBottom(true);
   setStatusDotState('error');

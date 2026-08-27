@@ -40,12 +40,46 @@
   // ── sendMessage envelope ({ok, data}) by msg.type ───────────────────────
   // Supports BOTH the callback form (ui-utils.js style) and the promise form.
   const pageMeta = seedConfig.__pageMeta || { id: 7, title: '示例页面 — browsa 预览', url: 'https://www.bilibili.com/video/BV1preview' };
+  // Mock saved sessions for the drawer preview: one pinned, one content-only
+  // search hit candidate ("时间戳" lives in a message body), buckets across
+  // today / yesterday / this-week dates.
+  const __now = Date.now();
+  const previewSessions = [
+    ...(seedConfig.sessions || []),
+    { id: 'pin1', name: 'browsa 上线清单', createdAt: __now - 2 * 3600e3, pinned: true, history: [] },
+    { id: 'tdy1', name: 'B站视频要点', createdAt: __now - 30 * 60e3, history: [{ role: 'user', content: '总结这个视频' }, { role: 'assistant', content: '…可点击时间戳 [02:14] …' }] },
+    { id: 'ysd1', name: '昨天：论文阅读', createdAt: __now - 26 * 3600e3, history: [] },
+    { id: 'wk1', name: '竞品调研记录', createdAt: __now - 4 * 86400e3, history: [] },
+    { id: 'old1', name: '一个月前的草稿', createdAt: __now - 40 * 86400e3, history: [] },
+  ];
   async function handle(msg) {
     switch (msg && msg.type) {
       case 'GET_CONFIG': return { ok: true, data: configData() };
       case 'GET_PAGE_CONTEXT': return { ok: true, data: { mode: msg.mode || 'reader', meta: pageMeta, text: '(预览环境无页面正文)' } };
       case 'STREAM_PEEK': return { ok: true, data: { inFlight: false } };
-      case 'GET_SESSIONS': return { ok: true, data: [] };
+      // Sessions drawer: contract matches lib/storage.js — query filters name
+      // OR content (case-insensitive), pinned sessions sort first, rows are
+      // metadata-only. PIN_SESSION flips the mock in place so the drawer UI
+      // can be driven end-to-end in the preview.
+      case 'GET_SESSIONS': {
+        const q = String((msg && msg.q) || '').trim().toLowerCase();
+        let list = [...previewSessions];
+        if (q) {
+          list = list.map(s => {
+            const nameMatch = s.name.toLowerCase().includes(q);
+            const contentMatch = !nameMatch && (s.history || []).some(
+              m => typeof m?.content === 'string' && m.content.toLowerCase().includes(q));
+            return nameMatch || contentMatch ? { ...s, contentMatch } : null;
+          }).filter(Boolean);
+        }
+        const pinned = list.filter(s => s.pinned);
+        return { ok: true, data: { sessions: [...pinned, ...list.filter(s => !s.pinned)] } };
+      }
+      case 'PIN_SESSION': {
+        const s = previewSessions.find(x => x.id === msg.id);
+        if (s) s.pinned = !!msg.pinned;
+        return { ok: true, data: {} };
+      }
       default: return { ok: true, data: {} };
     }
   }
