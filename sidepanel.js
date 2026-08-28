@@ -8,7 +8,7 @@ import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCar
 import {
   renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps,
-  makeStreamRenderer, setThoughtAutoCollapse
+  makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
 import { initMediaDownload } from './lib/sidepanel/media-download.js';
@@ -161,7 +161,9 @@ async function init() {
 
   // Load chat preferences
   sendShortcut = cfg.sendShortcut || 'enter';
-  setThoughtAutoCollapse(cfg.thoughtAutoCollapse);
+  // 默认折叠（undefined = 从未设置过 → 折叠）；只有显式存过 false（设置页取消
+  // 勾选）的用户保持展开。
+  setThoughtAutoCollapse(cfg.thoughtAutoCollapse !== false);
   if (cfg.fontSize) applyFontSize(cfg.fontSize);
 
   // Load history
@@ -455,7 +457,7 @@ async function init() {
       }
       if (changes.fontSize?.newValue != null) applyFontSize(changes.fontSize.newValue);
       if (changes.sendShortcut?.newValue != null) sendShortcut = changes.sendShortcut.newValue;
-      if (changes.thoughtAutoCollapse != null) setThoughtAutoCollapse(changes.thoughtAutoCollapse.newValue);
+      if (changes.thoughtAutoCollapse) setThoughtAutoCollapse(changes.thoughtAutoCollapse.newValue !== false);
       return;
     }
     // Session storage: pick up pending selection actions written by the
@@ -2840,7 +2842,16 @@ function addMsgActions(el, getRaw) {
     copyBtn.innerHTML = ICONS.copy;
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const text = getRaw() || el.innerText || '';
+      // 只复制正文：剥掉 <think>…</think>（思考内容有自己的「Copy thinking」小
+      // 按钮，见 addThinkCopyButtons）。getRaw() 为空的兜底路径同样剔除 think 块
+      // 的 DOM（克隆后移除 .think-block 再取 innerText——展开状态下的 innerText
+      // 会带出 think 正文）。
+      let text = stripThinkSegments(getRaw() || '');
+      if (!text) {
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll('.think-block').forEach((n) => n.remove());
+        text = (clone.innerText || '').trim();
+      }
       try {
         await _copyText(text);
         copyBtn.textContent = '✓';

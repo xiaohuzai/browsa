@@ -30,7 +30,7 @@ const {
   fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
-  linkifyTimestamps
+  stripThinkSegments, linkifyTimestamps
 } = await import('../lib/sidepanel/render.js');
 
 // ─── CJK/bold regression suite ──────────────────────────────────────────────
@@ -162,6 +162,32 @@ test('renderSafe respects setThoughtAutoCollapse(true) by omitting the open attr
   setThoughtAutoCollapse(false);
   const html2 = await renderSafe('<think>x</think>y');
   assert.match(html2, /<details class="think-block" open>/);
+});
+
+test('thinking blocks DEFAULT to collapsed (fresh module, no setThoughtAutoCollapse call)', async () => {
+  // 用户反馈展开不好看 → 默认折叠。sidepanel 以 !== false 传入：storage 里显式
+  // 存过 false（取消勾选）才展开；从未设置（undefined）折叠。fresh import 绕过
+  // 本文件其他测试对模块状态的修改。
+  const fresh = await import('../lib/sidepanel/render.js?default-think-collapse');
+  const html = await fresh.renderSafe('<think>x</think>y');
+  assert.doesNotMatch(html, /<details class="think-block" open>/);
+  assert.match(html, /<details class="think-block">/);
+});
+
+test('stripThinkSegments removes think blocks (incl. unclosed tail) and keeps the body', () => {
+  // 消息 copy 只复制正文：thinking 内容不进剪贴板（它有自己的 Copy thinking 按钮）。
+  assert.equal(stripThinkSegments('<think>内部推理</think>你好'), '你好');
+  assert.equal(stripThinkSegments('<thinking>abc</thinking>\n\n正文一'), '正文一');
+  assert.equal(stripThinkSegments('<antml:thinking>x</antml:thinking>body'), 'body');
+  // 多个 think 段、夹在正文中间
+  assert.equal(stripThinkSegments('A<think>x</think>B<thinking>y</thinking>C'), 'ABC');
+  // 未闭合（流式中断）→ 尾部全是 think，丢弃
+  assert.equal(stripThinkSegments('正文<think>没写完'), '正文');
+  assert.equal(stripThinkSegments('<think>只有思考'), '');
+  // 无 think 原样返回
+  assert.equal(stripThinkSegments('普通消息'), '普通消息');
+  assert.equal(stripThinkSegments(''), '');
+  assert.equal(stripThinkSegments(null), '');
 });
 
 test('renderSafe: a echoed math/think placeholder does not downgrade the whole message', async () => {

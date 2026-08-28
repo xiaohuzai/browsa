@@ -52,7 +52,8 @@ function applyChatPrefs(cfg) {
   const ss = $('sendShortcut');
   if (ss) ss.value = cfg.sendShortcut || 'enter';
   const tac = $('thoughtAutoCollapse');
-  if (tac) tac.checked = !!(cfg.thoughtAutoCollapse);
+  // 勾选框反映实际行为：从未设置（undefined）= 默认折叠 = 勾上；显式取消才展开。
+  if (tac) tac.checked = cfg.thoughtAutoCollapse !== false;
 }
 
 async function saveChatPrefs() {
