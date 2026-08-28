@@ -482,6 +482,15 @@ test('linkifyTimestamps: supports [h:mm:ss] hour form', () => {
   assert.equal(ts.textContent, '[1:02:03]');
 });
 
+test('linkifyTimestamps: wraps native 3-digit total-minute stamps [105:30]', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>quote from a long video [105:30] here</p>';
+  linkifyTimestamps(el);
+  const ts = el.querySelector('.browsa-ts');
+  assert.ok(ts, '3-digit total-minute stamps must be clickable too');
+  assert.equal(ts.dataset.s, String(105 * 60 + 30));
+});
+
 test('linkifyTimestamps: strips BiliNote *Content- prefix in display but keeps the time', () => {
   const el = document.createElement('div');
   el.innerHTML = '<p>Intro *Content-[00:10]</p>';

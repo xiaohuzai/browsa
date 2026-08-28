@@ -103,6 +103,19 @@ test('ping(): /v1/models 404 WITHOUT a passing /health — still throws (no corr
   );
 });
 
+test('ping(): apiStyle anthropic sends x-api-key + anthropic-version (official API requires both)', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  let capturedHeaders = null;
+  globalThis.fetch = async (url, opts) => {
+    capturedHeaders = opts.headers;
+    return { ok: true, text: async () => '' };
+  };
+  const result = await ping({ baseUrl: 'https://api.anthropic.com', apiKey: 'sk-ant', model: 'claude-x', apiStyle: 'anthropic' });
+  assert.equal(result, 'ok');
+  assert.equal(capturedHeaders['x-api-key'], 'sk-ant', 'official Anthropic auth is x-api-key, not Bearer');
+  assert.ok(capturedHeaders['anthropic-version'], 'anthropic-version is mandatory (400 without it)');
+});
+
 test('ping(): model configured — sends a real max_tokens:1 request, not /v1/models', async () => {
   const { ping } = await import('../lib/llm-client.js');
   let sawModelsCall = false;

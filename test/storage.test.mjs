@@ -366,6 +366,25 @@ test('clearAllSessions empties the saved-sessions list', async () => {
   assert.deepEqual(await storage.getSavedSessions(), []);
 });
 
+test('cap eviction skips pinned sessions: oldest unpinned are evicted first', async () => {
+  reset();
+  for (let i = 0; i < 49; i++) {
+    await storage.setHistory([{ role: 'user', content: `conversation ${i}` }]);
+    await storage.saveCurrentSession(`Session ${i}`);
+  }
+  // Pin the OLDEST session, then push two more through the cap.
+  await storage.pinSession((await storage.getSavedSessions()).find(s => s.name === 'Session 0').id, true);
+  for (let i = 49; i < 51; i++) {
+    await storage.setHistory([{ role: 'user', content: `conversation ${i}` }]);
+    await storage.saveCurrentSession(`Session ${i}`);
+  }
+  const list = await storage.getSavedSessions();
+  assert.equal(list.length, 50, 'cap still holds when an unpinned candidate is available');
+  assert.ok(list.some(s => s.name === 'Session 0'), 'the pinned oldest session must survive');
+  assert.ok(!list.some(s => s.name === 'Session 1'), 'the oldest UNPINNED session is evicted first');
+  assert.ok(list.some(s => s.name === 'Session 50'), 'the newest session must be present');
+});
+
 test('getSessionFull returns null for an unknown id', async () => {
   reset();
   assert.equal(await storage.getSessionFull('nope'), null);

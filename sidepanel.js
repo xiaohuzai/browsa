@@ -28,6 +28,7 @@ import {
   initTranscriptDrawer, refreshTranscriptSource, openTranscriptDrawer,
   closeTranscriptDrawer, isOpenTranscriptDrawer, formatTs
 } from './lib/sidepanel/transcript-drawer.js';
+import { planHistoryReconcile } from './lib/sidepanel/history-reconcile.js';
 import {
   initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
   deleteSelectedMessages
@@ -140,7 +141,11 @@ async function init() {
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); }
   });
   initMultiselect({
-    decrementNextHistoryIdx: () => { nextHistoryIdx = Math.max(0, nextHistoryIdx - 1); }
+    decrementNextHistoryIdx: () => { nextHistoryIdx = Math.max(0, nextHistoryIdx - 1); },
+    // 批量删除与单条删除共用同一把锁，避免两边的 hidx 平移互相踩。
+    tryLock: () => { if (deleteLock) return false; deleteLock = true; return true; },
+    releaseLock: () => { deleteLock = false; },
+    reconcile: () => { reconcileHistoryIdx(); },
   });
   mediaDownloadRefresh = initMediaDownload({ getTabId: () => currentTabId }).refresh;
 
@@ -255,6 +260,7 @@ async function init() {
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
+      cancelStream(); // 流没停就清空，回复结束后会写进新会话开头（孤儿回复）
       clearChatHistory();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
@@ -388,7 +394,7 @@ async function init() {
       // XHR within a few hundred ms.
       lastXhsNote = null;
       sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId })
-        .then((ctx) => renderDiagnostics(ctx))
+        .then((res) => renderDiagnostics(res?.data))
         .catch(() => {});
     } else {
       // Not a 小红书 note — clear the banner and cache.
@@ -859,7 +865,7 @@ async function onAttachPage() {
           imageDataUrl: finalDataUrl,
           metaUrl: ctx.meta?.url || '',
           metaTitle: title }).catch(() => null);
-        if (res?.ok) nextHistoryIdx++;
+        if (res?.data?.ok) nextHistoryIdx++;
         const screenshotEl = appendScreenshot(finalDataUrl);
         appendAttachSystem(`📎 已附加截图："${title}"`, screenshotEl);
       });
@@ -895,7 +901,9 @@ async function onAttachPage() {
         numPages: pdfNumPages,
         figureImages: pdfFigureImages
       }).catch(() => null);
-      if (confirmRes?.ok) {
+      // handler 在 text 为空时返回内层 { ok:false, error:'no text' }——外层
+      // res.ok 只是桥接层标志，误当成功会虚增 nextHistoryIdx（索引错位）。
+      if (confirmRes?.data?.ok) {
         nextHistoryIdx++;
         const title = ctx.meta?.title || 'PDF';
         const charLabel = pdfText?.length > 0 ? `，${pdfText.length.toLocaleString()} 字符` : '';
@@ -933,18 +941,16 @@ async function onAttachPage() {
       // 播放地址全部过期且自动刷新失败（deadline 签名的 m4s URL，过期后 CDN 一律
       // 403，referer/cookie 再对也没用）——再试也是白等三轮 403，直接明示原因并
       // 走回退（用户刷新视频页后重新 attach 即可，刷新 = 重新拉 playurl = 新签名）。
+      // 平台显示名（错误/toast/确认标签共用）——必须在 asrExpiredError 的
+      // throw 之前声明，否则那条错误自己先炸成 ReferenceError（TDZ）。
+      const platform = ctx.asrPlatform || 'bilibili';
+      const platformLabel = platform === 'youtube' ? 'YouTube' : 'B站';
       if (ctx.asrExpiredError) {
         console.warn('[ASR] expired playurl, auto-refresh failed:', ctx.asrExpiredError);
         throw new Error(`${platformLabel}播放地址已过期且自动刷新失败（${ctx.asrExpiredError}）——请刷新视频页面后重新附加`);
       }
       let transcriptText = '';
       let audioBytes = 0;
-      // 原始平台（bilibili / youtube）——由 buildAsrPendingCtx 写入 ctx.asrPlatform。
-      // 决定：是否注册 DNR Referer/Cookie 注入规则（仅 bilibili）、下载请求头、
-      // 403 自愈路径和平台文案。
-      const platform = ctx.asrPlatform || 'bilibili';
-      // 平台显示名（错误/toast/确认标签共用）。
-      const platformLabel = platform === 'youtube' ? 'YouTube' : 'B站';
       const dnrRuleId = Math.floor(Math.random() * 4_999_999) + 1;
       try {
         // 0. Bilibili ONLY: register a session DNR rule injecting the bilibili.com
@@ -1267,7 +1273,7 @@ async function onAttachPage() {
         platform,
         tabId: currentTabId,
       }).catch(() => null);
-      if (confirmRes?.ok) {
+      if (confirmRes?.data?.ok) {
         nextHistoryIdx++;
         refreshTranscriptSource(); // 字幕进历史了，抽屉按钮可能该亮出来
         const title = ctx.meta?.title || (platform === 'youtube' ? 'YouTube视频' : 'B站视频');
@@ -1355,6 +1361,7 @@ function hideHistoryUpgradeIndicator() {
 }
 
 async function newSession() {
+  cancelStream(); // 先停流：否则在途回复会在清空后落进新会话
   // Auto-save current conversation if it has messages, then clear
   const { history } = await chrome.storage.local.get('history');
   const hasMessages = Array.isArray(history) && history.some(m => m.role === 'user' || m.role === 'assistant');
@@ -1384,6 +1391,7 @@ async function clearChatHistory() {
     danger: true
   });
   if (!ok) return;
+  cancelStream(); // 确认后再停流：取消确认不应误杀进行中的回复
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
   nextHistoryIdx = 0;
@@ -1405,18 +1413,33 @@ async function clearChatHistory() {
 async function reconcileHistoryIdx() {
   try {
     const { history: h } = await chrome.storage.local.get('history');
-    const actualLen = Array.isArray(h) ? h.length : nextHistoryIdx;
-    const drift = nextHistoryIdx - actualLen;
-    if (drift <= 0) return; // no trim, nothing to do
-    // Shift every visible bubble's data-hidx down by the trim count.
-    // Bubbles whose index goes below 0 are no longer in storage; their
-    // delete buttons will be no-ops (REMOVE_HISTORY_ENTRY_BY_INDEX returns
-    // false for out-of-range indices), so they degrade safely.
+    // Anchor on the LOWEST-hidx bubble (attach bubbles are never rendered, so
+    // that isn't necessarily index 0) and let the pure planner decide whether
+    // the drift is a real front-trim (shift DOM down) or a failed append
+    // (counter was just too high — shifting here desynced every subsequent
+    // delete; the pre-0.33.0 code always assumed trim).
+    let anchor = null, anchorH = Infinity;
     messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
-      const bidx = parseInt(b.dataset.hidx, 10);
-      if (!isNaN(bidx)) b.dataset.hidx = bidx - drift;
+      const v = parseInt(b.dataset.hidx, 10);
+      if (!isNaN(v) && v < anchorH) { anchorH = v; anchor = b; }
     });
-    nextHistoryIdx = actualLen;
+    const plan = planHistoryReconcile({
+      entries: Array.isArray(h) ? h : [],
+      nextHistoryIdx,
+      anchorH: anchor ? anchorH : -1,
+      anchorRaw: anchor?.dataset?.raw || '',
+    });
+    if (plan.action === 'none') return;
+    if (plan.action === 'shift') {
+      // Bubbles whose index goes below 0 are no longer in storage; their
+      // delete buttons will be no-ops (REMOVE_HISTORY_ENTRY_BY_INDEX returns
+      // ok:false and the UI now honors that), so they degrade safely.
+      messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
+        const bidx = parseInt(b.dataset.hidx, 10);
+        if (!isNaN(bidx)) b.dataset.hidx = bidx - plan.drift;
+      });
+    }
+    nextHistoryIdx = plan.actualLen;
   } catch (_) { /* storage unavailable — leave as-is */ }
 }
 
@@ -1572,7 +1595,10 @@ async function openSettingsPage() {
   // chrome.runtime.getURL('options.html').
   try {
     const url = chrome.runtime.getURL('options.html');
-    await sendMessage({ type: 'OPEN_OPTIONS_TAB', url });
+    const res = await sendMessage({ type: 'OPEN_OPTIONS_TAB', url });
+    // ui-utils 的 sendMessage 不 reject（lastError 也走 resolve），catch 是
+    // 死代码——回退判断必须看返回值本身。
+    if (!res?.ok) throw new Error(res?.error || 'OPEN_OPTIONS_TAB failed');
   } catch (e) {
     // Fallback: try the direct API
     try {
@@ -1831,6 +1857,14 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
         const r = getRenderer();
         await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
       }
+      // The background never disconnects the port after pushing ERROR —
+      // without this cleanup activeController leaks, and every later send
+      // gets silently routed into the followups queue (which never drains
+      // because DONE can never run again). Port self-disconnect() does NOT
+      // fire our own onDisconnect, so do the full cleanup here.
+      activeController = null;
+      setStreamingUI(false);
+      try { port.disconnect(); } catch (_) {}
       onAborted?.();
     }
   });
@@ -1868,7 +1902,9 @@ async function onSend() {
   // this turn finishes (maybeDrainFollowups in the DONE branch).
   if (activeController && !activeController.cancelled) {
     enqueueFollowup(rawText);
+    resetHistoryNav(inputEl); // 同 onSend：先复位召回态再清空
     inputEl.value = '';
+    clearPersistedDraft();
     updateComposerInfo();
     return;
   }
@@ -1903,6 +1939,10 @@ async function onSend() {
   const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
   const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
   userBubble.dataset.hidx = nextHistoryIdx++;  // user turn stored in background CHAT handler
+  // 复位 ↑ 召回态——不复位的话 _navIdx 保持武装，发送后敲的第一个字会被旧
+  // 草稿顶掉。resetHistoryNav 会把召回前的草稿写回 value，所以必须先复位、
+  // 再清空。
+  resetHistoryNav(inputEl);
   inputEl.value = '';
   clearPersistedDraft();
   updateComposerInfo();
@@ -1984,6 +2024,12 @@ async function onSend() {
     });
     if (!res.ok) {
       // Real error (re-thrown by background, port receives nothing).
+      // Clean up NOW: the port will never receive DONE/ERROR, so without
+      // this activeController leaks and the retry button below would
+      // route into the followups queue instead of re-sending.
+      clearInterval(_swPingInterval);
+      activeController = null;
+      try { port.disconnect(); } catch (_) {}
       // Preserve any partial streaming content; append the error inline.
       const errMsg = res.error || 'Unknown error';
       if (state.acc) {
@@ -2001,6 +2047,9 @@ async function onSend() {
   } catch (e) {
     // sendMessage itself threw (SW restart, no receiver, etc.).
     // The CHAT handler never ran, so the user turn was likely NOT stored.
+    clearInterval(_swPingInterval);
+    activeController = null;
+    try { port.disconnect(); } catch (_) {}
     if (state.acc) {
       await renderStream(state.acc + `\n\n---\n❌ **${e.message}**`, true);
     } else {
@@ -2038,9 +2087,11 @@ async function resumeInFlightStream(tabId) {
     return;
   }
   // Ask the background: is there a stream for this tab, and if so,
-  // what do you have so far?
-  const peek = await sendMessage({ type: 'STREAM_PEEK', tabId });
-  if (!peek?.inFlight) {
+  // what do you have so far? The bridge envelopes every reply as
+  // { ok, data } — the payload fields live under .data.
+  const peekRes = await sendMessage({ type: 'STREAM_PEEK', tabId });
+  const peek = peekRes?.data || {};
+  if (!peek.inFlight) {
     // No stream running. The "switch tab and come back" path lands
     // here for the common case where the stream finished while the
     // user was away — storage already has the reply, renderHistory
@@ -2461,7 +2512,9 @@ function addMsgActions(el, getRaw) {
     try {
       if (!isNaN(idx)) {
         const res = await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
-        if (res?.ok) {
+        // 真判据在 envelope 的 data.ok 里——res.ok 只是「handler 没抛异常」，
+        // 索引超界时 storage 静默返回 ok:false，误当成功会平移错所有 hidx。
+        if (res?.data?.ok) {
           // Confirmed: shift indices of all remaining bubbles after the deleted slot.
           messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
             const bidx = parseInt(b.dataset.hidx, 10);
@@ -2578,7 +2631,10 @@ async function regenerateReply(userBubble) {
   if (!raw) return;
 
   if (activeController && !activeController.cancelled) cancelStream();
-  await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+  const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+  // 内层 ok:false（负索引等）说明 storage 没截成——此时绝不能清 DOM，否则
+  // storage 里残留的后续轮次会和界面分叉，下一轮悄悄混进上下文。
+  if (!truncRes?.data?.ok) { showToast('历史截断失败，已取消重新生成', 'error'); return; }
   let sib = userBubble.nextElementSibling;
   while (sib) {
     const next = sib.nextElementSibling;
@@ -2654,7 +2710,8 @@ function startMsgEdit(el) {
       // corrupt history indices.
       if (activeController && !activeController.cancelled) cancelStream();
       // Truncate history from this point onward, then re-send
-      await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+      const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
+      if (!truncRes?.data?.ok) { showToast('历史截断失败，未保存修改', 'error'); return; }
       // Remove all DOM bubbles after this one (assistant reply + any following)
       let sib = el.nextElementSibling;
       while (sib) {
@@ -2746,9 +2803,13 @@ function showApprovalCard(bubbleEl, data) {
     `</div>` +
     cmd + desc +
     `<div class="approval-actions">${btns}</div>`;
+  // 审批按 chat 发起时的 tabId 存于 background；点击时再读 currentTabId 会
+  // 在用户切 tab 后对不上号（卡片已移除、agent 干等超时）——渲染时钉死。
+  card.dataset.tabId = String(currentTabId ?? '');
   card.querySelectorAll('.approval-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      sendMessage({ type: 'APPROVAL_RESPOND', tabId: currentTabId, choice: btn.dataset.choice });
+    btn.addEventListener('click', async () => {
+      const res = await sendMessage({ type: 'APPROVAL_RESPOND', tabId: Number(card.dataset.tabId), choice: btn.dataset.choice }).catch(() => null);
+      if (!res?.data?.ok) showToast('审批发送失败：' + (res?.data?.error || res?.error || '后台状态已丢失'), 'error');
       card.remove();
     });
   });
@@ -2769,14 +2830,18 @@ function showClarifyCard(bubbleEl, data) {
     `</div>`;
   const input  = card.querySelector('.clarify-input');
   const submit = card.querySelector('.clarify-submit');
-  const respond = () => {
+  // Same tabId pinning as the approval card — currentTabId at click time can
+  // already point at a different tab, orphaning the pending clarification.
+  card.dataset.tabId = String(currentTabId ?? '');
+  const respond = async () => {
     const response = input.value.trim();
     if (!response) return;
-    sendMessage({ type: 'CLARIFY_RESPOND', tabId: currentTabId, response });
+    const res = await sendMessage({ type: 'CLARIFY_RESPOND', tabId: Number(card.dataset.tabId), response }).catch(() => null);
+    if (!res?.data?.ok) showToast('回复发送失败：' + (res?.data?.error || res?.error || '后台状态已丢失'), 'error');
     card.remove();
   };
   submit.addEventListener('click', respond);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') respond(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) respond(); });
   _insertCard(bubbleEl, card);
   setTimeout(() => input.focus(), 50);
 }
@@ -2929,8 +2994,12 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint) {
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     const res = await sendMessage({ type: 'UNDO_ATTACH' }).catch(() => null);
-    if (res?.ok) {
-      const removedIdx = res.removedIdx ?? -1;
+    // Handler returns { ok: removedIdx>=0, removedIdx } INSIDE the envelope —
+    // read both off res.data (reading res.removedIdx off the envelope always
+    // gave undefined, so the hidx shift never ran and indices drifted).
+    const d = res?.data || {};
+    if (res?.ok && d.ok) {
+      const removedIdx = d.removedIdx ?? -1;
       if (removedIdx >= 0) {
         // Shift data-hidx on every DOM bubble that came after the removed entry.
         messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
@@ -3130,7 +3199,9 @@ async function showEffectivePrompt() {
   titleEl.textContent = 'Effective System Prompt';
   const urlEl = document.createElement('div');
   urlEl.className = 'prompt-inspector-url';
-  urlEl.textContent = tabUrl || '(no page)';
+  // 当前页 URL 从顶栏的 pagemeta 链接取（tab 切换时会同步更新）；原代码引用
+  // 了不存在的 tabUrl，/prompt 一执行就 ReferenceError，输入还被清空。
+  urlEl.textContent = pagemetaEl?.href?.startsWith('http') ? pagemetaEl.href : '(no page)';
   modal.appendChild(titleEl);
   modal.appendChild(urlEl);
   if (sections.length) {

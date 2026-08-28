@@ -112,6 +112,15 @@ test('parseTranscriptLines: timestamps, h:mm:ss, speaker labels, skips non-lines
   assert.equal(T.formatTs(3605), '1:00:05');
 });
 
+test('parseTranscriptLines handles native 3-digit total-minute stamps ([105:30])', async () => {
+  // B站/YouTube 原生字幕用总分钟制——≥100 分钟视频输出 [105:30]，h:mm:ss
+  // 摆不下；0.33.0 之前 _LINE_RE 不认这种行，长视频字幕在 99:59 被截断。
+  T = await freshModule();
+  const lines = T.parseTranscriptLines('[99:59] before the cut\n[105:30] after the cut');
+  assert.equal(lines.length, 2);
+  assert.equal(lines[1].s, 105 * 60 + 30);
+});
+
 test('pickNoteLine applies the −3s reaction offset with first-line fallback', async () => {
   T = await freshModule();
   const lines = T.parseTranscriptLines(RAW);

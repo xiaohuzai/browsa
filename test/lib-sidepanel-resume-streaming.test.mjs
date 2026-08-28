@@ -49,7 +49,10 @@ globalThis.chrome = makeSidepanelChromeMock({
     // in-flight stream with some accumulated text already, so init()'s
     // resumeInFlightStream() takes the "resume" branch instead of
     // returning early.
-    if (msg.type === 'STREAM_PEEK') return { inFlight: true, acc: 'resumed so far. ', startedAt: Date.now() - 5000 };
+    // Real bridge wraps every reply as { ok, data }: payload fields live
+    // under .data (a bare { inFlight } here silently killed the resume path
+    // — same divergence class as the 0.32.x preview-shim bug).
+    if (msg.type === 'STREAM_PEEK') return { ok: true, data: { inFlight: true, acc: 'resumed so far. ', startedAt: Date.now() - 5000 } };
     return { ok: true };
   }),
 });
