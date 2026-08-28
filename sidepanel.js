@@ -1500,7 +1500,12 @@ async function onAttachPage() {
         const fallbackLabel = (platform === 'youtube' && msg403)
           ? (ctx.noTranscript === false ? '已回退使用自带字幕（YouTube 限制了音频下载）' : '已回退为视频信息（YouTube 限制了音频下载）')
           : '已回退为视频信息';
-        showToast(`${analysisMode === 'video' ? '视频解析' : 'ASR 转写'}失败：${e?.message || '未知错误'}（${fallbackLabel}）`, 'error');
+        // 401 + "API key format is incorrect" = key 类型不对（不是密码错）：Agent
+        // Plan 专属 key 与标准方舟平台 key 官方明确不通用，而 ASR/视频解析走标准
+        // 端点的 Files API。给出可操作的提示，别让用户去猜。
+        const authHint = /API key format is incorrect|AuthenticationError/i.test(e?.message || '')
+          ? '——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）' : '';
+        showToast(`${analysisMode === 'video' ? '视频解析' : 'ASR 转写'}失败：${e?.message || '未知错误'}${authHint}（${fallbackLabel}）`, 'error');
       } finally {
         // Remove the Referer-injection rule now that the download is done.
         // (A download that never started, a throw, or a success all land here.)

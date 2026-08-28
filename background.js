@@ -21,7 +21,7 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { handleGetMediaStreams, handleDownloadMedia } from './lib/handlers/media-handler.js';
-import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
+import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -1459,7 +1459,8 @@ async function buildAsrPendingCtx(tabId, ctx) {
       if (!got) return null;
     }
     const streams = got.streams || [];
-    const videoDurationSec = got.videoDurationSec || 0;
+    // SSR duration 缺失时用 DASH 流自带 duration（秒）兜底（resolveVideoDurationSec）。
+    const videoDurationSec = resolveVideoDurationSec(got.videoDurationSec, streams);
     const audioCandidates = streams
       .filter((s) => s.type === 'audio' && s.url)
       .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0));

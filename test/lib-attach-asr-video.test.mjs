@@ -13,6 +13,7 @@ import {
   buildVideoAnalysisInstructions,
   buildVideoAnalysisTaskText,
   analyzeVideo,
+  resolveVideoDurationSec,
 } from '../lib/handlers/attach-asr.js';
 
 const MB = 1024 * 1024;
@@ -123,4 +124,19 @@ test('analyzeVideo sends input_video(+input_audio+input_text) with the video mod
 test('VIDEO_MAX_UPLOAD_BYTES stays under the Ark 512MB hard cap', () => {
   assert.ok(VIDEO_MAX_UPLOAD_BYTES <= 512 * MB);
   assert.ok(VIDEO_MAX_UPLOAD_BYTES > 400 * MB);
+});
+
+test('resolveVideoDurationSec prefers SSR duration, falls back to DASH stream metadata', () => {
+  // SSR 有值 → 直接用
+  assert.equal(resolveVideoDurationSec(600, [{ duration: 999 }]), 600);
+  // SSR 缺失（2026-08-28 实测 81 分钟视频 videoDurationSec=0）→ 取流元数据最大值
+  assert.equal(resolveVideoDurationSec(0, [
+    { type: 'audio', duration: 4874.2 },
+    { type: 'video', duration: 4873.8 },
+  ]), 4874);
+  // 音频/视频任意一条带 duration 都够
+  assert.equal(resolveVideoDurationSec(undefined, [{ type: 'video', duration: 300 }]), 300);
+  // 全部缺失 → 0（维持“未知”语义，不编造）
+  assert.equal(resolveVideoDurationSec(0, [{ type: 'audio', duration: 0 }]), 0);
+  assert.equal(resolveVideoDurationSec(0, []), 0);
 });
