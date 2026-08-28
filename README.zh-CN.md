@@ -6,7 +6,7 @@
 
 > **官网**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — 功能亮点与界面示意（简体中文 · English）
 
-browsa 是一个 Chrome / Edge 扩展（Manifest V3）：在你当前打开的标签页旁打开一个聊天面板，附加页面内容，并从任意 OpenAI 兼容 API 流式接收回复。
+browsa 是一个 Chrome / Edge 扩展（Manifest V3）：在你当前打开的标签页旁打开一个聊天面板，附加页面内容，并从 OpenAI（Chat Completions / Responses）、Anthropic Messages、Ollama 等任意兼容端点流式接收回复。
 
 ```
 [Web 页面]  →  [browsa 侧边栏]  →  [你的 LLM / 智能体]  →  流式回复
