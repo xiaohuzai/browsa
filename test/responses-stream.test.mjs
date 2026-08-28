@@ -121,3 +121,63 @@ test('runsApiStream: partial deltas before tools, remainder streamed after (no d
   assert.equal(deltas.join(''), 'Pre-tool text. Post-tool answer.', 'only the unstreamed remainder should be emitted after run.completed');
   assert.equal(result.full, 'Pre-tool text. Post-tool answer.');
 });
+
+// ─── CRLF SSE: \r\n\r\n block separators must not lose the whole reply ──────
+// The parsers split events on '\n\n'; a provider emitting \r\n line endings
+// produces \r\n\r\n blocks that never match, so runs/responses/anthropic
+// adapters used to return an empty reply.
+
+test('runsApiStream: CRLF (\\r\\n) SSE framing still delivers the full reply', async () => {
+  const { runsApiStream } = await import('../lib/llm-client.js?crlf=' + Math.random());
+
+  const sse = 'event: message.delta\r\ndata: {"delta":"hello from crlf"}\r\n\r\n'
+    + 'event: run.completed\r\ndata: {"output":"hello from crlf"}\r\n\r\n';
+  const bytes = new TextEncoder().encode(sse);
+  // runsApiStream makes two fetches: POST /v1/runs, then the events GET.
+  let call = 0;
+  globalThis.fetch = async () => {
+    call += 1;
+    if (call === 1) return { ok: true, status: 200, json: async () => ({ run_id: 'run_crlf' }) };
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({
+        start(controller) { controller.enqueue(bytes); controller.close(); }
+      }),
+      text: async () => ''
+    };
+  };
+
+  const deltas = [];
+  const result = await runsApiStream({ baseUrl: 'http://test', apiKey: 'k', input: 'hi', onDelta: (d) => deltas.push(d) });
+  assert.match(result.full, /hello from crlf/, 'CRLF framing must not lose the reply');
+  assert.match(deltas.join(''), /hello from crlf/, 'deltas must stream under CRLF framing too');
+});
+
+// ─── hermes run.completed divergence: never chop the answer's head ────────
+test('runsApiStream: run.completed output diverging from streamed deltas is delivered whole, not head-sliced', async () => {
+  const { runsApiStream } = await import('../lib/llm-client.js?div=' + Math.random());
+
+  const streamed = 'A'.repeat(10);           // message.delta narration
+  const finalOutput = 'B'.repeat(20);        // authoritative answer, no shared prefix
+  const sse = `event: message.delta\ndata: {"delta":"${streamed}"}\n\n`
+    + `event: run.completed\ndata: {"output":"${finalOutput}"}\n\n`;
+  const bytes = new TextEncoder().encode(sse);
+  let call = 0;
+  globalThis.fetch = async () => {
+    call += 1;
+    if (call === 1) return { ok: true, status: 200, json: async () => ({ run_id: 'run_div' }) };
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({
+        start(controller) { controller.enqueue(bytes); controller.close(); }
+      }),
+      text: async () => ''
+    };
+  };
+
+  const deltas = [];
+  const result = await runsApiStream({ baseUrl: 'http://test', apiKey: 'k', input: 'hi', onDelta: (d) => deltas.push(d) });
+  const emitted = deltas.join('');
+  assert.ok(emitted.includes(finalOutput), `the WHOLE final output must be emitted, got: ${JSON.stringify(emitted)}`);
+  assert.ok(result.full.includes(finalOutput));
+});

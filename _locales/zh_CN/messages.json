@@ -84,7 +84,7 @@
     "description": "New session button"
   },
   "sessionsSearchPlaceholder": {
-    "message": "搜索会话…",
+    "message": "搜索标题与内容…",
     "description": "Sessions search input placeholder"
   },
   "sessionsEmpty": {
@@ -198,5 +198,35 @@
   "toolbarAria": {
     "message": "browsa 快捷操作",
     "description": "Selection toolbar aria-label"
-  }
+  },
+  "regenTitle": { "message": "重新生成回复", "description": "Assistant message action: regenerate" },
+  "errAuth": { "message": "鉴权失败——请检查 API key 和权限。", "description": "Error card headline: 401/403 class" },
+  "errRateLimit": { "message": "请求被限流或额度不足——稍等重试，或检查账户余额。", "description": "Error card headline: 429/quota class" },
+  "errModel": { "message": "服务方没有这个模型——请到设置里核对模型 ID。", "description": "Error card headline: unknown model class" },
+  "errTimeout": { "message": "请求超时了。", "description": "Error card headline: timeout class" },
+  "errNetwork": { "message": "网络错误——这台设备连不上服务端点。", "description": "Error card headline: network/DNS class" },
+  "errServer": { "message": "服务端出错了——请稍后再试。", "description": "Error card headline: 5xx class" },
+  "errGeneric": { "message": "出了点问题。", "description": "Error card headline fallback" },
+  "errRawToggle": { "message": "原始错误信息", "description": "Error card raw-text disclosure label" },
+  "copyLabel": { "message": "复制", "description": "Generic copy button label" },
+  "queuedLabel": { "message": "已排队", "description": "Follow-up queue dock label" },
+  "queuedSendNow": { "message": "立即发送这条", "description": "Follow-up queue chip: send immediately" },
+  "queuedRemove": { "message": "从队列移除", "description": "Follow-up queue chip: remove" },
+  "pinnedGroupLabel": { "message": "置顶", "description": "Sessions drawer pinned group header" },
+  "pinSession": { "message": "置顶", "description": "Session row pin action tooltip" },
+  "unpinSession": { "message": "取消置顶", "description": "Session row unpin action tooltip" },
+  "deleteSession": { "message": "删除会话", "description": "Session row delete tooltip" },
+  "deleteArmedHint": { "message": "再点一次确认删除", "description": "Two-step delete armed state tooltip" },
+  "contentMatchHint": { "message": "在消息内容中命中", "description": "Content-only search hit dot tooltip" },
+  "sessionsToday": { "message": "今天", "description": "Sessions drawer time bucket" },
+  "sessionsYesterday": { "message": "昨天", "description": "Sessions drawer time bucket" },
+  "sessionsWeek": { "message": "本周", "description": "Sessions drawer time bucket" },
+  "sessionsEarlier": { "message": "更早", "description": "Sessions drawer time bucket" },
+  "transcriptBtnTitle": { "message": "字幕面板", "description": "Topbar button: open transcript drawer" },
+  "transcriptTitle": { "message": "字幕", "description": "Transcript drawer header title" },
+  "transcriptSearchPlaceholder": { "message": "搜索字幕…", "description": "Transcript drawer search input" },
+  "transcriptNote": { "message": "记一笔（当前播放行）", "description": "Transcript drawer note-capture button tooltip" },
+  "followPlayback": { "message": "回到播放位置", "description": "Transcript drawer floating pill after manual scroll" },
+  "transcriptEmpty": { "message": "当前会话没有字幕。", "description": "Transcript drawer empty state" },
+  "thinkDoneTitle": { "message": "思考过程", "description": "Collapsible think-block summary on a finished message" }
 }

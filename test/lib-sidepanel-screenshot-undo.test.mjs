@@ -86,7 +86,10 @@ globalThis.chrome = {
         res = { ok: true, data: { ok: true, ctx: { imageDataUrl: 'data:image/png;base64,fake', meta: { url: 'https://example.com/', title: 'Example Page' } } } };
       }
       if (msg.type === 'ATTACH_SCREENSHOT_CONFIRM') res = { ok: true };
-      if (msg.type === 'UNDO_ATTACH') res = undoShouldSucceed ? { ok: true, removedIdx: 0 } : { ok: false };
+      // Real bridge envelope: handler's { ok, removedIdx } lives under .data.
+      if (msg.type === 'UNDO_ATTACH') res = undoShouldSucceed
+        ? { ok: true, data: { ok: true, removedIdx: 0 } }
+        : { ok: true, data: { ok: false, removedIdx: -1 } };
       cb(res);
     },
     lastError: undefined,

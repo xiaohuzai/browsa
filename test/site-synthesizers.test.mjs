@@ -129,3 +129,14 @@ test('synthesizeYouTubeResult: sets the structured noTranscript flag when there 
   const withSubs = synthesizeYouTubeResult({ videoId: 'abc', title: 'T', author: 'A', lengthSeconds: 0, shortDescription: '', transcript: '[00:00] hi' }, fakeMeta('https://www.youtube.com/watch?v=abc'));
   assert.equal(withSubs.noTranscript, false, 'with transcript -> noTranscript=false');
 });
+
+test('synthesizeSiteCache: rejects a cache whose source site does not match the current page (cross-tab-navigation staleness)', async () => {
+  const { synthesizeSiteCache } = await import('../lib/site-synthesizers.js');
+  // Same tab visited Zhihu earlier, then a Bilibili video: the tabId-keyed
+  // cache still holds Zhihu data and must NOT be synthesized for the
+  // Bilibili page.
+  const res = synthesizeSiteCache({ source: 'zhihu', data: { foo: 'bar' } }, { url: 'https://www.bilibili.com/video/BV1x' });
+  assert.equal(res, null, 'zhihu cache must not serve a bilibili page');
+  const res2 = synthesizeSiteCache({ source: 'bilibili', data: { foo: 'bar' } }, { url: 'https://zhihu.com/question/1' });
+  assert.equal(res2, null, 'bilibili cache must not serve a zhihu page');
+});

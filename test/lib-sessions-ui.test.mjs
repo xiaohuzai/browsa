@@ -10,20 +10,32 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.Node = dom.window.Node;
 
-const SESSIONS = [
-  { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
-  { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
-];
-
 const sentMessages = [];
+// Server-side session store backing the fake GET_SESSIONS — mirrors
+// lib/storage.js's contract: query filters name OR content, pinned first.
 let storageHistory = [{ role: 'user', content: 'hi' }];
+let serverSessions = [
+  // Append-ordered like real chrome.storage: OLDEST first; GET_SESSIONS
+  // reverses to newest-first for display.
+  { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
+  { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
+];
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
       sentMessages.push(msg);
-      if (msg.type === 'GET_SESSIONS') return cb({ data: { sessions: SESSIONS } });
+      if (msg.type === 'GET_SESSIONS') {
+        const q = String(msg.q || '').trim().toLowerCase();
+        let list = [...serverSessions].reverse();
+        if (q) {
+          list = list.filter(s =>
+            s.name.toLowerCase().includes(q) ||
+            (s.history || []).some(m => typeof m?.content === 'string' && m.content.toLowerCase().includes(q)));
+        }
+        return cb({ data: { sessions: list } });
+      }
       if (msg.type === 'GET_SESSION_FULL') {
-        const s = SESSIONS.find(s => s.id === msg.id);
+        const s = serverSessions.find(s => s.id === msg.id);
         return cb({ data: { session: s ? { ...s, history: storageHistory } : null } });
       }
       if (msg.type === 'LOAD_SESSION') return cb({ ok: true });
@@ -55,6 +67,10 @@ initSessionsUI({
 function setupDom() {
   sentMessages.length = 0;
   deps.cancelled = false; deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
+  serverSessions = [
+    { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
+    { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
+  ];
   document.body.innerHTML = `
     <div id="sessions-drawer" hidden>
       <input class="sessions-search" />
@@ -99,29 +115,74 @@ test('closeSessionsDrawer hides the drawer', () => {
   assert.equal(getSessionsDrawer().hidden, true);
 });
 
-test('renderSessionsList filters by the current search query', async () => {
+test('renderSessionsList forwards the search query to GET_SESSIONS (server-side filter)', async () => {
   onSessionSearch({ target: { value: 'second' } });
   await new Promise((r) => setTimeout(r, 250)); // debounced 200ms
   const items = document.querySelectorAll('.session-item');
   assert.equal(items.length, 1);
   assert.match(items[0].querySelector('.session-item-name').textContent, /Second session/);
+  assert.ok(sentMessages.some(m => m.type === 'GET_SESSIONS' && m.q === 'second'),
+    'the raw query must reach the background (it filters names AND content there)');
 });
 
-test('renderSessionsList shows an empty state when there are no saved sessions', async () => {
+test('renderSessionsList shows an empty state when the server-side search finds nothing', async () => {
   onSessionSearch({ target: { value: 'no-such-session-xyz' } });
   await new Promise((r) => setTimeout(r, 250));
   assert.match(document.getElementById('sessions-list').textContent, /No sessions match/);
 });
 
-test('clicking a session delete button asks for confirmation, then sends DELETE_SESSION and refreshes the list', async () => {
+test('delete is a two-step arm: first click arms, second click deletes without any confirm dialog', async () => {
   openSessionsDrawer(); // also resets the search filter left over from a previous test
   await new Promise((r) => setTimeout(r, 10));
   const delBtn = document.querySelector('.session-item .session-del-btn');
-  const confirmed = autoConfirm(true);
+
+  // First plain click: arms only — no DELETE_SESSION yet.
   delBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await confirmed;
+  assert.ok(delBtn.classList.contains('armed'), 'armed state must be visible');
+  assert.ok(!sentMessages.some(m => m.type === 'DELETE_SESSION'), 'arming must not delete');
+
+  // Second click while armed (no Ctrl): commits — no confirm dialog involved.
+  delBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 10));
   assert.ok(sentMessages.some(m => m.type === 'DELETE_SESSION' && m.id === 's1'));
+});
+
+test('Ctrl+click on delete skips arming and deletes immediately', async () => {
+  openSessionsDrawer();
+  await new Promise((r) => setTimeout(r, 10));
+  const delBtn = document.querySelector('.session-item .session-del-btn');
+  delBtn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, ctrlKey: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.ok(sentMessages.some(m => m.type === 'DELETE_SESSION' && m.id === 's1'));
+});
+
+test('pinned sessions get their own group, hide the delete button, and toggle via PIN_SESSION', async () => {
+  serverSessions.find(s => s.id === 's1').pinned = true; // s1 pinned
+  openSessionsDrawer();
+  await new Promise((r) => setTimeout(r, 10));
+
+  // Pinned band first, then the time buckets.
+  const labels = [...document.querySelectorAll('.sessions-group-label')].map(l => l.textContent);
+  assert.equal(labels[0], 'Pinned');
+
+  const pinnedItem = document.querySelector('.session-item.pinned');
+  assert.ok(pinnedItem, 's1 must render as pinned');
+  assert.ok(!pinnedItem.querySelector('.session-del-btn'), 'pinned rows must not offer delete');
+  assert.ok(pinnedItem.querySelector('.session-pin-btn.active'), 'pin button shows active state');
+  assert.ok(!serverSessions.find(s => s.id === 's2').pinned);
+
+  // Unpin via the pin button → PIN_SESSION with flipped flag.
+  pinnedItem.querySelector('.session-pin-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.ok(sentMessages.some(m => m.type === 'PIN_SESSION' && m.id === 's1' && m.pinned === false));
+});
+
+test('unfiltered list groups by time buckets (Today for the fresh session)', async () => {
+  openSessionsDrawer();
+  await new Promise((r) => setTimeout(r, 10));
+  const labels = [...document.querySelectorAll('.sessions-group-label')].map(l => l.textContent);
+  assert.deepEqual(labels.filter(t => /^(Today|Yesterday|This week|Earlier|Pinned)$/.test(t)).length > 0, true,
+    'at least one bucket label must appear');
 });
 
 test('clearAllSessions is a no-op if the user cancels the confirmation', async () => {

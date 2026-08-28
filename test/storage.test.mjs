@@ -267,6 +267,51 @@ test('getSavedSessions returns metadata only (no history payload), newest first'
   assert.ok(!('history' in list[0]), 'list entries must not include the full history payload');
 });
 
+test('pinSession toggles a session and pinned sessions float above unpinned ones', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'one' }]);
+  const s1 = await storage.saveCurrentSession('One');
+  await storage.setHistory([{ role: 'user', content: 'two' }]);
+  const s2 = await storage.saveCurrentSession('Two');
+
+  // Pin the OLDER session; it must surface above the newer one.
+  await storage.pinSession(s1.id, true);
+  let list = await storage.getSavedSessions();
+  assert.deepEqual(list.map(s => s.id), [s1.id, s2.id]);
+  assert.equal(list[0].pinned, true);
+  assert.equal(list[1].pinned, false);
+
+  // Unpinning restores plain recency order.
+  await storage.pinSession(s1.id, false);
+  list = await storage.getSavedSessions();
+  assert.deepEqual(list.map(s => s.id), [s2.id, s1.id]);
+});
+
+test('getSavedSessions(q) matches names AND message content, flagging content-only hits', async () => {
+  reset();
+  await storage.setHistory([
+    { role: 'user', content: 'how do I parse JSON safely?' },
+    { role: 'assistant', content: 'Use JSON.parse inside try/catch.' },
+  ]);
+  const sA = await storage.saveCurrentSession('json parsing');
+  await storage.setHistory([{ role: 'user', content: 'hello there' }]);
+  const sB = await storage.saveCurrentSession('greeting');
+
+  // Name hit on its own.
+  let hits = await storage.getSavedSessions('greeting');
+  assert.deepEqual(hits.map(s => s.id), [sB.id]);
+  assert.equal(hits[0].contentMatch, false);
+
+  // Content-only hit: matched text lives in a message, not the title.
+  hits = await storage.getSavedSessions('JSON.parse');
+  assert.deepEqual(hits.map(s => s.id), [sA.id]);
+  assert.equal(hits[0].contentMatch, true);
+
+  // No match at all → empty result. Query is case-insensitive.
+  assert.deepEqual(await storage.getSavedSessions('quantum blockchain'), []);
+  assert.equal((await storage.getSavedSessions('GREETING')).length, 1);
+});
+
 test('loadSession restores a saved session into the live history and returns its length', async () => {
   reset();
   await storage.setHistory([{ role: 'user', content: 'a' }, { role: 'user', content: 'b' }]);
@@ -319,6 +364,25 @@ test('clearAllSessions empties the saved-sessions list', async () => {
   await storage.saveCurrentSession('One');
   await storage.clearAllSessions();
   assert.deepEqual(await storage.getSavedSessions(), []);
+});
+
+test('cap eviction skips pinned sessions: oldest unpinned are evicted first', async () => {
+  reset();
+  for (let i = 0; i < 49; i++) {
+    await storage.setHistory([{ role: 'user', content: `conversation ${i}` }]);
+    await storage.saveCurrentSession(`Session ${i}`);
+  }
+  // Pin the OLDEST session, then push two more through the cap.
+  await storage.pinSession((await storage.getSavedSessions()).find(s => s.name === 'Session 0').id, true);
+  for (let i = 49; i < 51; i++) {
+    await storage.setHistory([{ role: 'user', content: `conversation ${i}` }]);
+    await storage.saveCurrentSession(`Session ${i}`);
+  }
+  const list = await storage.getSavedSessions();
+  assert.equal(list.length, 50, 'cap still holds when an unpinned candidate is available');
+  assert.ok(list.some(s => s.name === 'Session 0'), 'the pinned oldest session must survive');
+  assert.ok(!list.some(s => s.name === 'Session 1'), 'the oldest UNPINNED session is evicted first');
+  assert.ok(list.some(s => s.name === 'Session 50'), 'the newest session must be present');
 });
 
 test('getSessionFull returns null for an unknown id', async () => {

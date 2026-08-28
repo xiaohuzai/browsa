@@ -141,9 +141,18 @@ test('renderSafe renders $...$ LaTeX via KaTeX', async () => {
 test('renderSafe extracts <think> blocks into a collapsible <details class="think-block">', async () => {
   const html = await renderSafe('<think>reasoning here</think>final answer');
   assert.match(html, /<details class="think-block"[^>]*>/);
-  assert.match(html, /<summary>Thinking…<\/summary>/);
+  // Done-state label (the live "Thinking…" element only exists mid-stream —
+  // a permanent progress label on finished messages reads as still-in-flight).
+  assert.match(html, /<summary>Thought process<\/summary>/);
   assert.match(html, /reasoning here/);
   assert.match(html, /final answer/);
+});
+
+test('renderSafe drops whitespace-only think blocks instead of rendering an empty collapsible', async () => {
+  const html = await renderSafe('你好！<think>\n</think>');
+  assert.doesNotMatch(html, /think-block/, 'an empty think must not leave an empty "thinking" shell');
+  assert.doesNotMatch(html, /<details/);
+  assert.match(html, /你好！/);
 });
 
 test('renderSafe respects setThoughtAutoCollapse(true) by omitting the open attribute', async () => {
@@ -153,6 +162,18 @@ test('renderSafe respects setThoughtAutoCollapse(true) by omitting the open attr
   setThoughtAutoCollapse(false);
   const html2 = await renderSafe('<think>x</think>y');
   assert.match(html2, /<details class="think-block" open>/);
+});
+
+test('renderSafe: a echoed math/think placeholder does not downgrade the whole message', async () => {
+  // A literal BROWSAMATHnEND in the reply (model quoting our internals) used
+  // to destructure undefined in the replace callback → outer catch → the
+  // ENTIRE message rendered as escaped plain text. It must degrade to
+  // nothing while the real math still renders.
+  const html = await renderSafe('real $x^2$ math then BROWSAMATH9END trailing');
+  assert.match(html, /<math/, 'the real formula must still render via KaTeX');
+  assert.ok(!html.includes('BROWSAMATH9END'), 'the bogus placeholder must be swallowed');
+  const html2 = await renderSafe('answer <div data-think="7"></div> done');
+  assert.match(html2, /answer/, 'bogus think placeholder must not crash the render');
 });
 
 test('renderSafe falls back to escaped plain text on unexpected internal errors', async () => {
@@ -471,6 +492,15 @@ test('linkifyTimestamps: supports [h:mm:ss] hour form', () => {
   assert.ok(ts);
   assert.equal(ts.dataset.s, String(1 * 3600 + 2 * 60 + 3));
   assert.equal(ts.textContent, '[1:02:03]');
+});
+
+test('linkifyTimestamps: wraps native 3-digit total-minute stamps [105:30]', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<p>quote from a long video [105:30] here</p>';
+  linkifyTimestamps(el);
+  const ts = el.querySelector('.browsa-ts');
+  assert.ok(ts, '3-digit total-minute stamps must be clickable too');
+  assert.equal(ts.dataset.s, String(105 * 60 + 30));
 });
 
 test('linkifyTimestamps: strips BiliNote *Content- prefix in display but keeps the time', () => {

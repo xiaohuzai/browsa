@@ -12,7 +12,8 @@ import {
   streamPorts, streamState, chatControllers, idleTimerResetters,
   activeRunIds, pendingApprovals, pendingClarifications,
   subChatControllers, subChatPorts,
-  initStreamState, appendToStreamState, clearStreamState
+  initStreamState, appendToStreamState, clearStreamState,
+  STREAM_KEEPALIVE_ALARM
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
@@ -354,7 +355,42 @@ chrome.alarms.create(GC_ALARM_NAME, { periodInMinutes: GC_ALARM_PERIOD_MINUTES }
 const siteCacheReady = restoreSiteCachesFromSession();
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === GC_ALARM_NAME) gcStreamState();
+  // Fires every 30s while a chat stream is in flight. Waking the service
+  // worker resets its idle timer, which keeps it alive when the side panel
+  // that started the stream is gone (closed panel used to mean the SW could
+  // die mid-stream and the reply was lost with its in-memory controller).
+  if (alarm.name === STREAM_KEEPALIVE_ALARM) {
+    if (chatControllers.size === 0) chrome.alarms.clear(STREAM_KEEPALIVE_ALARM);
+  }
 });
+
+// True when `tabUrl` is still the same video page as the stamped source URL:
+// same origin + path, and the same `v` query param when either side has one
+// (YouTube watch URLs differ only there; Bilibili identity is in the path).
+function videoUrlMatches(tabUrl, sourceUrl) {
+  if (!tabUrl || !sourceUrl) return false;
+  try {
+    const a = new URL(tabUrl), b = new URL(sourceUrl);
+    if (a.origin !== b.origin || a.pathname !== b.pathname) return false;
+    const va = a.searchParams.get('v'), vb = b.searchParams.get('v');
+    if (va || vb) return va === vb;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function tabMatchesVideo(tabId, sourceUrl) {
+  // A missing source URL (older stamps) can't be verified — allow, matching
+  // pre-0.33.1 behavior; the video-element probe still degrades safely.
+  if (!sourceUrl) return true;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    return videoUrlMatches(tab?.url, sourceUrl);
+  } catch (_) {
+    return false; // tab gone
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Every handler is async; return true to keep the channel open.
@@ -486,7 +522,12 @@ async function handle(msg, sender) {
       // falls back to opening the source URL with ?t= when this returns
       // ok:false (tab closed, navigated away, or no <video> on the page).
       const tabId = msg.tabId;
-      if (!tabId) return { ok: false, error: 'no tabId' };
+      if (tabId == null) return { ok: false, error: 'no tabId' };
+      // videoSrc.tabId is persisted in saved sessions — after a browser
+      // restart those ids are recycled, and blind injection could seek an
+      // UNRELATED tab's video. Revalidate the tab still shows the source
+      // video; mismatch degrades to the side panel's ?t= URL fallback.
+      if (!(await tabMatchesVideo(tabId, msg.url))) return { ok: false, error: 'tab no longer shows the source video' };
       try {
         const [res] = await chrome.scripting.executeScript({
           target: { tabId },
@@ -512,6 +553,31 @@ async function handle(msg, sender) {
             return { ok: true };
           },
           args: [Number(msg.seconds) || 0],
+        });
+        return res?.result || { ok: false };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
+    }
+
+    case 'GET_VIDEO_TIME': {
+      // Read the video tab's current playback position (for the transcript
+      // drawer's playback-follow highlight). Mirrors SEEK_VIDEO's element
+      // lookup so both agree on which <video> is the target.
+      const tabId = msg.tabId;
+      if (tabId == null) return { ok: false, error: 'no tabId' };
+      // Same stale-tabId revalidation as SEEK_VIDEO — otherwise a recycled
+      // id makes the drawer follow some OTHER tab's playback.
+      if (!(await tabMatchesVideo(tabId, msg.url))) return { ok: false, error: 'tab no longer shows the source video' };
+      try {
+        const [res] = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: () => {
+            const v = document.querySelector('#movie_player video, #bilibili-player video, video');
+            if (!v) return { ok: false };
+            return { ok: true, time: v.currentTime || 0, paused: !!v.paused };
+          },
         });
         return res?.result || { ok: false };
       } catch (e) {
@@ -776,6 +842,7 @@ async function handle(msg, sender) {
     case 'LOAD_SESSION':
     case 'DELETE_SESSION':
     case 'RENAME_SESSION':
+    case 'PIN_SESSION':
     case 'CLEAR_ALL_SESSIONS':
     case 'GET_SESSION_FULL':
       return handleSession(msg);

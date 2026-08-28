@@ -11,11 +11,16 @@ globalThis.document = dom.window.document;
 globalThis.Node = dom.window.Node;
 
 const sentMessages = [];
+let DELETE_FAIL_INDEX = Symbol('none'); // set to a number to simulate a failed removal
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
       sentMessages.push(msg);
-      cb({ ok: true });
+      // Mirror the real bridge envelope: { ok, data } where data is the
+      // handler's return ({ ok: removed }). DELETE_FAIL_INDEX lets a test
+      // make a specific removal fail the way an out-of-range index does.
+      const removed = msg.type === 'REMOVE_HISTORY_ENTRY_BY_INDEX' ? msg.index !== DELETE_FAIL_INDEX : true;
+      cb({ ok: true, data: { ok: removed } });
     },
     lastError: undefined,
   },
@@ -113,6 +118,28 @@ test('deleteSelectedMessages: deletes checked messages highest-index-first, shif
 
   // Multiselect mode must be exited automatically after deletion.
   assert.equal(isInMultiSelectMode(), false);
+});
+
+test('deleteSelectedMessages: a failed removal is not shifted/counted and its bubble stays', async () => {
+  // Make the FIRST processed deletion (highest index, 2) fail like an
+  // out-of-range index would in real storage.
+  DELETE_FAIL_INDEX = 2;
+  try {
+    enterMultiSelect();
+    document.querySelector('.msg[data-hidx="0"] .msg-select-cb').checked = true;
+    document.querySelector('.msg[data-hidx="2"] .msg-select-cb').checked = true;
+    const decrementsBefore = decrements;
+    await deleteSelectedMessages();
+
+    assert.equal(decrements, decrementsBefore + 1, 'only the successful removal (index 0) decrements; the failed one must not');
+    // The failed bubble (hidx=2) must still be in the DOM — its storage
+    // entry survived; only hidx=0 was actually deleted.
+    const remaining = [...document.querySelectorAll('.msg')].map(m => m.textContent);
+    assert.ok(remaining.includes('hello') === false || remaining.length === 2, 'deleted bubble is gone, failed bubble stays');
+    assert.equal(document.querySelectorAll('.msg').length, 2, 'failed removal keeps its bubble');
+  } finally {
+    DELETE_FAIL_INDEX = Symbol('none');
+  }
 });
 
 test('deleteSelectedMessages: shifts data-hidx of surviving bubbles above a deleted index', async () => {
