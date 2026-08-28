@@ -715,11 +715,14 @@ async function handle(msg, sender) {
       // 原始平台由 sidepanel 透传（bilibili / youtube）——决定 mode、videoSrc.platform
       // 和日志标签。缺省回退 bilibili（兼容旧调用/测试）。
       const asrPlatform = (platform === 'youtube') ? 'youtube' : 'bilibili';
+      // format 标签：音频转写 `${platform}-asr`（默认，兼容旧调用）；视频精读由
+      // sidepanel 传 `${platform}-video`，让下游上下文/日志能区分两种产物。
+      const asrFormat = (typeof msg.format === 'string' && msg.format) ? msg.format : `${asrPlatform}-asr`;
       const asrCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
         mode: asrPlatform,
         text: `${finalText}\n\nNote: ${VIDEO_NOTE_HINT}`,
-        format: `${asrPlatform}-asr`,
+        format: asrFormat,
       };
       const contextText = buildPageContextText(asrCtx);
       const historyEntry = { role: 'user', content: contextText };
@@ -816,9 +819,11 @@ async function handle(msg, sender) {
                 return { ok: false, error: '脚本未注入或缺 bvid/cid（页面可能未播放过）' };
               }
               const fresh = await freshFn(bvid, cid);
-              const audios = (Array.isArray(fresh) ? fresh : []).filter((s) => s.type === 'audio' && s.url);
-              if (!audios.length) return { ok: false, error: 'playurl 返回空音频流' };
-              return { ok: true, streams: audios };
+              // 返回全部流类型（audio/video/muxed），由 background 按 msg.want 过滤——
+              // 视频解析模式需要 video/muxed 流一起刷新（want 缺省 'audio'，纯 ASR 行为不变）。
+              const all = (Array.isArray(fresh) ? fresh : []).filter((s) => s.url);
+              if (!all.length) return { ok: false, error: 'playurl 返回空流列表' };
+              return { ok: true, streams: all };
             } catch (e) {
               return { ok: false, error: String((e && e.message) || e) };
             }
@@ -826,8 +831,12 @@ async function handle(msg, sender) {
         });
         const r = res?.result;
         if (r?.ok && Array.isArray(r.streams) && r.streams.length) {
-          console.log(`browsa: ASR_FRESH_URLS ok — ${r.streams.length} fresh audio streams`);
-          return { ok: true, streams: r.streams };
+          // want: 'audio'（缺省，纯 ASR）只回音频流；'all' 连 video/muxed 一起回
+          //（视频解析模式的自愈刷新，sidepanel 拿到后重新选流）。
+          const want = msg.want === 'all' ? 'all' : 'audio';
+          const filtered = want === 'all' ? r.streams : r.streams.filter((s) => s.type === 'audio');
+          console.log(`browsa: ASR_FRESH_URLS ok — ${filtered.length} fresh ${want} streams`);
+          return { ok: true, streams: filtered };
         }
         console.warn('browsa: ASR_FRESH_URLS refresh failed:', r?.error || 'no result');
         return { ok: false, error: r?.error || 'no result' };
@@ -1492,6 +1501,23 @@ async function buildAsrPendingCtx(tabId, ctx) {
       duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '', id: s.id || 0,
     }));
     if (!audio) return null;
+    // 视频解析（v1 仅 B站）：透传 video-only 流候选（按码率降序）+ durl 合一流。
+    // YouTube 的流捕获是 audio-only（pot 视频 URL 未验证），天然没有 video 条目 →
+    // sidepanel 不出模式选择卡，维持纯音频行为。选流/512MB 预算判定在 sidepanel
+    // 的 pickVideoStream 里做（卡片上要展示预估体积，选流必须发生在 UI 层）。
+    const videoCandidates = streams
+      .filter((s) => s.type === 'video' && s.url)
+      .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))
+      .map((s) => ({
+        url: s.url, label: s.label || '', bandwidth: s.bandwidth || 0,
+        duration: s.duration || 0, size: s.size || 0,
+        width: s.width || 0, height: s.height || 0, id: s.id || 0,
+      }));
+    const muxedRaw = streams.find((s) => s.type === 'muxed' && s.url);
+    const muxedStream = muxedRaw ? {
+      url: muxedRaw.url, label: muxedRaw.label || 'mp4', bandwidth: muxedRaw.bandwidth || 0,
+      duration: muxedRaw.duration || 0, size: muxedRaw.size || 0,
+    } : null;
     // 读完整平台 cookie（含 HttpOnly 的 SESSDATA / SID），传给 sidepanel 在下载前经
     // DNR 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
     // onSendHeaders 捕获页面播放器真实请求的完整 cookie（含 HttpOnly），而
@@ -1528,6 +1554,9 @@ async function buildAsrPendingCtx(tabId, ctx) {
       // 完整候选音频流列表 + 视频总时长（秒）：sidepanel 转码后若发现实际解码
       // 时长远小于视频总长（服务端 body 截断 / 元数据谎报），可换下一候选流重试。
       audioCandidates: candidateAudios,
+      // 视频解析候选（B站才有内容）：video-only 流（码率降序）+ durl 合一流（可空）。
+      videoCandidates,
+      muxedStream,
       videoDurationSec: videoDurationSec || 0,
       // 传給 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
       biliCookie: platformCookie,
@@ -1537,6 +1566,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
         apiKey: asr.apiKey,
         baseUrl: asr.baseUrl,
         model: asr.model,
+        videoModel: asr.videoModel || '',
         language: asr.language,
         format: asr.format,
         timeoutMs: asr.timeoutMs,

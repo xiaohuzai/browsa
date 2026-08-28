@@ -2604,3 +2604,35 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+/* ── ASR 模式选择卡（无字幕视频 attach 时：音频转写 / 视频精读）───────────── */
+/* 与 approval/clarify 卡同一视觉原则：bg-2 面板 + 细边框 + 圆角，居中窄卡。 */
+.asr-mode-card {
+  align-self: center;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+  animation: none;
+}
+.asr-mode-title { color: var(--fg-2); margin-bottom: 8px; }
+.asr-mode-row { display: flex; gap: 8px; }
+.asr-mode-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-3);
+  color: var(--fg-2);
+  cursor: pointer;
+  text-align: left;
+  transition: opacity var(--t);
+}
+.asr-mode-btn:hover { opacity: 0.85; }
+.asr-mode-main { font-weight: 500; color: var(--fg); }
+.asr-mode-sub { font-size: 0.85em; color: var(--fg-dim); }
