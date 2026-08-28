@@ -130,6 +130,9 @@ For text selection, highlight text on the page and use the **floating toolbar** 
 - **Diff highlighting** — `diff` code blocks color `+` green and `-` red
 - **Detail thread ("细聊")** — select any text inside a reply to open a scoped side conversation about just that excerpt, without touching the main history. Fully resizable, closes and discards everything on ✕
 - **Edit & resend** — click ✏ on any user message to edit and re-send
+- **Regenerate** — ⟳ re-runs any assistant reply from its preceding user message
+- **Queued follow-ups** — typing while a reply streams queues your message; it sends automatically once the stream ends
+- **Error cards** — provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable
 - **Copy response** — click ⎘ to copy the full raw Markdown
 - **Timestamps** — hover any message to see send time
 
@@ -138,12 +141,14 @@ For text selection, highlight text on the page and use the **floating toolbar** 
 - **Session history** — save the current conversation as a named session, browse and restore past sessions from the 🕐 drawer
 - **Export** — export any session as a Markdown file
 - **In-conversation search** — `Ctrl+F` to search across all messages with prev/next navigation
+- **Session drawer search & pin** — filter sessions by title AND message content (content-only hits flagged); pinned sessions float above the list
 - **Multi-select** — select multiple messages for batch deletion
 - **Undo clear** — clearing history shows an undo option for 5 seconds
 
 ### Input
 
 - **Image attachment** — drag-and-drop or paste images directly into the composer (for multimodal models)
+- **Input history & drafts** — ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel
 - **Slash commands** — type `/` to see completions; see list below
 - **Quick actions** — one-click Summarize / Key Points / Explain / → 中文 / Outline buttons above the composer
 - **Floating selection toolbar** — appears when you highlight text on any page: Ask · Explain · → 中文 · Summarize
