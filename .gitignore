@@ -47,3 +47,6 @@ dev-preview/*.preview.html
 
 # CWS 商店截图（上传 Chrome Web Store 用，本地生成不入库）
 store-assets/
+
+# ZCode CLI 工具本地状态
+skills-lock.json
