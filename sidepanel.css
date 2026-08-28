@@ -1444,7 +1444,7 @@ math[display="block"] {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
-.toast span { flex: 1; }
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .toast-x {
   background: none;
   border: none;

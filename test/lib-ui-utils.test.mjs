@@ -105,6 +105,36 @@ test('showToast auto-classifies an error-looking message as type=error with Copy
   assert.ok(toast.querySelector('.toast-x'), 'error toasts get a Dismiss button');
 });
 
+test('showToast: error toast dismisses on clicking anywhere outside it', async () => {
+  showToast('some failure', 'error');
+  const toast = document.querySelector('.toast-error:last-child');
+  assert.ok(toast, 'toast exists');
+  await new Promise((r) => setTimeout(r, 10)); // outside-click 监听延后一拍挂上
+  document.body.click(); // 点 toast 外
+  assert.ok(!toast.isConnected, 'outside click must dismiss the toast');
+});
+
+test('showToast: clicking ON the toast does not dismiss it', async () => {
+  showToast('another failure', 'error');
+  const toast = document.querySelector('.toast-error:last-child');
+  await new Promise((r) => setTimeout(r, 10));
+  toast.click(); // 点 toast 本身（选文本/误触）
+  assert.ok(toast.isConnected, 'clicking the toast must keep it');
+  toast.querySelector('.toast-x').click(); // Dismiss 仍然有效
+  assert.ok(!toast.isConnected);
+});
+
+test('showToast: overlong messages are truncated for display (buttons stay reachable)', () => {
+  // 2026-08-28 实测：原始 JSON 报错把 Dismiss 顶出视口 → “关不掉”。
+  const long = '视频解析失败：' + JSON.stringify({ error: { code: 'AuthenticationError', message: 'x'.repeat(800) } });
+  showToast(long, 'error');
+  const toast = document.querySelector('.toast-error:last-child');
+  const span = toast.querySelector('span');
+  assert.ok(span.textContent.length < 600, 'display text must be capped');
+  assert.ok(span.textContent.endsWith('…'), 'truncation must be marked with an ellipsis');
+  toast.querySelector('.toast-x').click();
+});
+
 test('showConfirmDialog resolves true when the confirm button is clicked', async () => {
   const p = showConfirmDialog({ title: 'Delete?', message: 'Are you sure?', confirmLabel: 'Delete', danger: true });
   const modal = document.querySelector('.confirm-modal');

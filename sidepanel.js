@@ -834,6 +834,22 @@ function cycleContextMode() {
   onContextModeChange(); // persist
 }
 
+// 方舟把可读错误放在 JSON body 里（upload HTTP 401: {"error":{"message":...}}），
+// 整串进 toast 又长又难读（还有无空格的 Request id 长 token）。抽出 error.message
+// 让 toast 保持一行可读；解析不出 JSON 原样返回。console.warn 仍记全文。
+function compactArkErrorText(msg) {
+  const s = String(msg || '');
+  const i = s.indexOf('{"');
+  if (i === -1) return s;
+  try {
+    const j = JSON.parse(s.slice(i));
+    const inner = j?.error?.message || j?.message || '';
+    return inner ? s.slice(0, i) + inner : s;
+  } catch (_) {
+    return s;
+  }
+}
+
 // Session DNR rule：给 ASR 媒体下载注入平台 CDN 要求的头（Referer/Origin/Cookie），
 // 音频/视频两条管线共用（自 sidepanel 内联块原样提取；每条头为什么必须注入的完整
 // 历史见 background.js DOWNLOAD_MEDIA 与下方注释）。
@@ -1505,7 +1521,7 @@ async function onAttachPage() {
         // 端点的 Files API。给出可操作的提示，别让用户去猜。
         const authHint = /API key format is incorrect|AuthenticationError/i.test(e?.message || '')
           ? '——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）' : '';
-        showToast(`${analysisMode === 'video' ? '视频解析' : 'ASR 转写'}失败：${e?.message || '未知错误'}${authHint}（${fallbackLabel}）`, 'error');
+        showToast(`${analysisMode === 'video' ? '视频解析' : 'ASR 转写'}失败：${compactArkErrorText(e?.message || '未知错误')}${authHint}（${fallbackLabel}）`, 'error');
       } finally {
         // Remove the Referer-injection rule now that the download is done.
         // (A download that never started, a throw, or a success all land here.)
