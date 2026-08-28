@@ -26,13 +26,14 @@ function installFakeWorker(behavior) {
     addEventListener(type, fn) { this._listeners[type].push(fn); }
     postMessage(data) {
       if (behavior === 'silent') return; // simulate a hung/never-responding worker
+      if (behavior === 'manual') return; // test fires replies itself
       // Echo back: a fake "html" distinguishable from real KaTeX/sync output,
       // so tests can tell worker results apart from cache/sync results. A
       // job whose formula is exactly 'FAIL' simulates a per-job render error.
       const jobs = data.jobs.map(j => j.formula === 'FAIL'
         ? { id: j.id, error: 'bad formula' }
         : { id: j.id, html: `<worker-html len="${j.formula.length}">` });
-      for (const fn of this._listeners.message) fn({ data: { jobs } });
+      for (const fn of this._listeners.message) fn({ data: { jobs, batchId: data.batchId } });
     }
     terminate() {}
   }
@@ -131,4 +132,43 @@ test('renderMathBatch: repeated identical formulas hit the cache and skip re-ren
   const second = await renderMathBatch([{ formula: 'cache-me', displayMode: true }]);
   assert.equal(second[0].ok, true);
   assert.equal(second[0].html, first[0].html);
+});
+
+test('renderMathBatch: a reply whose batchId matches resolves; an unknown batchId is ignored (no cross-batch contamination)', async () => {
+  const getWorker = (() => {
+    let lastInstance = null;
+    class ManualWorker {
+      constructor() {
+        this._listeners = { message: [], error: [] };
+        lastInstance = this;
+      }
+      addEventListener(type, fn) { this._listeners[type].push(fn); }
+      postMessage() {} // test fires replies manually
+      terminate() {}
+    }
+    globalThis.Worker = ManualWorker;
+    return () => lastInstance;
+  })();
+  getWorker();
+
+  const { renderMathBatch } = await freshModule();
+  // Enough (long) formulas to clear the worker threshold — a small batch
+  // would take the synchronous path and never construct a worker.
+  const formulas = Array.from({ length: 12 }, (_, i) => `x_{${i}}^{2} + ${i} \\frac{a${i}}{b${i}} ` + 'y'.repeat(40 + i * 10));
+  const pending = renderMathBatch(formulas.map((f, i) => ({ formula: f, displayMode: i === 0 })));
+  // Give the module a tick to construct the worker + queue the batch (batchId 1).
+  await new Promise((r) => setTimeout(r, 0));
+
+  const worker = getWorker();
+  const fire = (payload) => worker._listeners.message.forEach((fn) => fn({ data: payload }));
+
+  // A late reply for a batch id that was never issued (or already timed out)
+  // must be dropped, not blindly shifted onto the pending batch.
+  fire({ jobs: [{ id: 0, html: '<stale-html>' }], batchId: 999 });
+  // The genuine reply for batchId 1 (ids are per-batch job indices).
+  const jobs = formulas.map((f, i) => ({ id: i, html: `<worker-good-${i}>` }));
+  fire({ jobs, batchId: 1 });
+
+  const results = await pending;
+  assert.equal(results[0]?.html, '<worker-good-0>', 'the pending batch resolves from ITS OWN reply only');
 });

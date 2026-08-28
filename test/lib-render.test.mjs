@@ -164,6 +164,18 @@ test('renderSafe respects setThoughtAutoCollapse(true) by omitting the open attr
   assert.match(html2, /<details class="think-block" open>/);
 });
 
+test('renderSafe: a echoed math/think placeholder does not downgrade the whole message', async () => {
+  // A literal BROWSAMATHnEND in the reply (model quoting our internals) used
+  // to destructure undefined in the replace callback → outer catch → the
+  // ENTIRE message rendered as escaped plain text. It must degrade to
+  // nothing while the real math still renders.
+  const html = await renderSafe('real $x^2$ math then BROWSAMATH9END trailing');
+  assert.match(html, /<math/, 'the real formula must still render via KaTeX');
+  assert.ok(!html.includes('BROWSAMATH9END'), 'the bogus placeholder must be swallowed');
+  const html2 = await renderSafe('answer <div data-think="7"></div> done');
+  assert.match(html2, /answer/, 'bogus think placeholder must not crash the render');
+});
+
 test('renderSafe falls back to escaped plain text on unexpected internal errors', async () => {
   // Can't easily force marked/katex to throw from the outside, but the
   // catch-all fallback branch must at minimum escape unsafe characters.

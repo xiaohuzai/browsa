@@ -2399,7 +2399,7 @@ async function onTimestampClick(ts) {
 async function seekVideo(vs, seconds) {
   if (vs?.tabId) {
     try {
-      const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds });
+      const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds, url: vs.url });
       // background envelopes every reply as { ok, data } — res.ok is just
       // "the handler didn't throw" and is true even when the seek itself
       // failed (tab gone / no <video>). The inner data.ok is the real
@@ -2650,7 +2650,10 @@ async function regenerateReply(userBubble) {
   try {
     await onSend();
   } finally {
-    inputEl.value = savedDraft;
+    // onSend resolves at the CHAT ack (network RTT). Only restore the parked
+    // draft when the composer is still empty — otherwise we'd erase whatever
+    // the user typed (or a transcript-drawer 记一笔 filled) meanwhile.
+    if (!inputEl.value.trim()) inputEl.value = savedDraft;
   }
 }
 
@@ -2728,7 +2731,8 @@ function startMsgEdit(el) {
   });
 
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveBtn.click(); }
+    // 同主输入框：中文 IME 确认候选词的 Enter 不能触发保存重发。
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.repeat) { e.preventDefault(); saveBtn.click(); }
     if (e.key === 'Escape') cancelBtn.click();
   });
 }
