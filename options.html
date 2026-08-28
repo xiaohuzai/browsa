@@ -23,7 +23,7 @@
         <div class="card-body">
           <div class="hint-line">
             <span class="hint">Configure your AI providers.</span>
-            <span class="tip" tabindex="0">?<span class="tip-bubble"><b>Hermes Agent</b> is the built-in agent backend — just fill in Base URL + API key (its own /v1/runs protocol is used automatically).<br><br><b>LLM providers</b>: any endpoint speaking OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages. Give each an Alias so multiple configs stay distinguishable. Use <b>Ping</b> to verify connectivity.</span></span>
+            <span class="tip" tabindex="0">?<span class="tip-bubble"><b>Hermes Agent</b> is the built-in agent backend — just fill in Base URL + API key (its own /v1/runs protocol is used automatically).<br><br><b>LLM providers</b>: any endpoint speaking OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages. Give each an Alias so multiple configs stay distinguishable. Use <b>Ping</b> to verify connectivity. Ark-style bases that already include the version (<code>…/api/v3</code>, <code>…/api/plan/v3</code>) work as-is — the version segment is detected and no extra <code>/v1</code> is added.</span></span>
           </div>
           <div id="providers"></div>
         </div>

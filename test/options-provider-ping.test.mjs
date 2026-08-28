@@ -46,6 +46,34 @@ test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models ca
   assert.equal(modelsCalled, false, 'must not call /v1/models when there is no apiKey to verify');
 });
 
+test('ping(): Ark-style versioned base (.../api/plan/v3) appends endpoints WITHOUT an extra /v1', async () => {
+  // 方舟网关的版本段在 base 里（官方给 Cline/Cursor 的 base 即 …/api/plan/v3），
+  // 再拼 /v1 得到 …/v3/v1/chat/completions —— plan 网关带 key 也 404（2026-08-28 实测）。
+  const { ping } = await import('../lib/llm-client.js');
+  const called = [];
+  mockFetchSequence([
+    (url) => { called.push(String(url)); return { ok: true, json: async () => ({ choices: [{ message: { content: 'hi' } }] }) }; },
+  ]);
+  const result = await ping({ baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3', apiKey: 'ark-key', model: 'doubao-seed-1-8', apiStyle: 'chat' });
+  assert.equal(result, 'ok');
+  assert.equal(called[0], 'https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions');
+
+  // responses 风格同理
+  called.length = 0;
+  await ping({ baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: 'ark-key', model: 'doubao-seed-1-6', apiStyle: 'responses' });
+  assert.equal(called[0], 'https://ark.cn-beijing.volces.com/api/v3/responses');
+});
+
+test('ping(): base already ending in /v1 is not double-prefixed', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  const called = [];
+  mockFetchSequence([
+    (url) => { called.push(String(url)); return { ok: true, json: async () => ({ choices: [{ message: { content: 'hi' } }] }) }; },
+  ]);
+  await ping({ baseUrl: 'https://api.openai.com/v1', apiKey: 'sk', model: 'gpt-test', apiStyle: 'chat' });
+  assert.equal(called[0], 'https://api.openai.com/v1/chat/completions');
+});
+
 test('ping(): no model, with apiKey — verifies auth via /v1/models even if /health passed', async () => {
   const { ping } = await import('../lib/llm-client.js');
   const calledUrls = [];
