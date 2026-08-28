@@ -6,7 +6,7 @@
 
 > **Website**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — feature highlights & interactive interface demos (English · 简体中文)
 
-browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI-compatible API.
+browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI (Chat Completions / Responses), Anthropic Messages, or Ollama-compatible API.
 
 ```
 [Web page]  →  [browsa side panel]  →  [your LLM / agent]  →  streaming reply
