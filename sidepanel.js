@@ -38,7 +38,7 @@ import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript, transcriptEndSec,
-  pickVideoStream, estimateStreamBytes, analyzeVideo,
+  pickVideoStream, estimateStreamBytes, analyzeVideo, parseKeyframeMarkers, extractKeyframes,
   ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -1064,7 +1064,17 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     if (!docText) {
       throw new Error('精读输出为空');
     }
-    return { transcriptText: docText, audioBytes: audio ? audio.bytes : 0, videoBytes: videoBlob.size };
+    // 关键帧截图：模型在文档里标记的 [截屏] 时刻 → 从已下载的视频 blob 抽帧
+    //（同源 canvas，无跨源污染），走 PDF 插图同款管线（image_url 进 history，
+    // 模型每轮可见）。抽帧任何失败都 fail-open 返回 []，绝不阻塞精读产物。
+    let figures = [];
+    const keyframes = parseKeyframeMarkers(docText);
+    if (videoBlob && keyframes.length) {
+      showAttachProgress('截取关键帧…');
+      figures = await extractKeyframes(videoBlob, keyframes);
+      console.log(`[ASR] keyframes: ${keyframes.length} markers -> ${figures.length} frames`);
+    }
+    return { transcriptText: docText, audioBytes: audio ? audio.bytes : 0, videoBytes: videoBlob.size, figures };
   } finally {
     clearInterval(waitTimer);
   }
@@ -1490,6 +1500,7 @@ async function onAttachPage() {
       let transcriptText = '';
       let audioBytes = 0;
       let videoBytes = 0;
+      let figures = [];
       const dnrRuleId = Math.floor(Math.random() * 4_999_999) + 1;
       try {
         // 0. Register the session DNR rule injecting the platform CDN's required
@@ -1502,6 +1513,7 @@ async function onAttachPage() {
           transcriptText = r.transcriptText;
           audioBytes = r.audioBytes;
           videoBytes = r.videoBytes;
+          figures = r.figures || [];
         } else {
           // —— 音频转写管线（原行为：下载最佳音频流 → WAV → 上传 → 轮询 → 转写）——
           const r = await runAudioTranscribePipeline({ ctx, platform, wantDurSec });
@@ -1542,11 +1554,16 @@ async function onAttachPage() {
       // 本身保持原样），失败回退时原字幕原样保留。
       let confirmText = ctx.text || '';
       if (transcriptText) {
-        // 两种产物的段落标题不同：字幕（音频转写）/ 视听精读（视频解析）。视频解析
-        // 只挂在无字幕视频上，没有「替换原字幕」分支（preferAsr 剥除仅音频模式）。
+        // 两种产物的段落标题不同：字幕（音频转写）/ 视听精读（视频解析）。
         const sectionHeader = analysisMode === 'video' ? '## 视听精读（视频解析）' : '## 字幕（ASR）';
         if (analysisMode === 'video') {
-          confirmText = (ctx.text || '') + '\n\n' + sectionHeader + '\n\n' + transcriptText;
+          // 视频精读的触发条件包含「有原字幕但设置了优先 ASR」（subtitleSource=asr）
+          // ——此时 ctx.text 带着 B站 AI 字幕的 ## 字幕 块，而精读把语音重新转写了
+          // 一遍，不剥掉的话两份语音内容全量进上下文（2026-08-29 用户实测重复）。
+          // 精读是字幕的升级替代品（语音＋画面），原字幕块一律剥掉。
+          confirmText = (ctx.text || '')
+            .replace(/\n\n## 字幕\n\n[\s\S]*$/, '')
+            .replace(/\s+$/, '') + '\n\n' + sectionHeader + '\n\n' + transcriptText;
         } else {
           const preferAsr = ctx.asr?.subtitleSource === ASR_SUBTITLE_SOURCE.ASR;
           const hadOriginalTranscript = ctx.noTranscript === false;
@@ -1565,6 +1582,8 @@ async function onAttachPage() {
         tabId: currentTabId,
         // 视频精读的 format 标签区分产物（ATTACH_ASR_CONFIRM 缺省仍是 -asr）。
         ...(analysisMode === 'video' ? { format: platform + '-video' } : {}),
+        // 关键帧截图（视频精读）：{url, caption} 列表，镜像 PDF 的 figureImages。
+        ...(analysisMode === 'video' && figures.length ? { figureImages: figures } : {}),
       }).catch(() => null);
       if (confirmRes?.data?.ok) {
         nextHistoryIdx++;
@@ -1578,9 +1597,9 @@ async function onAttachPage() {
         ].join('');
         // 解析失败时的回退标签要区分：有原字幕的视频保留原字幕，无字幕的视频才是纯视频信息。
         const subLabel = transcriptText
-          ? `，${lineCount} 行${kindLabel === '视听精读' ? '精读' : '字幕'}`
+          ? `，${lineCount} 行${kindLabel === '视听精读' ? '精读' : '字幕'}${figures.length ? `，${figures.length} 张截图` : ''}`
           : (ctx.noTranscript === false ? '（解析失败，已保留原字幕）' : '（无字幕，已用视频信息代替）');
-        appendAttachSystem(`📎 已附加 ${platformLabel}${kindLabel}："${title}"（${analysisMode === 'video' ? '视频解析' : 'ASR'}${bytesLabel}${subLabel}）`, null, confirmText);
+        appendAttachSystem(`📎 已附加 ${platformLabel}${kindLabel}："${title}"（${analysisMode === 'video' ? '视频解析' : 'ASR'}${bytesLabel}${subLabel}）`, null, confirmText, figures);
       } else {
         appendError('ASR attach failed');
       }

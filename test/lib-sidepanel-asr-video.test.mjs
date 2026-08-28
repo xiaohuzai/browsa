@@ -81,11 +81,27 @@ globalThis.fetch = async (url, init) => {
       json: async () => ({
         id: 'resp_1',
         output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text',
-          text: '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:04] 欢迎收看' }] }],
+          text: '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:01] [截屏] 标题卡片画面\n[00:04] 欢迎收看' }] }],
       }),
     };
   }
   throw new Error('unexpected fetch: ' + u);
+};
+
+const attachCtx = {
+  meta: { url: 'https://www.bilibili.com/video/BV1xx411c7mD', title: '测试视频' },
+  mode: 'asr-pending',
+  audioUrl: 'https://bilivideo.com/audio/192.m4s',
+  audioCandidates: [{ url: 'https://bilivideo.com/audio/192.m4s', label: '192 kbps', bandwidth: 192000, size: 96 * 1024, duration: 4, codecs: 'mp4a.40.2', id: 30216 }],
+  videoCandidates: [
+    { url: 'https://bilivideo.com/video/big.m4s', label: '3840x2160', bandwidth: 9000000, size: 900 * MB, duration: 4, height: 2160, id: 120 },
+    { url: 'https://bilivideo.com/video/301.m4s', label: '1920x1080', bandwidth: 2000000, size: 100 * MB, duration: 4, height: 1080, id: 80 },
+  ],
+  videoDurationSec: 4,
+  biliCookie: 'buvid3=test-buvid; b_nut=12345',
+  noTranscript: true,
+  text: 'bilibili plain text fallback',
+  asr: { apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original' },
 };
 
 globalThis.chrome = {
@@ -110,26 +126,7 @@ globalThis.chrome = {
       if (msg.type === 'GET_CONFIG') { cb({ data: {} }); return; }
       if (msg.type === 'STREAM_PEEK') { cb({ inFlight: false }); return; }
       if (msg.type === 'ATTACH_PAGE') {
-        cb({
-          ok: true, data: {
-            ok: true,
-            ctx: {
-              meta: { url: 'https://www.bilibili.com/video/BV1xx411c7mD', title: '测试视频' },
-              mode: 'asr-pending',
-              audioUrl: 'https://bilivideo.com/audio/192.m4s',
-              audioCandidates: [{ url: 'https://bilivideo.com/audio/192.m4s', label: '192 kbps', bandwidth: 192000, size: 96 * 1024, duration: 4, codecs: 'mp4a.40.2', id: 30216 }],
-              videoCandidates: [
-                { url: 'https://bilivideo.com/video/big.m4s', label: '3840x2160', bandwidth: 9000000, size: 900 * MB, duration: 4, height: 2160, id: 120 },
-                { url: 'https://bilivideo.com/video/301.m4s', label: '1920x1080', bandwidth: 2000000, size: 100 * MB, duration: 4, height: 1080, id: 80 },
-              ],
-              videoDurationSec: 4,
-              biliCookie: 'buvid3=test-buvid; b_nut=12345',
-              noTranscript: true,
-              text: 'bilibili plain text fallback',
-              asr: { apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original' },
-            },
-          },
-        });
+        cb({ ok: true, data: { ok: true, ctx: attachCtx } });
         return;
       }
       if (msg.type === 'ATTACH_ASR_CONFIRM') { confirmed = msg; cb({ ok: true, data: { ok: true } }); return; }
@@ -155,6 +152,9 @@ const messagesEl = document.getElementById('messages');
 function resetState() {
   sent = []; confirmed = null; downloads = []; uploads = []; polledIds = []; responsesBodies = [];
   dnrRules = 0; dnrRemoved = 0;
+  // 恢复 ctx 基线（个别测试会改 noTranscript/text）
+  attachCtx.noTranscript = true;
+  attachCtx.text = 'bilibili plain text fallback';
 }
 
 async function waitFor(fn, ms = 4000) {
@@ -180,7 +180,7 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   assert.match(btns[1].textContent, /约 100MB/);
 
   btns[1].click(); // 视频精读
-  await waitFor(() => confirmed && uploads.length === 2);
+  await waitFor(() => confirmed && uploads.length === 2, 9000);
 
   // 双下载（视频流 + 音频流）、双上传（video.mp4 + audio.wav，purpose=user_data）
   assert.deepEqual(downloads.map((d) => d.url.includes('/video/') ? 'video' : 'audio').sort(), ['audio', 'video']);
@@ -203,9 +203,31 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   assert.match(confirmed.text, /bilibili plain text fallback/);
   assert.equal(confirmed.format, 'bilibili-video');
   assert.equal(confirmed.platform, 'bilibili');
+  // 截屏标记行保留在产物里；jsdom 没有 URL.createObjectURL → 抽帧 fail-open 返回
+  // [] → confirm 不带 figureImages（真实浏览器里抽帧成功才走多模态入库）。
+  assert.match(confirmed.text, /\[00:01\] \[截屏\] 标题卡片画面/);
+  assert.equal(confirmed.figureImages, undefined);
   assert.ok(dnrRules >= 1 && dnrRemoved >= 1, 'DNR rule registered and removed');
   assert.ok(!document.querySelector('.asr-mode-card'), 'card removed after choice');
   await waitFor(() => !attachBtn.disabled);
+});
+
+test('video mode on a subtitled video strips the original ## 字幕 block', async () => {
+  // 触发条件包含「有字幕但设置了优先 ASR」——精读把语音重新转写一遍，原字幕块不剥
+  // 的话两份语音全量进上下文（2026-08-29 用户实测重复）。
+  resetState();
+  // 在 ctx 里塞一份 B站 AI 字幕（buildAsrPendingCtx 对有字幕视频的形态）
+  attachCtx.noTranscript = false;
+  attachCtx.text = 'bilibili plain text fallback\n\n## 字幕\n\n[00:00] 原字幕第一句\n[00:01] 原字幕第二句';
+  attachBtn.click();
+  await waitFor(() => document.querySelector('.asr-mode-card'), 3000, 'mode card');
+  document.querySelectorAll('.asr-mode-btn')[1].click();
+  // confirm 等待放宽：jsdom 下抽帧 fail-open 也要走完 4s metadata 超时才返回 []
+  await waitFor(() => confirmed, 9000, 'ATTACH_ASR_CONFIRM');
+  assert.match(confirmed.text, /## 视听精读（视频解析）/);
+  assert.match(confirmed.text, /bilibili plain text fallback/, '视频元信息保留');
+  assert.doesNotMatch(confirmed.text, /原字幕第一句/, '原字幕块必须被剥掉（精读已覆盖语音内容）');
+  assert.doesNotMatch(confirmed.text, /## 字幕（ASR）/, '视频模式不产生音频字幕段');
 });
 
 test('audio mode: picking 音频转写 runs the legacy single-file pipeline', async () => {

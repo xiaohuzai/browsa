@@ -708,10 +708,21 @@ async function handle(msg, sender) {
       // two-step handoff. The transcript is a `[mm:ss] text` block which, when
       // stamped with videoSrc below, becomes clickable seek links in the
       // rendered reply (linkifyTimestamps).
-      const { text, metaUrl, metaTitle, platform } = msg;
+      const { text, metaUrl, metaTitle, platform, figureImages } = msg;
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
       let finalText = text;
+      // 关键帧截图（视频精读专属，镜像 ATTACH_PDF_CONFIRM 的 figure 管线）：模型在
+      // 精读文档里标记的 [截屏] 时刻，sidepanel 从视频 blob 抽帧后以 {url, caption}
+      // 传入。captions 按顺序列进正文 Figures 段（模型把「截图 N」与 image_url 块
+      // 一一对应），image_url 块随 history 每轮重发给多模态 provider。
+      const figures = (Array.isArray(figureImages) ? figureImages : [])
+        .map((f) => (typeof f === 'string' ? { url: f } : f))
+        .filter((f) => f && f.url);
+      if (figures.length) {
+        const lines = figures.map((f, i) => `${i + 1}. ${f.caption || `Keyframe ${i + 1}`}`);
+        finalText += '\n\n## Figures\nThe descriptions below correspond to the following video screenshots in order:\n' + lines.join('\n');
+      }
       // 原始平台由 sidepanel 透传（bilibili / youtube）——决定 mode、videoSrc.platform
       // 和日志标签。缺省回退 bilibili（兼容旧调用/测试）。
       const asrPlatform = (platform === 'youtube') ? 'youtube' : 'bilibili';
@@ -725,7 +736,19 @@ async function handle(msg, sender) {
         format: asrFormat,
       };
       const contextText = buildPageContextText(asrCtx);
-      const historyEntry = { role: 'user', content: contextText };
+      // 有关键帧时存成多模态 content 数组（与 ATTACH_PDF_CONFIRM / ATTACH_SCREENSHOT_CONFIRM
+      // 同构）：text 块在前，image_url 块按 Figures 段的顺序跟随。buildMessages 把
+      // history 原样透传，截图每轮随文本一起发给多模态 provider。无截图保持纯字符串
+      // content 形状，history 结构不变。
+      const historyEntry = figures.length
+        ? {
+            role: 'user',
+            content: [
+              { type: 'text', text: contextText },
+              ...figures.map((f) => ({ type: 'image_url', image_url: { url: f.url } })),
+            ],
+          }
+        : { role: 'user', content: contextText };
       // Stamp videoSrc so the [mm:ss] transcript renders as clickable seek
       // links (same platform/url/tabId shape as ATTACH_PAGE stamps on video
       // page-contexts).
@@ -737,7 +760,7 @@ async function handle(msg, sender) {
       const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
       if (willSummarize) historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
-      console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars`);
+      console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars${figures.length ? `, ${figures.length} keyframes` : ''}`);
       if (willSummarize) {
         maybeSummarizeAttachment({
           attachId: historyEntry.attachId,

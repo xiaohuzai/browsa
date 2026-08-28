@@ -14,6 +14,7 @@ import {
   buildVideoAnalysisTaskText,
   analyzeVideo,
   resolveVideoDurationSec,
+  parseKeyframeMarkers,
 } from '../lib/handlers/attach-asr.js';
 
 const MB = 1024 * 1024;
@@ -78,6 +79,32 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
+  // 截屏标记协议（最多 6 个 + 间隔 + 独立成行）
+  assert.match(ins, /\[截屏\]/);
+  assert.match(ins, /at most 6/i);
+  assert.match(task, /\[截屏\]/);
+  assert.match(task, /最多 6 个/);
+});
+
+test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and min gap', () => {
+  const doc = [
+    '[00:00] 大家好',
+    '[00:05] [截屏] 图表一',
+    '[00:10] [截屏] 图表二',        // 与上一条间隔 5s < 8s → 丢弃
+    '[00:30] 画面：普通行（无标记）',
+    '[02:05] [截屏] 代码演示',
+    '[1:02:03] [截屏] 片尾总结',
+    '[00:03] [截屏] 排序后最早',     // 乱序输入 → 排序后 3s，与 00:05 冲突 → 丢弃
+  ].join('\n');
+  const out = parseKeyframeMarkers(doc);
+  // 排序后 3s 先入选；5s/10s 与它间隔 < 8s 被滤；125s、3723s 保留。
+  assert.deepEqual(out.map((m) => m.sec), [3, 125, 3723], 'sorted, gap-filtered');
+  assert.deepEqual(out.map((m) => m.caption), ['排序后最早', '代码演示', '片尾总结']);
+  // 上限 6
+  const many = Array.from({ length: 10 }, (_, i) => `[${i}:00:00] [截屏] 图${i}`).join('\n');
+  assert.equal(parseKeyframeMarkers(many).length, 6);
+  assert.deepEqual(parseKeyframeMarkers('没有标记的文档'), []);
+  assert.deepEqual(parseKeyframeMarkers(''), []);
 });
 
 test('analyzeVideo sends input_video(+input_audio+input_text) with the video model and reports the transcript', async () => {
