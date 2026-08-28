@@ -2636,3 +2636,13 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .asr-mode-btn:hover { opacity: 0.85; }
 .asr-mode-main { font-weight: 500; color: var(--fg); }
 .asr-mode-sub { font-size: 0.85em; color: var(--fg-dim); }
+
+/* 回复文本中的 [图N] 引用 → 内联截图缩略图（视频精读关键帧） */
+.inline-fig {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 6px 0;
+}

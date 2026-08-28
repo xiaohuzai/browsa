@@ -30,7 +30,7 @@ export {
   initStreamState, appendToStreamState, clearStreamState
 };
 import { extractActiveTab } from './lib/page-extractor.js';
-import { buildPageContextText } from './lib/message-builder.js';
+import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
 // ─── Media download: keep the DOWNLOAD_CALL simple ──────────────────────────
@@ -654,7 +654,9 @@ async function handle(msg, sender) {
       if (figures.length) {
         const lines = figures.map((f, i) =>
           `${i + 1}. ${f.caption || `Figure on page ${f.page || '?'}`}`);
-        finalText += '\n\n## Figures\nThe descriptions below correspond to the following images in order:\n' + lines.join('\n');
+        // PDF 文本提取不保留插图位置（wasm markdown 无占位），图片按文档顺序
+        // 附在文末；引用约定与视频截图统一：回答中用 [图N]（N 为顺序号）。
+        finalText += '\n\n## Figures\nThe attached images are the document\'s figures in document order — refer to them as [图N] (N = order below) when citing them in your reply:\n' + lines.join('\n');
       }
       const pdfCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
@@ -720,8 +722,9 @@ async function handle(msg, sender) {
         .map((f) => (typeof f === 'string' ? { url: f } : f))
         .filter((f) => f && f.url);
       if (figures.length) {
-        const lines = figures.map((f, i) => `${i + 1}. ${f.caption || `Keyframe ${i + 1}`}`);
-        finalText += '\n\n## Figures\nThe descriptions below correspond to the following video screenshots in order:\n' + lines.join('\n');
+        // 锚点说明（VinQA 式引用约定）：精读文档的 [图N] 锚点行已带 caption 与
+        // 时间戳，无需再列编号清单；这里只告诉模型对应关系与引用方式。
+        finalText += `\n\n（文中 [图N] 标记按顺序对应随附的 ${figures.length} 张视频截图；在回答中引用截图时请使用相同的 [图N] 标记。）`;
       }
       // 原始平台由 sidepanel 透传（bilibili / youtube）——决定 mode、videoSrc.platform
       // 和日志标签。缺省回退 bilibili（兼容旧调用/测试）。
@@ -735,19 +738,16 @@ async function handle(msg, sender) {
         text: `${finalText}\n\nNote: ${VIDEO_NOTE_HINT}`,
         format: asrFormat,
       };
+      // 关键帧截图（视频精读专属，镜像 ATTACH_PDF_CONFIRM 的 figure 管线）：模型在
+      // 精读文档里标记的 [截屏] 时刻，sidepanel 从视频 blob 抽帧后以 {url, caption}
+      // 传入。sidepanel 已把文档里的标记行改写为 [图N] 锚点（带 caption 与时间戳），
+      // 这里按锚点位置真交错入库——图片部件出现在其语义位置，而非文末堆图。
       const contextText = buildPageContextText(asrCtx);
-      // 有关键帧时存成多模态 content 数组（与 ATTACH_PDF_CONFIRM / ATTACH_SCREENSHOT_CONFIRM
-      // 同构）：text 块在前，image_url 块按 Figures 段的顺序跟随。buildMessages 把
-      // history 原样透传，截图每轮随文本一起发给多模态 provider。无截图保持纯字符串
-      // content 形状，history 结构不变。
+      // 有关键帧时存成交错多模态 content（与 ATTACH_PDF_CONFIRM 同为 image_url 部件，
+      // 但按 [图N] 锚点插入文档中间）。buildMessages 把 history 原样透传，截图每轮
+      // 随文本一起发给多模态 provider。无截图保持纯字符串 content 形状不变。
       const historyEntry = figures.length
-        ? {
-            role: 'user',
-            content: [
-              { type: 'text', text: contextText },
-              ...figures.map((f) => ({ type: 'image_url', image_url: { url: f.url } })),
-            ],
-          }
+        ? { role: 'user', content: interleaveImageParts(contextText, figures) }
         : { role: 'user', content: contextText };
       // Stamp videoSrc so the [mm:ss] transcript renders as clickable seek
       // links (same platform/url/tabId shape as ATTACH_PAGE stamps on video

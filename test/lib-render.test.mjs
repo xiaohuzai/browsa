@@ -30,7 +30,7 @@ const {
   fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
-  stripThinkSegments, linkifyTimestamps
+  stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry
 } = await import('../lib/sidepanel/render.js');
 
 // ─── CJK/bold regression suite ──────────────────────────────────────────────
@@ -567,4 +567,37 @@ test('linkifyTimestamps: wraps multiple timestamps in one text node, preserving 
   // surrounding words survive
   assert.match(el.textContent, /first/);
   assert.match(el.textContent, /second/);
+});
+
+test('figuresBeforeEntry: nearest preceding user entry with image parts wins', () => {
+  const list = [
+    { role: 'user', content: [{ type: 'text', text: 'a' }, { type: 'image_url', image_url: { url: 'old' } }] },
+    { role: 'assistant', content: 'x' },
+    { role: 'user', content: 'plain text turn' },
+    { role: 'user', content: [{ type: 'text', text: 'b' }, { type: 'image_url', image_url: { url: 'new1' } }, { type: 'image_url', image_url: { url: 'new2' } }] },
+    { role: 'assistant', content: 'y' },
+  ];
+  assert.deepEqual(figuresBeforeEntry(list, 4), ['new1', 'new2']);
+  assert.deepEqual(figuresBeforeEntry(list, 2), ['old'], 'idx=2 的最近带图条目是 index 0');
+  assert.deepEqual(figuresBeforeEntry(list, 0), []);
+  assert.deepEqual(figuresBeforeEntry(list, 99), ['new1', 'new2'], '越界 idx 从末尾往前找');
+});
+
+test('decorateFigureRefs: [图N] text tokens become inline thumbnails; out-of-range stays text', () => {
+  document.body.innerHTML = '';
+  const el = document.createElement('div');
+  el.innerHTML = '<p>看 [图1] 这张图，对比 [图2]；[图9] 不存在。</p>';
+  document.body.appendChild(el);
+  decorateFigureRefs(el, ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB']);
+  const imgs = el.querySelectorAll('img.inline-fig');
+  assert.equal(imgs.length, 2);
+  assert.equal(imgs[0].src, 'data:image/jpeg;base64,AAA');
+  assert.equal(imgs[1].alt, '图2');
+  assert.match(el.textContent, /\[图9\] 不存在/, '越界引用按纯文本保留');
+  // 空 figures → 原样不动
+  const el2 = document.createElement('div');
+  el2.textContent = '引用 [图1]';
+  decorateFigureRefs(el2, []);
+  assert.equal(el2.querySelectorAll('img').length, 0);
+  assert.match(el2.textContent, /\[图1\]/);
 });

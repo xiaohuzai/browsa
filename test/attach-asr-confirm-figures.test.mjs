@@ -77,7 +77,7 @@ function lastEntry() {
 test('ATTACH_ASR_CONFIRM: keyframes become a caption-anchored multimodal entry with videoSrc', async () => {
   const res = await handle({
     type: 'ATTACH_ASR_CONFIRM',
-    text: '视频元信息\n\n## 视听精读（视频解析）\n\n[00:05] [截屏] 图表一\n[01:20] 正文',
+    text: '视频元信息\n\n## 视听精读（视频解析）\n\n[00:05] [图1] 图表一\n[01:20] 正文',
     metaUrl: 'https://www.bilibili.com/video/BV1test',
     metaTitle: '测试视频',
     platform: 'bilibili',
@@ -91,16 +91,14 @@ test('ATTACH_ASR_CONFIRM: keyframes become a caption-anchored multimodal entry w
   assert.equal(res.ok, true);
   const entry = lastEntry();
   assert.ok(Array.isArray(entry.content), 'figures present -> multimodal content array');
-  assert.equal(entry.content[0].type, 'text');
+  // 真交错：图片部件插在其 [图N] 锚点行之后，而非文末堆图
+  assert.deepEqual(entry.content.map((b) => b.type), ['text', 'image_url', 'text', 'image_url']);
   assert.match(entry.content[0].text, /## 视听精读（视频解析）/);
-  // Figures captions 段：模型把「截图 N」与按序 image_url 块一一对应
-  assert.match(entry.content[0].text, /## Figures/);
-  assert.match(entry.content[0].text, /1\. 图表一/);
-  assert.match(entry.content[0].text, /2\. Keyframe 2/, '无 caption 回退到序号标签');
-  const imgs = entry.content.filter((b) => b.type === 'image_url');
-  assert.equal(imgs.length, 2);
-  assert.equal(imgs[0].image_url.url, 'data:image/jpeg;base64,AAA');
-  assert.equal(imgs[1].image_url.url, 'data:image/jpeg;base64,BBB');
+  assert.match(entry.content[0].text, /\[00:05\] \[图1\] 图表一/, '锚点行保留在其文本片段内');
+  assert.equal(entry.content[1].image_url.url, 'data:image/jpeg;base64,AAA');
+  assert.match(entry.content[2].text, /\[01:20\] 正文/);
+  assert.match(entry.content[2].text, /\[图N\] 标记按顺序对应随附的 2 张视频截图/, '锚点说明行在末段');
+  assert.equal(entry.content[3].image_url.url, 'data:image/jpeg;base64,BBB', '无锚点的图片按序追加在尾部');
   // videoSrc 戳（可点击时间戳跳转的载体）不受多模态数组影响
   assert.deepEqual(entry.videoSrc, { platform: 'bilibili', url: 'https://www.bilibili.com/video/BV1test', tabId: 42 });
 });

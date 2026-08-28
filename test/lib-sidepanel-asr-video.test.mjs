@@ -203,9 +203,9 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   assert.match(confirmed.text, /bilibili plain text fallback/);
   assert.equal(confirmed.format, 'bilibili-video');
   assert.equal(confirmed.platform, 'bilibili');
-  // 截屏标记行保留在产物里；jsdom 没有 URL.createObjectURL → 抽帧 fail-open 返回
-  // [] → confirm 不带 figureImages（真实浏览器里抽帧成功才走多模态入库）。
-  assert.match(confirmed.text, /\[00:01\] \[截屏\] 标题卡片画面/);
+  // 截屏标记行改写为 [图N] 锚点保留在产物里；jsdom 没有 URL.createObjectURL →
+  // 抽帧 fail-open 返回 [] → confirm 不带 figureImages（真实浏览器里抽帧成功才交错入库）。
+  assert.match(confirmed.text, /\[00:01\] \[图1\] 标题卡片画面/);
   assert.equal(confirmed.figureImages, undefined);
   assert.ok(dnrRules >= 1 && dnrRemoved >= 1, 'DNR rule registered and removed');
   assert.ok(!document.querySelector('.asr-mode-card'), 'card removed after choice');

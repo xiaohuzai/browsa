@@ -8,7 +8,7 @@ import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCar
 import {
   renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps,
-  makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments
+  makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
 import { initMediaDownload } from './lib/sidepanel/media-download.js';
@@ -57,6 +57,14 @@ const streamRendererOpts = {
     scrollToBottom();
   },
   onDone: (el, delta) => {
+    // 回复里的 [图N] 引用还原为内联缩略图（图片来自其上方最近的带图附加条目）。
+    // 异步读 history，fire-and-forget：失败只影响缩略图，不影响正文渲染。
+    (async () => {
+      try {
+        const { history } = await chrome.storage.local.get('history');
+        decorateFigureRefs(el, figuresBeforeEntry(Array.isArray(history) ? history : [], (history || []).length));
+      } catch (_) {}
+    })();
     addMsgActions(el, () => delta);
     scrollToBottom(true);
   }
@@ -1060,15 +1068,22 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       console.warn('[ASR] video analysis incomplete: last stamp', endSec, 's < 90% of', wantDurSec, 's video');
       throw new Error('精读不完整（最后时间戳 ' + (endSec == null ? '?' : endSec.toFixed(0)) + 's / 视频 ' + wantDurSec + 's）');
     }
-    const docText = fmt.lines.join('\n');
+    const docTextLines = fmt.lines;
+    // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行
+    const keyframes = parseKeyframeMarkers(docTextLines.filter((l) => l.includes('[截屏]')).join('\n'));
+    // 标记行改写为 [图N] 锚点（带时间戳与 caption）：入库时 interleaveImageParts
+    // 按锚点位置真交错插入图片部件，模型回答引用 [图N] 时渲染端还原为缩略图。
+    let figIdx = 0;
+    const docText = docTextLines
+      .map((l) => (l.includes('[截屏]') ? l.replace('[截屏]', `[图${++figIdx}]`) : l))
+      .join('\n');
     if (!docText) {
       throw new Error('精读输出为空');
     }
-    // 关键帧截图：模型在文档里标记的 [截屏] 时刻 → 从已下载的视频 blob 抽帧
-    //（同源 canvas，无跨源污染），走 PDF 插图同款管线（image_url 进 history，
-    // 模型每轮可见）。抽帧任何失败都 fail-open 返回 []，绝不阻塞精读产物。
+    // 关键帧截图：从已下载的视频 blob 抽帧（同源 canvas，无跨源污染），走 PDF
+    // 插图同款管线入库（image_url 部件随 history 每轮发给多模态 provider）。
+    // 抽帧任何失败都 fail-open 返回 []，绝不阻塞精读产物。
     let figures = [];
-    const keyframes = parseKeyframeMarkers(docText);
     if (videoBlob && keyframes.length) {
       showAttachProgress('截取关键帧…');
       figures = await extractKeyframes(videoBlob, keyframes);
@@ -3613,11 +3628,13 @@ async function renderHistory() {
       const el = appendAssistant('', true);
       // Sync fast-render so the bubble is visible immediately
       el.innerHTML = renderStreamingSafe(rawContent);
+      const figs = figuresBeforeEntry(list, i);
+      decorateFigureRefs(el, figs);
       el.dataset.raw = rawContent;
       el.dataset.hidx = i;
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       addMsgActions(el, () => rawContent);
-      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc });
+      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs });
     }
   }
 
@@ -3642,11 +3659,12 @@ async function renderHistory() {
   // formula in message 3 doesn't delay message 5 from upgrading.
   if (asyncUpgrades.length > 0) {
     showHistoryUpgradeIndicator();
-    Promise.all(asyncUpgrades.map(async ({ el, rawContent }) => {
+    Promise.all(asyncUpgrades.map(async ({ el, rawContent, figs }) => {
       const html = await renderSafe(rawContent);
       el.innerHTML = html;
       decorateLinks(el);
       linkifyTimestamps(el);
+      decorateFigureRefs(el, figs);
       renderMermaid(el); renderEcharts(el); renderMarkmap(el);
       addCodeCopyButtons(el); // re-wire copy buttons on the upgraded content
       // el.innerHTML above wipes out the .msg-actions row appended during the
