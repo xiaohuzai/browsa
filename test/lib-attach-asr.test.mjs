@@ -256,6 +256,36 @@ test('transcribeAudio: empty language also falls back to auto-detect (no concret
   delete globalThis.fetch;
 });
 
+// ── 流式中止路径（2026-08-29 实测：81 分钟视频精读被 10 分钟墙钟中止，Chrome 报
+// "BodyStreamBuffer was aborted" 用户看不懂）——两种中止源必须给出可读报错。 ──
+
+test('transcribeAudio: idle timeout (no server data) produces a readable idle-timeout error', async () => {
+  // mock read() 模拟真实 fetch 的中止传播：abort 后 body 流 reject（固定 500ms）。
+  // idle 200ms 先触发 ac.abort()，外部 signal 未触发 → 空闲超时文案。
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: { getReader: () => ({ read: () => new Promise((_, rej) => setTimeout(() => rej(new Error('BodyStreamBuffer was aborted')), 500)) }) },
+  });
+  await assert.rejects(
+    transcribeAudio({ baseUrl: 'https://ark.test/api/v3', apiKey: 'k', fileId: 'f', model: 'm', language: 'zh', idleTimeoutMs: 200 }),
+    /空闲超时/
+  );
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: wall-clock signal abort produces a readable budget-timeout error', async () => {
+  // 墙钟 120ms 先于 idle（60s）触发 → signal.aborted → 预算文案。
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: { getReader: () => ({ read: () => new Promise((_, rej) => setTimeout(() => rej(new Error('BodyStreamBuffer was aborted')), 600)) }) },
+  });
+  await assert.rejects(
+    transcribeAudio({ baseUrl: 'https://ark.test/api/v3', apiKey: 'k', fileId: 'f', model: 'm', language: 'zh', signal: AbortSignal.timeout(120), idleTimeoutMs: 60_000 }),
+    /超时预算/
+  );
+  delete globalThis.fetch;
+});
+
 test('transcribeAudio: falls back to non-stream JSON response when body has no reader', async () => {
   globalThis.fetch = async () => ({
     ok: true,

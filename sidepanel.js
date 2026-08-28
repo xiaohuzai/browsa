@@ -1043,7 +1043,10 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       durationSec: wantDurSec,
       // 墙钟预算随视频时长缩放（与音频转写同式）：视频预处理 + 帧推理更慢，
       // 保留 10 分钟下限、45 分钟上限防无限挂起；流式内部另有 60s 空闲超时。
+      // 空闲超时给到 180s：视频预处理（服务端抽帧）可能让首 token 静默远超 60s
+      //（音频 ASR 无此问题——预处理在上传阶段就完成了）。
       signal: AbortSignal.timeout(Math.max(10 * 60_000, Math.min(45 * 60_000, Math.round((wantDurSec || 0) * 1000 / 2)))),
+      idleTimeoutMs: 180_000,
     });
     if (res.truncated) {
       console.warn('[ASR] video analysis truncated:', res.finishReason);
