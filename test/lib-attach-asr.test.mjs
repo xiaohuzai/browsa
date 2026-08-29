@@ -451,6 +451,24 @@ test('normalizeAsrTimestamps: range/fraction timestamps become a single start [m
   assert.equal(normalizeAsrTimestamps(null), '');
 });
 
+test('normalizeAsrTimestamps: line-start bare seconds convert to [mm:ss] (2026-08-30 real regression)', () => {
+  // 真实故障：视频精读输出退化成原生 ASR 的秒级时间轴 [0.0]/[624.0]/[1009.0]。
+  // 只认【行首】纯数字括号，句中括号/年份/说话人标签不受影响。
+  assert.equal(normalizeAsrTimestamps('[0.0] [说话人1] 朋友们。'), '[00:00] [说话人1] 朋友们。');
+  assert.equal(normalizeAsrTimestamps('[624.0] [说话人1] 韩元刚刚6月份创下了17年新低。'), '[10:24] [说话人1] 韩元刚刚6月份创下了17年新低。');
+  assert.equal(normalizeAsrTimestamps('[1009.0] 画面：片尾。'), '[16:49] 画面：片尾。');
+  assert.equal(normalizeAsrTimestamps('[62] 裸整数秒'), '[01:02] 裸整数秒');
+  // 小数截断（与既有「秒向下取整」约定一致）
+  assert.equal(normalizeAsrTimestamps('[62.5] 带小数'), '[01:02] 带小数');
+  assert.equal(normalizeAsrTimestamps('[59.6] 不进位'), '[00:59] 不进位');
+  // 行首以外的数字括号不动（防误伤引用/年份类）
+  assert.equal(normalizeAsrTimestamps('引用[2025]年的数据'), '引用[2025]年的数据');
+  // 已是 mm:ss 的行首不受二遍处理影响
+  assert.equal(normalizeAsrTimestamps('[10:24] 已经正确'), '[10:24] 已经正确');
+  // [图N] 锚点行不受影响
+  assert.equal(normalizeAsrTimestamps('[00:35] [图3] 贝森特便签'), '[00:35] [图3] 贝森特便签');
+});
+
 test('formatAsrTranscript: range-format input is normalized to single stamps and still counted', () => {
   const raw = [
     '[00:00.00-00:12.77] 第一句',
@@ -981,4 +999,24 @@ test('transcodeAudioBlob: non-fragmented (single mdat) file uses whole-file deco
   assert.match(failRes.error, /not a fragmented mp4 \(boxes: ftyp,moov,mdat\)/);
   globalThis.AudioContext = saved.AudioContext;
   globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcriptEndSec: bare-second lines are parsed with decimal precision (mixed with mm:ss markers)', () => {
+  // 2026-08-30 真实故障：精读输出语音行裸秒、[图N] 标记行 mm:ss——完整度守卫
+  // 之前一行都解析不出 → 返回 null → 守卫静默跳过。
+  const doc = [
+    '[0.0] [说话人1] 朋友们。',
+    '[624.0] [说话人1] 韩元刚刚6月份创下了17年新低。',
+    '[00:35] [图3] 贝森特便签',
+    '[1009.0] 画面：片尾。',
+  ].join('\n');
+  const end = transcriptEndSec(doc);
+  assert.ok(end != null && Math.abs(end - 1009) < 0.001, `last stamp must be 1009s, got ${end}`);
+  // 小数精度保留：4.6s ≥ 5s*90% 的边界场景不能被截断误判
+  assert.equal(transcriptEndSec('[00:00] 一\n[00:04.6] 二'), 4.6);
+  // 行首裸秒 > 12h 视为非时间戳。≤12h 的行首年份类歧义【接受为时间戳】：
+  // 误判方向的代价只是完整度守卫宽松，反方向会让真实裸秒文档守卫失效。
+  assert.equal(transcriptEndSec('[2025] 年份行'), 2025);
+  // 句中数字括号不是裸秒时间戳（行首锚定兜住常见情况）
+  assert.equal(transcriptEndSec('引用[2025]年的数据'), null);
 });

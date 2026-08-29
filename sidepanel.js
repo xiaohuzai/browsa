@@ -1095,7 +1095,8 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     }
     const fmt = formatAsrTranscript(res.text);
     // 完整度兜底（与字幕 ASR 同阈值）：最后时间戳必须覆盖到视频 90% 以上，
-    // 绝不允许静默存半截精读。
+    // 绝不允许静默存半截精读。transcriptEndSec 自识裸秒数（[624.0]）并保留小数
+    // 精度——不能先归一化再解析（mm:ss 截断小数会把 4.6s 边界误判成不完整）。
     const endSec = transcriptEndSec(res.text);
     if (wantDurSec > 0 && endSec != null && endSec < wantDurSec * 0.9) {
       console.warn('[ASR] video analysis incomplete: last stamp', endSec, 's < 90% of', wantDurSec, 's video');
@@ -1419,6 +1420,7 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
     // 完整度兜底：即使音频本身完整（WAV 校验过了）、模型也没报截断，只要转写
     // 明显没覆盖到视频结尾（最后一句时间戳 < 视频 90%），说明输出被中途截断
     // ——绝不允许静默存半截字幕，必须失败回退（纯文本 + toast）。
+    // transcriptEndSec 自识裸秒数（[624.0]）并保留小数精度（2026-08-30 真实故障）。
     const endSec = transcriptEndSec(tr.text);
     const incomplete = !!(wantDurSec > 0 && endSec != null && endSec < wantDurSec * 0.9);
     if (incomplete) {
