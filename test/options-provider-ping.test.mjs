@@ -373,6 +373,13 @@ test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own
   assert.equal(hermesCard.querySelector('[data-k="alias"]'), null, 'agent cards have no alias field');
   assert.equal(hermesCard.querySelector('[data-k="model"]'), null, 'agent cards have no model field');
   assert.equal(hermesCard.querySelector('[data-act="delete"]'), null, 'agent cards are not removable');
+  // API Server 提示 + 官方文档链接（2026-08-29：用户反馈不知道要配置的是
+  // Hermes 自带的 API Server，而不是模型厂商的 API）。
+  const serverHint = hermesCard.querySelector('.fields > .hint');
+  assert.ok(serverHint && /API Server/.test(serverHint.textContent), 'agent card explains the Hermes API Server requirement');
+  const docLink = hermesCard.querySelector('a.doc-link[href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server"]');
+  assert.ok(docLink, 'agent card links the official API Server docs');
+  assert.equal(docLink.target, '_blank', 'docs open in a new tab');
 });
 
 test('options.js: provider cards expose Max output tokens (truncation control) but still no Temperature', async () => {

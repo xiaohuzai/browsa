@@ -208,9 +208,12 @@ function buildProviderCard(name, cfg, opts = {}) {
       </div>` : ''}
       <div class="field">
         <label>Base URL
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" />
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
         </label>
       </div>
+      ${isAgent ? `
+      <p class="hint">这里填的是 <b>Hermes 自带的 API Server</b> 地址（如 <code>http://127.0.0.1:8080</code>），不是模型厂商的 API——需要先在本地或自己的服务器上把 Server 跑起来。</p>
+      <a class="doc-link" href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">📖 什么是 Hermes API Server？→ 启动与配置文档</a>` : ''}
       <div class="field">
         <label>API key
           <div class="apikey-wrap">

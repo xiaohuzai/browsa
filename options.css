@@ -356,6 +356,11 @@ details.provider-group[open] > .provider-group-header::before {
   padding-left: 8px;
   margin-bottom: 8px;
 }
+/* 提示文字与文档链接在两列网格里独占整行（Hermes 卡片的 API Server 说明）。 */
+.provider .fields > .hint,
+.provider .fields > .doc-link {
+  grid-column: 1 / -1;
+}
 .field {
   min-width: 0;
 }
@@ -691,14 +696,14 @@ input[type="range"] { accent-color: var(--accent); }
 }
 
 /* ── ASR 卡片底部的参考文档链接 ───────────────────────────────────────────── */
-.asr-doc-link {
+.doc-link {
   color: var(--accent);
   font-size: 12px;
   text-decoration: none;
   border-bottom: 1px dotted var(--border-strong);
   padding-bottom: 1px;
 }
-.asr-doc-link:hover {
+.doc-link:hover {
   text-decoration: underline;
 }
 
