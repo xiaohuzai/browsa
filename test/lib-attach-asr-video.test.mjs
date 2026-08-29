@@ -15,9 +15,19 @@ import {
   analyzeVideo,
   resolveVideoDurationSec,
   parseKeyframeMarkers,
+  keyframeCapFor,
 } from '../lib/handlers/attach-asr.js';
 
 const MB = 1024 * 1024;
+
+test('keyframeCapFor scales with duration, clamped to [4,10], 6 when unknown', () => {
+  assert.equal(keyframeCapFor(0), 6);
+  assert.equal(keyframeCapFor(undefined), 6);
+  assert.equal(keyframeCapFor(300), 4, '5 分钟 → ceil(2)=2 → 下限 4');
+  assert.equal(keyframeCapFor(1015), 7, '17 分钟 → ceil(6.77)=7（小Lin说实测档位）');
+  assert.equal(keyframeCapFor(1800), 10, '30 分钟 → ceil(12) → 上限 10');
+  assert.equal(keyframeCapFor(5400), 10, '90 分钟仍封顶 10');
+});
 
 test('estimateStreamBytes prefers the API size, falls back to bandwidth×duration/8, else 0', () => {
   assert.equal(estimateStreamBytes({ size: 123 }, 600), 123);
@@ -79,11 +89,20 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
-  // 截屏标记协议（最多 6 个 + 间隔 + 独立成行）
+  // 截屏标记协议（上限随时长伸缩 + 间隔 + 独立成行）
   assert.match(ins, /\[截屏\]/);
-  assert.match(ins, /at most 6/i);
   assert.match(task, /\[截屏\]/);
-  assert.match(task, /最多 6 个/);
+  // instructions 不带时长 → 回退 6；带时长 → 与 keyframeCapFor 同源。
+  assert.match(ins, /at most 6/i);
+  assert.match(buildVideoAnalysisInstructions('zh', 1015), /at most 7/i);
+  assert.match(buildVideoAnalysisTaskText(600, 'zh'), /最多 4 个/);
+  assert.match(buildVideoAnalysisTaskText(0, 'zh'), /最多 6 个/);
+  // 广告段压缩 + 说话人身份括注（2026-08-29 用户实测：小Lin说视频广告逐字照录、
+  // 特朗普插播只标 [说话人2] 而主叙述不标）。
+  assert.match(task, /（广告：品牌\+核心卖点）/);
+  assert.match(buildVideoAnalysisInstructions('zh', 600), /AD READS/);
+  assert.match(task, /（特朗普）/);
+  assert.match(buildVideoAnalysisInstructions('zh', 600), /FIRST line/);
 });
 
 test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and min gap', () => {

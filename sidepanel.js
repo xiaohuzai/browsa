@@ -39,6 +39,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript, transcriptEndSec,
   pickVideoStream, estimateStreamBytes, analyzeVideo, parseKeyframeMarkers, extractKeyframes,
+  keyframeCapFor, videoAssetId, lookupCachedArkFiles, saveArkFileCacheEntry,
   ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -932,6 +933,15 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
   const { asr } = ctx;
   let pick = videoPick;
   const needAudio = pick.kind !== 'muxed'; // durl 合一流自带音轨
+  // Ark Files 复用缓存：同一视频 30 天内再解析直接用上次的 file_id，免重传
+  // （视频模式仍要下载视频 blob 供截屏；音频命中时连下载+转码一起跳过）。
+  const pageUrl = ctx.meta?.url || '';
+  const assetId = videoAssetId(platform, pageUrl);
+  const fnameBase = assetId ? `browsa-${assetId}` : '';
+  const cached = await lookupCachedArkFiles({
+    baseUrl: asr.baseUrl, apiKey: asr.apiKey, platform, pageUrl,
+    need: 'video', durationSec: wantDurSec,
+  }).catch(() => null) || { videoFileId: '', audioFileId: '' };
   // 视频流 403 自愈：与音频同款思路，仅一次——重拉 playurl（want:'all'）后重新
   // 选流（视频/音频换新 URL），再失败就明示报错走回退。
   let videoBlob = null;
@@ -990,8 +1000,12 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     throw new Error(err);
   }
   // 独立音频流：下载 + 转码 16kHz mono WAV（候选循环/截断校验/403 自愈与音频管线同款）。
+  // 缓存命中的音频文件直接复用，整段下载/转码/上传全部跳过。
   let audio = null;
-  if (needAudio) {
+  if (needAudio && cached.audioFileId) {
+    console.log('[ASR] reusing cached audio fileId', cached.audioFileId);
+    showAttachProgress('复用上次上传的音频文件（30 天内有效），跳过下载与上传…');
+  } else if (needAudio) {
     showAttachProgress('下载音频中…');
     audio = await downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want: 'all' });
   }
@@ -1016,8 +1030,20 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     console.log(`[ASR] uploaded ${label} fileId`, up.fileId, '| sent', up.bytes, '| Ark meta:', JSON.stringify({ upBytes: up.upBytes, upContentType: up.upContentType, upStatus: up.upStatus }));
     return up;
   };
-  const vup = await uploadWithProgress(videoBlob, 'video.mp4', '视频');
-  const aup = audio ? await uploadWithProgress(audio.wavBlob, 'audio.wav', '音频') : null;
+  let vup;
+  if (cached.videoFileId) {
+    console.log('[ASR] reusing cached video fileId', cached.videoFileId);
+    showAttachProgress('复用上次上传的视频文件（30 天内有效），跳过上传…');
+    vup = { fileId: cached.videoFileId };
+  } else {
+    vup = await uploadWithProgress(videoBlob, fnameBase ? `${fnameBase}-video.mp4` : 'video.mp4', '视频');
+  }
+  let aup = null;
+  if (needAudio) {
+    aup = cached.audioFileId
+      ? { fileId: cached.audioFileId }
+      : await uploadWithProgress(audio.wavBlob, fnameBase ? `${fnameBase}-audio.wav` : 'audio.wav', '音频');
+  }
   // 轮询 + 精读：两阶段都可能以分钟计，interval 每秒刷新阶段/已等待秒数。
   const waitStart = Date.now();
   let stageLabel = '识别处理';
@@ -1038,6 +1064,13 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
         throw new Error('音频文件处理失败: ' + (pa.error || ''));
       }
     }
+    // 上传+处理都成功 → 落缓存（只记本次新上传的 id，复用的 id 保持原 expireAt；
+    // 之后精读即使失败，文件本身仍可用，下次免传）。
+    await saveArkFileCacheEntry({
+      baseUrl: asr.baseUrl, apiKey: asr.apiKey, platform, pageUrl, durationSec: wantDurSec,
+      videoFileId: cached.videoFileId ? '' : vup.fileId,
+      audioFileId: (needAudio && !cached.audioFileId && aup) ? aup.fileId : '',
+    });
     stageLabel = '视听精读';
     const res = await analyzeVideo({
       baseUrl: asr.baseUrl,
@@ -1069,8 +1102,12 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       throw new Error('精读不完整（最后时间戳 ' + (endSec == null ? '?' : endSec.toFixed(0)) + 's / 视频 ' + wantDurSec + 's）');
     }
     const docTextLines = fmt.lines;
-    // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行
-    const keyframes = parseKeyframeMarkers(docTextLines.filter((l) => l.includes('[截屏]')).join('\n'));
+    // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行；
+    // max 与 prompt 上限同源（keyframeCapFor），随时长伸缩。
+    const keyframes = parseKeyframeMarkers(
+      docTextLines.filter((l) => l.includes('[截屏]')).join('\n'),
+      { max: keyframeCapFor(wantDurSec) },
+    );
     // 标记行改写为 [图N] 锚点（带时间戳与 caption）：入库时 interleaveImageParts
     // 按锚点位置真交错插入图片部件，模型回答引用 [图N] 时渲染端还原为缩略图。
     let figIdx = 0;
@@ -1294,32 +1331,51 @@ async function downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want =
 // WAV → 轮询 → Responses 流式转写 → 截断/完整度校验。返回 { transcriptText, audioBytes }。
 async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
   const { asr } = ctx;
-  const best = await downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want: 'audio' });
+  // Ark Files 复用缓存：音频文件 30 天内命中则整段「下载→转码→上传」全部跳过。
+  const pageUrl = ctx.meta?.url || '';
+  const assetId = videoAssetId(platform, pageUrl);
+  const fnameBase = assetId ? `browsa-${assetId}` : '';
+  const cached = await lookupCachedArkFiles({
+    baseUrl: asr.baseUrl, apiKey: asr.apiKey, platform, pageUrl,
+    need: 'audio', durationSec: wantDurSec,
+  }).catch(() => null) || { videoFileId: '', audioFileId: '' };
+  let best = null;
+  if (cached.audioFileId) {
+    console.log('[ASR] reusing cached audio fileId', cached.audioFileId);
+    showAttachProgress('复用上次上传的音频文件（30 天内有效），跳过下载与上传…');
+  } else {
+    best = await downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want: 'audio' });
+  }
   // 4. 上传 → 转写。单次调用整段音频（流式）：火山文档只限制上传文件大小
   // ≤512MB，没有“单次输出必须切分”的要求；切分方案的说话人编号不连续/边界
   // 重复问题无法根治，已按决策移除，改为直传 + 日志 + 完整度兜底，复现时
   // 靠日志正向定位。
   // XHR upload.onprogress gives a real percentage (fetch has none).
-  showAttachProgress('上传音频中…（0%）');
-  const upStart = Date.now();
-  const up = await uploadBlobToArk({
-    blob: best.wavBlob,
-    filename: 'audio.wav',
-    apiKey: asr.apiKey,
-    baseUrl: asr.baseUrl,
-    onProgress: (done, total) => {
-      if (total) {
-        showAttachProgress(`上传音频中…（${Math.round((done / total) * 100)}%）`);
-      } else {
-        const secs = Math.round((Date.now() - upStart) / 1000);
-        showAttachProgress(`上传音频中…（已上传 ${(done / 1024 / 1024).toFixed(1)}MB，已等待 ${secs}s）`);
-      }
-    },
-  });
-  if (!up?.ok || !up.fileId) {
-    throw new Error('ASR upload failed: ' + (up?.error || 'no fileId'));
+  let up;
+  if (cached.audioFileId) {
+    up = { fileId: cached.audioFileId };
+  } else {
+    showAttachProgress('上传音频中…（0%）');
+    const upStart = Date.now();
+    up = await uploadBlobToArk({
+      blob: best.wavBlob,
+      filename: fnameBase ? `${fnameBase}-audio.wav` : 'audio.wav',
+      apiKey: asr.apiKey,
+      baseUrl: asr.baseUrl,
+      onProgress: (done, total) => {
+        if (total) {
+          showAttachProgress(`上传音频中…（${Math.round((done / total) * 100)}%）`);
+        } else {
+          const secs = Math.round((Date.now() - upStart) / 1000);
+          showAttachProgress(`上传音频中…（已上传 ${(done / 1024 / 1024).toFixed(1)}MB，已等待 ${secs}s）`);
+        }
+      },
+    });
+    if (!up?.ok || !up.fileId) {
+      throw new Error('ASR upload failed: ' + (up?.error || 'no fileId'));
+    }
+    console.log('[ASR] uploaded fileId', up.fileId, '| sent', up.bytes, '| Ark meta:', JSON.stringify({ upBytes: up.upBytes, upContentType: up.upContentType, upStatus: up.upStatus }));
   }
-  console.log('[ASR] uploaded fileId', up.fileId, '| sent', up.bytes, '| Ark meta:', JSON.stringify({ upBytes: up.upBytes, upContentType: up.upContentType, upStatus: up.upStatus }));
   // 实时等待反馈：poll + transcribe 都可能耗时较长（长音频处理 + 流式转写），
   // 用一个 interval 每秒刷新当前阶段/已等待秒数，让用户知道仍在处理而非卡死。
   const waitStart = Date.now();
@@ -1337,6 +1393,11 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
     if (!poll.ready) {
       throw new Error('ASR file processing failed: ' + (poll.error || ''));
     }
+    // 上传+处理成功 → 落缓存（复用命中时不覆盖原 expireAt）。
+    await saveArkFileCacheEntry({
+      baseUrl: asr.baseUrl, apiKey: asr.apiKey, platform, pageUrl, durationSec: wantDurSec,
+      audioFileId: cached.audioFileId ? '' : up.fileId,
+    });
     // 3. Transcribe via Responses API（流式）
     stageLabel = '转写';
     const tr = await transcribeAudio({
@@ -1371,7 +1432,7 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
     if (!finalText) {
       throw new Error('ASR returned empty transcript');
     }
-    return { transcriptText: finalText, audioBytes: best.bytes };
+    return { transcriptText: finalText, audioBytes: best ? best.bytes : 0 };
   } finally {
     clearInterval(waitTimer);
   }

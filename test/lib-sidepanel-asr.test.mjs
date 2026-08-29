@@ -185,7 +185,7 @@ test('clicking attach on an asr-pending ctx runs download->transcode(WAV)->uploa
   // executeScript MAIN-world — the Ark upload is CORS-blocked there).
   assert.equal(downloadCalls, 1, 'm4s must be downloaded via extension-context fetch');
   assert.equal(uploadCalls, 1, 'Ark /files upload must run via extension-context fetch');
-  assert.equal(uploadedFileName, 'audio.wav', 'must upload the transcoded WAV, not the raw m4s');
+  assert.equal(uploadedFileName, 'browsa-bili-BV1xx411c7mD-p1-audio.wav', 'must upload the transcoded WAV (semantic name), not the raw m4s');
   assert.ok(uploadedBlobSize > 0 && uploadedBlobSize < 44 * 1024 * 1024, 'transcoded WAV must be smaller than the raw 44MB m4s');
   assert.ok(dnrAdded, 'must register a DNR Referer-injection rule before the download');
   assert.equal(dnrAdded.condition.urlFilter, 'bilivideo', 'must cover both .com and .cn CDN hosts');

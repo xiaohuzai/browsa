@@ -1,15 +1,16 @@
 // test/lib-sidepanel-asr-video.test.mjs — 视频解析（视听精读）端到端：真实
 // sidepanel.js + jsdom，模拟 asr-pending ctx 带 videoCandidates（B站 DASH 分离流）。
 // 验证：模式选择卡出现（音频/视频两个选项 + 预估体积）→ 点「视频精读」→ 视频/音频
-// 双下载、双上传（video.mp4 + audio.wav，purpose=user_data）、双轮询、/responses
+// 双下载、双上传（语义文件名，purpose=user_data + expire_at=30d）、双轮询、/responses
 // 带 input_video+input_audio 组合 → ATTACH_ASR_CONFIRM 带「视听精读（视频解析）」
 // 段与 format=bilibili-video。另覆盖：点「音频转写」走单文件旧管线；卡片被清掉
-//（会话切换）时静默取消（按钮恢复、无上传、无入库）。
+//（会话切换）时静默取消；Ark Files 复用缓存命中/死亡的跳过与回退行为。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
+import { saveArkFileCacheEntry } from '../lib/handlers/attach-asr.js';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -53,6 +54,8 @@ let polledIds = [];
 let responsesBodies = [];
 let dnrRules = 0;
 let dnrRemoved = 0;
+let warmIdsAlive = true;         // false = 缓存里的 file_id 探活失败（404）→ 回退完整上传
+let arkCacheStore = {};          // browsaArkFileCache 的可播种内存存储
 
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -66,13 +69,15 @@ globalThis.fetch = async (url, init) => {
   }
   if (u.endsWith('/files')) {
     const f = init?.body?.get?.('file');
-    uploads.push({ name: (f && f.name) || '', size: (f && f.size) || 0, purpose: init?.body?.get?.('purpose') || '' });
+    uploads.push({ name: (f && f.name) || '', size: (f && f.size) || 0, purpose: init?.body?.get?.('purpose') || '', expireAt: init?.body?.get?.('expire_at') || '' });
     const id = uploads.length === 1 ? 'file-vid' : 'file-aud';
     return { ok: true, json: async () => ({ id, bytes: (f && f.size) || 0 }) };
   }
-  if (u.endsWith('/files/file-vid') || u.endsWith('/files/file-aud')) {
-    polledIds.push(u.slice(u.lastIndexOf('/') + 1));
-    return { ok: true, json: async () => ({ status: 'completed' }) };
+  if (u.includes('/files/')) {
+    // 轮询（pipeline）与存活探测（缓存复用）共用：GET /files/{id}
+    const id = u.slice(u.lastIndexOf('/') + 1);
+    polledIds.push(id);
+    return { ok: warmIdsAlive || !id.startsWith('file-warm-'), json: async () => ({ status: 'completed' }) };
   }
   if (u.endsWith('/responses')) {
     responsesBodies.push(JSON.parse(init.body));
@@ -135,7 +140,16 @@ globalThis.chrome = {
     lastError: undefined,
   },
   storage: {
-    local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
+    local: {
+      get: async (arg) => {
+        const key = typeof arg === 'string' ? arg
+          : (arg && typeof arg === 'object' && !Array.isArray(arg) ? Object.keys(arg)[0] : null);
+        if (key === 'browsaArkFileCache') return { browsaArkFileCache: arkCacheStore };
+        return {};
+      },
+      set: async (obj) => { if (obj && 'browsaArkFileCache' in obj) arkCacheStore = obj.browsaArkFileCache; },
+      remove: async () => {},
+    },
     session: { get: async () => ({}), remove: async () => {} },
     onChanged: { addListener: () => {} },
   },
@@ -152,6 +166,8 @@ const messagesEl = document.getElementById('messages');
 function resetState() {
   sent = []; confirmed = null; downloads = []; uploads = []; polledIds = []; responsesBodies = [];
   dnrRules = 0; dnrRemoved = 0;
+  warmIdsAlive = true;
+  arkCacheStore = {};
   // 恢复 ctx 基线（个别测试会改 noTranscript/text）
   attachCtx.noTranscript = true;
   attachCtx.text = 'bilibili plain text fallback';
@@ -182,11 +198,11 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   btns[1].click(); // 视频精读
   await waitFor(() => confirmed && uploads.length === 2, 9000);
 
-  // 双下载（视频流 + 音频流）、双上传（video.mp4 + audio.wav，purpose=user_data）
+  // 双下载（视频流 + 音频流）、双上传（语义文件名 browsa-{BV}-video/audio，purpose=user_data）
   assert.deepEqual(downloads.map((d) => d.url.includes('/video/') ? 'video' : 'audio').sort(), ['audio', 'video']);
-  assert.equal(uploads[0].name, 'video.mp4');
+  assert.equal(uploads[0].name, 'browsa-bili-BV1xx411c7mD-p1-video.mp4');
   assert.equal(uploads[0].purpose, 'user_data');
-  assert.equal(uploads[1].name, 'audio.wav');
+  assert.equal(uploads[1].name, 'browsa-bili-BV1xx411c7mD-p1-audio.wav');
   assert.deepEqual(polledIds.sort(), ['file-aud', 'file-vid']);
 
   // /responses 单请求组合 input_video + input_audio，模型回退用转写模型
@@ -237,7 +253,7 @@ test('audio mode: picking 音频转写 runs the legacy single-file pipeline', as
   document.querySelectorAll('.asr-mode-btn')[0].click();
   await waitFor(() => confirmed && uploads.length === 1);
   assert.deepEqual(downloads.map((d) => d.url.includes('/video/') ? 'video' : 'audio'), ['audio']);
-  assert.equal(uploads[0].name, 'audio.wav');
+  assert.equal(uploads[0].name, 'browsa-bili-BV1xx411c7mD-p1-audio.wav');
   assert.deepEqual(responsesBodies[0].input[0].content.map((c) => c.type), ['input_audio', 'input_text']);
   assert.match(confirmed.text, /## 字幕（ASR）/);
   assert.equal(confirmed.format, undefined);
@@ -252,4 +268,65 @@ test('card removed without a choice (session switch) aborts silently', async () 
   assert.equal(uploads.length, 0, 'no upload after abort');
   assert.equal(confirmed, null, 'no confirm after abort');
   assert.ok(!sent.includes('ATTACH_ASR_CONFIRM'));
+});
+
+// ─── Ark Files 复用缓存（30 天内同视频免重传）────────────────────────────────
+
+test('video mode with warm file cache: video upload and audio download/transcode/upload all skipped', async () => {
+  resetState();
+  await saveArkFileCacheEntry({
+    baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
+    platform: 'bilibili', pageUrl: attachCtx.meta.url,
+    videoFileId: 'file-warm-vid', audioFileId: 'file-warm-aud', durationSec: 4,
+  });
+  attachBtn.click();
+  await waitFor(() => document.querySelector('.asr-mode-card'));
+  document.querySelectorAll('.asr-mode-btn')[1].click(); // 视频精读
+  await waitFor(() => confirmed, 9000);
+
+  // 视频上传跳过（blob 仍要下载供截屏）；音频的下载/转码/上传整段跳过。
+  assert.deepEqual(downloads.map((d) => d.url.includes('/video/') ? 'video' : 'audio').sort(), ['video']);
+  assert.equal(uploads.length, 0, 'both file ids reused — zero uploads');
+  assert.deepEqual([...new Set(polledIds)].sort(), ['file-warm-aud', 'file-warm-vid'], '复用的 id 仍走轮询确认处理状态（探活+轮询各一次，去重后两条）');
+  assert.equal(responsesBodies[0].input[0].content[0].file_id, 'file-warm-vid');
+  assert.equal(responsesBodies[0].input[0].content[1].file_id, 'file-warm-aud');
+});
+
+test('audio mode with warm audio cache: download/transcode/upload fully skipped', async () => {
+  resetState();
+  await saveArkFileCacheEntry({
+    baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
+    platform: 'bilibili', pageUrl: attachCtx.meta.url,
+    audioFileId: 'file-warm-aud', durationSec: 4,
+  });
+  attachBtn.click();
+  await waitFor(() => document.querySelector('.asr-mode-card'));
+  document.querySelectorAll('.asr-mode-btn')[0].click(); // 音频转写
+  await waitFor(() => confirmed, 9000);
+
+  assert.deepEqual(downloads, [], 'audio download skipped');
+  assert.equal(uploads.length, 0, 'audio upload skipped');
+  assert.deepEqual(responsesBodies[0].input[0].content.map((c) => c.type), ['input_audio', 'input_text']);
+  assert.equal(responsesBodies[0].input[0].content[0].file_id, 'file-warm-aud');
+  assert.match(confirmed.text, /## 字幕（ASR）/);
+});
+
+test('dead cache (file ids 404): falls back to the full download/upload pipeline', async () => {
+  resetState();
+  await saveArkFileCacheEntry({
+    baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
+    platform: 'bilibili', pageUrl: attachCtx.meta.url,
+    videoFileId: 'file-warm-vid', audioFileId: 'file-warm-aud', durationSec: 4,
+  });
+  warmIdsAlive = false; // Ark 侧文件已过期/删除（GET /files/{id} 404）
+  attachBtn.click();
+  await waitFor(() => document.querySelector('.asr-mode-card'));
+  document.querySelectorAll('.asr-mode-btn')[1].click(); // 视频精读
+  await waitFor(() => confirmed && uploads.length === 2, 9000);
+
+  assert.equal(uploads.length, 2, 'cache miss → re-upload both files');
+  const expSent = parseInt(uploads[0].expireAt, 10);
+  const expExpected = Math.floor(Date.now() / 1000) + 30 * 86400;
+  assert.ok(Math.abs(expExpected - expSent) <= 60, `expire_at=30 天上限随上传发送（sent=${expSent}, expected≈${expExpected}）`);
+  assert.equal(responsesBodies[0].input[0].content[0].file_id, 'file-vid', 'fresh ids, not the dead cache');
 });

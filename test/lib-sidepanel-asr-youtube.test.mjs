@@ -174,7 +174,7 @@ test('youtube ASR: DNR injects youtube Referer+Origin+Cookie, download sends Ran
   assert.deepEqual(dnrRule.condition.initiatorDomains, ['test-extension-id'], 'must target the extension initiator only');
 
   assert.equal(uploadCalls, 1, 'Ark /files upload must run via extension-context fetch');
-  assert.equal(uploadedFileName, 'audio.wav', 'must upload the transcoded WAV');
+  assert.equal(uploadedFileName, 'browsa-yt-abc123XYZ-audio.wav', 'must upload the transcoded WAV (semantic name)');
 
   assert.ok(sent.includes('ATTACH_ASR_CONFIRM'), 'must send ATTACH_ASR_CONFIRM after the pipeline');
   assert.ok(confirmed, 'confirm payload must be captured');
