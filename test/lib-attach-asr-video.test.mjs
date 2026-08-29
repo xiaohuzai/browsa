@@ -20,13 +20,13 @@ import {
 
 const MB = 1024 * 1024;
 
-test('keyframeCapFor scales with duration, clamped to [4,10], 6 when unknown', () => {
+test('keyframeCapFor scales with duration, clamped to [4,12], 6 when unknown', () => {
   assert.equal(keyframeCapFor(0), 6);
   assert.equal(keyframeCapFor(undefined), 6);
-  assert.equal(keyframeCapFor(300), 4, '5 分钟 → ceil(2)=2 → 下限 4');
-  assert.equal(keyframeCapFor(1015), 7, '17 分钟 → ceil(6.77)=7（小Lin说实测档位）');
-  assert.equal(keyframeCapFor(1800), 10, '30 分钟 → ceil(12) → 上限 10');
-  assert.equal(keyframeCapFor(5400), 10, '90 分钟仍封顶 10');
+  assert.equal(keyframeCapFor(300), 4, '5 分钟 → ceil(2.5)=3 → 下限 4');
+  assert.equal(keyframeCapFor(1015), 9, '17 分钟 → ceil(8.46)=9（小Lin说档位，2026-08-30 用户反馈 6 张太少）');
+  assert.equal(keyframeCapFor(1440), 12, '24 分钟 → ceil(12)=12 → 上限 12');
+  assert.equal(keyframeCapFor(5400), 12, '90 分钟仍封顶 12');
 });
 
 test('estimateStreamBytes prefers the API size, falls back to bandwidth×duration/8, else 0', () => {
@@ -89,14 +89,15 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
-  // 截屏标记协议（上限随时长伸缩 + 间隔 + 独立成行）
+  // 截屏标记协议（上限随时长伸缩 + 间隔 + 独立成行；上限是预算不是指标）
   assert.match(ins, /\[截屏\]/);
   assert.match(task, /\[截屏\]/);
   // instructions 不带时长 → 回退 6；带时长 → 与 keyframeCapFor 同源。
-  assert.match(ins, /at most 6/i);
-  assert.match(buildVideoAnalysisInstructions('zh', 1015), /at most 7/i);
-  assert.match(buildVideoAnalysisTaskText(600, 'zh'), /最多 4 个/);
-  assert.match(buildVideoAnalysisTaskText(0, 'zh'), /最多 6 个/);
+  assert.match(ins, /up to 6/);
+  assert.match(buildVideoAnalysisInstructions('zh', 1015), /up to 9/);
+  assert.match(buildVideoAnalysisTaskText(600, 'zh'), /上限 5 个/);
+  assert.match(buildVideoAnalysisTaskText(0, 'zh'), /上限 6 个/);
+  assert.match(task, /尽量用满/, '上限是预算不是指标——prompt 鼓励图表密集视频用满额度');
   // 广告段压缩 + 说话人身份括注（2026-08-29 用户实测：小Lin说视频广告逐字照录、
   // 特朗普插播只标 [说话人2] 而主叙述不标）。
   assert.match(task, /（广告：品牌\+核心卖点）/);
