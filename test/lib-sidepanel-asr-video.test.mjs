@@ -86,7 +86,7 @@ globalThis.fetch = async (url, init) => {
       json: async () => ({
         id: 'resp_1',
         output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text',
-          text: '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:01] [截屏] 标题卡片画面\n[00:04] 欢迎收看' }] }],
+          text: '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:01] [截屏] 标题卡片画面\n[00:02] [截屏] 间隔太近应被丢弃\n[00:04] 欢迎收看' }] }],
       }),
     };
   }
@@ -222,6 +222,10 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   // 截屏标记行改写为 [图N] 锚点保留在产物里；jsdom 没有 URL.createObjectURL →
   // 抽帧 fail-open 返回 [] → confirm 不带 figureImages（真实浏览器里抽帧成功才交错入库）。
   assert.match(confirmed.text, /\[00:01\] \[图1\] 标题卡片画面/);
+  // 幸存标记才编号；被安全阀/间隔滤掉的标记整行丢弃，编号与真图对齐。
+  assert.doesNotMatch(confirmed.text, /间隔太近应被丢弃/, '被滤掉的标记行整行删除');
+  assert.doesNotMatch(confirmed.text, /\[截屏\]/, '无残留的原始截屏标记');
+  assert.doesNotMatch(confirmed.text, /\[图2\]/, '滤掉的标记不占编号');
   assert.equal(confirmed.figureImages, undefined);
   assert.ok(dnrRules >= 1 && dnrRemoved >= 1, 'DNR rule registered and removed');
   assert.ok(!document.querySelector('.asr-mode-card'), 'card removed after choice');

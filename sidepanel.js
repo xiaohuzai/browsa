@@ -1104,16 +1104,20 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     }
     const docTextLines = fmt.lines;
     // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行。
-    // max 只是防病态输出的安全阀（SAFETY_KEYFRAME_CAP），数量由模型按内容决定。
+    // max 只是防病态输出的安全阀（SAFETY_KEYFRAME_CAP）；只对幸存标记编号，越界
+    // 标记整行丢弃——编号与真图必须一一对齐（2026-08-30 真实 bug：模型输出 37 个
+    // 标记、抽帧只取 24，但改写把 37 个全编了号，图 25 起的锚点没有真图）。
     const keyframes = parseKeyframeMarkers(
       docTextLines.filter((l) => l.includes('[截屏]')).join('\n'),
       { max: SAFETY_KEYFRAME_CAP },
     );
+    const survivingMarkerLines = new Set(keyframes.map((k) => k.line));
     // 标记行改写为 [图N] 锚点（带时间戳与 caption）：入库时 interleaveImageParts
     // 按锚点位置真交错插入图片部件，模型回答引用 [图N] 时渲染端还原为缩略图。
     let figIdx = 0;
     const docText = docTextLines
-      .map((l) => (l.includes('[截屏]') ? l.replace('[截屏]', `[图${++figIdx}]`) : l))
+      .filter((l) => !l.includes('[截屏]') || survivingMarkerLines.has(l))
+      .map((l) => (survivingMarkerLines.has(l) ? l.replace('[截屏]', `[图${++figIdx}]`) : l))
       .join('\n');
     if (!docText) {
       throw new Error('精读输出为空');

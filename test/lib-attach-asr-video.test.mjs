@@ -84,15 +84,19 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
-  // 截屏标记协议：数量由内容决定（2026-08-30 用户定调，不设预算），≥10s 间隔、
-  // 独立成行；客户端只留安全阀。
+  // 截屏协议（2026-08-30 用户定调：内容/音频是主体，图只截关键的）：只截论证
+  // 依赖的画面，软性密度参考（15-20 分钟 ≈ 6-10），禁截装饰性画面与重复画面；
+  // 客户端只留安全阀。
   assert.match(ins, /\[截屏\]/);
   assert.match(task, /\[截屏\]/);
-  assert.doesNotMatch(ins, /up to \d+/, 'EN prompt 不再出现数字上限');
-  assert.doesNotMatch(task, /上限 \d+ 个/, '中文 prompt 不再出现数字上限');
-  assert.match(ins, /as many as the content warrants/);
-  assert.match(task, /有多少值得截的就标多少/);
-  assert.match(task, /不要为了精简跳过有价值的画面/);
+  assert.doesNotMatch(ins, /up to \d+/, 'EN prompt 无硬性数字上限');
+  assert.doesNotMatch(task, /上限 \d+ 个/, '中文 prompt 无硬性数字上限');
+  assert.match(ins, /KEY visuals ONLY/);
+  assert.match(ins, /never capture the same visual twice/);
+  assert.match(task, /只截【关键】画面/);
+  assert.match(task, /通常 6-10 处即可/);
+  assert.match(task, /同一画面只截一次/);
+  assert.match(task, /不要截：标题卡/);
   // 广告段压缩 + 说话人身份括注（2026-08-29 用户实测：小Lin说视频广告逐字照录、
   // 特朗普插播只标 [说话人2] 而主叙述不标）。
   assert.match(task, /（广告：品牌\+核心卖点）/);
@@ -115,6 +119,9 @@ test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and mi
   // 排序后 3s 先入选；5s/10s 与它间隔 < 8s 被滤；125s、3723s 保留。
   assert.deepEqual(out.map((m) => m.sec), [3, 125, 3723], 'sorted, gap-filtered');
   assert.deepEqual(out.map((m) => m.caption), ['排序后最早', '代码演示', '片尾总结']);
+  // 每个幸存标记携带原始行文本（sidepanel 只对幸存者做 [截屏]→[图N] 改写）
+  assert.ok(out.every((m) => /\[截屏\]/.test(m.line)));
+  assert.ok(out.every((m) => m.line.includes(m.caption)));
   // 上限 6
   const many = Array.from({ length: 10 }, (_, i) => `[${i}:00:00] [截屏] 图${i}`).join('\n');
   assert.equal(parseKeyframeMarkers(many).length, 6);
