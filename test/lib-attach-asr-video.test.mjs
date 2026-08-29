@@ -15,18 +15,13 @@ import {
   analyzeVideo,
   resolveVideoDurationSec,
   parseKeyframeMarkers,
-  keyframeCapFor,
+  SAFETY_KEYFRAME_CAP,
 } from '../lib/handlers/attach-asr.js';
 
 const MB = 1024 * 1024;
 
-test('keyframeCapFor scales with duration, clamped to [4,12], 6 when unknown', () => {
-  assert.equal(keyframeCapFor(0), 6);
-  assert.equal(keyframeCapFor(undefined), 6);
-  assert.equal(keyframeCapFor(300), 4, '5 分钟 → ceil(2.5)=3 → 下限 4');
-  assert.equal(keyframeCapFor(1015), 9, '17 分钟 → ceil(8.46)=9（小Lin说档位，2026-08-30 用户反馈 6 张太少）');
-  assert.equal(keyframeCapFor(1440), 12, '24 分钟 → ceil(12)=12 → 上限 12');
-  assert.equal(keyframeCapFor(5400), 12, '90 分钟仍封顶 12');
+test('SAFETY_KEYFRAME_CAP: client-side guard only, generous enough for chart-dense videos', () => {
+  assert.equal(SAFETY_KEYFRAME_CAP, 24);
 });
 
 test('estimateStreamBytes prefers the API size, falls back to bandwidth×duration/8, else 0', () => {
@@ -89,21 +84,21 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
-  // 截屏标记协议（上限随时长伸缩 + 间隔 + 独立成行；上限是预算不是指标）
+  // 截屏标记协议：数量由内容决定（2026-08-30 用户定调，不设预算），≥10s 间隔、
+  // 独立成行；客户端只留安全阀。
   assert.match(ins, /\[截屏\]/);
   assert.match(task, /\[截屏\]/);
-  // instructions 不带时长 → 回退 6；带时长 → 与 keyframeCapFor 同源。
-  assert.match(ins, /up to 6/);
-  assert.match(buildVideoAnalysisInstructions('zh', 1015), /up to 9/);
-  assert.match(buildVideoAnalysisTaskText(600, 'zh'), /上限 5 个/);
-  assert.match(buildVideoAnalysisTaskText(0, 'zh'), /上限 6 个/);
-  assert.match(task, /尽量用满/, '上限是预算不是指标——prompt 鼓励图表密集视频用满额度');
+  assert.doesNotMatch(ins, /up to \d+/, 'EN prompt 不再出现数字上限');
+  assert.doesNotMatch(task, /上限 \d+ 个/, '中文 prompt 不再出现数字上限');
+  assert.match(ins, /as many as the content warrants/);
+  assert.match(task, /有多少值得截的就标多少/);
+  assert.match(task, /不要为了精简跳过有价值的画面/);
   // 广告段压缩 + 说话人身份括注（2026-08-29 用户实测：小Lin说视频广告逐字照录、
   // 特朗普插播只标 [说话人2] 而主叙述不标）。
   assert.match(task, /（广告：品牌\+核心卖点）/);
-  assert.match(buildVideoAnalysisInstructions('zh', 600), /AD READS/);
+  assert.match(buildVideoAnalysisInstructions('zh'), /AD READS/);
   assert.match(task, /（特朗普）/);
-  assert.match(buildVideoAnalysisInstructions('zh', 600), /FIRST line/);
+  assert.match(buildVideoAnalysisInstructions('zh'), /FIRST line/);
 });
 
 test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and min gap', () => {

@@ -39,7 +39,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript, transcriptEndSec,
   pickVideoStream, estimateStreamBytes, analyzeVideo, parseKeyframeMarkers, extractKeyframes,
-  keyframeCapFor, videoAssetId, lookupCachedArkFiles, saveArkFileCacheEntry,
+  SAFETY_KEYFRAME_CAP, videoAssetId, lookupCachedArkFiles, saveArkFileCacheEntry,
   ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -1102,11 +1102,11 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       throw new Error('精读不完整（最后时间戳 ' + (endSec == null ? '?' : endSec.toFixed(0)) + 's / 视频 ' + wantDurSec + 's）');
     }
     const docTextLines = fmt.lines;
-    // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行；
-    // max 与 prompt 上限同源（keyframeCapFor），随时长伸缩。
+    // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行。
+    // max 只是防病态输出的安全阀（SAFETY_KEYFRAME_CAP），数量由模型按内容决定。
     const keyframes = parseKeyframeMarkers(
       docTextLines.filter((l) => l.includes('[截屏]')).join('\n'),
-      { max: keyframeCapFor(wantDurSec) },
+      { max: SAFETY_KEYFRAME_CAP },
     );
     // 标记行改写为 [图N] 锚点（带时间戳与 caption）：入库时 interleaveImageParts
     // 按锚点位置真交错插入图片部件，模型回答引用 [图N] 时渲染端还原为缩略图。

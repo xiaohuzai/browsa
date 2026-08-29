@@ -16,7 +16,8 @@
     "contextMenus",
     "downloads",
     "declarativeNetRequest",
-    "cookies"
+    "cookies",
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "<all_urls>"
