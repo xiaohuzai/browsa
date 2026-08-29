@@ -30,6 +30,7 @@ export {
   initStreamState, appendToStreamState, clearStreamState
 };
 import { extractActiveTab } from './lib/page-extractor.js';
+import { inlinePageImages } from './lib/page-images.js';
 import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
@@ -1060,9 +1061,32 @@ async function handle(msg, sender) {
           ctx = withVideoNote(ctx);
         }
 
+        // 页面配图（reader/auto/jina）：正文 Markdown 里的 ![alt](url) 原位转成
+        // [图N] 锚点行，图片在 SW 下载压缩成 JPEG dataURL 随条目交错入库——与视频
+        // 截图 / PDF figure 同一套 [图N] 引用协议（回答引用 [图N]，渲染端还原缩略图）。
+        // 全程 fail-open：无图/下载失败/无解码环境保持原文，绝不阻塞附加。
+        // dom/full 是树状文本（无 Markdown 图片语法）、selected 是局部摘录，不参与。
+        if (['reader', 'auto', 'jina'].includes(ctx.mode) && ctx.text) {
+          try {
+            const inlined = await inlinePageImages(ctx.text, { baseUrl: ctx.meta?.url || '' });
+            if (inlined.figures.length) {
+              ctx.text = inlined.text
+                + `\n\n（文中 [图N] 标记按顺序对应随附的 ${inlined.figures.length} 张页面配图；在回答中引用配图时请使用相同的 [图N] 标记。）`;
+              ctx.pageFigures = inlined.figures;
+            }
+          } catch (e) {
+            console.warn('browsa: page image inlining failed, keeping plain text:', e?.message);
+          }
+        }
+
         // All other modes: save to global history immediately.
         const contextText = buildPageContextText(ctx);
-        const historyEntry = { role: 'user', content: contextText };
+        const pageFigures = Array.isArray(ctx.pageFigures) ? ctx.pageFigures : [];
+        // 有配图时存成按 [图N] 锚点真交错的多模态 content（与 ATTACH_ASR_CONFIRM 的
+        // 视频截图同构）；无配图保持纯字符串 content 形状不变。
+        const historyEntry = pageFigures.length
+          ? { role: 'user', content: interleaveImageParts(contextText, pageFigures) }
+          : { role: 'user', content: contextText };
         // Stamp the video source on video page-contexts (youtube/bilibili)
         // so video-note replies can turn their [mm:ss] markers into clickable
         // seek links. Other pages have no seekable <video> target.
@@ -1085,7 +1109,7 @@ async function handle(msg, sender) {
         const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(ctx.text, all.summarizeThresholdChars);
         if (willSummarize) historyEntry.attachId = crypto.randomUUID();
         await storage.appendToHistory(historyEntry);
-        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
+        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`);
         if (willSummarize) {
           maybeSummarizeAttachment({
             attachId: historyEntry.attachId,
