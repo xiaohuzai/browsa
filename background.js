@@ -836,8 +836,12 @@ async function handle(msg, sender) {
           func: async () => {
             try {
               const pi = window.__playinfo__?.data || window.__playinfo__;
-              const bvid = pi?.bvid || '';
-              const cid = pi?.cid || 0;
+              // bvid 不能读 __playinfo__（playurl 响应无此字段，恒空串 → 自愈永远
+              // 拦死）；与字幕提取同策略：URL path 优先，__INITIAL_STATE__ 兜底。
+              const pathBvid = (window.location?.pathname || '').match(/\/video\/(BV[A-Za-z0-9]+)/)?.[1] || '';
+              const vd = window.__INITIAL_STATE__?.videoData;
+              const bvid = pathBvid || pi?.bvid || vd?.bvid || '';
+              const cid = pi?.cid || vd?.cid || 0;
               const freshFn = window.__browsaFetchFreshBilibiliStreams;
               if (typeof freshFn !== 'function' || !bvid || !cid) {
                 return { ok: false, error: '脚本未注入或缺 bvid/cid（页面可能未播放过）' };
@@ -1481,8 +1485,17 @@ async function buildAsrPendingCtx(tabId, ctx) {
             if (cachedAudio) return { streams: cached, videoDurationSec };
             // Cached audio empty or expired — fall back to fresh playurl API
             // (re-signs a brand-new URL with a fresh deadline, no page refresh).
-            const bvid = pi?.bvid || '';
-            const cid = pi?.cid || 0;
+            // bvid 绝不能从 __playinfo__ 读：B站 playurl 响应里没有 bvid 字段，
+            // pi?.bvid 恒为空串 → 自愈刷新永远被 !bvid 拦死（真实故障 2026-08-29：
+            // 页面开久了缓存流过期后必报「脚本未注入或缺 bvid/cid」让用户白刷新）。
+            // 与字幕提取的主动拉取同策略：URL path 优先，__INITIAL_STATE__ 兜底；
+            // cid 用 playinfo（有此字段）+ INITIAL_STATE 兜底。
+            //（注意：函数体内不要出现 activeFetch / contentType 等 mock 匹配标记词，
+            // attach-asr.test.mjs 按 func.toString() 字符串路由 canned 结果。）
+            const pathBvid = (window.location?.pathname || '').match(/\/video\/(BV[A-Za-z0-9]+)/)?.[1] || '';
+            const vd = window.__INITIAL_STATE__?.videoData;
+            const bvid = pathBvid || pi?.bvid || vd?.bvid || '';
+            const cid = pi?.cid || vd?.cid || 0;
             const freshFn = window.__browsaFetchFreshBilibiliStreams;
             if (typeof freshFn === 'function' && bvid && cid) {
               try {
