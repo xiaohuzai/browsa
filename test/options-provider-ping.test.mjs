@@ -375,10 +375,15 @@ test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own
   assert.equal(hermesCard.querySelector('[data-act="delete"]'), null, 'agent cards are not removable');
 });
 
-test('options.js: provider cards no longer expose Temperature / Max tokens fields', async () => {
+test('options.js: provider cards expose Max output tokens (truncation control) but still no Temperature', async () => {
+  // maxTokens 2026-08-29 重新露出：字段一直在 BLANK_LLM/推理管线里，但没有 UI
+  // 用户就无法提高输出预算——真实故障：视频笔记类长回复被 16K 上限截断且无处可调。
+  // Temperature 保持删除（无对应故障，纯旋钮）。
   const card = await addLlmCard();
-  assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field removed');
-  assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field removed');
+  const mt = card.querySelector('[data-k="maxTokens"]');
+  assert.ok(mt, 'Max tokens field exposed');
+  assert.equal(mt.type, 'number', 'maxTokens is a number input');
+  assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field stays removed');
 });
 
 test('options.js: adding a provider appends a new LLM card with alias + protocol select + delete', async () => {

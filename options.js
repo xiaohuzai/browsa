@@ -224,6 +224,11 @@ function buildProviderCard(name, cfg, opts = {}) {
         <label>Model ID
           <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" />
         </label>
+      </div>
+      <div class="field">
+        <label>Max output tokens
+          <input data-k="maxTokens" type="number" min="256" step="256" value="${cfg.maxTokens ? Number(cfg.maxTokens) : ''}" placeholder="empty = default 16384" />
+        </label>
       </div>` : ''}
       ${!isAgent ? `
       <div class="field field-full">

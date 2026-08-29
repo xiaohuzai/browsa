@@ -2221,7 +2221,11 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       if (m.usage) showTokenUsage(el, m.usage);
       // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
       // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
-      if (m.outputTruncated) showToast('回复已达模型输出长度上限，可回复「继续」续写', 'info');
+      if (m.outputTruncated) {
+        // 背景端已自动续写一次；走到这里说明续写后仍被上限截断。
+        showToast('回复仍被模型输出上限截断，可点「继续生成」或回复「继续」', 'info');
+        appendMsgAction(el, '→ 继续生成', () => { inputEl.value = '继续'; onSend(); });
+      }
       if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
       // Detect max-turns: agent hit the tool-call ceiling and is asking
       // the user to continue. Show a one-click Continue button.

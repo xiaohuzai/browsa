@@ -636,3 +636,32 @@ test('buildAnthropicMessages: history image_url data URLs convert to base64 imag
 });
 
 
+
+// --------------- auto-continuation on output-cap truncation ------------------
+// handleChat() 本身不做端到端 mock（见文件头说明），这里按本文件惯例做源级
+// 结构断言：续写块必须存在、必须门控在 replyTruncated、必须静默第二遍、
+// 必须在时间戳重写【之前】执行（重写作用于续写后的全文）。
+
+test('chat-handler: auto-continuation block sits between the retry loop and the timestamp rewrite', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  const contIdx = src.indexOf('Auto-continuation on output-cap truncation');
+  const rewriteIdx = src.indexOf('Auto timestamp rewrite (video notes)');
+  assert.ok(contIdx > 0, 'continuation block must exist');
+  assert.ok(rewriteIdx > contIdx, 'continuation must run BEFORE the timestamp rewrite (rewrite operates on the merged full text)');
+
+  const block = src.slice(contIdx, rewriteIdx);
+  assert.match(block, /if \(replyTruncated && fullReply\)/, 'gated on the truncation flag');
+  assert.match(block, /doStream\(\{ silent: true \}\)/, 'second pass is silent (deltas swallowed, DONE.full replaces the bubble)');
+  assert.match(block, /fullReply = fullReply \+ rc\.full/, 'merged, not replaced (continuation resumes mid-sentence)');
+  assert.match(block, /replyTruncated = rc\.finishReason === 'length'/, 'still-truncated flag re-derived from the continuation leg');
+  assert.match(block, /isHermes/, 'Hermes runs-path mirrors the rewrite conversation rebuild');
+  assert.match(block, /Do NOT repeat any content already written/, 'anti-repetition instruction present');
+});
+
+test('chat-handler: continuation reuses the silent-second-pass contract (TS_STATUS pushed, acc reset+merged)', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  const block = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
+  assert.match(block, /pushChunk\(tabId, \{ type: 'TS_STATUS'/, 'user-visible status while the silent pass runs');
+  assert.match(block, /_stCont\.acc = ''/, 'stream-state accumulator reset before the silent pass (no v1+v2 double in PEEK)');
+  assert.match(block, /_stCont\.acc = fullReply/, 'acc holds the MERGED text after the continuation (tab-switch PEEK correctness)');
+});
