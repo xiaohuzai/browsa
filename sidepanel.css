@@ -1896,8 +1896,7 @@ code.language-patch {
 }
 .sessions-backdrop.active { display: block; }
 
-/* ─── Transcript drawer (playback-follow transcript, ported from
-       youtube-digest) ─────────────────────────────────────────────────────── */
+/* ─── Video timeline drawer（视频时间线：播放跟随的图文时间线）────────────── */
 /* Deliberately no backdrop: unlike the sessions drawer this one is meant to
    be used WHILE watching — clicking a row seeks the video and you keep
    reading. A blocking overlay would fight that. */
@@ -1956,8 +1955,10 @@ code.language-patch {
 .ts-row {
   display: flex;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 6px 10px;
+  margin: 0 6px;
   cursor: pointer;
+  border-radius: 8px;
   border-left: 2px solid transparent;
 }
 .ts-row:hover { background: var(--hover-bg, rgba(128,128,128,0.08)); }
@@ -1984,6 +1985,16 @@ code.language-patch {
   background: var(--accent-dim);
 }
 .ts-row.active .ts-row-time { color: var(--accent); }
+/* 关键帧图卡：精读截图内联在时间线里（[图N] 锚点行），文字行与图卡混排 */
+.ts-row.ts-fig { display: block; }
+.ts-fig-img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  margin: 2px 0 5px;
+}
+.ts-fig-caption { display: block; font-size: 12px; color: var(--fg-2); }
 .ts-row-text mark {
   background: var(--gold-dim);
   color: inherit;

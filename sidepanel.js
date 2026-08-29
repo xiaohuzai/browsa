@@ -2714,8 +2714,7 @@ function appendUser(text, imageDataUrls) {
 // Shared with the transcript drawer's row clicks via seekVideo(vs, seconds).
 async function onTimestampClick(ts) {
   // A live text selection means the user was dragging across text, not
-  // aiming at the marker — seeking then would be a surprise (same guard as
-  // youtube-digest's transcript rows).
+  // aiming at the marker — seeking then would be a surprise.
   const sel = typeof window.getSelection === 'function' ? window.getSelection() : null;
   if (sel && !sel.isCollapsed) return;
   const seconds = Number(ts.dataset.s) || 0;
@@ -2755,8 +2754,23 @@ async function getVideoTranscriptSource() {
     const list = Array.isArray(history) ? history : [];
     for (let i = list.length - 1; i >= 0; i--) {
       const m = list[i];
-      if (m?.role === 'user' && m.videoSrc && typeof m.content === 'string') {
-        return { raw: m.content, videoSrc: m.videoSrc };
+      if (m?.role !== 'user' || !m.videoSrc) continue;
+      if (typeof m.content === 'string') {
+        return { raw: m.content, videoSrc: m.videoSrc, figures: [] };
+      }
+      // 交错多模态条目（视频精读 + 关键帧）：text 部件拼接为时间线原文，
+      // image 部件按序抽出——[图N] 锚点行渲染成内联截图卡片。
+      if (Array.isArray(m.content)) {
+        const raw = m.content
+          .filter((p) => p.type === 'text' || p.type === 'input_text')
+          .map((p) => p.text)
+          .join('\n');
+        if (!raw) continue;
+        const figures = m.content
+          .filter((p) => p.type === 'image_url')
+          .map((p) => (typeof p.image_url === 'string' ? p.image_url : p.image_url?.url))
+          .filter(Boolean);
+        return { raw, videoSrc: m.videoSrc, figures };
       }
     }
   } catch (_) {}
