@@ -166,3 +166,64 @@ test('uploadBlobToQwen 失败路径：缺参 / getPolicy 失败 / OSS 非 2xx �
     globalThis.fetch = realFetch;
   }
 });
+
+test('OSS 上传网络级失败自动重试：两次重置后第三次成功', async () => {
+  const realFetch = globalThis.fetch;
+  let ossCalls = 0;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('getPolicy')) {
+        return { ok: true, status: 200, json: async () => POLICY };
+      }
+      ossCalls++;
+      if (ossCalls <= 2) throw new Error('reset');
+      return { ok: true, status: 200, text: async () => '' };
+    };
+    const out = await uploadBlobToQwen({
+      blob: new Blob(['x']), filename: 'a.wav', apiKey: 'sk', baseUrl: BASE, model: 'm',
+    });
+    assert.equal(out.ok, true, '瞬时重置在重试预算内恢复');
+    assert.equal(ossCalls, 3);
+    assert.equal(out.fileId, 'oss://dashscope-instant/uploads/abc123/a.wav');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('重试只针对可重试失败：4xx 不重试（1 次），5xx 重试（3 次后仍失败带 attempts/host）', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    let ossCalls = 0;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('getPolicy')) {
+        return { ok: true, status: 200, json: async () => POLICY };
+      }
+      ossCalls++;
+      return { ok: false, status: 403, text: async () => '' };
+    };
+    const denied = await uploadBlobToQwen({
+      blob: new Blob(['x']), filename: 'a.wav', apiKey: 'sk', baseUrl: BASE, model: 'm',
+    });
+    assert.equal(denied.ok, false);
+    assert.match(denied.error, /OSS upload HTTP 403/);
+    assert.equal(ossCalls, 1, '4xx 是确定性失败，不重试');
+
+    ossCalls = 0;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('getPolicy')) {
+        return { ok: true, status: 200, json: async () => POLICY };
+      }
+      ossCalls++;
+      return { ok: false, status: 503, text: async () => '' };
+    };
+    const down = await uploadBlobToQwen({
+      blob: new Blob(['x']), filename: 'a.wav', apiKey: 'sk', baseUrl: BASE, model: 'm',
+    });
+    assert.equal(down.ok, false);
+    assert.equal(ossCalls, 3, '5xx 属可重试，打满尝试预算');
+    assert.match(down.error, /attempts: 3/);
+    assert.match(down.error, /host: .*dashscope-file\.oss-cn-beijing\.aliyuncs\.com/, '失败信息带 host 便于定位');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
