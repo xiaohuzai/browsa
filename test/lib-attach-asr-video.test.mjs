@@ -103,6 +103,16 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(buildVideoAnalysisInstructions('zh'), /AD READS/);
   assert.match(task, /（特朗普）/);
   assert.match(buildVideoAnalysisInstructions('zh'), /FIRST line/);
+  // 2026-08-30 用户定调：播客/访谈类，视频解析的价值首在分辨说话人——
+  // 画面锚定（镜头对着谁就是谁）+ 身份括注在长间隔后重复 + 抢话归属规则。
+  assert.match(ins, /DIARIZE WITH THE VISUAL CHANNEL/);
+  assert.match(ins, /stronger than acoustic similarity/);
+  assert.match(ins, /never flip-flop a speaker's number mid-video/);
+  assert.match(ins, /AGAIN at their first line after every absence/);
+  assert.match(task, /用画面辅助分辨说话人/);
+  assert.match(task, /强于听声音相似度/);
+  assert.match(task, /再次括注/);
+  assert.match(task, /抢话/);
 });
 
 test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and min gap', () => {
