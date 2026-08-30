@@ -214,6 +214,8 @@ test('video mode: card shows both options, picking 视频精读 runs dual downlo
   assert.equal(responsesBodies[0].input[0].content[0].file_id, 'file-vid');
   assert.equal(responsesBodies[0].input[0].content[1].file_id, 'file-aud');
   assert.equal(responsesBodies[0].model, 'm', 'videoModel 留空回退转写模型');
+  // 说话人命名先验：标题 + 页面元信息块随任务文本下发
+  assert.match(responsesBodies[0].input[0].content[2].text, /视频元信息/, 'metaHint（标题+页面元信息块）随任务文本下发');
 
   // 入库：精读段标题 + format 标签 + 元信息保留；卡片已移除
   assert.match(confirmed.text, /## 视听精读（视频解析）/);

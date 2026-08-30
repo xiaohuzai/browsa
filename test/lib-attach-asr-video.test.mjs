@@ -113,6 +113,11 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /强于听声音相似度/);
   assert.match(task, /再次括注/);
   assert.match(task, /抢话/);
+  // 命名标签：有身份证据时用 [说话人:名字]，未知才回退 [说话人N]
+  assert.match(task, /标签优先用真实名字/);
+  assert.match(task, /\[说话人:英博博士\]/);
+  assert.match(ins, /LABEL WITH REAL NAMES/);
+  assert.match(ins, /at most 8 characters/);
 });
 
 test('parseKeyframeMarkers parses [mm:ss]/[h:mm:ss] markers, enforces cap and min gap', () => {
@@ -198,4 +203,40 @@ test('resolveVideoDurationSec prefers SSR duration, falls back to DASH stream me
   // 全部缺失 → 0（维持“未知”语义，不编造）
   assert.equal(resolveVideoDurationSec(0, [{ type: 'audio', duration: 0 }]), 0);
   assert.equal(resolveVideoDurationSec(0, []), 0);
+});
+
+test('analyzeVideo: metaHint 进入任务文本（说话人命名先验）', async () => {
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    return {
+      ok: true,
+      json: async () => ({ id: 'resp_1', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] hi' }] }] }),
+    };
+  };
+  try {
+    await analyzeVideo({ baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: 'k', videoFileId: 'fv', audioFileId: 'fa', model: 'm', durationSec: 60, metaHint: '硅谷101：mRNA癌症疫苗（UP主：硅谷101）' });
+    const taskText = calls[0].body.input[0].content.find((c) => c.type === 'input_text').text;
+    assert.match(taskText, /视频元信息（用于识别说话人姓名与职务/);
+    assert.match(taskText, /UP主：硅谷101/, '先验文本完整下发');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('analyzeVideo: 无 metaHint 时不出现元信息段', async () => {
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ body: JSON.parse(init.body) });
+    return { ok: true, json: async () => ({ id: 'resp_1', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] hi' }] }] }) };
+  };
+  try {
+    await analyzeVideo({ baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: 'k', videoFileId: 'fv', audioFileId: null, model: 'm', durationSec: 60 });
+    const taskText = calls[0].body.input[0].content.find((c) => c.type === 'input_text').text;
+    assert.doesNotMatch(taskText, /视频元信息/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

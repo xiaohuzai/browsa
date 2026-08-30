@@ -334,3 +334,15 @@ test('视频时间线：figures 就位时 [图N] 行渲染成内联截图卡片�
   assert.match(plainRows[0].textContent, /屏幕代码/);
   T.__TRANSCRIPT_TESTING__.reset();
 });
+
+test('parseTranscriptLines: [说话人:名字] 形态解析出名字标签；[图N] 不被误吃', async () => {
+  T = await freshModule();
+  const lines = T.parseTranscriptLines(
+    '[00:13] [说话人:英博博士] 星辰大海。\n[00:20] [说话人2] 编号兜底形态。\n[00:35] [图3] 贝森特便签\n[00:40] [说话人:Yushan] 英文名也行。');
+  assert.equal(lines[0].label, '英博博士', '命名标签显示名字本身');
+  assert.equal(lines[0].text, '星辰大海。');
+  assert.equal(lines[1].label, '说话人2', '编号形态向后兼容');
+  assert.equal(lines[2].label, '', '[图N] 不是说话人标签');
+  assert.equal(lines[2].fig, 3, '[图N] 仍走截图卡片解析');
+  assert.equal(lines[3].label, 'Yushan');
+});

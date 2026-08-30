@@ -1073,11 +1073,17 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       audioFileId: (needAudio && !cached.audioFileId && aup) ? aup.fileId : '',
     });
     stageLabel = '视听精读';
+    // 说话人命名先验：标题 + 页面元信息块（B站合成文本开头带 UP主/简介/嘉宾名单，
+    // 硅谷101 实测简介里直接列出「采访嘉宾/主持人」）。截 500 字控 token。
+    const metaHint = [ctx.articleTitle || ctx.meta?.title || '', (ctx.text || '').slice(0, 500)]
+      .filter(Boolean).join(' ').slice(0, 600);
     const res = await asrAdapterFor(asr.provider).analyzeVideo({
       baseUrl: asr.baseUrl,
       apiKey: asr.apiKey,
       videoFileId: vup.fileId,
       audioFileId: aup ? aup.fileId : null,
+      // 说话人命名先验（身份证据：画面姓名条/自我介绍/简介名单）
+      metaHint,
       // 精读用视频模型（options 可配 videoModel，留空回退转写模型——doubao-seed
       // 系列本身就是多模态）。
       model: (asr.videoModel || '').trim() || asr.model,
