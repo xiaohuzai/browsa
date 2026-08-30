@@ -1624,6 +1624,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
       // 播放地址过期/刷新失败原因（无则空串）。
       asrExpiredError: got.asrExpiredError || '',
       asr: {
+        provider: asr.provider || 'ark',
         apiKey: asr.apiKey,
         baseUrl: asr.baseUrl,
         model: asr.model,

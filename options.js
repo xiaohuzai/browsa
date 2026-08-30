@@ -3,6 +3,7 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
+import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
 const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');
@@ -32,6 +33,14 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
+  // 切换服务商：Base URL 为空时预填该家默认值，提示/占位符/文档链接随动。
+  document.getElementById('asrProvider')?.addEventListener('change', () => {
+    const sel = document.getElementById('asrProvider');
+    const p = getAsrProvider(sel?.value);
+    const baseEl = document.getElementById('asrBaseUrl');
+    if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
+    syncAsrProviderUI();
+  });
 
   // Chat preferences
   applyChatPrefs(cachedCfg);
@@ -72,11 +81,47 @@ async function saveChatPrefs() {
   }
 }
 
+// ASR 卡片的下拉选项、占位符、? 提示、文档链接全部由 lib/asr-providers.js 的
+// 注册表驱动——接入新供应商时 UI 零改动（注册表加一项即可）。
+function syncAsrProviderUI() {
+  const sel = document.getElementById('asrProvider');
+  if (!sel) return;
+  if (!sel.options.length) {
+    for (const p of Object.values(ASR_PROVIDERS)) {
+      const o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.label;
+      sel.appendChild(o);
+    }
+  }
+  const p = getAsrProvider(sel.value);
+  const baseEl = document.getElementById('asrBaseUrl');
+  if (baseEl) baseEl.placeholder = p.defaultBaseUrl;
+  const keyEl = document.getElementById('asrApiKey');
+  if (keyEl) keyEl.placeholder = p.apiKeyPlaceholder || 'API Key';
+  const modelEl = document.getElementById('asrModel');
+  if (modelEl) modelEl.placeholder = p.defaultModel;
+  const tip = document.getElementById('asrBaseUrlTip');
+  if (tip) tip.innerHTML = p.baseUrlTip || '';
+  const doc = document.getElementById('asrDocLink');
+  if (doc) {
+    doc.href = p.docUrl || '';
+    doc.textContent = '📖 ' + (p.docLabel || '配置文档');
+  }
+}
+
 function applyAsr(cfg) {
   const a = cfg.asr || {};
   const set = (id, v, placeholder) => { const el = document.getElementById(id); if (el) { if (v != null && v !== '') el.value = v; else el.value = ''; el.placeholder = placeholder || el.placeholder; } };
   const cb = document.getElementById('asrEnabled');
   if (cb) cb.checked = a.enabled !== false;
+  const provSel = document.getElementById('asrProvider');
+  if (provSel) {
+    syncAsrProviderUI(); // 先填充选项，再回填已存值
+    const v = a.provider || 'ark';
+    if ([...provSel.options].some((o) => o.value === v)) provSel.value = v;
+    else provSel.value = 'ark';
+  }
   set('asrApiKey', a.apiKey);
   set('asrBaseUrl', a.baseUrl);
   set('asrModel', a.model);
@@ -99,9 +144,11 @@ function applyAsr(cfg) {
 
 async function saveAsr() {
   const enabled = !!document.getElementById('asrEnabled')?.checked;
+  const provider = document.getElementById('asrProvider')?.value || 'ark';
+  const p = getAsrProvider(provider);
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
-  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || 'https://ark.cn-beijing.volces.com/api/v3';
-  const model = (document.getElementById('asrModel')?.value || '').trim() || 'doubao-seed-2-0-lite-260428';
+  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
+  const model = (document.getElementById('asrModel')?.value || '').trim() || p.defaultModel;
   // 视频解析（视听精读）模型；留空回退用转写模型（runVideoAnalysisPipeline 兜底）。
   const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim();
   const language = document.getElementById('asrLanguage')?.value || 'auto';
@@ -110,18 +157,19 @@ async function saveAsr() {
     flash('err', '启用 ASR 需要填写 API Key。');
     return;
   }
-  // Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
+  // 方舟 Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
   // 不硬拦截保存 —— 自动规整到标准版 api/v3 后正常保存（运行时 normalizeArkBaseUrl
   // 也会兜底），只给一个醒目提示。否则用户点 Save 会被 return 挡住，整个 asr 配置
   // （含 enabled）都存不进去，反而导致 ASR 静默不生效（2026-08-15 实机踩到）。
+  // 仅方舟需要该规整；其他服务商的端点没有这个变体。
   let savedBaseUrl = baseUrl;
-  if (baseUrl.includes('/api/plan')) {
+  if (provider === 'ark' && baseUrl.includes('/api/plan')) {
     savedBaseUrl = normalizeArkBaseUrl(baseUrl);
     flash('err', `已把 Base URL 从 Agent Plan 端点自动改为标准版 ${savedBaseUrl}（api/plan/v3 没有文件上传）。`);
   }
-  cachedCfg.asr = { enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
+  cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
   await chrome.storage.local.set({ asr: cachedCfg.asr });
-  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}${enabled ? '（模型 ' + model + '）' : ''}。`);
+  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}（${p.label}，模型 ${model}）。`);
 }
 
 function renderProviders() {

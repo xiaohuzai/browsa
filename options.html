@@ -111,15 +111,21 @@
 
         <section class="card">
           <div class="card-header">
-            <h2>ASR 字幕识别（火山方舟）</h2>
+            <h2>ASR 字幕识别</h2>
           </div>
           <div class="card-body">
             <label class="toggle-row">
               <input type="checkbox" id="asrEnabled" />
-              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">仅支持 B 站</span></span></span>
+              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">视频页附加时自动转写/解析。平台：仅支持 B 站。</span></span></span>
             </label>
 
             <div class="fields">
+              <div class="field">
+                <label for="asrProvider">
+                  <span class="field-title">服务商</span>
+                  <select id="asrProvider"></select>
+                </label>
+              </div>
               <div class="field">
                 <label for="asrSubtitleSource">
                   <span class="field-title">字幕来源</span>
@@ -155,43 +161,25 @@
               <div class="field">
                 <label for="asrApiKey">
                   <span class="field-title">API Key</span>
-                  <input id="asrApiKey" type="password" placeholder="标准方舟 API Key（UUID 或 ark- 前缀均可）" />
+                  <input id="asrApiKey" type="password" />
                 </label>
               </div>
               <div class="field">
                 <label for="asrBaseUrl">
-                  <span class="field-title">Base URL<span class="tip" tabindex="0">?<span class="tip-bubble">用标准版 <code>…/api/v3</code>：实测 Agent Plan 的 <code>…/api/plan/v3</code> 不支持文件上传（Files API）。</span></span></span>
-                  <input id="asrBaseUrl" type="text" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
+                  <span class="field-title">Base URL<span class="tip" tabindex="0">?<span id="asrBaseUrlTip" class="tip-bubble"></span></span></span>
+                  <input id="asrBaseUrl" type="text" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrModel">
-                  <span class="field-title">模型 ID</span>
-                  <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
-                </label>
-              </div>
-              <div class="field field-full">
-                <label for="asrModel">
-                  <span class="field-title">模型 ID</span>
-                  <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
-                </label>
-              </div>
-              <div class="field field-full">
-                <label for="asrModel">
-                  <span class="field-title">模型 ID</span>
-                  <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
-                </label>
-              </div>
-              <div class="field field-full">
-                <label for="asrModel">
-                  <span class="field-title">模型 ID</span>
-                  <input id="asrModel" type="text" placeholder="doubao-seed-2-0-lite-260428" />
+                  <span class="field-title">模型 ID（音频转写）</span>
+                  <input id="asrModel" type="text" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrVideoModel">
                   <span class="field-title">视频模型 ID（视频解析用，留空则用上面的模型）</span>
-                  <input id="asrVideoModel" type="text" placeholder="留空 = 同转写模型（doubao-seed 系列多模态）" />
+                  <input id="asrVideoModel" type="text" placeholder="留空 = 同转写模型" />
                 </label>
               </div>
             </div>
@@ -199,8 +187,8 @@
             <div class="card-actions">
               <button data-act="save-asr" class="primary">Save</button>
             </div>
-            <a class="doc-link" href="https://ark.volcengine.com/region:cn-beijing/docs/82379/2377589?lang=zh" target="_blank" rel="noopener noreferrer">
-              📖 为什么要这样配置？→ 火山方舟录音文件识别文档
+            <a class="doc-link" id="asrDocLink" target="_blank" rel="noopener noreferrer">
+              📖 配置文档
             </a>
           </div>
         </section>

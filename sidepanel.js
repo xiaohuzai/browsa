@@ -37,8 +37,8 @@ import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll liste
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import {
-  downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, transcribeAudio, formatAsrTranscript, transcriptEndSec,
-  pickVideoStream, estimateStreamBytes, analyzeVideo, parseKeyframeMarkers, extractKeyframes,
+  downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
+  pickVideoStream, estimateStreamBytes, parseKeyframeMarkers, extractKeyframes,
   SAFETY_KEYFRAME_CAP, videoAssetId, lookupCachedArkFiles, saveArkFileCacheEntry,
   ASR_SUBTITLE_SOURCE
 } from './lib/handlers/attach-asr.js';
@@ -1072,7 +1072,7 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       audioFileId: (needAudio && !cached.audioFileId && aup) ? aup.fileId : '',
     });
     stageLabel = '视听精读';
-    const res = await analyzeVideo({
+    const res = await asrAdapterFor(asr.provider).analyzeVideo({
       baseUrl: asr.baseUrl,
       apiKey: asr.apiKey,
       videoFileId: vup.fileId,
@@ -1405,7 +1405,7 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
     });
     // 3. Transcribe via Responses API（流式）
     stageLabel = '转写';
-    const tr = await transcribeAudio({
+    const tr = await asrAdapterFor(asr.provider).transcribeAudio({
       baseUrl: asr.baseUrl,
       apiKey: asr.apiKey,
       fileId: up.fileId,
