@@ -383,14 +383,13 @@ test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own
   assert.equal(docLink.target, '_blank', 'docs open in a new tab');
 });
 
-test('options.js: provider cards expose Max output tokens (truncation control) but still no Temperature', async () => {
-  // maxTokens 2026-08-29 重新露出：字段一直在 BLANK_LLM/推理管线里，但没有 UI
-  // 用户就无法提高输出预算——真实故障：视频笔记类长回复被 16K 上限截断且无处可调。
-  // Temperature 保持删除（无对应故障，纯旋钮）。
+test('options.js: provider cards expose NO raw inference knobs (maxTokens auto-negotiates)', async () => {
+  // maxTokens 输入框 2026-08-30 撤下：模型输出上限是供应商各自的硬约束，用户
+  // 不该被要求知道该填什么（用户原话「其实我也不知道该设什么值」）。改为自动
+  // 协商：默认 32768，超限 400 时从报错解析真实上限自动重试（llm-client.js）。
+  // Temperature 保持删除（纯旋钮，无对应故障）。
   const card = await addLlmCard();
-  const mt = card.querySelector('[data-k="maxTokens"]');
-  assert.ok(mt, 'Max tokens field exposed');
-  assert.equal(mt.type, 'number', 'maxTokens is a number input');
+  assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field stays removed');
   assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field stays removed');
 });
 
