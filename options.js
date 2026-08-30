@@ -33,19 +33,24 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
-  // 切换服务商：Base URL 为空时预填该家默认值；模型字段如果还是【任一家注册表推荐
-  // 值】（或为空）就跟随换成新供应商的默认——用户手填过的自定义值不动。否则
-  // ark→qwen 会把 doubao 的模型 ID 静默带给千问（默认值会在页面打开时预填进输入框，
-  // 只靠「留空才取默认」的保存兜底拦不住）。提示/占位符/文档链接随动。
+  // 切换服务商：Base URL 为空、或仍是【任一家注册表默认值】时跟随换成新供应商的
+  // 默认；模型字段同理（任一家推荐值或为空才跟随）——用户手填过的自定义值一律不动。
+  // 否则 ark→qwen 会把方舟的 Base URL 和 doubao 的模型 ID 静默带给千问（已存配置会
+  // 在页面打开时预填进输入框，只靠「留空才取默认」的保存兜底拦不住，2026-08-31 用户
+  // 实测踩到）。提示/占位符/文档链接随动。
   document.getElementById('asrProvider')?.addEventListener('change', () => {
     const sel = document.getElementById('asrProvider');
     const p = getAsrProvider(sel?.value);
-    const baseEl = document.getElementById('asrBaseUrl');
-    if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
+    const cannedBase = new Set();
     const canned = new Set();
     for (const q of Object.values(ASR_PROVIDERS)) {
+      if (q.defaultBaseUrl) cannedBase.add(q.defaultBaseUrl);
       canned.add(q.defaultModel);
       if (q.defaultVideoModel) canned.add(q.defaultVideoModel);
+    }
+    const baseEl = document.getElementById('asrBaseUrl');
+    if (baseEl && (!baseEl.value.trim() || cannedBase.has(baseEl.value.trim()))) {
+      baseEl.value = p.defaultBaseUrl;
     }
     const modelEl = document.getElementById('asrModel');
     if (modelEl && (!modelEl.value.trim() || canned.has(modelEl.value.trim()))) modelEl.value = p.defaultModel;

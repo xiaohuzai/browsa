@@ -78,13 +78,29 @@ test('切换到 qwen：占位符/?提示/文档链接随注册表切换，视频
   sel.value = 'qwen';
   sel.dispatchEvent(new window.Event('change'));
   assert.equal(document.getElementById('asrBaseUrl').placeholder, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
-  assert.equal(document.getElementById('asrModel').placeholder, 'qwen3.5-omni-flash');
+  assert.equal(document.getElementById('asrModel').placeholder, 'qwen-audio-3.0-asr-flash-filetrans');
   assert.equal(document.getElementById('asrVideoModel').placeholder, 'qwen3.8-flash（推荐）');
   const tip = document.getElementById('asrBaseUrlTip');
   assert.match(tip.innerHTML, /compatible-mode\/v1/, 'qwen 的 ? 提示来自注册表');
   const doc = document.getElementById('asrDocLink');
   assert.match(doc.href, /platform\.qianwenai\.com/);
   assert.match(doc.textContent, /千问/);
+});
+
+test('切换供应商时 Base URL 同步跟随（存过方舟默认值 → 切千问自动换 dashscope）', () => {
+  const sel = document.getElementById('asrProvider');
+  const baseEl = document.getElementById('asrBaseUrl');
+  // 已存方舟默认 Base URL（老配置预填进输入框的形态）
+  baseEl.value = 'https://ark.cn-beijing.volces.com/api/v3';
+  sel.value = 'qwen';
+  sel.dispatchEvent(new window.Event('change'));
+  assert.equal(baseEl.value, 'https://dashscope.aliyuncs.com/compatible-mode/v1', '任一家默认值跟随新供应商');
+  // 自定义地址不被覆盖
+  baseEl.value = 'https://my-proxy.example.com/v1';
+  sel.value = 'ark';
+  sel.dispatchEvent(new window.Event('change'));
+  assert.equal(baseEl.value, 'https://my-proxy.example.com/v1', '手填的自定义 Base URL 不动');
+  baseEl.value = '';
 });
 
 test('qwen 保存：模型留空走注册表默认（转写 Omni / 视频视觉系两个模型分工）', async () => {
@@ -100,7 +116,7 @@ test('qwen 保存：模型留空走注册表默认（转写 Omni / 视频视觉�
   const saved = setCalls.filter((o) => o.asr).map((o) => o.asr).pop();
   assert.ok(saved, 'asr 配置块已写入');
   assert.equal(saved.provider, 'qwen');
-  assert.equal(saved.model, 'qwen3.5-omni-flash', '转写模型留空 → 注册表默认 Omni');
+  assert.equal(saved.model, 'qwen-audio-3.0-asr-flash-filetrans', '转写模型留空 → 注册表默认 filetrans ASR');
   assert.equal(saved.videoModel, 'qwen3.8-flash', '视频模型留空 → 注册表推荐视觉系模型');
   // 复位，避免影响后续/其它用例对默认供应商的假设
   sel.value = 'ark';
