@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
-import { saveArkFileCacheEntry } from '../lib/handlers/attach-asr.js';
+import { saveAsrFileCacheEntry } from '../lib/handlers/attach-asr.js';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -282,7 +282,7 @@ test('card removed without a choice (session switch) aborts silently', async () 
 
 test('video mode with warm file cache: video upload and audio download/transcode/upload all skipped', async () => {
   resetState();
-  await saveArkFileCacheEntry({
+  await saveAsrFileCacheEntry({
     baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
     platform: 'bilibili', pageUrl: attachCtx.meta.url,
     videoFileId: 'file-warm-vid', audioFileId: 'file-warm-aud', durationSec: 4,
@@ -302,7 +302,7 @@ test('video mode with warm file cache: video upload and audio download/transcode
 
 test('audio mode with warm audio cache: download/transcode/upload fully skipped', async () => {
   resetState();
-  await saveArkFileCacheEntry({
+  await saveAsrFileCacheEntry({
     baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
     platform: 'bilibili', pageUrl: attachCtx.meta.url,
     audioFileId: 'file-warm-aud', durationSec: 4,
@@ -321,7 +321,7 @@ test('audio mode with warm audio cache: download/transcode/upload fully skipped'
 
 test('dead cache (file ids 404): falls back to the full download/upload pipeline', async () => {
   resetState();
-  await saveArkFileCacheEntry({
+  await saveAsrFileCacheEntry({
     baseUrl: attachCtx.asr.baseUrl, apiKey: attachCtx.asr.apiKey,
     platform: 'bilibili', pageUrl: attachCtx.meta.url,
     videoFileId: 'file-warm-vid', audioFileId: 'file-warm-aud', durationSec: 4,

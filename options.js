@@ -33,12 +33,26 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
-  // 切换服务商：Base URL 为空时预填该家默认值，提示/占位符/文档链接随动。
+  // 切换服务商：Base URL 为空时预填该家默认值；模型字段如果还是【任一家注册表推荐
+  // 值】（或为空）就跟随换成新供应商的默认——用户手填过的自定义值不动。否则
+  // ark→qwen 会把 doubao 的模型 ID 静默带给千问（默认值会在页面打开时预填进输入框，
+  // 只靠「留空才取默认」的保存兜底拦不住）。提示/占位符/文档链接随动。
   document.getElementById('asrProvider')?.addEventListener('change', () => {
     const sel = document.getElementById('asrProvider');
     const p = getAsrProvider(sel?.value);
     const baseEl = document.getElementById('asrBaseUrl');
     if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
+    const canned = new Set();
+    for (const q of Object.values(ASR_PROVIDERS)) {
+      canned.add(q.defaultModel);
+      if (q.defaultVideoModel) canned.add(q.defaultVideoModel);
+    }
+    const modelEl = document.getElementById('asrModel');
+    if (modelEl && (!modelEl.value.trim() || canned.has(modelEl.value.trim()))) modelEl.value = p.defaultModel;
+    const videoModelEl = document.getElementById('asrVideoModel');
+    if (videoModelEl && (!videoModelEl.value.trim() || canned.has(videoModelEl.value.trim()))) {
+      videoModelEl.value = p.defaultVideoModel || '';
+    }
     syncAsrProviderUI();
   });
 
@@ -101,6 +115,13 @@ function syncAsrProviderUI() {
   if (keyEl) keyEl.placeholder = p.apiKeyPlaceholder || 'API Key';
   const modelEl = document.getElementById('asrModel');
   if (modelEl) modelEl.placeholder = p.defaultModel;
+  const videoModelEl = document.getElementById('asrVideoModel');
+  if (videoModelEl) {
+    // 千问等把「转写/视频」拆成两个模型的供应商给出推荐值；方舟单模型则提示留空回退
+    videoModelEl.placeholder = p.defaultVideoModel
+      ? `${p.defaultVideoModel}（推荐）`
+      : '留空 = 同转写模型';
+  }
   const tip = document.getElementById('asrBaseUrlTip');
   if (tip) tip.innerHTML = p.baseUrlTip || '';
   const doc = document.getElementById('asrDocLink');
@@ -149,8 +170,9 @@ async function saveAsr() {
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
   const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
   const model = (document.getElementById('asrModel')?.value || '').trim() || p.defaultModel;
-  // 视频解析（视听精读）模型；留空回退用转写模型（runVideoAnalysisPipeline 兜底）。
-  const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim();
+  // 视频解析（视听精读）模型；留空回退该供应商的推荐视频模型（如千问 qwen3.8-flash，
+  // 视觉系与 Omni 转写模型分工），再不行才用转写模型（runVideoAnalysisPipeline 兜底）。
+  const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim() || p.defaultVideoModel || '';
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
   if (enabled && !apiKey) {
