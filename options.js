@@ -292,7 +292,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${showModel ? `
       <div class="field">
         <label>Model ID
-          <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" />
+          <input data-k="model" type="text" value="${escapeAttr((cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).join(', '))}" placeholder="e.g. gpt-4o, gpt-4o-mini — comma separated" />
         </label>
       </div>` : ''}
       ${!isAgent ? `
@@ -372,6 +372,14 @@ async function saveCard(name, card) {
   // not-yet-persisted) card keeps type/stream/isHermes/temperature/...
   // defaults on first Save; real providers just override their own values.
   cachedCfg.providers[name] = { ...BLANK_LLM, ...(cachedCfg.providers[name] || {}), ...data };
+  // Model ID 支持逗号分隔多模型（一张网关卡配多家模型，主页下拉按 Alias · model 逐个
+  // 选择）：models 存全量列表、model 存第一个——既有的 model 消费方（Ping、旧路径）
+  // 语义不变。Agent 卡（Hermes）没有 model 字段，不做规范化。
+  if ('model' in data) {
+    const modelList = [...new Set(String(data.model || '').split(',').map((s) => s.trim()).filter(Boolean))];
+    cachedCfg.providers[name].models = modelList;
+    cachedCfg.providers[name].model = modelList[0] || '';
+  }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
   chrome.storage.local.get('pingStates', ({ pingStates }) => {
@@ -422,7 +430,8 @@ async function pingCard(name, card) {
     let activeNote = '';
     if (!wasReachable && cachedCfg.activeProvider !== name) {
       cachedCfg.activeProvider = name;
-      await chrome.storage.local.set({ activeProvider: name });
+      cachedCfg.activeModel = ''; // 首次 Ping 通自动切换：未指定具体模型，用卡上第一个
+      await chrome.storage.local.set({ activeProvider: name, activeModel: '' });
       document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       activeNote = ' — set as active provider';
@@ -524,7 +533,8 @@ async function removeProvider(name) {
   });
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
-    await chrome.storage.local.set({ activeProvider: 'hermes' });
+    cachedCfg.activeModel = '';
+    await chrome.storage.local.set({ activeProvider: 'hermes', activeModel: '' });
   }
   renderProviders();
 }

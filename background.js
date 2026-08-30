@@ -593,7 +593,9 @@ async function handle(msg, sender) {
       return handleDownloadMedia(msg);
 
     case 'SET_ACTIVE_PROVIDER': {
-      await storage.setActiveProvider(msg.name);
+      // model 可空：多模型 provider 上主页下拉选中的具体模型（Alias · model），
+      // 空串 = 未指定，聊天侧回退 provider.model
+      await storage.setActiveProvider(msg.name, msg.model || '');
       return { activeProvider: msg.name };
     }
 

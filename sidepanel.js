@@ -34,6 +34,7 @@ import {
   deleteSelectedMessages
 } from './lib/sidepanel/multiselect.js';
 import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
+import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import {
@@ -690,20 +691,36 @@ function populateProviderSelect(cfg) {
     })
     .map(({ name }) => name);
   providerSel.innerHTML = '';
+  // 多模型 provider（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按
+  // 「Alias · model」展示——一张网关卡（方舟 Coding / 兼容网关动辄几十个模型）
+  // 不用为每个模型建卡。单模型/Agent 卡保持纯 Alias 展示（与旧形态一致）。
+  let activeFallback = null;
+  let anySelected = false;
   for (const name of providers) {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.dataset.display = displayProviderName(name, cfg.providers[name]);
-    const configured = !!(cfg.providers[name]?.baseUrl?.trim());
+    const pcfg = cfg.providers[name];
+    const display = displayProviderName(name, pcfg);
+    const models = providerModelList(pcfg);
+    const modelList = (pcfg.type || 'llm') === 'llm' && models.length > 1 ? models : [''];
+    const configured = !!(pcfg?.baseUrl?.trim());
     let status;
     if (!configured)               status = 'not set';
     else if (pingStates[name] === 'reachable')   status = '● reachable';
     else if (pingStates[name] === 'unreachable') status = '○ unreachable';
     else                           status = 'not pinged';
-    opt.textContent = `${displayProviderName(name, cfg.providers[name])} — ${status}`;
-    if (name === cfg.activeProvider) opt.selected = true;
-    providerSel.appendChild(opt);
+    for (const model of modelList) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.dataset.model = model;
+      opt.dataset.display = model ? `${display} · ${model}` : display;
+      opt.textContent = model ? `${display} · ${model} — ${status}` : `${display} — ${status}`;
+      if (name === cfg.activeProvider) {
+        if ((model || '') === String(cfg.activeModel || '')) { opt.selected = true; anySelected = true; }
+        else if (!activeFallback) activeFallback = opt;
+      }
+      providerSel.appendChild(opt);
+    }
   }
+  if (!anySelected && activeFallback) activeFallback.selected = true;
 }
 
 // Show the user-set alias when present; fall back to a readable internal name.
@@ -2055,8 +2072,10 @@ async function openSettingsPage() {
 
 async function onProviderChange() {
   const name = providerSel.value;
-  await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name });
   const opt = providerSel.selectedOptions[0];
+  // 多模型 provider：选项按 Alias · model 展示，选中的具体模型随 provider 一起落存储
+  const model = opt?.dataset?.model || '';
+  await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name, model });
   showToast(`Switched to ${opt?.dataset?.display || displayProviderName(name)}`, 'success');
 }
 
