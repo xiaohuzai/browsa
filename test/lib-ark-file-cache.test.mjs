@@ -1,7 +1,6 @@
-// test/lib-ark-file-cache.test.mjs — ASR 文件复用缓存（方舟 file_id 30 天 / 千问
-// oss:// 临时 URL 48h 免重传）：资产标识解析、缓存 key 指纹、存取合并语义、
-// 过期/时长不符/文件死亡（404）/千问模型绑定不符的 fail-open 行为。
-// 全部注入 fake storageArea / aliveFn，不碰 chrome 全局。
+// test/lib-ark-file-cache.test.mjs — Ark Files 复用缓存（file_id 30 天免重传）：
+// 资产标识解析、缓存 key 指纹、存取合并语义、过期/时长不符/文件死亡（404）的
+// fail-open 行为。全部注入 fake storageArea / aliveFn，不碰 chrome 全局。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,10 +9,9 @@ import {
   arkExpireAtSec,
   videoAssetId,
   arkFileCacheKey,
-  asrFileCacheKey,
   arkFileAlive,
-  lookupCachedAsrFiles,
-  saveAsrFileCacheEntry,
+  lookupCachedArkFiles,
+  saveArkFileCacheEntry,
 } from '../lib/handlers/attach-asr.js';
 
 const BASE = 'https://ark.cn-beijing.volces.com/api/v3';
@@ -57,16 +55,16 @@ test('arkFileCacheKey: apiKey 指纹参与（不同账号的 file_id 不通用�
 
 test('save + lookup roundtrip；need 只决定必查字段，另一字段命中照常返回', async () => {
   const area = fakeStorage();
-  await saveAsrFileCacheEntry({
+  await saveArkFileCacheEntry({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     videoFileId: 'file-v', audioFileId: 'file-a', durationSec: 600, storageArea: area,
   });
-  const hit = await lookupCachedAsrFiles({
+  const hit = await lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     need: 'video', durationSec: 600, storageArea: area, aliveFn: aliveTrue,
   });
   assert.deepEqual(hit, { videoFileId: 'file-v', audioFileId: 'file-a' });
-  const hitAudio = await lookupCachedAsrFiles({
+  const hitAudio = await lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     need: 'audio', durationSec: 600, storageArea: area, aliveFn: aliveTrue,
   });
@@ -75,12 +73,12 @@ test('save + lookup roundtrip；need 只决定必查字段，另一字段命中�
 
 test('合并语义：两次不同模式各自积累，旧字段与旧 expireAt 保留', async () => {
   const area = fakeStorage();
-  await saveAsrFileCacheEntry({
+  await saveArkFileCacheEntry({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     audioFileId: 'file-a', durationSec: 600, storageArea: area,
   });
   const audioExp1 = Object.values(area.store.get('browsaArkFileCache'))[0].audioExpireAt;
-  await saveAsrFileCacheEntry({
+  await saveArkFileCacheEntry({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     videoFileId: 'file-v', durationSec: 600, storageArea: area,
   });
@@ -93,12 +91,12 @@ test('合并语义：两次不同模式各自积累，旧字段与旧 expireAt �
 
 test('过期 / 时长不符 / 文件死亡（aliveFn false）都 fail-open 返回 null', async () => {
   const area = fakeStorage();
-  await saveAsrFileCacheEntry({
+  await saveArkFileCacheEntry({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     videoFileId: 'file-v', durationSec: 600, storageArea: area,
   });
   const cacheKey = arkFileCacheKey(BASE, KEY, 'bili-BV1xx411c7mD-p2');
-  const lookup = (over = {}) => lookupCachedAsrFiles({
+  const lookup = (over = {}) => lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     need: 'video', durationSec: 600, storageArea: area, aliveFn: aliveTrue, ...over,
   });
@@ -114,12 +112,12 @@ test('过期 / 时长不符 / 文件死亡（aliveFn false）都 fail-open 返�
 
 test('部分复用：视频死亡但音频存活时，音频模式仍可复用音频', async () => {
   const area = fakeStorage();
-  await saveAsrFileCacheEntry({
+  await saveArkFileCacheEntry({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     videoFileId: 'file-v', audioFileId: 'file-a', durationSec: 600, storageArea: area,
   });
   const perFileAlive = async ({ fileId }) => fileId === 'file-a';
-  const hit = await lookupCachedAsrFiles({
+  const hit = await lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     need: 'audio', durationSec: 600, storageArea: area, aliveFn: perFileAlive,
   });
@@ -142,116 +140,12 @@ test('arkFileAlive: 2xx 存活，404/网络异常按死亡处理', async () => {
 });
 
 test('资产标识解析不出 / storage 不可用 → 直接 miss（回退完整上传）', async () => {
-  assert.equal(await lookupCachedAsrFiles({
+  assert.equal(await lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: 'https://www.bilibili.com/blackboard/x',
     need: 'video', storageArea: fakeStorage(), aliveFn: aliveTrue,
   }), null);
-  assert.equal(await lookupCachedAsrFiles({
+  assert.equal(await lookupCachedArkFiles({
     baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
     need: 'video', storageArea: null, aliveFn: aliveTrue,
   }), null, '无 storage（非扩展环境）→ miss');
-});
-
-// ─── 千问（qwen）临时文件缓存：48h TTL、模型绑定、无探活 ─────────────────────────
-
-const QWEN_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-
-test('asrFileCacheKey: 方舟保持旧格式（升级不清掉已存缓存），千问独立命名空间', () => {
-  assert.equal(
-    asrFileCacheKey('ark', BASE, KEY, 'bili-BV1-p1'),
-    arkFileCacheKey(BASE, KEY, 'bili-BV1-p1'),
-    '方舟 key 与旧版逐字节一致',
-  );
-  assert.equal(
-    asrFileCacheKey('qwen', QWEN_BASE, 'sk-q', 'bili-BV1-p1'),
-    `qwen|${QWEN_BASE}|4:sk-q|bili-BV1-p1`,
-  );
-  assert.notEqual(
-    asrFileCacheKey('qwen', QWEN_BASE, 'sk-q', 'bili-BV1-p1'),
-    asrFileCacheKey('ark', BASE, KEY, 'bili-BV1-p1'),
-    '两家同资产互不串号',
-  );
-});
-
-test('qwen save+lookup：绑定模型逐文件记录，模型匹配才命中', async () => {
-  const area = fakeStorage();
-  await saveAsrFileCacheEntry({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    videoFileId: 'oss://dir/video.mp4', videoModel: 'qwen3.8-flash',
-    audioFileId: 'oss://dir/audio.wav', audioModel: 'qwen3.5-omni-flash',
-    durationSec: 600, storageArea: area,
-  });
-  const entry = area.store.get('browsaArkFileCache')[asrFileCacheKey('qwen', QWEN_BASE, 'sk-q', 'bili-BV1xx411c7mD-p2')];
-  const nowPlus48h = Math.floor(Date.now() / 1000) + 48 * 3600;
-  assert.ok(Math.abs(entry.videoExpireAt - nowPlus48h) <= 5, '千问 TTL = 上传时刻 + 48h');
-  assert.equal(entry.videoModel, 'qwen3.8-flash');
-  assert.equal(entry.audioModel, 'qwen3.5-omni-flash');
-
-  const hit = await lookupCachedAsrFiles({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    videoModel: 'qwen3.8-flash', audioModel: 'qwen3.5-omni-flash',
-    need: 'video', durationSec: 600, storageArea: area,
-  });
-  assert.deepEqual(hit, { videoFileId: 'oss://dir/video.mp4', audioFileId: 'oss://dir/audio.wav' });
-  // 换视频模型（或换转写模型）→ 对应文件不可用
-  const missVideo = await lookupCachedAsrFiles({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    videoModel: 'qwen3.7-plus', audioModel: 'qwen3.5-omni-flash',
-    need: 'video', durationSec: 600, storageArea: area,
-  });
-  assert.equal(missVideo, null, '视频文件绑定模型不符 → miss');
-  const partialAudio = await lookupCachedAsrFiles({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    videoModel: 'qwen3.8-flash', audioModel: 'qwen3-omni-flash',
-    need: 'video', durationSec: 600, storageArea: area,
-  });
-  assert.deepEqual(partialAudio, { videoFileId: 'oss://dir/video.mp4', audioFileId: '' },
-    '音频绑定模型不符 → 音频不可用，但视频仍命中（管线只补传音频）');
-});
-
-test('qwen lookup 默认不发任何请求（平台没有查询接口，无法探活；仅 TTL 判活）', async () => {
-  const area = fakeStorage();
-  await saveAsrFileCacheEntry({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    audioFileId: 'oss://dir/audio.wav', audioModel: 'qwen3.5-omni-flash',
-    durationSec: 600, storageArea: area,
-  });
-  const realFetch = globalThis.fetch;
-  let fetches = 0;
-  try {
-    globalThis.fetch = async () => { fetches++; return { ok: true }; };
-    const hit = await lookupCachedAsrFiles({
-      provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-      audioModel: 'qwen3.5-omni-flash', need: 'audio', durationSec: 600, storageArea: area,
-    });
-    assert.deepEqual(hit, { videoFileId: '', audioFileId: 'oss://dir/audio.wav' });
-    assert.equal(fetches, 0, '零网络请求');
-  } finally {
-    globalThis.fetch = realFetch;
-  }
-});
-
-test('qwen 过期（48h）→ fail-open miss；方舟与千问条目同资产互不干扰', async () => {
-  const area = fakeStorage();
-  await saveAsrFileCacheEntry({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    audioFileId: 'oss://dir/audio.wav', audioModel: 'qwen3.5-omni-flash',
-    durationSec: 600, storageArea: area,
-  });
-  await saveAsrFileCacheEntry({
-    baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
-    audioFileId: 'file-a', durationSec: 600, storageArea: area,
-  });
-  const qKey = asrFileCacheKey('qwen', QWEN_BASE, 'sk-q', 'bili-BV1xx411c7mD-p2');
-  area.store.get('browsaArkFileCache')[qKey].audioExpireAt = Math.floor(Date.now() / 1000) - 10;
-  const miss = await lookupCachedAsrFiles({
-    provider: 'qwen', baseUrl: QWEN_BASE, apiKey: 'sk-q', platform: 'bilibili', pageUrl: URL_BILI,
-    audioModel: 'qwen3.5-omni-flash', need: 'audio', durationSec: 600, storageArea: area,
-  });
-  assert.equal(miss, null, '千问过期 → miss');
-  const arkHit = await lookupCachedAsrFiles({
-    baseUrl: BASE, apiKey: KEY, platform: 'bilibili', pageUrl: URL_BILI,
-    need: 'audio', durationSec: 600, storageArea: area, aliveFn: aliveTrue,
-  });
-  assert.deepEqual(arkHit, { videoFileId: '', audioFileId: 'file-a' }, '方舟条目不受影响');
 });

@@ -33,31 +33,12 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
-  // 切换服务商：Base URL 为空、或仍是【任一家注册表默认值】时跟随换成新供应商的
-  // 默认；模型字段同理（任一家推荐值或为空才跟随）——用户手填过的自定义值一律不动。
-  // 否则 ark→qwen 会把方舟的 Base URL 和 doubao 的模型 ID 静默带给千问（已存配置会
-  // 在页面打开时预填进输入框，只靠「留空才取默认」的保存兜底拦不住，2026-08-31 用户
-  // 实测踩到）。提示/占位符/文档链接随动。
+  // 切换服务商：Base URL 为空时预填该家默认值，提示/占位符/文档链接随动。
   document.getElementById('asrProvider')?.addEventListener('change', () => {
     const sel = document.getElementById('asrProvider');
     const p = getAsrProvider(sel?.value);
-    const cannedBase = new Set();
-    const canned = new Set();
-    for (const q of Object.values(ASR_PROVIDERS)) {
-      if (q.defaultBaseUrl) cannedBase.add(q.defaultBaseUrl);
-      canned.add(q.defaultModel);
-      if (q.defaultVideoModel) canned.add(q.defaultVideoModel);
-    }
     const baseEl = document.getElementById('asrBaseUrl');
-    if (baseEl && (!baseEl.value.trim() || cannedBase.has(baseEl.value.trim()))) {
-      baseEl.value = p.defaultBaseUrl;
-    }
-    const modelEl = document.getElementById('asrModel');
-    if (modelEl && (!modelEl.value.trim() || canned.has(modelEl.value.trim()))) modelEl.value = p.defaultModel;
-    const videoModelEl = document.getElementById('asrVideoModel');
-    if (videoModelEl && (!videoModelEl.value.trim() || canned.has(videoModelEl.value.trim()))) {
-      videoModelEl.value = p.defaultVideoModel || '';
-    }
+    if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
     syncAsrProviderUI();
   });
 
@@ -122,7 +103,7 @@ function syncAsrProviderUI() {
   if (modelEl) modelEl.placeholder = p.defaultModel;
   const videoModelEl = document.getElementById('asrVideoModel');
   if (videoModelEl) {
-    // 千问等把「转写/视频」拆成两个模型的供应商给出推荐值；方舟单模型则提示留空回退
+    // 注册表带 defaultVideoModel 的供应商（转写/视频拆成两个模型）给出推荐值；单模型则提示留空回退
     videoModelEl.placeholder = p.defaultVideoModel
       ? `${p.defaultVideoModel}（推荐）`
       : '留空 = 同转写模型';
@@ -141,17 +122,19 @@ function applyAsr(cfg) {
   const set = (id, v, placeholder) => { const el = document.getElementById(id); if (el) { if (v != null && v !== '') el.value = v; else el.value = ''; el.placeholder = placeholder || el.placeholder; } };
   const cb = document.getElementById('asrEnabled');
   if (cb) cb.checked = a.enabled !== false;
+  // 已卸载的供应商（如移除的千问）：ASR 字段整体回落默认——残留的别家 baseUrl/
+  // 模型 ID 若留在输入框里，用户随手 Save 就会把错配写回存储。applyAsr 不写存储，
+  // 用户重新 Save 才落新值。
+  const known = !!ASR_PROVIDERS[a.provider];
   const provSel = document.getElementById('asrProvider');
   if (provSel) {
     syncAsrProviderUI(); // 先填充选项，再回填已存值
-    const v = a.provider || 'ark';
-    if ([...provSel.options].some((o) => o.value === v)) provSel.value = v;
-    else provSel.value = 'ark';
+    provSel.value = known ? (a.provider || 'ark') : 'ark';
   }
-  set('asrApiKey', a.apiKey);
-  set('asrBaseUrl', a.baseUrl);
-  set('asrModel', a.model);
-  set('asrVideoModel', a.videoModel);
+  set('asrApiKey', known ? a.apiKey : '');
+  set('asrBaseUrl', known ? a.baseUrl : '');
+  set('asrModel', known ? a.model : '');
+  set('asrVideoModel', known ? a.videoModel : '');
   const langSel = document.getElementById('asrLanguage');
   if (langSel) {
     const v = a.language || 'auto';
@@ -175,8 +158,8 @@ async function saveAsr() {
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
   const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
   const model = (document.getElementById('asrModel')?.value || '').trim() || p.defaultModel;
-  // 视频解析（视听精读）模型；留空回退该供应商的推荐视频模型（如千问 qwen3.8-flash，
-  // 视觉系与 Omni 转写模型分工），再不行才用转写模型（runVideoAnalysisPipeline 兜底）。
+  // 视频解析（视听精读）模型；留空回退注册表推荐值（defaultVideoModel），再不行才用
+  // 转写模型（runVideoAnalysisPipeline 兜底）。
   const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim() || p.defaultVideoModel || '';
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';

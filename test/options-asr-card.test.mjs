@@ -31,6 +31,14 @@ globalThis.chrome = {
   },
 };
 
+// 预置一份「已卸载供应商」的 ASR 配置，验证 applyAsr 的回落行为
+storedData.asr = {
+  enabled: true, provider: 'qwen', apiKey: 'sk-qwen-old',
+  baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  model: 'qwen-audio-3.0-asr-flash-filetrans', videoModel: 'qwen3.8-flash',
+  language: 'zh', subtitleSource: 'original',
+};
+
 await import('../options.js');
 await new Promise((r) => setTimeout(r, 50)); // init() fire-and-forget，等 applyAsr 跑完
 
@@ -39,7 +47,6 @@ test('服务商下拉由注册表填充，ark 元数据驱动占位符/?提示/�
   assert.ok(sel, '服务商下拉存在');
   assert.deepEqual([...sel.options].map((o) => ({ v: o.value, t: o.textContent })), [
     { v: 'ark', t: '火山方舟' },
-    { v: 'qwen', t: '千问AI平台' },
   ], '只列已实现的服务商');
   assert.equal(sel.value, 'ark', '默认选中 ark');
 
@@ -51,6 +58,15 @@ test('服务商下拉由注册表填充，ark 元数据驱动占位符/?提示/�
   const doc = document.getElementById('asrDocLink');
   assert.match(doc.href, /ark\.volcengine\.com/);
   assert.match(doc.textContent, /火山方舟/);
+});
+
+test('存过已卸载供应商（qwen）的 ASR 配置：storage 读时归一，UI 回落 ark 默认', () => {
+  // storedData.asr 在文件顶部播种（provider 'qwen' 已不在注册表）；
+  // storage.getAll 归一化把连接字段换回方舟默认值（key 清空待重填），UI 原样呈现
+  assert.equal(document.getElementById('asrProvider').value, 'ark', '服务商回落 ark');
+  assert.equal(document.getElementById('asrBaseUrl').value, 'https://ark.cn-beijing.volces.com/api/v3', 'baseUrl 归一为方舟默认');
+  assert.equal(document.getElementById('asrModel').value, 'doubao-seed-2-0-lite-260428', '模型归一为方舟默认');
+  assert.equal(document.getElementById('asrApiKey').value, '', '千问 key 不残留（待重填）');
 });
 
 test('模型 ID 字段只有一份（曾因复制粘贴重复 4 份，同 id 干扰 JS 读写）', () => {
@@ -71,54 +87,4 @@ test('save-asr 把 provider 写入 asr 配置块', async () => {
   assert.equal(saved.apiKey, 'ark-test-key');
   assert.equal(saved.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3', 'Base URL 留空 → 注册表默认值');
   assert.equal(saved.model, 'doubao-seed-2-0-lite-260428', '模型留空 → 注册表默认值');
-});
-
-test('切换到 qwen：占位符/?提示/文档链接随注册表切换，视频模型给推荐值', () => {
-  const sel = document.getElementById('asrProvider');
-  sel.value = 'qwen';
-  sel.dispatchEvent(new window.Event('change'));
-  assert.equal(document.getElementById('asrBaseUrl').placeholder, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
-  assert.equal(document.getElementById('asrModel').placeholder, 'qwen-audio-3.0-asr-flash-filetrans');
-  assert.equal(document.getElementById('asrVideoModel').placeholder, 'qwen3.8-flash（推荐）');
-  const tip = document.getElementById('asrBaseUrlTip');
-  assert.match(tip.innerHTML, /compatible-mode\/v1/, 'qwen 的 ? 提示来自注册表');
-  const doc = document.getElementById('asrDocLink');
-  assert.match(doc.href, /platform\.qianwenai\.com/);
-  assert.match(doc.textContent, /千问/);
-});
-
-test('切换供应商时 Base URL 同步跟随（存过方舟默认值 → 切千问自动换 dashscope）', () => {
-  const sel = document.getElementById('asrProvider');
-  const baseEl = document.getElementById('asrBaseUrl');
-  // 已存方舟默认 Base URL（老配置预填进输入框的形态）
-  baseEl.value = 'https://ark.cn-beijing.volces.com/api/v3';
-  sel.value = 'qwen';
-  sel.dispatchEvent(new window.Event('change'));
-  assert.equal(baseEl.value, 'https://dashscope.aliyuncs.com/compatible-mode/v1', '任一家默认值跟随新供应商');
-  // 自定义地址不被覆盖
-  baseEl.value = 'https://my-proxy.example.com/v1';
-  sel.value = 'ark';
-  sel.dispatchEvent(new window.Event('change'));
-  assert.equal(baseEl.value, 'https://my-proxy.example.com/v1', '手填的自定义 Base URL 不动');
-  baseEl.value = '';
-});
-
-test('qwen 保存：模型留空走注册表默认（转写 Omni / 视频视觉系两个模型分工）', async () => {
-  const sel = document.getElementById('asrProvider');
-  sel.value = 'qwen';
-  sel.dispatchEvent(new window.Event('change'));
-  document.getElementById('asrEnabled').checked = true;
-  document.getElementById('asrApiKey').value = 'sk-qwen-test';
-  document.getElementById('asrBaseUrl').value = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-  document.querySelector('button[data-act="save-asr"]').click();
-  await new Promise((r) => setTimeout(r, 20));
-
-  const saved = setCalls.filter((o) => o.asr).map((o) => o.asr).pop();
-  assert.ok(saved, 'asr 配置块已写入');
-  assert.equal(saved.provider, 'qwen');
-  assert.equal(saved.model, 'qwen-audio-3.0-asr-flash-filetrans', '转写模型留空 → 注册表默认 filetrans ASR');
-  assert.equal(saved.videoModel, 'qwen3.8-flash', '视频模型留空 → 注册表推荐视觉系模型');
-  // 复位，避免影响后续/其它用例对默认供应商的假设
-  sel.value = 'ark';
-  sel.dispatchEvent(new window.Event('change'));
 });
