@@ -38,6 +38,7 @@ import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
+  largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
   pickVideoStream, estimateStreamBytes, parseKeyframeMarkers, extractKeyframes,
   SAFETY_KEYFRAME_CAP, videoAssetId, lookupCachedArkFiles, saveArkFileCacheEntry,
   ASR_SUBTITLE_SOURCE
@@ -1093,6 +1094,7 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
       console.warn('[ASR] video analysis truncated:', res.finishReason);
       throw new Error(`精读输出被模型上限截断（${res.finishReason || 'max_output_tokens'}）`);
     }
+    console.log('[ASR] video analysis usage:', JSON.stringify(res.usage || {}));
     const fmt = formatAsrTranscript(res.text);
     // 完整度兜底（与字幕 ASR 同阈值）：最后时间戳必须覆盖到视频 90% 以上，
     // 绝不允许静默存半截精读。transcriptEndSec 自识裸秒数（[624.0]）并保留小数
@@ -1101,6 +1103,13 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     if (wantDurSec > 0 && endSec != null && endSec < wantDurSec * 0.9) {
       console.warn('[ASR] video analysis incomplete: last stamp', endSec, 's < 90% of', wantDurSec, 's video');
       throw new Error('精读不完整（最后时间戳 ' + (endSec == null ? '?' : endSec.toFixed(0)) + 's / 视频 ' + wantDurSec + 's）');
+    }
+    // 空洞守卫：last stamp 过线不等于覆盖完整——81 分钟视频真实故障：0-16 分钟
+    // 密集覆盖后直接跳到 49:27 和片尾，中间约 1 小时整段缺失，90% 守卫无感。
+    const gap = largestTranscriptGapSec(res.text);
+    if (gap && gap.gapSec > TRANSCRIPT_GAP_LIMIT_SEC) {
+      console.warn('[ASR] video analysis incomplete: gap', JSON.stringify(gap));
+      throw new Error(`精读不完整（时间轴存在 ${Math.round(gap.gapSec / 60)} 分钟空窗：${formatStampSec(gap.fromSec)} → ${formatStampSec(gap.toSec)}）`);
     }
     const docTextLines = fmt.lines;
     // 截屏标记解析（抽帧用）要在 [截屏]→[图N] 改写之前——解析器认 [截屏] 行。
@@ -1425,11 +1434,19 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
     // 明显没覆盖到视频结尾（最后一句时间戳 < 视频 90%），说明输出被中途截断
     // ——绝不允许静默存半截字幕，必须失败回退（纯文本 + toast）。
     // transcriptEndSec 自识裸秒数（[624.0]）并保留小数精度（2026-08-30 真实故障）。
+    console.log('[ASR] transcribe usage:', JSON.stringify(tr.usage || {}));
     const endSec = transcriptEndSec(tr.text);
     const incomplete = !!(wantDurSec > 0 && endSec != null && endSec < wantDurSec * 0.9);
     if (incomplete) {
       console.warn('[ASR] transcript incomplete: last stamp', endSec, 's < 90% of', wantDurSec, 's video');
       throw new Error('ASR transcript is incomplete (' + (endSec == null ? '?' : endSec.toFixed(0)) + 's of ' + wantDurSec + 's video)');
+    }
+    // 空洞守卫（与视频精读同款）：52:48 视频中途停 ×90% 守卫的教训之外，
+    // 中段整段跳过也必须拦下（last stamp 合格但中间有洞）。
+    const gap = largestTranscriptGapSec(tr.text);
+    if (gap && gap.gapSec > TRANSCRIPT_GAP_LIMIT_SEC) {
+      console.warn('[ASR] transcript incomplete: gap', JSON.stringify(gap));
+      throw new Error(`ASR transcript is incomplete (时间轴 ${Math.round(gap.gapSec / 60)} 分钟空窗：${formatStampSec(gap.fromSec)} → ${formatStampSec(gap.toSec)})`);
     }
     if (endSec != null) {
       console.log(`[ASR] transcript complete: last stamp ${endSec.toFixed(1)}s (${(wantDurSec > 0 ? ((endSec / wantDurSec) * 100).toFixed(0) : '?')}% of ${wantDurSec}s video)`);

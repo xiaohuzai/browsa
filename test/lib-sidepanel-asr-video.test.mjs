@@ -56,6 +56,7 @@ let dnrRules = 0;
 let dnrRemoved = 0;
 let warmIdsAlive = true;         // false = 缓存里的 file_id 探活失败（404）→ 回退完整上传
 let arkCacheStore = {};          // browsaArkFileCache 的可播种内存存储
+let asrRespOverride = null;      // 测试可覆盖 /responses 返回的精读文本（空洞守卫用例）
 
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -86,7 +87,7 @@ globalThis.fetch = async (url, init) => {
       json: async () => ({
         id: 'resp_1',
         output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text',
-          text: '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:01] [截屏] 标题卡片画面\n[00:02] [截屏] 间隔太近应被丢弃\n[00:04] 欢迎收看' }] }],
+          text: asrRespOverride || '[00:00] 大家好\n[00:01] 画面：标题卡片\n[00:01] [截屏] 标题卡片画面\n[00:02] [截屏] 间隔太近应被丢弃\n[00:04] 欢迎收看' }] }],
       }),
     };
   }
@@ -168,6 +169,7 @@ function resetState() {
   dnrRules = 0; dnrRemoved = 0;
   warmIdsAlive = true;
   arkCacheStore = {};
+  asrRespOverride = null;
   // 恢复 ctx 基线（个别测试会改 noTranscript/text）
   attachCtx.noTranscript = true;
   attachCtx.text = 'bilibili plain text fallback';
@@ -333,4 +335,20 @@ test('dead cache (file ids 404): falls back to the full download/upload pipeline
   const expExpected = Math.floor(Date.now() / 1000) + 30 * 86400;
   assert.ok(Math.abs(expExpected - expSent) <= 60, `expire_at=30 天上限随上传发送（sent=${expSent}, expected≈${expExpected}）`);
   assert.equal(responsesBodies[0].input[0].content[0].file_id, 'file-vid', 'fresh ids, not the dead cache');
+});
+
+test('video mode with a giant timeline hole: guard rejects the partial doc, fail-open to plain text', async () => {
+  // 2026-08-30 真实故障形状：81 分钟视频，0-16 分钟密集覆盖后直接跳 49:27 和
+  // 片尾——last stamp 过了 90% 线，旧守卫静默放行。空洞守卫必须拦下并走
+  // fail-open（存纯文本 + 报错提示），绝不存缺 1 小时的精读。
+  resetState();
+  asrRespOverride = '[00:00] [说话人1] 开场。\n[16:07] [说话人1] 中段最后一句。\n[49:27] 画面：CRS 科普弹窗。\n[1:21:05] [说话人1] 结尾。';
+  attachBtn.click();
+  await waitFor(() => document.querySelector('.asr-mode-card'));
+  document.querySelectorAll('.asr-mode-btn')[1].click(); // 视频精读
+  await waitFor(() => confirmed, 9000);
+
+  assert.match(confirmed.text, /bilibili plain text fallback/, '空洞产物被拒后回退纯文本');
+  assert.doesNotMatch(confirmed.text, /## 视听精读（视频解析）/, '有整段空洞的精读绝不入库');
+  assert.doesNotMatch(confirmed.text, /49:27/, '缺失段的片段也不残留');
 });
