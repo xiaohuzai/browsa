@@ -207,7 +207,7 @@ function buildProviderCard(name, cfg, opts = {}) {
         </label>
       </div>` : ''}
       <div class="field">
-        <label>Base URL${isAgent ? `<span class="tip" tabindex="0">?<span class="tip-bubble">这里填的是 <b>Hermes 自带的 API Server</b> 地址（如 <code>http://127.0.0.1:8080</code>），不是模型厂商的 API——需要先在本地或自己的服务器上把 Server 跑起来。<br><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">官方文档：API Server 启动与配置</a></span></span>` : ''}
+        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span></span>` : 'Base URL'}
           <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
         </label>
       </div>
