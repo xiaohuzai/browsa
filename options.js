@@ -1,7 +1,7 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
-import { ping, getCapabilities } from './lib/llm-client.js';
+import { ping, getCapabilities, listModels } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
@@ -292,7 +292,11 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${showModel ? `
       <div class="field">
         <label>Model ID
-          <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" />
+          <div class="apikey-wrap">
+            <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" list="models-${escapeAttr(name)}" />
+            <button type="button" class="apikey-toggle" data-act="fetch-models" title="从该供应商拉取模型列表（/v1/models）" aria-label="Fetch model list">⟳</button>
+          </div>
+          <datalist id="models-${escapeAttr(name)}">${(cfg.discoveredModels || []).map((m) => `<option value="${escapeAttr(m)}"></option>`).join('')}</datalist>
         </label>
       </div>` : ''}
       ${!isAgent ? `
@@ -322,6 +326,31 @@ function buildProviderCard(name, cfg, opts = {}) {
       const show = apiInput.type === 'password';
       apiInput.type = show ? 'text' : 'password';
       apiToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
+
+  // 模型列表自动检测（cherry-studio 同款能力）：⟳ 读卡片当前值（未 Save 也行），
+  // GET {base}/models 的结果挂到 Model ID 的 datalist 上。失败只闪一行错误，
+  // 不打断配置流程——手动填模型的老路原样可用。
+  const fetchModelsBtn = card.querySelector('[data-act="fetch-models"]');
+  if (fetchModelsBtn) {
+    fetchModelsBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const data = readCard(card);
+      if (!data.baseUrl?.trim()) { flashCard(card, 'err', '❌ Fill in Base URL first'); return; }
+      fetchModelsBtn.disabled = true;
+      flashCard(card, '', 'Fetching models…');
+      const out = await listModels({ baseUrl: data.baseUrl.trim(), apiKey: data.apiKey, apiStyle: data.apiStyle || 'chat' });
+      fetchModelsBtn.disabled = false;
+      if (!out.ok) { flashCard(card, 'err', '❌ ' + out.error); return; }
+      cfg.discoveredModels = out.models;
+      renderModelDatalist(card, out.models);
+      // 已落配置的卡片顺手持久化（reserved 卡等 Save 时从 DOM 收编，见 saveCard）
+      if (cachedCfg.providers[name]) {
+        cachedCfg.providers[name].discoveredModels = out.models;
+        try { await chrome.storage.local.set({ providers: cachedCfg.providers }); } catch (_) {}
+      }
+      flashCard(card, 'ok', `✓ ${out.models.length} models — click the Model ID field to pick`);
     });
   }
 
@@ -365,6 +394,12 @@ function flashCard(card, cls, text) {
   if (cls === 'ok') el._timer = setTimeout(() => { el.textContent = ''; el.className = 'card-status'; }, 4000);
 }
 
+/** 把模型 ID 列表灌进卡片 Model ID 输入框的 datalist（点击输入框即出候选）。 */
+function renderModelDatalist(card, models) {
+  const dl = card.querySelector('datalist');
+  if (dl) dl.innerHTML = (models || []).map((m) => `<option value="${escapeAttr(m)}"></option>`).join('');
+}
+
 async function saveCard(name, card) {
   const data = readCard(card);
   const wasReserved = !cachedCfg.providers[name];
@@ -372,6 +407,13 @@ async function saveCard(name, card) {
   // not-yet-persisted) card keeps type/stream/isHermes/temperature/...
   // defaults on first Save; real providers just override their own values.
   cachedCfg.providers[name] = { ...BLANK_LLM, ...(cachedCfg.providers[name] || {}), ...data };
+  // ⟳ 拉取的模型列表一并持久化：reserved 卡（未落配置时）的列表只挂在 DOM 的
+  // datalist 上，首次 Save 从 DOM 收编；已保存卡片走按钮处理器直接写入。
+  const dl = card.querySelector('datalist');
+  const listed = dl ? [...dl.querySelectorAll('option')].map((o) => o.value).filter(Boolean) : [];
+  if (listed.length && !cachedCfg.providers[name].discoveredModels?.length) {
+    cachedCfg.providers[name].discoveredModels = listed;
+  }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
   chrome.storage.local.get('pingStates', ({ pingStates }) => {
@@ -444,6 +486,18 @@ async function pingCard(name, card) {
       flashCard(card, 'ok', `✅ ${reply.slice(0, 80)}${activeNote}`);
     }
     setBadge(card, 'reachable', name);
+
+    // 模型列表顺手自动检测：Ping 通过 = 配置可用，正是「刚配完一家」的时刻。
+    // 静默进行——成功只挂 datalist，失败无声（⟳ 按钮可手动重试），绝不覆盖
+    // Ping 结果的提示，也不把检测失败算成配置失败。
+    try {
+      const lm = await listModels({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, apiStyle: cfg.apiStyle || 'chat' });
+      if (lm.ok && !cachedCfg.providers[name].discoveredModels?.length) {
+        cachedCfg.providers[name].discoveredModels = lm.models;
+        await chrome.storage.local.set({ providers: cachedCfg.providers });
+        renderModelDatalist(card, lm.models);
+      }
+    } catch (_) { /* 静默 */ }
   } catch (e) {
     flashCard(card, 'err', `❌ ${e.message}`);
     setBadge(card, 'unreachable', name);
