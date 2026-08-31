@@ -46,6 +46,34 @@ test('ping(): no model, no apiKey — /health ok is sufficient (no /v1/models ca
   assert.equal(modelsCalled, false, 'must not call /v1/models when there is no apiKey to verify');
 });
 
+test('ping(): Ark-style versioned base (.../api/plan/v3) appends endpoints WITHOUT an extra /v1', async () => {
+  // 方舟网关的版本段在 base 里（官方给 Cline/Cursor 的 base 即 …/api/plan/v3），
+  // 再拼 /v1 得到 …/v3/v1/chat/completions —— plan 网关带 key 也 404（2026-08-28 实测）。
+  const { ping } = await import('../lib/llm-client.js');
+  const called = [];
+  mockFetchSequence([
+    (url) => { called.push(String(url)); return { ok: true, json: async () => ({ choices: [{ message: { content: 'hi' } }] }) }; },
+  ]);
+  const result = await ping({ baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3', apiKey: 'ark-key', model: 'doubao-seed-1-8', apiStyle: 'chat' });
+  assert.equal(result, 'ok');
+  assert.equal(called[0], 'https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions');
+
+  // responses 风格同理
+  called.length = 0;
+  await ping({ baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: 'ark-key', model: 'doubao-seed-1-6', apiStyle: 'responses' });
+  assert.equal(called[0], 'https://ark.cn-beijing.volces.com/api/v3/responses');
+});
+
+test('ping(): base already ending in /v1 is not double-prefixed', async () => {
+  const { ping } = await import('../lib/llm-client.js');
+  const called = [];
+  mockFetchSequence([
+    (url) => { called.push(String(url)); return { ok: true, json: async () => ({ choices: [{ message: { content: 'hi' } }] }) }; },
+  ]);
+  await ping({ baseUrl: 'https://api.openai.com/v1', apiKey: 'sk', model: 'gpt-test', apiStyle: 'chat' });
+  assert.equal(called[0], 'https://api.openai.com/v1/chat/completions');
+});
+
 test('ping(): no model, with apiKey — verifies auth via /v1/models even if /health passed', async () => {
   const { ping } = await import('../lib/llm-client.js');
   const calledUrls = [];
@@ -345,12 +373,24 @@ test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own
   assert.equal(hermesCard.querySelector('[data-k="alias"]'), null, 'agent cards have no alias field');
   assert.equal(hermesCard.querySelector('[data-k="model"]'), null, 'agent cards have no model field');
   assert.equal(hermesCard.querySelector('[data-act="delete"]'), null, 'agent cards are not removable');
+  // API Server 说明走 Base URL 标签上的 ? 悬浮提示（2026-08-30 用户反馈：不要
+  // 常驻的 📖 链接行，悬停才出现）。
+  const baseUrlTip = hermesCard.querySelector('[data-k="baseUrl"]')?.closest('label')?.querySelector('.tip .tip-bubble');
+  assert.ok(baseUrlTip, 'Base URL label carries a ? tooltip');
+  assert.match(baseUrlTip.textContent, /API Server/, 'tooltip explains the Hermes API Server requirement');
+  const docLink = baseUrlTip.querySelector('a[href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server"]');
+  assert.ok(docLink, 'tooltip links the official API Server docs');
+  assert.equal(docLink.target, '_blank', 'docs open in a new tab');
 });
 
-test('options.js: provider cards no longer expose Temperature / Max tokens fields', async () => {
+test('options.js: provider cards expose NO raw inference knobs (maxTokens auto-negotiates)', async () => {
+  // maxTokens 输入框 2026-08-30 撤下：模型输出上限是供应商各自的硬约束，用户
+  // 不该被要求知道该填什么（用户原话「其实我也不知道该设什么值」）。改为自动
+  // 协商：默认 32768，超限 400 时从报错解析真实上限自动重试（llm-client.js）。
+  // Temperature 保持删除（纯旋钮，无对应故障）。
   const card = await addLlmCard();
-  assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field removed');
-  assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field removed');
+  assert.ok(!card.querySelector('[data-k="maxTokens"]'), 'Max tokens field stays removed');
+  assert.ok(!card.querySelector('[data-k="temperature"]'), 'Temperature field stays removed');
 });
 
 test('options.js: adding a provider appends a new LLM card with alias + protocol select + delete', async () => {

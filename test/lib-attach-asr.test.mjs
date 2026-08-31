@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {
   downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono,
   pollFileStatus, transcribeAudio, formatAsrTranscript, normalizeAsrTimestamps, transcriptEndSec,
+  largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
   ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, extFromMime, normalizeArkBaseUrl, splitMp4Fragments
 } from '../lib/handlers/attach-asr.js';
 
@@ -256,6 +257,36 @@ test('transcribeAudio: empty language also falls back to auto-detect (no concret
   delete globalThis.fetch;
 });
 
+// ── 流式中止路径（2026-08-29 实测：81 分钟视频精读被 10 分钟墙钟中止，Chrome 报
+// "BodyStreamBuffer was aborted" 用户看不懂）——两种中止源必须给出可读报错。 ──
+
+test('transcribeAudio: idle timeout (no server data) produces a readable idle-timeout error', async () => {
+  // mock read() 模拟真实 fetch 的中止传播：abort 后 body 流 reject（固定 500ms）。
+  // idle 200ms 先触发 ac.abort()，外部 signal 未触发 → 空闲超时文案。
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: { getReader: () => ({ read: () => new Promise((_, rej) => setTimeout(() => rej(new Error('BodyStreamBuffer was aborted')), 500)) }) },
+  });
+  await assert.rejects(
+    transcribeAudio({ baseUrl: 'https://ark.test/api/v3', apiKey: 'k', fileId: 'f', model: 'm', language: 'zh', idleTimeoutMs: 200 }),
+    /空闲超时/
+  );
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: wall-clock signal abort produces a readable budget-timeout error', async () => {
+  // 墙钟 120ms 先于 idle（60s）触发 → signal.aborted → 预算文案。
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: { getReader: () => ({ read: () => new Promise((_, rej) => setTimeout(() => rej(new Error('BodyStreamBuffer was aborted')), 600)) }) },
+  });
+  await assert.rejects(
+    transcribeAudio({ baseUrl: 'https://ark.test/api/v3', apiKey: 'k', fileId: 'f', model: 'm', language: 'zh', signal: AbortSignal.timeout(120), idleTimeoutMs: 60_000 }),
+    /超时预算/
+  );
+  delete globalThis.fetch;
+});
+
 test('transcribeAudio: falls back to non-stream JSON response when body has no reader', async () => {
   globalThis.fetch = async () => ({
     ok: true,
@@ -419,6 +450,24 @@ test('normalizeAsrTimestamps: range/fraction timestamps become a single start [m
   assert.equal(normalizeAsrTimestamps('[1:02:03, 1:05:00] 超过一小时'), '[1:02:03] 超过一小时');
   assert.equal(normalizeAsrTimestamps('[44:44 - 49:59] 空格连字符'), '[44:44] 空格连字符');
   assert.equal(normalizeAsrTimestamps(null), '');
+});
+
+test('normalizeAsrTimestamps: line-start bare seconds convert to [mm:ss] (2026-08-30 real regression)', () => {
+  // 真实故障：视频精读输出退化成原生 ASR 的秒级时间轴 [0.0]/[624.0]/[1009.0]。
+  // 只认【行首】纯数字括号，句中括号/年份/说话人标签不受影响。
+  assert.equal(normalizeAsrTimestamps('[0.0] [说话人1] 朋友们。'), '[00:00] [说话人1] 朋友们。');
+  assert.equal(normalizeAsrTimestamps('[624.0] [说话人1] 韩元刚刚6月份创下了17年新低。'), '[10:24] [说话人1] 韩元刚刚6月份创下了17年新低。');
+  assert.equal(normalizeAsrTimestamps('[1009.0] 画面：片尾。'), '[16:49] 画面：片尾。');
+  assert.equal(normalizeAsrTimestamps('[62] 裸整数秒'), '[01:02] 裸整数秒');
+  // 小数截断（与既有「秒向下取整」约定一致）
+  assert.equal(normalizeAsrTimestamps('[62.5] 带小数'), '[01:02] 带小数');
+  assert.equal(normalizeAsrTimestamps('[59.6] 不进位'), '[00:59] 不进位');
+  // 行首以外的数字括号不动（防误伤引用/年份类）
+  assert.equal(normalizeAsrTimestamps('引用[2025]年的数据'), '引用[2025]年的数据');
+  // 已是 mm:ss 的行首不受二遍处理影响
+  assert.equal(normalizeAsrTimestamps('[10:24] 已经正确'), '[10:24] 已经正确');
+  // [图N] 锚点行不受影响
+  assert.equal(normalizeAsrTimestamps('[00:35] [图3] 贝森特便签'), '[00:35] [图3] 贝森特便签');
 });
 
 test('formatAsrTranscript: range-format input is normalized to single stamps and still counted', () => {
@@ -951,4 +1000,79 @@ test('transcodeAudioBlob: non-fragmented (single mdat) file uses whole-file deco
   assert.match(failRes.error, /not a fragmented mp4 \(boxes: ftyp,moov,mdat\)/);
   globalThis.AudioContext = saved.AudioContext;
   globalThis.OfflineAudioContext = saved.OfflineAudioContext;
+});
+
+test('transcriptEndSec: bare-second lines are parsed with decimal precision (mixed with mm:ss markers)', () => {
+  // 2026-08-30 真实故障：精读输出语音行裸秒、[图N] 标记行 mm:ss——完整度守卫
+  // 之前一行都解析不出 → 返回 null → 守卫静默跳过。
+  const doc = [
+    '[0.0] [说话人1] 朋友们。',
+    '[624.0] [说话人1] 韩元刚刚6月份创下了17年新低。',
+    '[00:35] [图3] 贝森特便签',
+    '[1009.0] 画面：片尾。',
+  ].join('\n');
+  const end = transcriptEndSec(doc);
+  assert.ok(end != null && Math.abs(end - 1009) < 0.001, `last stamp must be 1009s, got ${end}`);
+  // 小数精度保留：4.6s ≥ 5s*90% 的边界场景不能被截断误判
+  assert.equal(transcriptEndSec('[00:00] 一\n[00:04.6] 二'), 4.6);
+  // 行首裸秒 > 12h 视为非时间戳。≤12h 的行首年份类歧义【接受为时间戳】：
+  // 误判方向的代价只是完整度守卫宽松，反方向会让真实裸秒文档守卫失效。
+  assert.equal(transcriptEndSec('[2025] 年份行'), 2025);
+  // 句中数字括号不是裸秒时间戳（行首锚定兜住常见情况）
+  assert.equal(transcriptEndSec('引用[2025]年的数据'), null);
+});
+
+test('transcribeAudio: SSE 的 response.completed usage 被透传（诊断模型实际摄入量）', async () => {
+  const SSE_USAGE = 'data: {"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":121500,"output_tokens":8200}}}';
+  globalThis.fetch = async () => makeSseResponse(SSE_DELTA_1, SSE_USAGE + '\n\n');
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.deepEqual(res.usage, { input_tokens: 121500, output_tokens: 8200 });
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: 非流式兜底也透传 usage', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: null,
+    json: async () => ({ id: 'resp_1', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '[00:00] 你好' }] }],
+      usage: { prompt_tokens: 900, completion_tokens: 30 } })
+  });
+  const res = await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.deepEqual(res.usage, { prompt_tokens: 900, completion_tokens: 30 });
+  delete globalThis.fetch;
+});
+
+test('largestTranscriptGapSec: 抓出 81 分钟视频实测的中间空洞（0-16 分钟后跳 49:27）', () => {
+  // 2026-08-30 真实故障形状：last stamp 过了 90% 线，中间却有 ~33 分钟空洞。
+  const doc = [
+    '[00:00] [说话人1] 开场。',
+    '[16:07] [说话人1] 中段最后一句。',
+    '[49:27] 画面：CRS 科普弹窗。',
+    '[49:33] [说话人2] 一句对话。',
+    '[1:21:05] [说话人1] 结尾。',
+  ].join('\n');
+  const gap = largestTranscriptGapSec(doc);
+  assert.ok(gap);
+  assert.equal(gap.fromSec, 16 * 60 + 7);
+  assert.equal(gap.toSec, 49 * 60 + 27);
+  assert.ok(gap.gapSec > TRANSCRIPT_GAP_LIMIT_SEC, `gap ${gap.gapSec}s 必须超过阈值 ${TRANSCRIPT_GAP_LIMIT_SEC}s`);
+});
+
+test('largestTranscriptGapSec: 均匀行距返回最大行距（<阈值不触发守卫）；混合裸秒数也能收集', () => {
+  const even = largestTranscriptGapSec('[00:00] a\n[01:00] b\n[02:00] c');
+  assert.ok(even && even.gapSec === 60, `均匀行距的最大相邻间隔就是行距本身，got ${even && even.gapSec}`);
+  assert.equal(largestTranscriptGapSec('[00:00] a'), null, '单一时间戳无从谈空窗');
+  // 裸秒行（2026-08-30 格式回归形态）同样参与收集
+  const mixed = ['[0.0] 朋友们。', '[00:35] [图3] 便签', '[624.0] 中段。'].join('\n');
+  const gap = largestTranscriptGapSec(mixed);
+  assert.ok(gap && Math.abs(gap.gapSec - 589) < 1, `35s→624s 的空窗应为 589s，got ${gap && gap.gapSec}`);
+  // 区间覆盖：[00:00-05:00] 与 [05:10-06:00] 的空窗按右端→左端算 10s
+  const ranged = largestTranscriptGapSec('[00:00-05:00] a\n[05:10-06:00] b');
+  assert.ok(ranged && ranged.gapSec === 10, `got ${ranged && ranged.gapSec}`);
+});
+
+test('formatStampSec: mm:ss / h:mm:ss 两种形态', () => {
+  assert.equal(formatStampSec(967), '16:07');
+  assert.equal(formatStampSec(4879), '1:21:19');
+  assert.equal(formatStampSec(0), '00:00');
 });

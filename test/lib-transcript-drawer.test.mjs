@@ -1,4 +1,4 @@
-// test/lib-transcript-drawer.test.mjs — 字幕抽屉：[mm:ss] 行解析、播放跟随
+// test/lib-transcript-drawer.test.mjs — 视频时间线：[mm:ss] 行解析、关键帧图卡、播放跟随
 // 高亮、手动滚动暂停 + 回位 pill、连续失败收摊、搜索循环、记一笔（−3s）。
 //
 // The module keeps drawer state at module level, so each test loads a FRESH
@@ -290,4 +290,59 @@ test('empty source hides the topbar button and open becomes a no-op', async () =
   assert.equal(document.getElementById('transcript-btn').hidden, true);
   T.openTranscriptDrawer();
   assert.equal(document.getElementById('transcript-drawer').hidden, true);
+});
+
+test('视频时间线：[图N] 关键帧锚点行解析出 fig 序号与 caption', async () => {
+  const T = await freshModule();
+  const lines = T.parseTranscriptLines([
+    '[00:05] [图1] 图表一',
+    '[00:12] [说话人1] 正文行',
+    '[03:00] [图2] 屏幕代码',
+    '[03:10] 无锚点行',
+  ].join('\n'));
+  assert.equal(lines[0].fig, 1);
+  assert.equal(lines[0].text, '图表一');
+  assert.equal(lines[1].fig, 0);
+  assert.equal(lines[2].fig, 2);
+  assert.equal(lines[2].text, '屏幕代码');
+  assert.equal(lines[3].fig, 0);
+  // 时间解析不受锚点影响
+  assert.equal(lines[0].s, 5);
+  assert.equal(lines[2].s, 180);
+});
+
+test('视频时间线：figures 就位时 [图N] 行渲染成内联截图卡片，越界回落文字行', async () => {
+  // 注意：不能用局部 freshModule() 遮蔽文件级 T——init() 接线的是 beforeEach
+  // 创建的那个实例，_listEl 挂在它身上。
+  const vs = mountDom();
+  init(vs);
+  T.__TRANSCRIPT_TESTING__.setSource([
+    '[00:05] [图1] 图表一',
+    '[03:00] [图2] 屏幕代码',
+    '[03:10] 纯文字行',
+  ].join('\n'), vs, ['data:image/jpeg;base64,AAA']);
+  T.openTranscriptDrawer();
+  const list = document.getElementById('transcript-list');
+  const figRows = list.querySelectorAll('.ts-row.ts-fig');
+  assert.equal(figRows.length, 1, '只有图1有对应截图，图2越界回落');
+  const img = figRows[0].querySelector('img.ts-fig-img');
+  assert.equal(img.getAttribute('src'), 'data:image/jpeg;base64,AAA');
+  assert.match(figRows[0].querySelector('.ts-fig-caption').textContent, /图表一/);
+  // 越界图2与纯文字行都是普通文字行
+  const plainRows = list.querySelectorAll('.ts-row:not(.ts-fig)');
+  assert.equal(plainRows.length, 2);
+  assert.match(plainRows[0].textContent, /屏幕代码/);
+  T.__TRANSCRIPT_TESTING__.reset();
+});
+
+test('parseTranscriptLines: [说话人:名字] 形态解析出名字标签；[图N] 不被误吃', async () => {
+  T = await freshModule();
+  const lines = T.parseTranscriptLines(
+    '[00:13] [说话人:英博博士] 星辰大海。\n[00:20] [说话人2] 编号兜底形态。\n[00:35] [图3] 贝森特便签\n[00:40] [说话人:Yushan] 英文名也行。');
+  assert.equal(lines[0].label, '英博博士', '命名标签显示名字本身');
+  assert.equal(lines[0].text, '星辰大海。');
+  assert.equal(lines[1].label, '说话人2', '编号形态向后兼容');
+  assert.equal(lines[2].label, '', '[图N] 不是说话人标签');
+  assert.equal(lines[2].fig, 3, '[图N] 仍走截图卡片解析');
+  assert.equal(lines[3].label, 'Yushan');
 });

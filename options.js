@@ -3,6 +3,7 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
+import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
 const $ = (id) => document.getElementById(id);
 const providersEl = $('providers');
@@ -32,6 +33,14 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
+  // 切换服务商：Base URL 为空时预填该家默认值，提示/占位符/文档链接随动。
+  document.getElementById('asrProvider')?.addEventListener('change', () => {
+    const sel = document.getElementById('asrProvider');
+    const p = getAsrProvider(sel?.value);
+    const baseEl = document.getElementById('asrBaseUrl');
+    if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
+    syncAsrProviderUI();
+  });
 
   // Chat preferences
   applyChatPrefs(cachedCfg);
@@ -52,7 +61,8 @@ function applyChatPrefs(cfg) {
   const ss = $('sendShortcut');
   if (ss) ss.value = cfg.sendShortcut || 'enter';
   const tac = $('thoughtAutoCollapse');
-  if (tac) tac.checked = !!(cfg.thoughtAutoCollapse);
+  // 勾选框反映实际行为：从未设置（undefined）= 默认折叠 = 勾上；显式取消才展开。
+  if (tac) tac.checked = cfg.thoughtAutoCollapse !== false;
 }
 
 async function saveChatPrefs() {
@@ -71,14 +81,60 @@ async function saveChatPrefs() {
   }
 }
 
+// ASR 卡片的下拉选项、占位符、? 提示、文档链接全部由 lib/asr-providers.js 的
+// 注册表驱动——接入新供应商时 UI 零改动（注册表加一项即可）。
+function syncAsrProviderUI() {
+  const sel = document.getElementById('asrProvider');
+  if (!sel) return;
+  if (!sel.options.length) {
+    for (const p of Object.values(ASR_PROVIDERS)) {
+      const o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.label;
+      sel.appendChild(o);
+    }
+  }
+  const p = getAsrProvider(sel.value);
+  const baseEl = document.getElementById('asrBaseUrl');
+  if (baseEl) baseEl.placeholder = p.defaultBaseUrl;
+  const keyEl = document.getElementById('asrApiKey');
+  if (keyEl) keyEl.placeholder = p.apiKeyPlaceholder || 'API Key';
+  const modelEl = document.getElementById('asrModel');
+  if (modelEl) modelEl.placeholder = p.defaultModel;
+  const videoModelEl = document.getElementById('asrVideoModel');
+  if (videoModelEl) {
+    // 注册表带 defaultVideoModel 的供应商（转写/视频拆成两个模型）给出推荐值；单模型则提示留空回退
+    videoModelEl.placeholder = p.defaultVideoModel
+      ? `${p.defaultVideoModel}（推荐）`
+      : '留空 = 同转写模型';
+  }
+  const tip = document.getElementById('asrBaseUrlTip');
+  if (tip) tip.innerHTML = p.baseUrlTip || '';
+  const doc = document.getElementById('asrDocLink');
+  if (doc) {
+    doc.href = p.docUrl || '';
+    doc.textContent = '📖 ' + (p.docLabel || '配置文档');
+  }
+}
+
 function applyAsr(cfg) {
   const a = cfg.asr || {};
   const set = (id, v, placeholder) => { const el = document.getElementById(id); if (el) { if (v != null && v !== '') el.value = v; else el.value = ''; el.placeholder = placeholder || el.placeholder; } };
   const cb = document.getElementById('asrEnabled');
   if (cb) cb.checked = a.enabled !== false;
-  set('asrApiKey', a.apiKey);
-  set('asrBaseUrl', a.baseUrl);
-  set('asrModel', a.model);
+  // 已卸载的供应商（如移除的千问）：ASR 字段整体回落默认——残留的别家 baseUrl/
+  // 模型 ID 若留在输入框里，用户随手 Save 就会把错配写回存储。applyAsr 不写存储，
+  // 用户重新 Save 才落新值。
+  const known = !!ASR_PROVIDERS[a.provider];
+  const provSel = document.getElementById('asrProvider');
+  if (provSel) {
+    syncAsrProviderUI(); // 先填充选项，再回填已存值
+    provSel.value = known ? (a.provider || 'ark') : 'ark';
+  }
+  set('asrApiKey', known ? a.apiKey : '');
+  set('asrBaseUrl', known ? a.baseUrl : '');
+  set('asrModel', known ? a.model : '');
+  set('asrVideoModel', known ? a.videoModel : '');
   const langSel = document.getElementById('asrLanguage');
   if (langSel) {
     const v = a.language || 'auto';
@@ -97,27 +153,33 @@ function applyAsr(cfg) {
 
 async function saveAsr() {
   const enabled = !!document.getElementById('asrEnabled')?.checked;
+  const provider = document.getElementById('asrProvider')?.value || 'ark';
+  const p = getAsrProvider(provider);
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
-  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || 'https://ark.cn-beijing.volces.com/api/v3';
-  const model = (document.getElementById('asrModel')?.value || '').trim() || 'doubao-seed-2-0-lite-260428';
+  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
+  const model = (document.getElementById('asrModel')?.value || '').trim() || p.defaultModel;
+  // 视频解析（视听精读）模型；留空回退注册表推荐值（defaultVideoModel），再不行才用
+  // 转写模型（runVideoAnalysisPipeline 兜底）。
+  const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim() || p.defaultVideoModel || '';
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
   if (enabled && !apiKey) {
     flash('err', '启用 ASR 需要填写 API Key。');
     return;
   }
-  // Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
+  // 方舟 Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
   // 不硬拦截保存 —— 自动规整到标准版 api/v3 后正常保存（运行时 normalizeArkBaseUrl
   // 也会兜底），只给一个醒目提示。否则用户点 Save 会被 return 挡住，整个 asr 配置
   // （含 enabled）都存不进去，反而导致 ASR 静默不生效（2026-08-15 实机踩到）。
+  // 仅方舟需要该规整；其他服务商的端点没有这个变体。
   let savedBaseUrl = baseUrl;
-  if (baseUrl.includes('/api/plan')) {
+  if (provider === 'ark' && baseUrl.includes('/api/plan')) {
     savedBaseUrl = normalizeArkBaseUrl(baseUrl);
     flash('err', `已把 Base URL 从 Agent Plan 端点自动改为标准版 ${savedBaseUrl}（api/plan/v3 没有文件上传）。`);
   }
-  cachedCfg.asr = { enabled, apiKey, baseUrl: savedBaseUrl, model, language, subtitleSource };
+  cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
   await chrome.storage.local.set({ asr: cachedCfg.asr });
-  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}${enabled ? '（模型 ' + model + '）' : ''}。`);
+  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}（${p.label}，模型 ${model}）。`);
 }
 
 function renderProviders() {
@@ -203,8 +265,8 @@ function buildProviderCard(name, cfg, opts = {}) {
         </label>
       </div>` : ''}
       <div class="field">
-        <label>Base URL
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" />
+        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span></span>` : 'Base URL'}
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
         </label>
       </div>
       <div class="field">
@@ -218,7 +280,13 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${showModel ? `
       <div class="field">
         <label>Model ID
-          <input data-k="model" type="text" value="${escapeAttr(cfg.model || '')}" placeholder="e.g. gpt-4o" />
+          <div class="model-chips" data-model-chips>
+            ${(cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).map((id) => `
+              <span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`).join('')}
+            <input class="chip-input" type="text" placeholder="add model id — Enter" aria-label="Add model ID" />
+            <button type="button" class="chip-add" title="Add model" aria-label="Add model ID">＋</button>
+          </div>
+          <input type="hidden" data-k="model" value="${escapeAttr((cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).join(', '))}" />
         </label>
       </div>` : ''}
       ${!isAgent ? `
@@ -248,6 +316,41 @@ function buildProviderCard(name, cfg, opts = {}) {
       const show = apiInput.type === 'password';
       apiInput.type = show ? 'text' : 'password';
       apiToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
+
+  // Model ID chips 编辑器：输入 + 回车/＋ 添加（粘贴逗号分隔自动拆分、去重），
+  // chip 上 ✕ 移除；真实值同步进隐藏的 data-k="model" 逗号串，readCard/saveCard
+  // 的既有规范化（models 全量 + model 首个）零改动。
+  const chipsWrap = card.querySelector('[data-model-chips]');
+  if (chipsWrap) {
+    const hidden = card.querySelector('input[data-k="model"]');
+    const chipInput = chipsWrap.querySelector('.chip-input');
+    const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
+    const syncChips = () => { hidden.value = chipIds().join(', '); };
+    const addChips = () => {
+      const parts = chipInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) return;
+      const existing = new Set(chipIds());
+      for (const id of parts) {
+        if (existing.has(id)) continue;
+        existing.add(id);
+        chipInput.insertAdjacentHTML('beforebegin',
+          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
+      }
+      chipInput.value = '';
+      syncChips();
+    };
+    chipInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addChips(); }
+    });
+    chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
+    chipsWrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove]');
+      if (!btn) return;
+      e.stopPropagation();
+      btn.closest('.chip').remove();
+      syncChips();
     });
   }
 
@@ -298,6 +401,14 @@ async function saveCard(name, card) {
   // not-yet-persisted) card keeps type/stream/isHermes/temperature/...
   // defaults on first Save; real providers just override their own values.
   cachedCfg.providers[name] = { ...BLANK_LLM, ...(cachedCfg.providers[name] || {}), ...data };
+  // Model ID 支持逗号分隔多模型（一张网关卡配多家模型，主页下拉按 Alias · model 逐个
+  // 选择）：models 存全量列表、model 存第一个——既有的 model 消费方（Ping、旧路径）
+  // 语义不变。Agent 卡（Hermes）没有 model 字段，不做规范化。
+  if ('model' in data) {
+    const modelList = [...new Set(String(data.model || '').split(',').map((s) => s.trim()).filter(Boolean))];
+    cachedCfg.providers[name].models = modelList;
+    cachedCfg.providers[name].model = modelList[0] || '';
+  }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
   chrome.storage.local.get('pingStates', ({ pingStates }) => {
@@ -348,7 +459,8 @@ async function pingCard(name, card) {
     let activeNote = '';
     if (!wasReachable && cachedCfg.activeProvider !== name) {
       cachedCfg.activeProvider = name;
-      await chrome.storage.local.set({ activeProvider: name });
+      cachedCfg.activeModel = ''; // 首次 Ping 通自动切换：未指定具体模型，用卡上第一个
+      await chrome.storage.local.set({ activeProvider: name, activeModel: '' });
       document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       activeNote = ' — set as active provider';
@@ -450,7 +562,8 @@ async function removeProvider(name) {
   });
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
-    await chrome.storage.local.set({ activeProvider: 'hermes' });
+    cachedCfg.activeModel = '';
+    await chrome.storage.local.set({ activeProvider: 'hermes', activeModel: '' });
   }
   renderProviders();
 }

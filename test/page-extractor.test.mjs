@@ -1976,6 +1976,38 @@ test('extractInPageWorld: img[srcset] picks the highest-resolution candidate ove
   assert.doesNotMatch(result.text, /tiny-placeholder\.jpg/, 'the low-res placeholder src must not survive');
 });
 
+test('extractInPageWorld: lazy data-src placeholder (WeChat pattern) swaps in the real URL', async () => {
+  const spacer = 'data:image/svg+xml,%3Cxml%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E';
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <figure><img src="${spacer}" data-src="https://mmbiz.qpic.cn/mmbiz_png/abc/640?wx_fmt=png&amp;from=appmsg" alt="图片"></figure>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://mp.weixin.qq.com/s/x' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /mmbiz\.qpic\.cn/, '真实图片 URL 应换入 src 并进入 Markdown');
+  assert.doesNotMatch(result.text, /data:image\/svg\+xml/, '占位 data: 行不得残留');
+});
+
+test('extractInPageWorld: standalone data:/blob: image lines collapse to <image-removed>', async () => {
+  const spacer = 'data:image/svg+xml,%3Cxml/%3E';
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <figure><img src="${spacer}" alt="图片"></figure>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/lazy' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /!\[图片\]\(<image-removed>\)/, '占位图行收敛为 image-removed 标记');
+  assert.doesNotMatch(result.text, /data:image/, 'base64/URL-encoded 噪声不得残留');
+});
+
 // --- PDF client-side text extraction (Feature A from firecrawl research) ---
 // _fetchPdfBytesInPageWorld runs IN-TAB (MAIN world) so the browser attaches
 // cookies -- tested here via a mocked fetch/Blob/btoa in the vm sandbox.

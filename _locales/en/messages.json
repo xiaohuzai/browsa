@@ -51,74 +51,280 @@
     "message": "(no chunks received — check Service Worker DevTools)",
     "description": "Hint when no streaming chunks arrive"
   },
-
-  "quickSummarize": { "message": "Summarize", "description": "Quick action: summarize the attached page" },
-  "quickKeypoints": { "message": "Key Points", "description": "Quick action: extract key points" },
-  "quickExplain": { "message": "Explain", "description": "Quick action: explain simply" },
-  "quickTranslate": { "message": "Translate", "description": "Quick action: translate to reply language" },
-  "quickOutline": { "message": "Outline", "description": "Quick action: nested heading outline" },
-  "quickbarToggle": { "message": "Show/hide quick actions", "description": "Quickbar collapse toggle tooltip" },
-
-  "sessionsTitle": { "message": "Session History", "description": "Sessions drawer title" },
-  "sessionsNew": { "message": "＋ New session", "description": "New session button" },
-  "sessionsSearchPlaceholder": { "message": "Search titles and content…", "description": "Sessions search input placeholder" },
-  "sessionsEmpty": { "message": "No saved sessions yet.", "description": "Empty sessions list" },
-  "sessionsEmptyHint": { "message": "Start a new session to archive this conversation.", "description": "Empty sessions list hint" },
-  "sessionsNoMatch": { "message": "No sessions match your search.", "description": "Sessions search miss" },
-  "sessionsClearAll": { "message": "Clear all sessions", "description": "Clear-all button title" },
-  "sessionsClose": { "message": "Close", "description": "Close drawer" },
-
-  "searchPlaceholder": { "message": "Search messages…", "description": "Message search input placeholder" },
-  "searchPrev": { "message": "Previous (Shift+Enter)", "description": "Search previous match" },
-  "searchNext": { "message": "Next (Enter)", "description": "Search next match" },
-  "searchClose": { "message": "Close (Esc)", "description": "Close search" },
-  "searchBtnTitle": { "message": "Search messages (Ctrl+F)", "description": "Search button tooltip" },
-  "multiselectTitle": { "message": "Select messages", "description": "Multiselect toggle tooltip" },
-  "newChatTitle": { "message": "New conversation (Ctrl+K)", "description": "Clear/new chat button tooltip" },
-  "attachTitle": { "message": "Attach current page to conversation", "description": "Attach button tooltip" },
-  "providerLabel": { "message": "AI provider", "description": "Provider select aria-label" },
-  "cancelStream": { "message": "Stop generating", "description": "Send button while streaming" },
-  "contextAuto": { "message": "Auto", "description": "Auto context mode" },
-  "contextAria": { "message": "Context mode", "description": "Context mode group aria-label" },
-  "mediaDownload": { "message": "Download audio/video", "description": "Media download button label/tooltip" },
-  "toolbarHide": { "message": "Hide on this page", "description": "Selection toolbar close button" },
-  "toolbarHideConfirm": { "message": "Hide toolbar on this page?", "description": "Selection toolbar hide confirmation question" },
-  "toolbarHideHint": { "message": "It won't show again until you reload.", "description": "Selection toolbar hide confirmation hint" },
-  "toolbarCancel": { "message": "Cancel", "description": "Confirm dialog cancel" },
-  "toolbarConfirmHide": { "message": "Hide", "description": "Confirm dialog hide action" },
-  "toolbarAsk": { "message": "Ask", "description": "Selection toolbar: ask about the selection" },
-  "toolbarExplain": { "message": "Explain", "description": "Selection toolbar: explain the selection" },
-  "toolbarTranslate": { "message": "Translate", "description": "Selection toolbar: translate the selection" },
-  "toolbarSummarize": { "message": "Summarize", "description": "Selection toolbar: summarize the selection" },
-  "toolbarAria": { "message": "browsa quick actions", "description": "Selection toolbar aria-label" },
-  "regenTitle": { "message": "Regenerate response", "description": "Assistant message action: regenerate" },
-  "errAuth": { "message": "Authentication failed — check your API key and permissions.", "description": "Error card headline: 401/403 class" },
-  "errRateLimit": { "message": "Rate limited or out of quota — wait a moment or check billing.", "description": "Error card headline: 429/quota class" },
-  "errModel": { "message": "Model not found on this provider — check the model ID in settings.", "description": "Error card headline: unknown model class" },
-  "errTimeout": { "message": "The request timed out.", "description": "Error card headline: timeout class" },
-  "errNetwork": { "message": "Network error — this device cannot reach the endpoint.", "description": "Error card headline: network/DNS class" },
-  "errServer": { "message": "Provider server error — try again shortly.", "description": "Error card headline: 5xx class" },
-  "errGeneric": { "message": "Something went wrong.", "description": "Error card headline fallback" },
-  "errRawToggle": { "message": "Raw error", "description": "Error card raw-text disclosure label" },
-  "copyLabel": { "message": "Copy", "description": "Generic copy button label" },
-  "queuedLabel": { "message": "Queued", "description": "Follow-up queue dock label" },
-  "queuedSendNow": { "message": "Send this one now", "description": "Follow-up queue chip: send immediately" },
-  "queuedRemove": { "message": "Remove from queue", "description": "Follow-up queue chip: remove" },
-  "pinnedGroupLabel": { "message": "Pinned", "description": "Sessions drawer pinned group header" },
-  "pinSession": { "message": "Pin", "description": "Session row pin action tooltip" },
-  "unpinSession": { "message": "Unpin", "description": "Session row unpin action tooltip" },
-  "deleteSession": { "message": "Delete session", "description": "Session row delete tooltip" },
-  "deleteArmedHint": { "message": "Click again to delete", "description": "Two-step delete armed state tooltip" },
-  "contentMatchHint": { "message": "matched in message content", "description": "Content-only search hit dot tooltip" },
-  "sessionsToday": { "message": "Today", "description": "Sessions drawer time bucket" },
-  "sessionsYesterday": { "message": "Yesterday", "description": "Sessions drawer time bucket" },
-  "sessionsWeek": { "message": "This week", "description": "Sessions drawer time bucket" },
-  "sessionsEarlier": { "message": "Earlier", "description": "Sessions drawer time bucket" },
-  "transcriptBtnTitle": { "message": "Transcript", "description": "Topbar button: open transcript drawer" },
-  "transcriptTitle": { "message": "Transcript", "description": "Transcript drawer header title" },
-  "transcriptSearchPlaceholder": { "message": "Search transcript…", "description": "Transcript drawer search input" },
-  "transcriptNote": { "message": "Insert note at playback position", "description": "Transcript drawer note-capture button tooltip" },
-  "followPlayback": { "message": "Jump to playback", "description": "Transcript drawer floating pill after manual scroll" },
-  "transcriptEmpty": { "message": "No transcript in this conversation.", "description": "Transcript drawer empty state" },
-  "thinkDoneTitle": { "message": "Thought process", "description": "Collapsible think-block summary on a finished message" }
+  "quickSummarize": {
+    "message": "Summarize",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "Key Points",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "Explain",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "Translate",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "Outline",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "Show/hide quick actions",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "Session History",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ New session",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "Search titles and content…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "No saved sessions yet.",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "Start a new session to archive this conversation.",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "No sessions match your search.",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "Clear all sessions",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "Close",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "Search messages…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "Previous (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "Next (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "Close (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "Search messages (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "Select messages",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "New conversation (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "Attach current page to conversation",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "AI provider",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "Stop generating",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "Auto",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "Context mode",
+    "description": "Context mode group aria-label"
+  },
+  "mediaDownload": {
+    "message": "Download audio/video",
+    "description": "Media download button label/tooltip"
+  },
+  "toolbarHide": {
+    "message": "Hide on this page",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "Hide toolbar on this page?",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "It won't show again until you reload.",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "Cancel",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "Hide",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "Ask",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "Explain",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "Translate",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "Summarize",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "browsa quick actions",
+    "description": "Selection toolbar aria-label"
+  },
+  "regenTitle": {
+    "message": "Regenerate response",
+    "description": "Assistant message action: regenerate"
+  },
+  "errAuth": {
+    "message": "Authentication failed — check your API key and permissions.",
+    "description": "Error card headline: 401/403 class"
+  },
+  "errRateLimit": {
+    "message": "Rate limited or out of quota — wait a moment or check billing.",
+    "description": "Error card headline: 429/quota class"
+  },
+  "errModel": {
+    "message": "Model not found on this provider — check the model ID in settings.",
+    "description": "Error card headline: unknown model class"
+  },
+  "errTimeout": {
+    "message": "The request timed out.",
+    "description": "Error card headline: timeout class"
+  },
+  "errNetwork": {
+    "message": "Network error — this device cannot reach the endpoint.",
+    "description": "Error card headline: network/DNS class"
+  },
+  "errServer": {
+    "message": "Provider server error — try again shortly.",
+    "description": "Error card headline: 5xx class"
+  },
+  "errGeneric": {
+    "message": "Something went wrong.",
+    "description": "Error card headline fallback"
+  },
+  "errRawToggle": {
+    "message": "Raw error",
+    "description": "Error card raw-text disclosure label"
+  },
+  "copyLabel": {
+    "message": "Copy",
+    "description": "Generic copy button label"
+  },
+  "queuedLabel": {
+    "message": "Queued",
+    "description": "Follow-up queue dock label"
+  },
+  "queuedSendNow": {
+    "message": "Send this one now",
+    "description": "Follow-up queue chip: send immediately"
+  },
+  "queuedRemove": {
+    "message": "Remove from queue",
+    "description": "Follow-up queue chip: remove"
+  },
+  "pinnedGroupLabel": {
+    "message": "Pinned",
+    "description": "Sessions drawer pinned group header"
+  },
+  "pinSession": {
+    "message": "Pin",
+    "description": "Session row pin action tooltip"
+  },
+  "unpinSession": {
+    "message": "Unpin",
+    "description": "Session row unpin action tooltip"
+  },
+  "deleteSession": {
+    "message": "Delete session",
+    "description": "Session row delete tooltip"
+  },
+  "deleteArmedHint": {
+    "message": "Click again to delete",
+    "description": "Two-step delete armed state tooltip"
+  },
+  "contentMatchHint": {
+    "message": "matched in message content",
+    "description": "Content-only search hit dot tooltip"
+  },
+  "sessionsToday": {
+    "message": "Today",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsYesterday": {
+    "message": "Yesterday",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsWeek": {
+    "message": "This week",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsEarlier": {
+    "message": "Earlier",
+    "description": "Sessions drawer time bucket"
+  },
+  "transcriptBtnTitle": {
+    "message": "Video timeline",
+    "description": "Topbar button: open the video timeline drawer"
+  },
+  "transcriptTitle": {
+    "message": "Video timeline",
+    "description": "Video timeline drawer header title"
+  },
+  "transcriptSearchPlaceholder": {
+    "message": "Search timeline…",
+    "description": "Video timeline drawer search input"
+  },
+  "transcriptNote": {
+    "message": "Insert note at playback position",
+    "description": "Transcript drawer note-capture button tooltip"
+  },
+  "followPlayback": {
+    "message": "Jump to playback",
+    "description": "Transcript drawer floating pill after manual scroll"
+  },
+  "transcriptEmpty": {
+    "message": "No video timeline in this conversation.",
+    "description": "Transcript drawer empty state"
+  },
+  "thinkDoneTitle": {
+    "message": "Thought process",
+    "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "Conversation outline",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "(empty message)",
+    "description": "Outline preview for an empty turn"
+  }
 }

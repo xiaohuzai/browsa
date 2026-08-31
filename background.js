@@ -21,7 +21,7 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { handleGetMediaStreams, handleDownloadMedia } from './lib/handlers/media-handler.js';
-import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
+import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -30,7 +30,8 @@ export {
   initStreamState, appendToStreamState, clearStreamState
 };
 import { extractActiveTab } from './lib/page-extractor.js';
-import { buildPageContextText } from './lib/message-builder.js';
+import { inlinePageImages } from './lib/page-images.js';
+import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
 // ─── Media download: keep the DOWNLOAD_CALL simple ──────────────────────────
@@ -82,11 +83,17 @@ chrome.sidePanel
 
 // Right-click context menu — text selection + image contexts.
 chrome.runtime.onInstalled.addListener((details) => {
+  // 菜单标题与浮动工具条（selection-toolbar）共用同一组 i18n 键——同一动作的
+  // 两个入口必须长一样（2026-08-31 用户反馈：右键菜单是英文+emoji、浮动条是
+  // 本地语言，观感割裂）。getMessage 在 SW 里可用；键缺失回退英文默认。
+  const menuTitle = (key, fallback) => {
+    try { return chrome.i18n.getMessage(key) || fallback; } catch (_) { return fallback; }
+  };
   chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-ask',       title: '💬 Ask',                   parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-ask',       title: menuTitle('toolbarAsk', 'Ask'),           parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-explain',   title: menuTitle('toolbarExplain', 'Explain'),   parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-translate', title: menuTitle('toolbarTranslate', 'Translate'), parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-summarize', title: menuTitle('toolbarSummarize', 'Summarize'), parentId: 'browsa', contexts: ['selection'] });
 
   if (details.reason === 'install' || details.reason === 'update') {
     // Best-effort: re-inject the selection toolbar into already-open tabs.
@@ -592,7 +599,9 @@ async function handle(msg, sender) {
       return handleDownloadMedia(msg);
 
     case 'SET_ACTIVE_PROVIDER': {
-      await storage.setActiveProvider(msg.name);
+      // model 可空：多模型 provider 上主页下拉选中的具体模型（Alias · model），
+      // 空串 = 未指定，聊天侧回退 provider.model
+      await storage.setActiveProvider(msg.name, msg.model || '');
       return { activeProvider: msg.name };
     }
 
@@ -654,7 +663,9 @@ async function handle(msg, sender) {
       if (figures.length) {
         const lines = figures.map((f, i) =>
           `${i + 1}. ${f.caption || `Figure on page ${f.page || '?'}`}`);
-        finalText += '\n\n## Figures\nThe descriptions below correspond to the following images in order:\n' + lines.join('\n');
+        // PDF 文本提取不保留插图位置（wasm markdown 无占位），图片按文档顺序
+        // 附在文末；引用约定与视频截图统一：回答中用 [图N]（N 为顺序号）。
+        finalText += '\n\n## Figures\nThe attached images are the document\'s figures in document order — refer to them as [图N] (N = order below) when citing them in your reply:\n' + lines.join('\n');
       }
       const pdfCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
@@ -708,21 +719,45 @@ async function handle(msg, sender) {
       // two-step handoff. The transcript is a `[mm:ss] text` block which, when
       // stamped with videoSrc below, becomes clickable seek links in the
       // rendered reply (linkifyTimestamps).
-      const { text, metaUrl, metaTitle, platform } = msg;
+      const { text, metaUrl, metaTitle, platform, figureImages } = msg;
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
       let finalText = text;
+      // 关键帧截图（视频精读专属，镜像 ATTACH_PDF_CONFIRM 的 figure 管线）：模型在
+      // 精读文档里标记的 [截屏] 时刻，sidepanel 从视频 blob 抽帧后以 {url, caption}
+      // 传入。captions 按顺序列进正文 Figures 段（模型把「截图 N」与 image_url 块
+      // 一一对应），image_url 块随 history 每轮重发给多模态 provider。
+      const figures = (Array.isArray(figureImages) ? figureImages : [])
+        .map((f) => (typeof f === 'string' ? { url: f } : f))
+        .filter((f) => f && f.url);
+      if (figures.length) {
+        // 锚点说明（VinQA 式引用约定）：精读文档的 [图N] 锚点行已带 caption 与
+        // 时间戳，无需再列编号清单；这里只告诉模型对应关系与引用方式。
+        finalText += `\n\n（文中 [图N] 标记按顺序对应随附的 ${figures.length} 张视频截图；在回答中引用截图时请使用相同的 [图N] 标记。）`;
+      }
       // 原始平台由 sidepanel 透传（bilibili / youtube）——决定 mode、videoSrc.platform
       // 和日志标签。缺省回退 bilibili（兼容旧调用/测试）。
       const asrPlatform = (platform === 'youtube') ? 'youtube' : 'bilibili';
+      // format 标签：音频转写 `${platform}-asr`（默认，兼容旧调用）；视频精读由
+      // sidepanel 传 `${platform}-video`，让下游上下文/日志能区分两种产物。
+      const asrFormat = (typeof msg.format === 'string' && msg.format) ? msg.format : `${asrPlatform}-asr`;
       const asrCtx = {
         meta: { url: metaUrl || '', title: metaTitle || '' },
         mode: asrPlatform,
         text: `${finalText}\n\nNote: ${VIDEO_NOTE_HINT}`,
-        format: `${asrPlatform}-asr`,
+        format: asrFormat,
       };
+      // 关键帧截图（视频精读专属，镜像 ATTACH_PDF_CONFIRM 的 figure 管线）：模型在
+      // 精读文档里标记的 [截屏] 时刻，sidepanel 从视频 blob 抽帧后以 {url, caption}
+      // 传入。sidepanel 已把文档里的标记行改写为 [图N] 锚点（带 caption 与时间戳），
+      // 这里按锚点位置真交错入库——图片部件出现在其语义位置，而非文末堆图。
       const contextText = buildPageContextText(asrCtx);
-      const historyEntry = { role: 'user', content: contextText };
+      // 有关键帧时存成交错多模态 content（与 ATTACH_PDF_CONFIRM 同为 image_url 部件，
+      // 但按 [图N] 锚点插入文档中间）。buildMessages 把 history 原样透传，截图每轮
+      // 随文本一起发给多模态 provider。无截图保持纯字符串 content 形状不变。
+      const historyEntry = figures.length
+        ? { role: 'user', content: interleaveImageParts(contextText, figures) }
+        : { role: 'user', content: contextText };
       // Stamp videoSrc so the [mm:ss] transcript renders as clickable seek
       // links (same platform/url/tabId shape as ATTACH_PAGE stamps on video
       // page-contexts).
@@ -734,7 +769,7 @@ async function handle(msg, sender) {
       const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
       if (willSummarize) historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
-      console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars`);
+      console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars${figures.length ? `, ${figures.length} keyframes` : ''}`);
       if (willSummarize) {
         maybeSummarizeAttachment({
           attachId: historyEntry.attachId,
@@ -809,16 +844,22 @@ async function handle(msg, sender) {
           func: async () => {
             try {
               const pi = window.__playinfo__?.data || window.__playinfo__;
-              const bvid = pi?.bvid || '';
-              const cid = pi?.cid || 0;
+              // bvid 不能读 __playinfo__（playurl 响应无此字段，恒空串 → 自愈永远
+              // 拦死）；与字幕提取同策略：URL path 优先，__INITIAL_STATE__ 兜底。
+              const pathBvid = (window.location?.pathname || '').match(/\/video\/(BV[A-Za-z0-9]+)/)?.[1] || '';
+              const vd = window.__INITIAL_STATE__?.videoData;
+              const bvid = pathBvid || pi?.bvid || vd?.bvid || '';
+              const cid = pi?.cid || vd?.cid || 0;
               const freshFn = window.__browsaFetchFreshBilibiliStreams;
               if (typeof freshFn !== 'function' || !bvid || !cid) {
                 return { ok: false, error: '脚本未注入或缺 bvid/cid（页面可能未播放过）' };
               }
               const fresh = await freshFn(bvid, cid);
-              const audios = (Array.isArray(fresh) ? fresh : []).filter((s) => s.type === 'audio' && s.url);
-              if (!audios.length) return { ok: false, error: 'playurl 返回空音频流' };
-              return { ok: true, streams: audios };
+              // 返回全部流类型（audio/video/muxed），由 background 按 msg.want 过滤——
+              // 视频解析模式需要 video/muxed 流一起刷新（want 缺省 'audio'，纯 ASR 行为不变）。
+              const all = (Array.isArray(fresh) ? fresh : []).filter((s) => s.url);
+              if (!all.length) return { ok: false, error: 'playurl 返回空流列表' };
+              return { ok: true, streams: all };
             } catch (e) {
               return { ok: false, error: String((e && e.message) || e) };
             }
@@ -826,8 +867,12 @@ async function handle(msg, sender) {
         });
         const r = res?.result;
         if (r?.ok && Array.isArray(r.streams) && r.streams.length) {
-          console.log(`browsa: ASR_FRESH_URLS ok — ${r.streams.length} fresh audio streams`);
-          return { ok: true, streams: r.streams };
+          // want: 'audio'（缺省，纯 ASR）只回音频流；'all' 连 video/muxed 一起回
+          //（视频解析模式的自愈刷新，sidepanel 拿到后重新选流）。
+          const want = msg.want === 'all' ? 'all' : 'audio';
+          const filtered = want === 'all' ? r.streams : r.streams.filter((s) => s.type === 'audio');
+          console.log(`browsa: ASR_FRESH_URLS ok — ${filtered.length} fresh ${want} streams`);
+          return { ok: true, streams: filtered };
         }
         console.warn('browsa: ASR_FRESH_URLS refresh failed:', r?.error || 'no result');
         return { ok: false, error: r?.error || 'no result' };
@@ -1028,9 +1073,32 @@ async function handle(msg, sender) {
           ctx = withVideoNote(ctx);
         }
 
+        // 页面配图（reader/auto/jina）：正文 Markdown 里的 ![alt](url) 原位转成
+        // [图N] 锚点行，图片在 SW 下载压缩成 JPEG dataURL 随条目交错入库——与视频
+        // 截图 / PDF figure 同一套 [图N] 引用协议（回答引用 [图N]，渲染端还原缩略图）。
+        // 全程 fail-open：无图/下载失败/无解码环境保持原文，绝不阻塞附加。
+        // dom/full 是树状文本（无 Markdown 图片语法）、selected 是局部摘录，不参与。
+        if (['reader', 'auto', 'jina'].includes(ctx.mode) && ctx.text) {
+          try {
+            const inlined = await inlinePageImages(ctx.text, { baseUrl: ctx.meta?.url || '' });
+            if (inlined.figures.length) {
+              ctx.text = inlined.text
+                + `\n\n（文中 [图N] 标记按顺序对应随附的 ${inlined.figures.length} 张页面配图；在回答中引用配图时请使用相同的 [图N] 标记。）`;
+              ctx.pageFigures = inlined.figures;
+            }
+          } catch (e) {
+            console.warn('browsa: page image inlining failed, keeping plain text:', e?.message);
+          }
+        }
+
         // All other modes: save to global history immediately.
         const contextText = buildPageContextText(ctx);
-        const historyEntry = { role: 'user', content: contextText };
+        const pageFigures = Array.isArray(ctx.pageFigures) ? ctx.pageFigures : [];
+        // 有配图时存成按 [图N] 锚点真交错的多模态 content（与 ATTACH_ASR_CONFIRM 的
+        // 视频截图同构）；无配图保持纯字符串 content 形状不变。
+        const historyEntry = pageFigures.length
+          ? { role: 'user', content: interleaveImageParts(contextText, pageFigures) }
+          : { role: 'user', content: contextText };
         // Stamp the video source on video page-contexts (youtube/bilibili)
         // so video-note replies can turn their [mm:ss] markers into clickable
         // seek links. Other pages have no seekable <video> target.
@@ -1053,7 +1121,7 @@ async function handle(msg, sender) {
         const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(ctx.text, all.summarizeThresholdChars);
         if (willSummarize) historyEntry.attachId = crypto.randomUUID();
         await storage.appendToHistory(historyEntry);
-        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}`);
+        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`);
         if (willSummarize) {
           maybeSummarizeAttachment({
             attachId: historyEntry.attachId,
@@ -1425,8 +1493,17 @@ async function buildAsrPendingCtx(tabId, ctx) {
             if (cachedAudio) return { streams: cached, videoDurationSec };
             // Cached audio empty or expired — fall back to fresh playurl API
             // (re-signs a brand-new URL with a fresh deadline, no page refresh).
-            const bvid = pi?.bvid || '';
-            const cid = pi?.cid || 0;
+            // bvid 绝不能从 __playinfo__ 读：B站 playurl 响应里没有 bvid 字段，
+            // pi?.bvid 恒为空串 → 自愈刷新永远被 !bvid 拦死（真实故障 2026-08-29：
+            // 页面开久了缓存流过期后必报「脚本未注入或缺 bvid/cid」让用户白刷新）。
+            // 与字幕提取的主动拉取同策略：URL path 优先，__INITIAL_STATE__ 兜底；
+            // cid 用 playinfo（有此字段）+ INITIAL_STATE 兜底。
+            //（注意：函数体内不要出现 activeFetch / contentType 等 mock 匹配标记词，
+            // attach-asr.test.mjs 按 func.toString() 字符串路由 canned 结果。）
+            const pathBvid = (window.location?.pathname || '').match(/\/video\/(BV[A-Za-z0-9]+)/)?.[1] || '';
+            const vd = window.__INITIAL_STATE__?.videoData;
+            const bvid = pathBvid || pi?.bvid || vd?.bvid || '';
+            const cid = pi?.cid || vd?.cid || 0;
             const freshFn = window.__browsaFetchFreshBilibiliStreams;
             if (typeof freshFn === 'function' && bvid && cid) {
               try {
@@ -1450,7 +1527,8 @@ async function buildAsrPendingCtx(tabId, ctx) {
       if (!got) return null;
     }
     const streams = got.streams || [];
-    const videoDurationSec = got.videoDurationSec || 0;
+    // SSR duration 缺失时用 DASH 流自带 duration（秒）兜底（resolveVideoDurationSec）。
+    const videoDurationSec = resolveVideoDurationSec(got.videoDurationSec, streams);
     const audioCandidates = streams
       .filter((s) => s.type === 'audio' && s.url)
       .sort((a, b) => (a.bandwidth || 0) - (b.bandwidth || 0));
@@ -1492,6 +1570,23 @@ async function buildAsrPendingCtx(tabId, ctx) {
       duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '', id: s.id || 0,
     }));
     if (!audio) return null;
+    // 视频解析（v1，当前暂时只支持 B 站）：透传 video-only 流候选（按码率降序）+ durl 合一流。
+    // YouTube 的流捕获是 audio-only（pot 视频 URL 未验证），天然没有 video 条目 →
+    // sidepanel 不出模式选择卡，维持纯音频行为。选流/512MB 预算判定在 sidepanel
+    // 的 pickVideoStream 里做（卡片上要展示预估体积，选流必须发生在 UI 层）。
+    const videoCandidates = streams
+      .filter((s) => s.type === 'video' && s.url)
+      .sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0))
+      .map((s) => ({
+        url: s.url, label: s.label || '', bandwidth: s.bandwidth || 0,
+        duration: s.duration || 0, size: s.size || 0,
+        width: s.width || 0, height: s.height || 0, id: s.id || 0,
+      }));
+    const muxedRaw = streams.find((s) => s.type === 'muxed' && s.url);
+    const muxedStream = muxedRaw ? {
+      url: muxedRaw.url, label: muxedRaw.label || 'mp4', bandwidth: muxedRaw.bandwidth || 0,
+      duration: muxedRaw.duration || 0, size: muxedRaw.size || 0,
+    } : null;
     // 读完整平台 cookie（含 HttpOnly 的 SESSDATA / SID），传给 sidepanel 在下载前经
     // DNR 注入 Cookie 头——对齐 cat-catch 的下载逻辑：cat-catch 用 chrome.webRequest
     // onSendHeaders 捕获页面播放器真实请求的完整 cookie（含 HttpOnly），而
@@ -1528,15 +1623,20 @@ async function buildAsrPendingCtx(tabId, ctx) {
       // 完整候选音频流列表 + 视频总时长（秒）：sidepanel 转码后若发现实际解码
       // 时长远小于视频总长（服务端 body 截断 / 元数据谎报），可换下一候选流重试。
       audioCandidates: candidateAudios,
+      // 视频解析候选（B站才有内容）：video-only 流（码率降序）+ durl 合一流（可空）。
+      videoCandidates,
+      muxedStream,
       videoDurationSec: videoDurationSec || 0,
       // 传給 sidepanel，供下载前 DNR 注入 Cookie 头（对齐 cat-catch 的下载逻辑）。
       biliCookie: platformCookie,
       // 播放地址过期/刷新失败原因（无则空串）。
       asrExpiredError: got.asrExpiredError || '',
       asr: {
+        provider: asr.provider || 'ark',
         apiKey: asr.apiKey,
         baseUrl: asr.baseUrl,
         model: asr.model,
+        videoModel: asr.videoModel || '',
         language: asr.language,
         format: asr.format,
         timeoutMs: asr.timeoutMs,

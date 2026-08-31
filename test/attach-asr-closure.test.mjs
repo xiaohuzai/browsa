@@ -160,3 +160,93 @@ test('YouTube ASR injected func falls back to the ANDROID fetch when no pot capt
     assert.match(streams[0].url, /c=ANDROID/, 'fallback is the ANDROID pot-less fetch');
   }
 });
+
+// ─── Bilibili 同源缺陷回归（真实故障 2026-08-29）─────────────────────────────
+// __playinfo__（playurl 响应）没有 bvid 字段，旧代码 pi?.bvid 恒为空串 →
+// 「缓存流过期 → 自动刷新」永远被 !bvid 拦死，用户被要求白刷新页面。
+// 修复后 bvid 必须从 window.location.pathname 读（与字幕提取的
+// activeFetchBilibiliVideo 同策略），__INITIAL_STATE__.videoData 兜底。
+
+async function extractBilibiliInjectFuncs() {
+  const src = await readFile(join(ROOT, 'background.js'), 'utf8');
+  const marker = 'window.__browsaFetchFreshBilibiliStreams';
+  const out = [];
+  let searchFrom = 0;
+  for (;;) {
+    const idx = src.indexOf(marker, searchFrom);
+    if (idx < 0) break;
+    searchFrom = idx + marker.length;
+    const headerStart = src.lastIndexOf('func: async () =>', idx);
+    assert.ok(headerStart > 0, `must find a func: async () => before marker at ${idx}`);
+    const openBrace = src.indexOf('{', headerStart);
+    let depth = 0;
+    let i = openBrace;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    }
+    assert.equal(depth, 0, 'func braces must balance');
+    out.push({ body: src.slice(openBrace, i + 1), offset: headerStart });
+  }
+  assert.ok(out.length === 2, `must find exactly 2 __browsaFetchFreshBilibiliStreams funcs, found ${out.length}`);
+  return out;
+}
+
+test('Bilibili ASR injected funcs parse bvid from window.location.pathname (playinfo has no bvid field)', async () => {
+  const funcs = await extractBilibiliInjectFuncs();
+  for (const { body } of funcs) {
+    const calls = [];
+    const fakeWindow = {
+      location: { pathname: '/video/BV1TestBvid/' },
+      // 无 bvid 字段 —— 旧代码在这里死掉（pi?.bvid 恒空）
+      __playinfo__: { cid: 4242, dash: {} },
+      __browsaFetchFreshBilibiliStreams: async (bvid, cid) => {
+        calls.push({ bvid, cid });
+        return [{ type: 'audio', url: 'https://upos.example/aud.m4s?deadline=9999999999', bandwidth: 128000 }];
+      },
+    };
+    const fn = runInFreshVm(body, fakeWindow);
+    const res = await fn();
+    assert.equal(calls.length, 1, 'must call the fresh fetcher exactly once');
+    assert.equal(calls[0].bvid, 'BV1TestBvid', 'bvid must come from the URL path');
+    assert.equal(calls[0].cid, 4242, 'cid comes from playinfo');
+    assert.ok(Array.isArray(res?.streams) && res.streams.length > 0,
+      `func must surface fresh streams (got ${JSON.stringify(res)})`);
+    assert.ok(!res?.asrExpiredError, 'no expired error when the refresh succeeds');
+  }
+});
+
+test('Bilibili ASR injected funcs fall back to __INITIAL_STATE__.videoData when the path has no BV', async () => {
+  const funcs = await extractBilibiliInjectFuncs();
+  for (const { body } of funcs) {
+    const calls = [];
+    const fakeWindow = {
+      location: { pathname: '/blackboard/x' }, // 无 BV
+      __playinfo__: { cid: 0 },
+      __INITIAL_STATE__: { videoData: { bvid: 'BV1Fallback', cid: 777 } },
+      __browsaFetchFreshBilibiliStreams: async (bvid, cid) => {
+        calls.push({ bvid, cid });
+        return [{ type: 'audio', url: 'https://upos.example/aud.m4s?deadline=9999999999' }];
+      },
+    };
+    const fn = runInFreshVm(body, fakeWindow);
+    await fn();
+    assert.deepEqual(calls, [{ bvid: 'BV1Fallback', cid: 777 }]);
+  }
+});
+
+test('Bilibili ASR injected funcs surface a clear error when neither path nor INITIAL_STATE has bvid', async () => {
+  const funcs = await extractBilibiliInjectFuncs();
+  for (const { body } of funcs) {
+    const fakeWindow = {
+      location: { pathname: '/blackboard/x' },
+      __playinfo__: { cid: 1 },
+      __browsaFetchFreshBilibiliStreams: async () => { throw new Error('should not be called'); },
+    };
+    const fn = runInFreshVm(body, fakeWindow);
+    const res = await fn();
+    const err = res?.asrExpiredError || res?.error;
+    assert.ok(err, `func must surface a clear error (got ${JSON.stringify(res)})`);
+    assert.match(String(err), /bvid/);
+  }
+});

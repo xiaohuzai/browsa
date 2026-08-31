@@ -131,6 +131,7 @@ body {
 /* ─── Messages ──────────────────────────────────────────────────────────────── */
 .messages {
   flex: 1;
+  position: relative;   /* outline-rail 的 offsetTop 以内容空间为参照 */
   overflow-y: auto;
   padding: 16px 14px 8px;
   display: flex;
@@ -1444,7 +1445,7 @@ math[display="block"] {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
-.toast span { flex: 1; }
+.toast span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .toast-x {
   background: none;
   border: none;
@@ -1896,8 +1897,7 @@ code.language-patch {
 }
 .sessions-backdrop.active { display: block; }
 
-/* ─── Transcript drawer (playback-follow transcript, ported from
-       youtube-digest) ─────────────────────────────────────────────────────── */
+/* ─── Video timeline drawer（视频时间线：播放跟随的图文时间线）────────────── */
 /* Deliberately no backdrop: unlike the sessions drawer this one is meant to
    be used WHILE watching — clicking a row seeks the video and you keep
    reading. A blocking overlay would fight that. */
@@ -1956,8 +1956,10 @@ code.language-patch {
 .ts-row {
   display: flex;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 6px 10px;
+  margin: 0 6px;
   cursor: pointer;
+  border-radius: 8px;
   border-left: 2px solid transparent;
 }
 .ts-row:hover { background: var(--hover-bg, rgba(128,128,128,0.08)); }
@@ -1984,6 +1986,16 @@ code.language-patch {
   background: var(--accent-dim);
 }
 .ts-row.active .ts-row-time { color: var(--accent); }
+/* 关键帧图卡：精读截图内联在时间线里（[图N] 锚点行），文字行与图卡混排 */
+.ts-row.ts-fig { display: block; }
+.ts-fig-img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  margin: 2px 0 5px;
+}
+.ts-fig-caption { display: block; font-size: 12px; color: var(--fg-2); }
 .ts-row-text mark {
   background: var(--gold-dim);
   color: inherit;
@@ -2604,3 +2616,99 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+/* ── ASR 模式选择卡（无字幕视频 attach 时：音频转写 / 视频精读）───────────── */
+/* 与 approval/clarify 卡同一视觉原则：bg-2 面板 + 细边框 + 圆角，居中窄卡。 */
+.asr-mode-card {
+  align-self: center;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+  animation: none;
+}
+.asr-mode-title { color: var(--fg-2); margin-bottom: 8px; }
+.asr-mode-row { display: flex; gap: 8px; }
+.asr-mode-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-3);
+  color: var(--fg-2);
+  cursor: pointer;
+  text-align: left;
+  transition: opacity var(--t);
+}
+.asr-mode-btn:hover { opacity: 0.85; }
+.asr-mode-main { font-weight: 500; color: var(--fg); }
+.asr-mode-sub { font-size: 0.85em; color: var(--fg-dim); }
+
+/* 回复文本中的 [图N] 引用 → 内联截图缩略图（视频精读关键帧） */
+.inline-fig {
+  display: block;
+  max-width: 260px;
+  max-height: 180px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin: 6px 0;
+}
+
+/* ── Conversation outline rail（对话大纲侧栏）──────────────────────────── */
+.outline-rail {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 6;
+  display: none;
+}
+.outline-rail.visible { display: block; }
+.outline-rail-strip {
+  position: absolute;
+  top: 10px;
+  right: 3px;
+  width: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.outline-rail-strip::-webkit-scrollbar { display: none; }
+.outline-rail .tick {
+  flex-shrink: 0;
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: width 0.15s, background-color 0.15s, opacity 0.15s;
+}
+.outline-rail .tick:hover { width: 16px; opacity: 0.9; }
+.outline-rail .tick.active { width: 16px; background: var(--accent); opacity: 1; }
+.outline-rail-preview {
+  position: absolute;
+  right: 24px;
+  max-width: 250px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  display: none;
+  z-index: 7;
+  word-break: break-word;
+}
+.msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }

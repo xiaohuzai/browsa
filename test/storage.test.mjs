@@ -62,6 +62,30 @@ test('getAll() returns full defaults when storage is empty', async () => {
   assert.equal(all.providers['llm-1'], undefined, 'no default LLM card — the LLM group starts empty and is filled via Add Provider');
 });
 
+test('getAll() normalizes an ASR config saved for an uninstalled provider back to ark defaults', async () => {
+  reset();
+  localArea.set({ asr: {
+    enabled: true, provider: 'qwen', apiKey: 'sk-qwen-old',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-audio-3.0-asr-flash-filetrans', videoModel: 'qwen3.8-flash',
+    language: 'zh', timeoutMs: 150000, subtitleSource: 'asr',
+  } });
+  const all = await storage.getAll();
+  assert.equal(all.asr.provider, 'ark', '已卸载供应商回落 ark');
+  assert.equal(all.asr.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3', '连接字段归一到方舟默认');
+  assert.equal(all.asr.model, 'doubao-seed-2-0-lite-260428');
+  assert.equal(all.asr.videoModel, '');
+  assert.equal(all.asr.apiKey, '', '别家 key 不保留');
+  assert.equal(all.asr.enabled, true, '开关与偏好保留');
+  assert.equal(all.asr.language, 'zh');
+  assert.equal(all.asr.subtitleSource, 'asr');
+
+  reset();
+  localArea.set({ asr: { enabled: true, provider: 'ark', apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', videoModel: '', language: 'zh', timeoutMs: 150000, subtitleSource: 'original' } });
+  const untouched = await storage.getAll();
+  assert.equal(untouched.asr.apiKey, 'ark-key', '合法配置原样透传');
+});
+
 test('getAll() does not resurrect a deleted LLM provider (empty LLM group stays empty)', async () => {
   reset();
   // Simulate a user who deleted every LLM card: storage holds only hermes.
