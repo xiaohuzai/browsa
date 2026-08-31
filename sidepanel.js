@@ -940,7 +940,7 @@ async function refreshAsrStreams(platform, want = 'audio') {
   return null;
 }
 
-// 视频精读管线（v1 仅 B站）：下载视频流（+ 独立音频流）→ 分别上传方舟 Files API
+// 视频精读管线（v1，当前暂时只支持 B 站）：下载视频流（+ 独立音频流）→ 分别上传方舟 Files API
 // → 轮询至 active → Responses API 单请求以 input_video(+input_audio) 引用，产出
 // 带 [mm:ss] 时间戳的「视听精读」文档。产物格式与字幕 ASR 完全一致，下游共用。
 // durl 合一流（音画合一）走单文件（audioFileId=null）；DASH 分离流走双文件组合
@@ -1601,7 +1601,7 @@ async function onAttachPage() {
         throw new Error(`${platformLabel}播放地址已过期且自动刷新失败（${ctx.asrExpiredError}）——请刷新视频页面后重新附加`);
       }
       const wantDurSec = (ctx.videoDurationSec && ctx.videoDurationSec > 0) ? ctx.videoDurationSec : 0;
-      // 视频解析模式（v1 仅 B站）：有 video/muxed 流候选时弹模式选择卡，由用户在
+      // 视频解析模式（v1，当前暂时只支持 B 站）：有 video/muxed 流候选时弹模式选择卡，由用户在
       // 「音频转写（字幕）」与「视频精读（画面＋语音）」之间选；没有候选（YouTube
       // 的流捕获是 audio-only）维持旧行为直接跑音频。pickVideoStream 已在方舟
       // 512MB 上传预算内选好流（全部超预算 → null → 不出卡），预估体积在卡上展示。
@@ -1630,7 +1630,7 @@ async function onAttachPage() {
         // audio and video pipelines (the helper holds the per-header history).
         await registerAsrDnrRule(dnrRuleId, platform, ctx);
         if (analysisMode === 'video') {
-          // —— 视频精读管线（v1 仅 B站；durl 合一流走单文件，否则视频＋音频双文件）——
+          // —— 视频精读管线（v1，当前暂时只支持 B 站；durl 合一流走单文件，否则视频＋音频双文件）——
           const r = await runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec });
           transcriptText = r.transcriptText;
           audioBytes = r.audioBytes;

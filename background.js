@@ -1570,7 +1570,7 @@ async function buildAsrPendingCtx(tabId, ctx) {
       duration: s.duration || 0, size: s.size || 0, codecs: s.codecs || '', id: s.id || 0,
     }));
     if (!audio) return null;
-    // 视频解析（v1 仅 B站）：透传 video-only 流候选（按码率降序）+ durl 合一流。
+    // 视频解析（v1，当前暂时只支持 B 站）：透传 video-only 流候选（按码率降序）+ durl 合一流。
     // YouTube 的流捕获是 audio-only（pot 视频 URL 未验证），天然没有 video 条目 →
     // sidepanel 不出模式选择卡，维持纯音频行为。选流/512MB 预算判定在 sidepanel
     // 的 pickVideoStream 里做（卡片上要展示预估体积，选流必须发生在 UI 层）。
