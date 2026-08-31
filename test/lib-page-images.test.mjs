@@ -93,6 +93,47 @@ test('inlinePageImages: 成功图原位编 [图N] 锚点，失败图保留 Markd
   }
 });
 
+test('inlinePageImages: 无信息量 alt（微信「图片」）不进锚点', async () => {
+  const restore = installDecodeStub();
+  try {
+    const md = '正文\n\n![图片](https://cdn.example.com/wx1.png)\n\n后续';
+    const res = await inlinePageImages(md, {
+      baseUrl: BASE,
+      fetchImpl: imgFetch({ 'https://cdn.example.com/wx1.png': { w: 640 } }),
+    });
+    assert.match(res.text, /\[图1\]/, '锚点保留');
+    assert.doesNotMatch(res.text, /\[图1\] 图片/, '通用 alt「图片」不带入锚点');
+  } finally {
+    restore();
+  }
+});
+
+test('inlinePageImages: 超过 8 张上限的落选图收敛为 [图片]，失败图仍保留 URL', async () => {
+  const restore = installDecodeStub();
+  try {
+    const fetchMap = {};
+    const lines = ['开头'];
+    for (let i = 1; i <= 9; i++) {
+      fetchMap[`https://cdn.example.com/${i}.png`] = { w: 640 };
+      lines.push(`![图${i}](https://cdn.example.com/${i}.png)`);
+    }
+    lines.push('![死链](https://cdn.example.com/dead.png)');
+    lines.push('结尾');
+    const res = await inlinePageImages(lines.join('\n'), {
+      baseUrl: BASE,
+      fetchImpl: imgFetch(fetchMap),
+    });
+    assert.equal(res.figures.length, 8, '上限 8 张');
+    assert.match(res.text, /\[图8\] 图8/, '前 8 张按文档序编号');
+    assert.doesNotMatch(res.text, /\[图9\]/, '第 9 张不占编号');
+    assert.match(res.text, /\[图片\]/, '落选的成功图原位收敛为 [图片]');
+    assert.doesNotMatch(res.text, /9\.png/, '落选图的 URL 不残留');
+    assert.match(res.text, /!\[死链\]\(https:\/\/cdn\.example\.com\/dead\.png\)/, '失败图仍保留 URL（模型可引用）');
+  } finally {
+    restore();
+  }
+});
+
 test('inlinePageImages: 小于最小尺寸的图（图标/头像）整体跳过', async () => {
   const restore = installDecodeStub();
   try {
@@ -125,7 +166,8 @@ test('inlinePageImages: 同一 URL 多次出现只锚定首次；上限 8 张封
     const r2 = await inlinePageImages(many, { baseUrl: BASE, fetchImpl: imgFetch(map) });
     assert.equal(r2.figures.length, 8);
     assert.doesNotMatch(r2.text, /(?<!!)\[图9\]/, '编号只到 8');
-    assert.match(r2.text, /!\[图8\]/, '第 9 张起保留原 Markdown');
+    assert.match(r2.text, /(?:^|\n)\[图片\](?:\n|$)/, '第 9 张起收敛为 [图片]（URL 不残留）');
+    assert.doesNotMatch(r2.text, /8\.png/, '落选图的 URL 不残留');
   } finally {
     restore();
   }
