@@ -2659,7 +2659,9 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   margin: 6px 0;
 }
 
-/* ── Conversation outline rail（对话大纲侧栏）──────────────────────────── */
+/* ── Conversation outline rail（对话大纲侧栏）────────────────────────────
+   strip 只装 ticks（垂直居中由 layoutStrip() 按 JS 写 top，这里不给 top）；
+   preview 卡是 strip 的兄弟节点——strip 有 overflow 裁剪，放里面会被整块裁掉。 */
 .outline-rail {
   position: sticky;
   top: 0;
@@ -2670,45 +2672,69 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .outline-rail.visible { display: block; }
 .outline-rail-strip {
   position: absolute;
-  top: 10px;
-  right: 3px;
-  width: 16px;
+  right: 2px;
+  width: 24px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 5px;
+  align-items: flex-end;
+  padding: 2px 0;
   overflow-y: auto;
   scrollbar-width: none;
-  padding: 2px 0;
 }
 .outline-rail-strip::-webkit-scrollbar { display: none; }
 .outline-rail .tick {
-  flex-shrink: 0;
+  flex: none;
+  width: 24px;
+  height: 16px;
+  padding: 0 4px 0 0;   /* 视觉线距右缘 6px，留呼吸感 */
+  border: 0;
+  background: none;
+  appearance: none;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+.outline-rail .tick:hover { background: var(--bg-3); }
+.outline-rail .tick::before {
+  content: '';
   width: 12px;
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
   background: var(--border-strong);
-  opacity: 0.55;
-  cursor: pointer;
-  transition: width 0.15s, background-color 0.15s, opacity 0.15s;
+  opacity: 0.75;
+  transition: width 0.16s ease, background-color 0.16s ease, opacity 0.16s ease;
 }
-.outline-rail .tick:hover { width: 16px; opacity: 0.9; }
-.outline-rail .tick.active { width: 16px; background: var(--accent); opacity: 1; }
+.outline-rail .tick:hover::before { width: 16px; background: var(--fg); opacity: 0.6; }
+.outline-rail .tick:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.outline-rail .tick.active::before { width: 16px; background: var(--accent); opacity: 1; }
+.outline-rail-strip.dense .tick { height: 12px; }
 .outline-rail-preview {
   position: absolute;
-  right: 24px;
-  max-width: 250px;
-  padding: 7px 10px;
+  right: 26px;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--fg);
   font-size: 12px;
-  line-height: 1.5;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  line-height: 1.55;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
   pointer-events: none;
-  display: none;
   z-index: 7;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(4px);
+  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s;
 }
+.outline-rail-preview.show { opacity: 1; visibility: visible; transform: none; }
 .msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }

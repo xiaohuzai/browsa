@@ -68,7 +68,7 @@ test('≥4 轮显示：用户消息开轮，其后的回复/系统卡并入同�
   assert.ok(rail.classList.contains('visible'), '满 4 轮显示');
   const ticks = rail.querySelectorAll('.tick');
   assert.equal(ticks.length, 4, '4 轮 = 4 个 tick（回复与系统卡并入当前轮）');
-  assert.equal(ticks[0].title, '第一个问题', '预览取用户消息原文');
+  assert.equal(ticks[0].getAttribute('aria-label'), '第一个问题', '预览文本在 aria-label（title 会触发浏览器原生 tooltip，与自定义预览卡打架）');
 });
 
 test('点击 tick：滚到该轮开头并加闪烁高亮', async () => {
@@ -139,13 +139,40 @@ test('hover tick：预览卡显示该轮用户消息（截断到 180 字符）',
   initOutlineRail({ messagesEl: el });
   await flush();
   const preview = el.querySelector('.outline-rail-preview');
-  assert.equal(preview.style.display, 'none', '默认隐藏');
+  assert.ok(!preview.classList.contains('show'), '默认隐藏');
   el.querySelectorAll('.outline-rail .tick')[0]
     .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
-  assert.equal(preview.style.display, 'block', 'hover 显示');
+  assert.ok(preview.classList.contains('show'), 'hover 显示');
   assert.ok(preview.textContent.startsWith('很长的问题'), '预览为用户消息原文');
   assert.ok(preview.textContent.length <= 181, '截断到 180 字符 + 省略号');
   el.querySelector('.outline-rail-strip')
     .dispatchEvent(new window.MouseEvent('mouseleave', { bubbles: false }));
-  assert.equal(preview.style.display, 'none', '离开隐藏');
+  assert.ok(!preview.classList.contains('show'), '离开隐藏');
+});
+
+// 0.35.3 事故回归：init 时 #messages 为空，真实渲染先清空 innerHTML 再灌消息，
+// rail 走 buildRail 自愈重建——监听若只挂 init 那份 strip，重建后 hover/click
+// 全部失灵（tick 看得见但点不动）。自愈后的新 strip 必须同样可交互。
+test('自愈重建后的 strip 仍可交互：点击跳轮、hover 出预览', async () => {
+  _resetOutlineRail();
+  const el = freshMessages();
+  initOutlineRail({ messagesEl: el });
+  await flush();
+  // 模拟 renderHistory：清空 + 灌入 ≥4 轮（rail 节点被连带拆掉 → 自愈重建）
+  el.innerHTML = '';
+  for (let i = 1; i <= 4; i++) {
+    el.appendChild(msg(document.createElement('div'), 'user', `问题${i}`));
+    el.appendChild(msg(document.createElement('div'), 'assistant', `回答${i}`));
+  }
+  await flush();
+  const preview = el.querySelector('.outline-rail-preview');
+  const tick2 = el.querySelectorAll('.outline-rail .tick')[1];
+  assert.ok(tick2, '自愈后 ticks 已重建');
+  tick2.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+  assert.ok(preview.classList.contains('show'), '自愈后的 strip hover 仍出预览');
+  assert.equal(preview.textContent, '问题2');
+  tick2.click();
+  const target = [...el.querySelectorAll('.msg.user')][1];
+  assert.ok(target._scrolled >= 1, '自愈后的 strip 点击仍滚到对应轮');
+  assert.ok(target.classList.contains('outline-flash'), '闪烁高亮已加');
 });
