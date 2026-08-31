@@ -38,6 +38,7 @@ import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll liste
 import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
+import { fetchArxivMeta, formatArxivMeta, arxivIdFromUrl } from './lib/arxiv.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
   largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
@@ -1534,7 +1535,13 @@ async function onAttachPage() {
     if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
       attachBtn.title = '解析 PDF 中…';
       showAttachProgress('解析 PDF 中…');
-      let pdfText, pdfNumPages, pdfOcrPages, pdfFigureImages = [];
+      const attachT0 = performance.now();
+      // arXiv enrichment runs alongside extraction: authors/categories/dates
+      // for the context header. Best-effort + 6s timeout — never delays the
+      // attach by more than that, and a miss just means no header block.
+      const pdfUrl = ctx.meta?.url || '';
+      const arxivMetaPromise = fetchArxivMeta(pdfUrl).catch(() => null);
+      let pdfText, pdfNumPages, pdfOcrPages, pdfFigureImages = [], pdfExtra = {};
       try {
         const pdfResult = await Promise.race([
           extractPdfContent(ctx.pdfBase64, { extractFigures: true }),
@@ -1544,17 +1551,27 @@ async function onAttachPage() {
         pdfNumPages = pdfResult.numPages;
         pdfOcrPages = pdfResult.pagesNeedingOcr;
         pdfFigureImages = Array.isArray(pdfResult.figureImages) ? pdfResult.figureImages : [];
+        pdfExtra = {
+          docTitle: pdfResult.docTitle || '',
+          layout: pdfResult.layout || null,
+          hasEncodingIssues: !!pdfResult.hasEncodingIssues
+        };
       } catch (e) {
         console.warn('browsa: pdf extraction failed, using placeholder', e.message);
         pdfText = `[PDF file — agent should fetch and read directly]\nURL: ${ctx.meta?.url || ''}\nTitle: ${ctx.meta?.title || ''}`;
       }
+      const arxivMeta = await arxivMetaPromise;
+      const arxivHeader = arxivMeta ? formatArxivMeta(arxivMeta, arxivIdFromUrl(pdfUrl)?.version) : '';
+      console.log(`browsa[pdf]: attach pipeline (extract+arxiv) took ${Math.round(performance.now() - attachT0)}ms`);
       const confirmRes = await sendMessage({
         type: 'ATTACH_PDF_CONFIRM',
         text: pdfText,
         metaUrl: ctx.meta?.url || '',
         metaTitle: ctx.meta?.title || '',
         numPages: pdfNumPages,
-        figureImages: pdfFigureImages
+        figureImages: pdfFigureImages,
+        arxivHeader,
+        paper: !!arxivMeta
       }).catch(() => null);
       // handler 在 text 为空时返回内层 { ok:false, error:'no text' }——外层
       // res.ok 只是桥接层标志，误当成功会虚增 nextHistoryIdx（索引错位）。
@@ -1565,7 +1582,18 @@ async function onAttachPage() {
         const pagesLabel = pdfNumPages ? `，${pdfNumPages} 页` : '';
         const ocrLabel = pdfOcrPages?.length > 0 ? `，${pdfOcrPages.length} 页可能需要 OCR` : '';
         const figLabel = pdfFigureImages.length > 0 ? `，${pdfFigureImages.length} figure${pdfFigureImages.length > 1 ? 's' : ''}` : '';
-        appendAttachSystem(`📎 已附加 PDF："${title}"（pdf-text${pagesLabel}${charLabel}${ocrLabel}${figLabel}）`, null, pdfText, pdfFigureImages);
+        const encLabel = pdfExtra.hasEncodingIssues ? '，文本可能存在编码问题' : '';
+        const tblLabel = pdfExtra.layout?.pagesWithTables?.length ? `，${pdfExtra.layout.pagesWithTables.length} 页含表格` : '';
+        // Visible confirmation that the arXiv metadata fetch landed — the
+        // inspect dialog only shows the pre-header body text.
+        const arxivLabel = arxivMeta ? `，arXiv:${arxivIdFromUrl(pdfUrl)?.id || '✓'}` : '';
+        // background 回传 contextText = 模型实际收到的完整上下文（头部含
+        // arXiv 元数据块 + 正文含 ## Figures 段）；回退旧响应时降级用 pdfText。
+        const inspectCtx = confirmRes?.data?.contextText || pdfText;
+        appendAttachSystem(
+          `📎 已附加 PDF："${title}"（pdf-text${arxivLabel}${pagesLabel}${charLabel}${ocrLabel}${figLabel}${encLabel}${tblLabel}）`,
+          null, inspectCtx, pdfFigureImages
+        );
       } else {
         appendError('PDF attach failed');
       }
@@ -3498,11 +3526,6 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint) {
   scrollToBottom(true);
 }
 
-/**
- * After streaming ends, render accumulated tool-call events as a collapsible
- * <details> panel *above* the assistant bubble — mirrors personal_ai_assistant's
- * "completed events → folded panels" pattern.
- */
 function renderToolHistory(bubbleEl, events) {
   if (!events.length) return;
   const details = document.createElement('details');

@@ -645,9 +645,17 @@ async function handle(msg, sender) {
       // Side panel finished pdf.js text extraction (or fell back to the
       // placeholder text on any parse failure/timeout) and hands us the final
       // text to store — mirrors ATTACH_SCREENSHOT_CONFIRM's two-step handoff.
-      const { text, metaUrl, metaTitle, numPages, figureImages } = msg;
+      const { text, metaUrl, metaTitle, numPages, figureImages, arxivHeader } = msg;
       if (!text) return { ok: false, error: 'no text' };
       const all = await storage.getAll();
+      // arXiv enrichment: the sidepanel fetched the paper's Atom API metadata
+      // (authors/categories/dates/DOI) and passes the formatted header block
+      // in. It rides the context header (like URL/Title) — the model sees
+      // provenance up front without it polluting the extracted body.
+      let headerBlock = '';
+      if (typeof arxivHeader === 'string' && arxivHeader.trim()) {
+        headerBlock = arxivHeader.trim() + '\n';
+      }
       let finalText = text;
       // Figure preservation (vision-capable providers): each extracted figure
       // arrives as {url, caption, page} (caption may be null). The caption is
@@ -667,13 +675,26 @@ async function handle(msg, sender) {
         // 附在文末；引用约定与视频截图统一：回答中用 [图N]（N 为顺序号）。
         finalText += '\n\n## Figures\nThe attached images are the document\'s figures in document order — refer to them as [图N] (N = order below) when citing them in your reply:\n' + lines.join('\n');
       }
+      // paper flag: paper-shaped analysis prompts downstream (auto-summarizer
+      // digest, paper analysis card). arXiv URL is the current signal; the
+      // sidepanel's detection result wins if it ever disagrees.
+      let isPaper = !!msg.paper;
+      if (!isPaper) {
+        try { isPaper = /(^|\.)arxiv\.org$/i.test(new URL(metaUrl || '').hostname); } catch (_) { /* non-URL */ }
+      }
       const pdfCtx = {
-        meta: { url: metaUrl || '', title: metaTitle || '' },
+        meta: { url: metaUrl || '', title: metaTitle || '', paper: isPaper },
         mode: 'pdf',
         text: finalText,
         format: numPages ? `pdf-text, ${numPages} pages` : 'pdf-text'
       };
-      const contextText = buildPageContextText(pdfCtx);
+      const contextText =
+        `${PAGE_CONTEXT_PREFIX}\n` +
+        `URL: ${metaUrl || ''}\n` +
+        `Title: ${metaTitle || ''}\n` +
+        (headerBlock ? headerBlock : '') +
+        `Mode: ${pdfCtx.mode}${pdfCtx.format ? ` | ${pdfCtx.format}` : ''}\n` +
+        `---\n\n${finalText}`;
       // Store the page text plus figure JPEGs as a multimodal content array -
       // exactly like ATTACH_SCREENSHOT_CONFIRM - so figures are resent on every
       // turn alongside the text. buildMessages pushes history entries through
@@ -709,7 +730,10 @@ async function handle(msg, sender) {
           provider: all.providers?.[all.activeProvider]
         });
       }
-      return { ok: true };
+      // contextText = the exact text the model receives (header incl. the
+      // arXiv block + body incl. the Figures section) — the sidepanel's
+      // 检查 dialog displays this, not the pre-header pdfText it holds.
+      return { ok: true, contextText };
     }
 
     case 'ATTACH_ASR_CONFIRM': {

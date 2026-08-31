@@ -2738,3 +2738,4 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 }
 .outline-rail-preview.show { opacity: 1; visibility: visible; transform: none; }
 .msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }
+
