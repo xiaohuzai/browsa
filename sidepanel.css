@@ -131,6 +131,7 @@ body {
 /* ─── Messages ──────────────────────────────────────────────────────────────── */
 .messages {
   flex: 1;
+  position: relative;   /* outline-rail 的 offsetTop 以内容空间为参照 */
   overflow-y: auto;
   padding: 16px 14px 8px;
   display: flex;
@@ -2657,3 +2658,57 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   border: 1px solid var(--border);
   margin: 6px 0;
 }
+
+/* ── Conversation outline rail（对话大纲侧栏）──────────────────────────── */
+.outline-rail {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 6;
+  display: none;
+}
+.outline-rail.visible { display: block; }
+.outline-rail-strip {
+  position: absolute;
+  top: 10px;
+  right: 3px;
+  width: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.outline-rail-strip::-webkit-scrollbar { display: none; }
+.outline-rail .tick {
+  flex-shrink: 0;
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: width 0.15s, background-color 0.15s, opacity 0.15s;
+}
+.outline-rail .tick:hover { width: 16px; opacity: 0.9; }
+.outline-rail .tick.active { width: 16px; background: var(--accent); opacity: 1; }
+.outline-rail-preview {
+  position: absolute;
+  right: 24px;
+  max-width: 250px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  display: none;
+  z-index: 7;
+  word-break: break-word;
+}
+.msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }

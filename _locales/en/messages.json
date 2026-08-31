@@ -318,5 +318,13 @@
   "thinkDoneTitle": {
     "message": "Thought process",
     "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "Conversation outline",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "(empty message)",
+    "description": "Outline preview for an empty turn"
   }
 }

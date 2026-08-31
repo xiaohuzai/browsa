@@ -28,6 +28,7 @@ import {
   initTranscriptDrawer, refreshTranscriptSource, openTranscriptDrawer,
   closeTranscriptDrawer, isOpenTranscriptDrawer, formatTs
 } from './lib/sidepanel/transcript-drawer.js';
+import { initOutlineRail } from './lib/sidepanel/outline-rail.js';
 import { planHistoryReconcile } from './lib/sidepanel/history-reconcile.js';
 import {
   initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
@@ -197,6 +198,7 @@ async function init() {
     closeSessionsDrawer();
     openTranscriptDrawer();
   });
+  initOutlineRail({ messagesEl });
   initTranscriptDrawer({
     sendMessage,
     onSeek: (seconds, vs) => seekVideo(vs, seconds),
