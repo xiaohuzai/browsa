@@ -280,7 +280,13 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${showModel ? `
       <div class="field">
         <label>Model ID
-          <input data-k="model" type="text" value="${escapeAttr((cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).join(', '))}" placeholder="e.g. gpt-4o, gpt-4o-mini — comma separated" />
+          <div class="model-chips" data-model-chips>
+            ${(cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).map((id) => `
+              <span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`).join('')}
+            <input class="chip-input" type="text" placeholder="add model id — Enter" aria-label="Add model ID" />
+            <button type="button" class="chip-add" title="Add model" aria-label="Add model ID">＋</button>
+          </div>
+          <input type="hidden" data-k="model" value="${escapeAttr((cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).join(', '))}" />
         </label>
       </div>` : ''}
       ${!isAgent ? `
@@ -310,6 +316,41 @@ function buildProviderCard(name, cfg, opts = {}) {
       const show = apiInput.type === 'password';
       apiInput.type = show ? 'text' : 'password';
       apiToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
+
+  // Model ID chips 编辑器：输入 + 回车/＋ 添加（粘贴逗号分隔自动拆分、去重），
+  // chip 上 ✕ 移除；真实值同步进隐藏的 data-k="model" 逗号串，readCard/saveCard
+  // 的既有规范化（models 全量 + model 首个）零改动。
+  const chipsWrap = card.querySelector('[data-model-chips]');
+  if (chipsWrap) {
+    const hidden = card.querySelector('input[data-k="model"]');
+    const chipInput = chipsWrap.querySelector('.chip-input');
+    const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
+    const syncChips = () => { hidden.value = chipIds().join(', '); };
+    const addChips = () => {
+      const parts = chipInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) return;
+      const existing = new Set(chipIds());
+      for (const id of parts) {
+        if (existing.has(id)) continue;
+        existing.add(id);
+        chipInput.insertAdjacentHTML('beforebegin',
+          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
+      }
+      chipInput.value = '';
+      syncChips();
+    };
+    chipInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addChips(); }
+    });
+    chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
+    chipsWrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove]');
+      if (!btn) return;
+      e.stopPropagation();
+      btn.closest('.chip').remove();
+      syncChips();
     });
   }
 

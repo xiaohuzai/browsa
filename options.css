@@ -392,6 +392,70 @@ details.provider-group[open] > .provider-group-header::before {
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* ── Model ID chips editor ──────────────────────────────────────────────── */
+.model-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 4px 5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.model-chips:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.model-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 3px 1px 8px;
+  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  color: var(--fg);
+  background: var(--accent-bg);
+}
+.model-chips .chip-x {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+.model-chips .chip-x:hover { color: var(--err); }
+.model-chips .chip-input {
+  flex: 1;
+  min-width: 110px;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 3px 4px;
+}
+.model-chips .chip-add {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.model-chips .chip-add:hover { border-color: var(--border-strong); color: var(--fg); }
+
 /* ── API style select (compact) ─────────────────────────────────────────── */
 .provider .row .api-style-select {
   font-size: 12px;
