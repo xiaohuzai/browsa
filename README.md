@@ -89,10 +89,10 @@ Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), O
 | Alias | a name you choose (e.g. "My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple providers stay distinguishable |
 | Base URL | e.g. `https://api.openai.com` |
 | API Key | your API key |
-| Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) |
+| Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable). Use **Ping** to verify connectivity and auto-detect capabilities; the first provider you verify is automatically set as active.
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs (comma-separated) — one card covers an entire gateway hosting dozens of models, expanded per model in the sidebar dropdown. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable). Use **Ping** to verify connectivity and auto-detect capabilities; the first provider you verify is automatically set as active.
 
 ---
 
@@ -111,7 +111,7 @@ GitHub file pages (`github.com/…/blob/…`) are a special case: browsa fetches
 
 For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
 
-**Structured extraction** — works on any webpage; where Readability alone isn't enough (YouTube, Bilibili, 小红书, and more), browsa observes the page's own network requests and reads structured content directly — subtitles, comments, article source, quotes. No signing, no re-auth. For videos with no subtitles at all, browsa can transcribe the audio automatically (ASR) — or run a full video analysis that reads the visuals (slides, on-screen code) together with the speech — so even those can be summarized with the same clickable `[mm:ss]` video notes. Feishu / Lark document pages are a special case: browsa parses the page's Slate-editor block structure directly, so headings, lists, and **table rows & columns** survive instead of being flattened to plain text.
+**Structured extraction** — works on any webpage; where Readability alone isn't enough (YouTube, Bilibili, 小红书, and more), browsa observes the page's own network requests and reads structured content directly — subtitles, comments, article source, quotes. No signing, no re-auth. For videos with no subtitles at all, browsa can transcribe the audio automatically (ASR) — or run a full video analysis that reads the visuals (slides, on-screen code) together with the speech — so even those can be summarized with the same clickable `[mm:ss]` video notes (ASR is optional — enable it in ⚙ Settings with a Volcengine Ark key). Feishu / Lark document pages are a special case: browsa parses the page's Slate-editor block structure directly, so headings, lists, and **table rows & columns** survive instead of being flattened to plain text.
 
 ---
 

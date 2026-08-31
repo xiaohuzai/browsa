@@ -59,7 +59,7 @@ browsa is an AI sidebar that chats with the page you're on — articles, YouTube
 
 🎬 VIDEO NOTES WITH CLICKABLE TIMESTAMPS
 • Built-in subtitles for YouTube & Bilibili are extracted automatically
-• No subtitles? browsa transcribes the audio locally via speech recognition (ASR), so subtitle-less videos work too
+• No subtitles? browsa transcribes the audio (ASR) through your own configured provider, so subtitle-less videos work too
 • Every [mm:ss] note in the reply is clickable and seeks the video
 
 📄 PDFs NEVER LEAVE YOUR MACHINE
@@ -125,7 +125,7 @@ browsa 是一个把「你正在看的页面」交给 AI 的浏览器侧边栏—
 • 划选任意文字 → 浮动工具栏：提问 · 解释 · 翻译 · 总结
 
 🎬 带可点击时间戳的视频笔记
-• 自动提取 YouTube / B站字幕；无字幕视频可在本地做语音转写（ASR）
+• 自动提取 YouTube / B站字幕；无字幕视频也能语音转写（ASR，经由你自己配置的服务）
 • 回复里的每个 [mm:ss] 都可以点击跳转
 
 📄 PDF 不出本机
@@ -197,7 +197,7 @@ Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、EC
 ## 6. 发布 checklist
 
 - [ ] Developer账号 $5（一次性）
-- [ ] zip：`npm run package` 当前 0.31.9 包已含最新设计
+- [ ] zip：`npm run package` 当前 0.35.1 包已含最新设计
 - [ ] privacy policy 页面上线并把 URL 填入 dashboard
 - [ ] 上传 5 张截图 + 440×280 宣传图
 - [ ] 权限说明逐条粘贴（上表）
