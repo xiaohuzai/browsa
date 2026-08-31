@@ -83,11 +83,17 @@ chrome.sidePanel
 
 // Right-click context menu — text selection + image contexts.
 chrome.runtime.onInstalled.addListener((details) => {
+  // 菜单标题与浮动工具条（selection-toolbar）共用同一组 i18n 键——同一动作的
+  // 两个入口必须长一样（2026-08-31 用户反馈：右键菜单是英文+emoji、浮动条是
+  // 本地语言，观感割裂）。getMessage 在 SW 里可用；键缺失回退英文默认。
+  const menuTitle = (key, fallback) => {
+    try { return chrome.i18n.getMessage(key) || fallback; } catch (_) { return fallback; }
+  };
   chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-ask',       title: '💬 Ask',                   parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-explain',   title: '🔍 Explain',               parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-translate', title: '🌐 Translate to Chinese',  parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-summarize', title: '📝 Summarize',             parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-ask',       title: menuTitle('toolbarAsk', 'Ask'),           parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-explain',   title: menuTitle('toolbarExplain', 'Explain'),   parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-translate', title: menuTitle('toolbarTranslate', 'Translate'), parentId: 'browsa', contexts: ['selection'] });
+  chrome.contextMenus.create({ id: 'browsa-summarize', title: menuTitle('toolbarSummarize', 'Summarize'), parentId: 'browsa', contexts: ['selection'] });
 
   if (details.reason === 'install' || details.reason === 'update') {
     // Best-effort: re-inject the selection toolbar into already-open tabs.
