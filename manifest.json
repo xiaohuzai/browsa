@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.35.3",
+  "version": "0.34.1",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "permissions": [
