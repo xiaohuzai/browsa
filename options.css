@@ -393,15 +393,19 @@ details.provider-group[open] > .provider-group-header::before {
 }
 
 /* ── Model ID chips editor ──────────────────────────────────────────────── */
+/* Box geometry mirrors .field input (same border/radius/bg/focus ring, same
+   padding and 13px input font) so it reads as one more form control; the
+   chips themselves reuse the page's pill vocabulary (global button/.provider-
+   badge are 999px) with the badge's --surface fill instead of an accent tint. */
 .model-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg);
-  padding: 4px 5px;
+  padding: 6px 10px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .model-chips:focus-within {
@@ -415,11 +419,12 @@ details.provider-group[open] > .provider-group-header::before {
   max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 1px 3px 1px 8px;
+  padding: 1px 4px 1px 9px;
   font-size: 12px;
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  line-height: 1.5;
   color: var(--fg);
-  background: var(--accent-bg);
+  background: var(--surface);
 }
 .model-chips .chip-x {
   display: inline-flex;
@@ -440,14 +445,14 @@ details.provider-group[open] > .provider-group-header::before {
   background: none;
   color: var(--fg);
   font: inherit;
-  font-size: 12.5px;
-  padding: 3px 4px;
+  font-size: 13px;
+  padding: 3px 2px;
 }
 .model-chips .chip-add {
   background: none;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px 7px;
+  border-radius: 999px;
+  padding: 2px 9px;
   cursor: pointer;
   font-size: 12px;
   color: var(--muted);
@@ -707,7 +712,8 @@ input[type="range"] { accent-color: var(--accent); }
   user-select: none;
 }
 .tip:hover,
-.tip:focus-visible {
+.tip:focus-visible,
+.tip:focus-within {
   background: var(--accent);
   color: #fff;
   outline: none;
@@ -737,8 +743,30 @@ input[type="range"] { accent-color: var(--accent); }
   z-index: 100;
 }
 .tip:hover .tip-bubble,
-.tip:focus-visible .tip-bubble {
+.tip:focus-visible .tip-bubble,
+.tip:focus-within .tip-bubble {
   display: block;
+}
+/* The bubble must survive the pointer travelling INTO it: .tip-bubble is a
+   DOM child of .tip so hovering it keeps .tip:hover alive, but the 8px gap
+   (top: calc(100% + 8px)) is dead space where neither element is hovered and
+   the bubble snaps shut mid-crossing. This invisible strip bridges the gap
+   (overlapping 2px on both sides so subpixel rounding can't reopen a seam)
+   — it only exists while the bubble is shown, so it never blocks clicks when
+   hidden. Inside the bubble the user is expected to linger: select/copy text
+   or click links (e.g. the Hermes docs link), so re-enable text selection
+   (.tip's user-select:none inherits down) and the text cursor. */
+.tip-bubble::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -10px;
+  width: 100%;
+  height: 12px;
+}
+.tip-bubble {
+  user-select: text;
+  cursor: auto;
 }
 .tip-bubble b { color: #f0f2f5; font-weight: 600; }
 .tip-bubble code {

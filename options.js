@@ -109,7 +109,12 @@ function syncAsrProviderUI() {
       : '留空 = 同转写模型';
   }
   const tip = document.getElementById('asrBaseUrlTip');
-  if (tip) tip.innerHTML = p.baseUrlTip || '';
+  if (tip) {
+    // 文档链接并进气泡：? 气泡现在可驻留（hover 进去点链接不消失），读提示时
+    // 就能直接跳文档，不必找到卡片底部那个常驻入口（两处都保留）。
+    tip.innerHTML = (p.baseUrlTip || '') +
+      (p.docUrl ? `<br><a href="${p.docUrl}" target="_blank" rel="noopener noreferrer">📖 ${p.docLabel || '配置文档'}</a>` : '');
+  }
   const doc = document.getElementById('asrDocLink');
   if (doc) {
     doc.href = p.docUrl || '';
@@ -347,10 +352,14 @@ function buildProviderCard(name, cfg, opts = {}) {
     chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
     chipsWrap.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-remove]');
-      if (!btn) return;
-      e.stopPropagation();
-      btn.closest('.chip').remove();
-      syncChips();
+      if (btn) {
+        e.stopPropagation();
+        btn.closest('.chip').remove();
+        syncChips();
+        return;
+      }
+      // 盒子外观对齐普通输入框后，点空白/点 chip 也应聚焦输入框（表单惯例）
+      if (e.target !== chipInput) chipInput.focus();
     });
   }
 
