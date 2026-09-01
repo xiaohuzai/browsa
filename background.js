@@ -7,6 +7,7 @@
 
 import * as storage from './lib/storage.js';
 import { ping, ProviderConfigError } from './lib/llm-client.js';
+import { pingSquilla } from './lib/squilla-client.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import {
   streamPorts, streamState, chatControllers, idleTimerResetters,
@@ -920,10 +921,15 @@ async function handle(msg, sender) {
       await storage.clearHistory();
       // Reset the Hermes session identity for every Hermes provider so the
       // next conversation starts fresh (new X-Hermes-Session-Id / session_id).
+      // Same for OpenSquilla providers: a fresh gateway sessionKey so the
+      // agent's server-side transcript doesn't bleed into the new talk.
       const allCfg = await storage.getAll();
       for (const name of Object.keys(allCfg.providers || {})) {
         if (allCfg.providers[name]?.isHermes) {
           await storage.resetHermesSessionId(name);
+        }
+        if (allCfg.providers[name]?.isSquilla) {
+          await storage.clearSquillaSessionKey(name);
         }
       }
       console.log('browsa[bg]: global history cleared');
@@ -1333,7 +1339,9 @@ async function handle(msg, sender) {
       } else {
         cfg = { baseUrl, apiKey, model };
       }
-      const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
+      const reply = cfg.isSquilla
+        ? await pingSquilla({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey })
+        : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model });
       return { reply };
     }
 

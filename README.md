@@ -1,27 +1,49 @@
-# browsa
+<p align="center">
+  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
-> **Languages**: **English** · [简体中文](README.zh-CN.md)
+<p align="center">
+  <img src="docs/assets/readme/hero-en.png" alt="browsa — read anywhere, ask anywhere" width="100%" />
+</p>
 
-> **browsa** = **brow**ser **s**ide p**a**nel **A**I. Side-panel AI chat for any webpage — talk to your LLM agent about what you're reading.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
+  <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
+  <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
+</p>
 
-> **Website**: [xiaohuzai.github.io/browsa](https://xiaohuzai.github.io/browsa/) — feature highlights & interactive interface demos (English · 简体中文)
+<p align="center">
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website</strong></a> · <a href="#see-it-in-action"><strong>Screenshots</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
+</p>
 
-browsa is a Chrome / Edge extension (Manifest V3) that opens a chat panel next to whatever tab you're on, attaches the page content, and streams replies from any OpenAI (Chat Completions / Responses), Anthropic Messages, or Ollama-compatible API.
+---
 
-```
-[Web page]  →  [browsa side panel]  →  [your LLM / agent]  →  streaming reply
-```
+**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes, OpenSquilla) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
 
-## Install (unpacked)
+## See it in action
+
+**Video pages** — ask for a summary and the key points come back as clickable `[mm:ss]` timestamps; click one to jump straight back to the moment. No subtitles? browsa transcribes the audio (ASR) or reads the visuals.
+
+![browsa summarizing a Bilibili video into clickable timestamped notes](docs/assets/readme/video-notes.png)
+
+**Papers & PDFs** — parsed entirely on your machine, nothing uploaded: tables, headings, and multi-column layout reconstructed, and actual figure regions cropped out and sent as images, so a vision model can actually *see* Figure 1.
+
+![browsa explaining Figure 1 of the Attention Is All You Need paper on arXiv](docs/assets/readme/pdf-figures.png)
+
+**Feeds & messy pages** — where plain readers give up, browsa reads the page's own data directly: subtitles, comments, note content. No re-auth, no signing in.
+
+![browsa extracting decision-ready key points from a Xiaohongshu note](docs/assets/readme/deep-extraction.png)
+
+## Install
 
 1. Clone or download this repo.
-2. Open `chrome://extensions` (or `edge://extensions`).
-3. Enable **Developer mode**.
-4. Click **Load unpacked** → select the `browsa/` directory.
-5. Press `Ctrl+Shift+H` (or click the toolbar icon) to open the side panel.
-6. Click **⚙ Settings** to configure a provider.
+2. Open `chrome://extensions` (or `edge://extensions`) and enable **Developer mode**.
+3. Click **Load unpacked** → select the `browsa/` directory.
+4. Press `Ctrl+Shift+H` (or click the toolbar icon) — the panel opens next to any page.
+5. Click **⚙ Settings** and connect a provider below.
 
-## Build & package
+<details>
+<summary><b>Build & package</b></summary>
 
 ```bash
 npm install          # first time only
@@ -31,20 +53,21 @@ npm run package      # → browsa-v<version>.zip
 
 `npm version patch|minor` bumps the version in both `package.json` and `manifest.json` automatically.
 
----
+</details>
 
-## Configure a provider
+## Connect a provider
 
-browsa splits providers into two categories:
+browsa works with two kinds of backends:
 
-- **Agent Providers** — full agent backend with tool execution (bash, file ops, web search, etc.). The AI can actually *do* things on the server side.
-- **LLM Providers** — plain language model endpoint for conversation only. Model ID is required.
+- **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
+- **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
-Use the **Ping** button in Settings to verify connectivity and auto-detect capabilities. The provider status (reachable / unreachable) is shown in the sidebar dropdown.
+Open ⚙ Settings, fill in Base URL + API key, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active.
 
----
+![browsa settings listing OpenAI, Claude, Ollama, and Hermes Agent providers](docs/assets/readme/providers-en.png)
 
-### 🤖 Hermes Agent
+<details>
+<summary><b>🤖 Hermes Agent</b> — self-hosted agent with built-in tools</summary>
 
 Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/runs` API — richer than plain chat completions (tool progress, approval/clarification prompts for dangerous actions) — with a stable `X-Hermes-Session-Id` per conversation so Hermes can maintain session continuity server-side. Falls back to plain `/v1/chat/completions` automatically if a Hermes deployment doesn't advertise `/v1/runs` support.
 
@@ -77,12 +100,49 @@ hermes gateway
 
 **5. Ping** to verify. `/v1/runs` support is auto-detected and enabled automatically.
 
----
-### 💬 LLM Providers
+</details>
 
-Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`) — OpenAI, Anthropic, Ollama, Groq, LiteLLM, etc.
+<details>
+<summary><b>🦑 OpenSquilla Agent</b> — local desktop agent over gateway WebSocket</summary>
 
-**Configure browsa** — open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**, or use **＋ Add Provider** anytime to add more, then configure:
+[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local desktop agent (gateway + Web UI + Electron app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.
+
+**1. Install & start the gateway**
+
+```bash
+uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.4/opensquilla-0.5.4-py3-none-any.whl"
+opensquilla gateway start
+# → running: http://127.0.0.1:18791
+```
+
+**2. Let the extension in** — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to `~/.opensquilla/config.toml`:
+
+```toml
+[cors]
+allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
+```
+
+This is browsa's **pinned extension ID** (fixed via the manifest key, the same on every machine and matching the future store listing — verify at `chrome://extensions` → browsa → **ID**). Accepting `chrome-extension://` origins needs OpenSquilla's origin-guard extension for non-http(s) origins — current releases 403 them even when listed; it's a small upstream patch (`gateway/origin_guard.py`, same pattern as the registered desktop origin), PR pending.
+
+**3. Configure browsa** — open ⚙ Settings, select the **OpenSquilla** provider:
+
+| Field | Value |
+|---|---|
+| Base URL | `ws://127.0.0.1:18791/ws` |
+| API Key | only if your gateway requires a token (optional) |
+
+**4. Ping** to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.
+
+Notes: each browsa conversation maps to one gateway session (`agent:main:browsa:…`, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); pasted images stay in browsa's own history but are not forwarded to OpenSquilla yet (its `chat.send` attachment encoding is not documented — v1 sends text only); the reply-language preference is prepended to the message since this protocol has no system-prompt field.
+
+</details>
+
+<details>
+<summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
+
+Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
+
+Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**, or use **＋ Add Provider** anytime:
 
 | Field | Value |
 |---|---|
@@ -92,89 +152,91 @@ Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), O
 | Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs (comma-separated) — one card covers an entire gateway hosting dozens of models, expanded per model in the sidebar dropdown. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable). Use **Ping** to verify connectivity and auto-detect capabilities; the first provider you verify is automatically set as active.
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable).
 
----
+</details>
 
-## Attaching page context
+## What browsa reads
 
-Click 📎 in the composer to attach the current page. browsa supports two attachment modes selectable in the composer footer:
+Click 📎 to attach the current tab — **Auto** mode (clean article text, falling back to DOM tree, then full page text) or **📷 Screenshot** mode (the visible tab, for multimodal models). Attaching a PDF — or a page that turns out to be one — is automatic; no mode to pick.
 
-| Mode | What gets sent |
+| You're reading | What browsa sends |
 |---|---|
-| **Auto** | Tries Mozilla Readability first (clean article text, ~5–30 KB), falls back to DOM tree, then full `body.innerText` |
-| **📷 Screenshot** | PNG of the visible tab — for multimodal models or visual content |
+| Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
+| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
+| Videos | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — Volcengine Ark key in Settings) or visually analyzed together with the speech |
+| GitHub file pages | raw source from `raw.githubusercontent.com` — markdown and code keep their structure |
+| Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
+| Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more) |
 
-Attaching a PDF (or a page that turns out to be one) is automatic — no separate mode to pick. browsa tries [`pdf-inspector-wasm`](https://github.com/firecrawl/pdf-inspector) first (full layout reconstruction — tables, headings, columns — running client-side, nothing uploaded), falls back to plain `pdf.js` text extraction if that's unavailable or the PDF turns out to be a scanned/image-only page with no text layer, and as a last resort attaches just the PDF's URL so your agent can fetch and read it with its own tools. For figure-heavy PDFs (textbooks, papers with plots), browsa also crops the actual figure regions - not whole-page renders - pairs each with its caption, and sends them as inline vision content so a vision-capable model can actually see the diagrams; once the model has answered, those figure images are compacted to labeled text placeholders in history so later turns resend cheap text instead of the pixels.
-
-GitHub file pages (`github.com/…/blob/…`) are a special case: browsa fetches the file's raw source from `raw.githubusercontent.com` directly. This is cleaner than scraping the rendered GitHub UI (markdown and code keep their structure instead of being flattened to plain text) and skips the page-cleanup step that would otherwise click through GitHub's nav menus and branch pickers.
-
-For text selection, highlight text on the page and use the **floating toolbar** or **right-click context menu** (Ask / Explain / Translate / Summarize). The selection is sent automatically without needing to click 📎.
-
-**Structured extraction** — works on any webpage; where Readability alone isn't enough (YouTube, Bilibili, 小红书, and more), browsa observes the page's own network requests and reads structured content directly — subtitles, comments, article source, quotes. No signing, no re-auth. For videos with no subtitles at all, browsa can transcribe the audio automatically (ASR) — or run a full video analysis that reads the visuals (slides, on-screen code) together with the speech — so even those can be summarized with the same clickable `[mm:ss]` video notes (ASR is optional — enable it in ⚙ Settings with a Volcengine Ark key). Feishu / Lark document pages are a special case: browsa parses the page's Slate-editor block structure directly, so headings, lists, and **table rows & columns** survive instead of being flattened to plain text.
-
----
+To ask about a text selection, highlight it and use the **floating toolbar** or **right-click menu** (Ask / Explain / Translate / Summarize) — no need to click 📎.
 
 ## Features
 
-### Chat
+The screenshots above are the shape of it — the full reference lives here:
 
-- **Streaming replies** — tokens appear as they arrive; click ✕ or press `Esc` to stop
-- **Think blocks** — `<think>` / `<thinking>` content shown in a collapsible block, auto-collapsed after streaming
-- **Markdown rendering** — full GFM: tables, code blocks, lists, inline formatting
-- **Syntax highlighting** — 40+ languages via highlight.js
-- **LaTeX** — inline `$...$` and display `$$...$$` via KaTeX, offloaded to a Web Worker for formula-heavy messages so the panel doesn't jank
-- **Mermaid diagrams** — rendered inline with zoom / pan / copy source / export SVG toolbar; sequence diagrams with a semicolon in dialogue text (e.g. embedded SQL) render correctly via an automatic escape-and-retry
-- **ECharts charts** — ` ```echarts ` code blocks rendered inline with a resize-aware toolbar
-- **Markmap mind maps** — ` ```markmap ` code blocks (a plain Markdown heading/list outline) rendered inline as an interactive, zoomable mind map with the same zoom/reset/copy/export toolbar as Mermaid/ECharts; no dedicated button needed — just ask for a mind map/outline and the model knows the format
-- **Diff highlighting** — `diff` code blocks color `+` green and `-` red
-- **Detail thread ("细聊")** — select any text inside a reply to open a scoped side conversation about just that excerpt, without touching the main history. Fully resizable, closes and discards everything on ✕
-- **Edit & resend** — click ✏ on any user message to edit and re-send
-- **Regenerate** — ⟳ re-runs any assistant reply from its preceding user message
-- **Queued follow-ups** — typing while a reply streams queues your message; it sends automatically once the stream ends
-- **Error cards** — provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable
-- **Copy response** — click ⎘ to copy the full raw Markdown
-- **Timestamps** — hover any message to see send time
+<details>
+<summary><b>Chat</b> — streaming, thinking blocks, diagrams, detail thread…</summary>
 
-### History & sessions
+| Feature | What you get |
+|---|---|
+| **Streaming replies** | tokens appear as they arrive; click ✕ or press `Esc` to stop |
+| **Think blocks** | `<think>` / `<thinking>` content in a collapsible block, auto-collapsed after streaming |
+| **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
+| **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
+| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format |
+| **Detail thread ("细聊")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable |
+| **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
+| **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
+| **Error cards** | provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable |
+| **Copy & timestamps** | ⎘ copies the full raw Markdown; hover any message to see its send time |
 
-- **Session history** — save the current conversation as a named session, browse and restore past sessions from the 🕐 drawer
-- **Export** — export any session as a Markdown file
-- **In-conversation search** — `Ctrl+F` to search across all messages with prev/next navigation
-- **Session drawer search & pin** — filter sessions by title AND message content (content-only hits flagged); pinned sessions float above the list
-- **Multi-select** — select multiple messages for batch deletion
-- **Undo clear** — clearing history shows an undo option for 5 seconds
+</details>
 
-### Input
+<details>
+<summary><b>History & sessions</b> — drawers, search, export…</summary>
 
-- **Image attachment** — drag-and-drop or paste images directly into the composer (for multimodal models)
-- **Input history & drafts** — ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel
-- **Slash commands** — type `/` to see completions; see list below
-- **Quick actions** — one-click Summarize / Key Points / Explain / → 中文 / Outline buttons above the composer
-- **Floating selection toolbar** — appears when you highlight text on any page: Ask · Explain · → 中文 · Summarize
-- **Right-click context menu** — browsa › Ask / Explain / Translate / Summarize on selected text
+| Feature | What you get |
+|---|---|
+| **Sessions** | save the conversation as a named session; browse and restore from the 🕐 drawer; pin favorites above the list |
+| **Search everywhere** | `Ctrl+F` across all messages in a conversation; the drawer filters sessions by title **and** message content (content-only hits flagged) |
+| **Export** | any session as a Markdown file |
+| **Safe deletion** | two-step armed delete for sessions; multi-select messages for batch deletion; clearing history is undoable for 5 seconds |
 
-### Settings
+</details>
 
-- **Domain rules** — per-URL-pattern extra system prompt (e.g. always respond in English on `github.com`)
-- **Mask rules** — regex-based content redaction before sending to the LLM (e.g. strip phone numbers)
-- **Reply language** — force replies in a specific language regardless of page language
-- **Max text chars** — cap how much page content is sent per turn
-- **Auto-summarize long attachments** — when an attached page or video transcript exceeds the threshold (default: 100,000 chars), browsa chunks it, summarizes each chunk in parallel using the configured provider, and merges the result once in the background — the attachment response returns immediately with no latency, and subsequent turns use the compressed version instead of re-sending the full text every time. Timestamp markers in video transcripts (`[mm:ss]`) are explicitly preserved so clickable seek links keep working. Fails open: any error silently keeps the original text.
-- **llms.txt** — when you attach a page (📎), browsa fetches `<origin>/llms.txt` once and bakes the site's LLM instructions into the attached page context (tied to the attached page, not the currently-active tab). Kept out of the system prompt so the prompt prefix stays byte-stable across turns (KV/prompt-cache friendly).
+<details>
+<summary><b>Input</b> — images, drafts, quick actions…</summary>
 
----
+| Feature | What you get |
+|---|---|
+| **Image attachments** | drag-and-drop or paste images into the composer (for multimodal models) |
+| **Input history & drafts** | ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel |
+| **Slash commands** | type `/` for completions — see the table below |
+| **Quick actions** | one-click Summarize / Key Points / Explain / → 中文 / Outline above the composer |
+| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · → 中文 · Summarize; or right-click → browsa › Ask / Explain / Translate / Summarize |
 
-## Slash commands
+</details>
 
-Type `/` in the composer to see autocomplete. All commands can be followed by additional instructions:
+<details>
+<summary><b>Settings</b> — domain rules, masking, auto-summarize…</summary>
 
-```
-/summarize focus on the methodology
-/translate keep technical terms in English
-```
+| Setting | What it does |
+|---|---|
+| **Domain rules** | per-URL-pattern extra system prompt (e.g. always respond in English on `github.com`) |
+| **Mask rules** | regex-based content redaction before anything is sent (e.g. strip phone numbers) |
+| **Reply language** | force replies in a specific language regardless of page language |
+| **Max text chars** | cap how much page content is sent per turn |
+| **Auto-summarize long attachments** | pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background — the attachment returns instantly and later turns resend the compressed version; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
+| **llms.txt** | on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
 
-| Command | Prompt sent to LLM |
+</details>
+
+### Slash commands
+
+Type `/` in the composer to see autocomplete. All commands accept extra instructions — `/summarize focus on the methodology`:
+
+| Command | Prompt sent to the model |
 |---|---|
 | `/summarize` | 3–5 bullet summary |
 | `/translate` | Translate to Chinese |
@@ -182,9 +244,7 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 | `/explain` | Explain for a beginner in simple language |
 | `/outline` | Nested outline of headings only |
 | `/keypoints` | Top 5 takeaways |
-| `/prompt` | Show the current active system prompt (not sent to LLM) |
-
----
+| `/prompt` | Show the current active system prompt (not sent to the model) |
 
 ## Keyboard shortcuts
 
@@ -198,31 +258,38 @@ Type `/` in the composer to see autocomplete. All commands can be followed by ad
 | `Ctrl+F` | Open in-conversation search |
 | `Esc` | Cancel stream / close search / close drawer |
 
----
-
 ## How it works
 
+```
+[Web page]  →  [browsa side panel]  →  [your model / agent]  →  streaming reply
+```
+
+<details>
+<summary><b>Code map</b></summary>
+
 - **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
-- **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, detail-thread each live in `lib/sidepanel/`.
+- **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, detail thread each live in `lib/sidepanel/`.
 - **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming client (`/v1/chat/completions` + Hermes `/v1/runs`), `chrome.storage.local` wrapper, content scripts.
 
----
+</details>
 
 ## Browser compatibility
 
 Chrome / Edge 114+ (primary target); Brave 1.56+ should work (same Chromium surface). Firefox is not supported (no `side_panel` API).
 
----
-
 ## Security
 
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
 - PDFs are parsed entirely client-side (WASM + pdf.js) — the file's bytes never leave your device; only extracted text goes to your provider.
-- LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources, and Mermaid's SVG output is stripped of `<script>`/event-handler attributes).
+- LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources; Mermaid's SVG output is stripped of `<script>` / event-handler attributes).
 - Content scripts only observe network requests; they never modify or block them.
-
----
 
 ## License
 
-MIT
+[MIT](LICENSE) — free to use, modify, and distribute.
+
+---
+
+<p align="center">
+  <sub><b>browsa</b> — read anywhere, ask anywhere.</sub>
+</p>

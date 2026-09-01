@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@font-face{font-family:'Inter';src:url('InterVar.ttf');font-weight:100 900}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1280px;height:800px;overflow:hidden;position:relative;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:#0d0f14;display:flex;align-items:center;justify-content:center;
+  background:
+  radial-gradient(ellipse 900px 420px at 78% 120%,rgba(224,84,44,.10),transparent 60%),
+  radial-gradient(ellipse 520px 280px at 8% -12%,rgba(212,167,44,.07),transparent 58%),#0d0f14}
+.col{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.keys-h{color:#eef0ee;font-size:44px;font-weight:800;letter-spacing:-.02em;line-height:1.25;text-align:center}
+.keys-h em{font-style:normal;color:#e0542c}
+.keys-sub{color:#9aa0ab;font-size:19px;margin-bottom:26px;font-family:ui-monospace,"SF Mono",Consolas,monospace}
+.prov-board{width:720px;border-radius:20px;padding:30px 36px;display:flex;flex-direction:column;gap:16px;
+  background:#14171f;border:1px solid #262b38;box-shadow:0 32px 80px rgba(0,0,0,.45)}
+.prov-board::before{content:"settings — providers";color:#9aa0ab;
+  font-family:ui-monospace,Consolas,monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  display:block;margin-bottom:4px}
+.prov-card{background:#0d0f14;border:1px solid #262b38;padding:18px 22px;border-radius:10px;
+  display:flex;align-items:center;gap:12px}
+.prov-card.active{background:rgba(224,84,44,.05);border-color:rgba(224,84,44,.4)}
+.prov-ava{width:40px;height:40px;font-size:15px;border-radius:11px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:ui-monospace,Consolas,monospace;font-weight:700;color:#fff}
+.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:#c2410c}
+.prov-info{flex:1;min-width:0}
+.prov-name{color:#eef0ee;font-size:17px;font-weight:600;display:block;line-height:1.3}
+.prov-model{color:#9aa0ab;font-size:13px;margin-top:4px;display:block;
+  font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.prov-badge{font-size:12px;padding:5px 13px;flex-shrink:0;border-radius:999px;
+  font-family:ui-monospace,Consolas,monospace;font-weight:600;letter-spacing:.03em}
+.pb-ok{color:#4ade80;background:rgba(74,222,128,.14)}
+.pb-idle{color:#d4a72c;background:rgba(212,167,44,.12)}
+</style></head><body>
+<div class="col">
+  <h2 class="keys-h">Your keys. Your models. <em>Your agent.</em></h2>
+  <p class="keys-sub">// no subscription · no markup · no telemetry</p>
+  <div class="prov-board">
+    <div class="prov-card">
+      <span class="prov-ava pa-openai">O</span>
+      <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
+      <span class="prov-badge pb-ok">reachable</span>
+    </div>
+    <div class="prov-card">
+      <span class="prov-ava pa-claude">C</span>
+      <span class="prov-info"><span class="prov-name">Claude</span><span class="prov-model">claude-sonnet · /v1/messages</span></span>
+      <span class="prov-badge pb-idle">not pinged</span>
+    </div>
+    <div class="prov-card">
+      <span class="prov-ava pa-ollama">L</span>
+      <span class="prov-info"><span class="prov-name">Ollama (local · fully offline)</span><span class="prov-model">localhost:11434 · qwen3:32b</span></span>
+      <span class="prov-badge pb-ok">offline ok</span>
+    </div>
+    <div class="prov-card active">
+      <span class="prov-ava pa-hermes">H</span>
+      <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approval for risky actions</span></span>
+      <span class="prov-badge pb-ok">reachable</span>
+    </div>
+  </div>
+</div>
+</body></html>
