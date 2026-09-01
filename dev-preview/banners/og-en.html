@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@font-face{font-family:'Inter';src:url('InterVar.ttf');font-weight:100 900}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1200px;height:630px;overflow:hidden;position:relative;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:#f5f6f3;color:#14171f}
+.glow{position:absolute;inset:0;background:
+  radial-gradient(ellipse 760px 340px at 50% 112%,rgba(194,65,12,.10),transparent 62%),
+  radial-gradient(ellipse 420px 240px at 8% 118%,rgba(146,108,13,.09),transparent 58%),
+  radial-gradient(ellipse 420px 240px at 92% 118%,rgba(146,108,13,.09),transparent 58%)}
+.mark-br{position:absolute;right:22px;bottom:22px;width:20px;height:20px}
+.mark-br::before{content:"";position:absolute;bottom:0;left:0;width:100%;height:1.5px;background:#5b6270;opacity:.5}
+.mark-br::after{content:"";position:absolute;top:0;right:0;width:1.5px;height:100%;background:#5b6270;opacity:.5}
+.wrap{position:relative;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 90px}
+.eyebrow{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:19px;font-weight:600;letter-spacing:.1em;color:#6f5206;display:flex;align-items:center;gap:18px;margin-bottom:26px}
+.eyebrow::before,.eyebrow::after{content:"";width:44px;height:2px;background:#926c0d}
+h1{font-size:84px;font-weight:800;letter-spacing:-.03em;line-height:1.12;margin-bottom:26px}
+em{font-style:normal;color:#c2410c;background:linear-gradient(transparent 62%,rgba(194,65,12,.18) 62%);padding:0 .06em}
+.sub{font-size:22px;color:#3a3f4a;line-height:1.75;max-width:920px}
+.footrow{position:absolute;left:90px;right:90px;bottom:42px;display:flex;align-items:center;justify-content:space-between}
+.wordmark{font-family:ui-monospace,Consolas,monospace;font-size:30px;font-weight:700;letter-spacing:.08em;color:#c2410c}
+.badge{font-family:ui-monospace,Consolas,monospace;font-size:17px;color:#f5f6f3;background:#14171f;padding:9px 22px;border-radius:999px;letter-spacing:.03em}
+.ts{display:inline-block;padding:.05em .35em;border-radius:8px;color:#d4a72c;background:rgba(212,167,44,.16);font-variant-numeric:tabular-nums}
+</style></head><body>
+<div class="glow"></div>
+<div class="wrap">
+  <p class="eyebrow">browser side-panel AI</p>
+  <h1>Read anywhere,<br><em>ask anywhere</em>.</h1>
+  <p class="sub">Attach the page — article, video, or PDF — and talk to your own model or agent.<br>Replies carry clickable timestamps <span class="ts">[07:42]</span> · no subscription · open source.</p>
+</div>
+<div class="footrow">
+  <span class="wordmark">browsa</span>
+  <span class="badge">MIT · your keys, your agent</span>
+</div>
+<div class="mark-br"></div>
+</body></html>
