@@ -138,6 +138,27 @@ Notes: each browsa conversation maps to one gateway session (`agent:main:browsa:
 </details>
 
 <details>
+<summary><b>⚙️ Codex Agent</b> — the local Codex engine, no URL, no key</summary>
+
+browsa can drive the OpenAI **Codex** engine installed on your own machine (CLI or the desktop app's managed copy) — the same `codex app-server` interface the VS Code extension uses. There is nothing to type: no Base URL, no API key — the connection is local and authenticated by your existing Codex login.
+
+A browser extension can't spawn processes, so browsa connects through [agent-bridge](https://github.com/xiaohuzai/agent-bridge) — a small, open, auditable Native-Messaging host. Install it once per machine, for all agent engines and all apps that use it:
+
+```bash
+git clone https://github.com/xiaohuzai/agent-bridge
+cd agent-bridge
+node cli/agent-bridge.mjs install   # interactive: enable codex → allow browsa
+```
+
+The installer registers the bridge for your browsers (Chrome / Edge / Chromium), allowlists **exactly** the extensions you approve — no wildcard; an unapproved extension can never drive your local agents. Engine binary discovery (PATH → Codex desktop's managed copy) is agent-bridge's job; if your engine needs environment variables (e.g. an API-key provider), put `KEY=VALUE` lines in `~/.agent-bridge.env`.
+
+**Then** restart the browser, open ⚙ Settings → select the **Codex** provider → **Ping** — it performs a real app-server handshake and shows the engine version + model count.
+
+Notes: each browsa conversation maps to one Codex thread that lives in `~/.codex` (cleared with browsa's history; a lost thread falls back to a fresh one). Replies stream as deltas; thinking summaries render as `<thinking>` blocks. Approvals for shell commands and file patches arrive as interactive cards — Allow / Allow for session / Deny. Sandbox and network policy stay where they belong: codex's own settings (`sandbox_mode` / `network_access` in `~/.codex/config.toml` or the desktop app) — browsa neither reads nor overrides them. Pasted images are not forwarded yet (Codex's `turn/start` takes file paths; converting data-URLs from the service worker is a future step).
+
+</details>
+
+<details>
 <summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).

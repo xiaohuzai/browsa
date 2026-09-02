@@ -865,43 +865,7 @@ input[type="range"] { accent-color: var(--accent); }
 .advanced-summary:hover { color: var(--fg-2); }
 .advanced-section[open] .advanced-summary { color: var(--fg-2); }
 
-/* ── Native-messaging bridge install row (Codex / WorkBuddy cards) ────────── */
-/* Same visual language as the card fields: 12px bordered controls on the card
-   surface; primary action gets the accent, secondaries stay quiet. */
-.bridge-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-  flex-wrap: wrap;
-}
-.bridge-btn {
-  padding: 5px 10px;
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.bridge-btn:hover { border-color: var(--border-strong, var(--accent)); color: var(--fg); }
-.bridge-btn-primary { color: var(--accent); border-color: var(--accent); }
-.bridge-btn-primary:hover { color: var(--accent); background: var(--accent-hover, var(--accent-bg)); }
-.bridge-cmd {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  max-height: 200px;
-  overflow: auto;
-  font-size: 11.5px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-}
+/* ── Native-messaging bridge hint (Codex / WorkBuddy cards) ───────────────── */
 .bridge-hint {
   margin-top: 6px;
   font-size: 11.5px;

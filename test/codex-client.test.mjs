@@ -27,7 +27,7 @@ class FakeBridge {
       runtime: {
         get lastError() { return self.disconnectReason ? { message: self.disconnectReason } : null; },
         connectNative: (name) => {
-          assert.equal(name, 'com.xiaohuzai.browsa_codex');
+          assert.equal(name, 'com.agentbridge.codex');
           return {
             onMessage: { addListener: (fn) => { self._msg = fn; } },
             onDisconnect: { addListener: (fn) => { self._disc = fn; } },
