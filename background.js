@@ -931,6 +931,12 @@ async function handle(msg, sender) {
         if (allCfg.providers[name]?.isSquilla) {
           await storage.clearSquillaSessionKey(name);
         }
+        if (allCfg.providers[name]?.isCodex) {
+          await storage.clearCodexThreadId(name);
+        }
+        if (allCfg.providers[name]?.isWorkbuddy) {
+          await storage.clearWorkbuddySessionId(name);
+        }
       }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
@@ -1231,10 +1237,15 @@ async function handle(msg, sender) {
     }
 
     case 'APPROVAL_RESPOND': {
-      // User clicked Allow/Deny on an approval card. Relay the choice to
-      // the Hermes agent via POST /v1/runs/{id}/approval so it can resume.
+      // User clicked Allow/Deny on an approval card. Codex approvals respond
+      // over the live Native Messaging port (closure stored by chat-handler);
+      // Hermes ones go back via POST /v1/runs/{id}/approval.
       const pending = pendingApprovals.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending approval' };
+      if (typeof pending.respond === 'function') {
+        try { pending.respond(msg.choice); return { ok: true }; }
+        catch (e) { return { ok: false, error: e?.message }; }
+      }
       try {
         const res = await fetch(
           `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/approval`,

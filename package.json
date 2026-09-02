@@ -1,8 +1,8 @@
 {
   "name": "browsa",
-  "version": "0.35.10",
+  "version": "0.37.3",
   "private": true,
-  "description": "Hand the current page to your AI agent — side-panel chat for Hermes, or any OpenAI-compatible API",
+  "description": "Hand the current page to your AI agent \u2014 side-panel chat for Hermes, or any OpenAI-compatible API",
   "scripts": {
     "build": "node build/build.mjs",
     "watch": "node build/build.mjs --watch",

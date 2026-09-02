@@ -4,6 +4,9 @@ window.__BROWSA_PREVIEW_SEED = {
   pingStates: { llm1: 'reachable', hermes: 'unreachable' },
   providers: {
     hermes: { type: 'agent', alias: 'Hermes Agent', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
+    squilla: { type: 'agent', alias: 'OpenSquilla', baseUrl: 'ws://127.0.0.1:18791/ws', apiKey: '', model: '', stream: true, isHermes: false, isSquilla: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
+    codex: { type: 'agent', alias: 'Codex', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, isSquilla: false, isCodex: true, apiStyle: 'chat', temperature: null, maxTokens: 0, codexBin: '' },
+    workbuddy: { type: 'agent', alias: 'WorkBuddy', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, isSquilla: false, isWorkbuddy: true, apiStyle: 'chat', temperature: null, maxTokens: 0, codebuddyBin: '' },
     llm1: { type: 'llm', alias: 'My OpenAI', baseUrl: 'https://api.openai.com', apiKey: 'sk-preview', model: 'gpt-4o', apiStyle: 'chat', temperature: null, maxTokens: 0 },
     llm2: { type: 'llm', alias: 'Local Ollama', baseUrl: 'http://127.0.0.1:11434', apiKey: '', model: 'qwen3:32b', apiStyle: 'chat', temperature: null, maxTokens: 0 },
   },

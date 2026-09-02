@@ -3,6 +3,8 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingSquilla } from './lib/squilla-client.js';
+import { codexPing, CODEX_NM_HOST } from './lib/codex-client.js';
+import { codebuddyPing, CODEBUDDY_NM_HOST } from './lib/codebuddy-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
@@ -188,6 +190,120 @@ async function saveAsr() {
   flash('ok', `ASR ${enabled ? '已启用' : '已停用'}（${p.label}，模型 ${model}）。`);
 }
 
+// One-shot installer for a native-messaging bridge. ONE generic shim template
+// (lib/nm-bridge.sh/.ps1) serves every NM backend; the generated command bakes
+// the backend (binary name + engine args) and the CURRENT extension ID into a
+// terminal command; Chrome only honors hosts whose allowed_origins list this
+// exact ID. Unpacked-extension IDs change when the extension directory moves,
+// so re-generate after relocating the repo.
+const NM_BACKENDS = {
+  codex: {
+    host: CODEX_NM_HOST,
+    binName: 'codex',
+    engineArgs: 'app-server --stdio',
+  },
+  codebuddy: {
+    host: CODEBUDDY_NM_HOST,
+    binName: 'codebuddy',
+    // Official headless mode (codebuddy.ai/docs/cli/headless). -y is REQUIRED
+    // for non-interactive runs and approval prompts cannot be forwarded — the
+    // WorkBuddy card's hint tells the user what that means.
+    engineArgs: '--input-format stream-json --output-format stream-json -p -y',
+  },
+};
+
+async function generateNmBridgeCommand(backend, osKind, binPath) {
+  const cfg = NM_BACKENDS[backend];
+  const [shimSh, shimPs1] = await Promise.all([
+    fetch(chrome.runtime.getURL('lib/nm-bridge.sh')).then(r => r.text()),
+    fetch(chrome.runtime.getURL('lib/nm-bridge.ps1')).then(r => r.text()),
+  ]);
+  const extId = chrome.runtime.id;
+  // Single-quote escaping for both shells (''' for bash, '' for PowerShell).
+  const shPath = binPath.replace(/'/g, `'\\''`);
+  const psPath = binPath.replace(/'/g, "''");
+  const bakeSh = (shim) => shim
+    .replace(/^#__BRIDGE_BIN_NAME__\s*$/m, `BRIDGE_BIN_NAME='${cfg.binName}'`)
+    .replace(/^#__BRIDGE_ARGS__\s*$/m, `BRIDGE_ARGS='${cfg.engineArgs}'`)
+    .replace(/^#__BRIDGE_BIN_OVERRIDE__\s*$/m, binPath ? `export BROWSA_BRIDGE_BIN='${shPath}'` : '');
+  const bakePs = (shim) => shim
+    .replace(/^#__BRIDGE_BIN_NAME__\s*$/m, `$script:BridgeBinName = '${cfg.binName}'`)
+    .replace(/^#__BRIDGE_ARGS__\s*$/m, `$script:BridgeArgs = '${cfg.engineArgs}'`)
+    .replace(/^#__BRIDGE_BIN_OVERRIDE__\s*$/m, binPath ? `$env:BROWSA_BRIDGE_BIN = '${psPath}'` : '');
+
+  if (osKind === 'win') {
+    const shim = bakePs(shimPs1);
+    // The literal here-string @'...'@ requires no '@ at line start in the shim
+    // — true of the checked-in shim; keep it that way when editing it.
+    // Manifest is pure ASCII → ASCII encoding avoids the PS 5.1 UTF-8 BOM,
+    // which Chrome's manifest parser would choke on. The .ps1 keeps UTF-8
+    // (its BOM is what makes Windows PowerShell read the Chinese text right).
+    return `$dir = "$env:LOCALAPPDATA\\browsa-bridge-${backend}"
+New-Item -ItemType Directory -Force $dir | Out-Null
+@'
+${shim}
+'@ | Set-Content "$dir\\nm-bridge.ps1" -Encoding UTF8
+@'
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0nm-bridge.ps1"
+'@ | Set-Content "$dir\\nm-bridge.bat" -Encoding ASCII
+@"
+{"name":"${cfg.host}","description":"browsa bridge for ${backend}","path":"$dir\\nm-bridge.bat","type":"stdio","allowed_origins":["chrome-extension://${extId}/"]}
+"@ | Set-Content "$dir\\${cfg.host}.json" -Encoding ASCII
+New-Item -Path "HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\${cfg.host}" -Force | Out-Null
+Set-ItemProperty -Path "HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\${cfg.host}" -Name "(default)" -Value "$dir\\${cfg.host}.json"
+Write-Host ("桥标记检查: dd bs=" + (Select-String -Path "$dir\\nm-bridge.ps1" -Pattern "dd bs" -SimpleMatch).Count + " (应≥4)")
+Write-Host "桥接已安装——重启 Chrome，回 browsa 设置点 Ping 验证。"
+`;
+  }
+
+  const nmDir = osKind === 'mac'
+    ? '$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts'
+    : '$HOME/.config/google-chrome/NativeMessagingHosts';
+  const shim = bakeSh(shimSh);
+  return `set -e
+mkdir -p "$HOME/.local/bin" "${nmDir}"
+cat >| "$HOME/.local/bin/browsa-${backend}-bridge" <<'BROWSA_SHIM_EOF'
+${shim}
+BROWSA_SHIM_EOF
+chmod +x "$HOME/.local/bin/browsa-${backend}-bridge"
+cat >| "${nmDir}/${cfg.host}.json" <<BROWSA_MANIFEST_EOF
+{"name":"${cfg.host}","description":"browsa bridge for ${backend}","path":"$HOME/.local/bin/browsa-${backend}-bridge","type":"stdio","allowed_origins":["chrome-extension://${extId}/"]}
+BROWSA_MANIFEST_EOF
+# 自检：桥必须是新版（dd 精确读 ≥4 处、无 head -c 字节读）。noclobber 开着也
+# 能覆盖（>|），写失败会因 set -e 中止——所以走到这里就是真装上了。
+echo "桥标记检查: dd bs=$(grep -c 'dd bs' "$HOME/.local/bin/browsa-${backend}-bridge") (应≥4)"
+echo "桥接已安装——重启 Chrome，回 browsa 设置点 Ping 验证。"
+`;
+}
+
+// Double-clickable installer file for the bridge. The payload is exactly the
+// generated terminal command; the wrapper just removes the "open a terminal
+// and paste" step. macOS .command files open in Terminal on double-click
+// (plain scripts, no Gatekeeper prompt); Windows runs the whole install
+// through powershell -EncodedCommand (UTF-16LE base64 — no quoting hazards).
+async function buildNmInstaller(backend, osKind, binPath) {
+  const cmd = await generateNmBridgeCommand(backend, osKind, binPath);
+  if (osKind === 'win') {
+    // powershell -EncodedCommand wants UTF-16LE bytes (not UTF-8).
+    let u16 = '';
+    for (const ch of cmd.replace(/\n/g, '\r\n') + '\r\npause\r\n') {
+      const c = ch.codePointAt(0);
+      u16 += String.fromCharCode(c & 255, (c >> 8) & 255);
+    }
+    const b64 = btoa(u16);
+    return {
+      filename: `browsa-${backend}-installer.bat`,
+      content: `@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${b64}\r\n`,
+    };
+  }
+  const pause = osKind === 'mac' ? `\necho\nread -n 1 -s -r -p "完成——按任意键关闭本窗口。"` : '';
+  return {
+    filename: `browsa-${backend}-installer.${osKind === 'mac' ? 'command' : 'sh'}`,
+    content: `#!/bin/bash\nset -e\n${cmd}${pause}\n`,
+  };
+}
+
 function renderProviders() {
   providersEl.innerHTML = '';
   const providers = cachedCfg.providers || {};
@@ -247,8 +363,14 @@ function buildProviderCard(name, cfg, opts = {}) {
   card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '') + (reserved ? ' reserved' : '');
   card.dataset.name = name;
 
-  const isConfigured = !!(cfg.baseUrl?.trim());
+  // Native-messaging agent cards (Codex / WorkBuddy) have no URL to be
+  // "configured" — binary auto-discovery + the ping are the real gates, so
+  // their badge just starts at the neutral "not pinged".
+  const isConfigured = !!(cfg.baseUrl?.trim()) || !!cfg.isCodex || !!cfg.isWorkbuddy;
   const isAgent = (cfg.type || 'llm') === 'agent';
+  const isCodex = !!cfg.isCodex;
+  const isWorkbuddy = !!cfg.isWorkbuddy;
+  const isNmAgent = isCodex || isWorkbuddy;
   const showModel = !isAgent; // Agent providers (Hermes) don't expose Model ID
   const displayName = prettyProviderName(name);
 
@@ -270,6 +392,27 @@ function buildProviderCard(name, cfg, opts = {}) {
           <input data-k="alias" type="text" value="${escapeAttr(cfg.alias || '')}" placeholder="e.g. My OpenAI" />
         </label>
       </div>` : ''}
+      ${isNmAgent ? `
+      <div class="field">
+        <label><span>${isCodex ? 'Codex 位置（可选）' : 'CodeBuddy 位置（可选）'}
+          <span class="tip" tabindex="0">?<span class="tip-bubble">留空自动发现：PATH 上的${isCodex ? ' codex → Codex 桌面版的托管副本（~/.codex/packages/standalone/current）' : ' codebuddy（npm 全局安装，或 WorkBuddy 桌面版内置）'}。装了 CLI 或桌面 app 任一即可。仅在自动发现不够时才填绝对路径。</span></span></span>
+          <input data-k="${isCodex ? 'codexBin' : 'codebuddyBin'}" type="text" value="${escapeAttr(isCodex ? (cfg.codexBin || '') : (cfg.codebuddyBin || ''))}" placeholder="留空自动发现" />
+        </label>
+      </div>
+      <div class="field field-full">
+        <label><span>桥接安装
+          <span class="tip" tabindex="0">?<span class="tip-bubble">浏览器扩展不能直接启动本地进程，Chrome 的 Native Messaging 可以。这一步把一个小桥接脚本装到本机，browsa 通过它驱动本机的${isCodex ? ' codex 引擎（与 VS Code 扩展同一接口）' : ' CodeBuddy 引擎（官方无头模式）'}，不改引擎侧任何东西。</span></span></span>
+          <div class="bridge-actions">
+            <button type="button" class="bridge-btn bridge-btn-primary" data-act="codex-download">下载一键安装器</button>
+            <button type="button" class="bridge-btn" data-act="codex-copy">复制命令</button>
+            <button type="button" class="bridge-btn" data-act="codex-show">查看命令</button>
+          </div>
+          <pre class="bridge-cmd" data-bridge-cmd hidden></pre>
+          <div class="bridge-hint">双击运行下载的安装器（macOS 若提示无权限：终端执行 bash ~/Downloads/<安装器文件名>），然后重启 Chrome、点 Ping 验证。${isWorkbuddy ? '注意：WorkBuddy 无头模式无法转发审批（上游限制），引擎以 -y 自动批准——只让它在你信任的目录里干活。' : ''}引擎要环境变量时（如 ARK_API_KEY），把 KEY=VALUE 写进 ~/.browsa-bridge.env。</div>
+        </label>
+      </div>
+      <div class="bridge-hint">沙箱与联网策略由 codex 侧管理（桌面 app 的沙箱设置，或 ~/.codex/config.toml 的 sandbox_mode / network_access）——browsa 不读取也不覆盖它们。</div>
+      ` : `
       <div class="field">
         <label>${isAgent ? `<span>Base URL${cfg.isSquilla ? `<span class="tip" tabindex="0">?<span class="tip-bubble">OpenSquilla gateway WebSocket 地址，默认 ws://127.0.0.1:18791/ws（<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>）。gateway 需把本扩展 origin 加入 cors.allowed_origins</span></span>` : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span>`}</span>` : 'Base URL'}
           <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isSquilla ? 'ws://127.0.0.1:18791/ws' : 'http://127.0.0.1:8080') : ''}" />
@@ -282,7 +425,7 @@ function buildProviderCard(name, cfg, opts = {}) {
             <button type="button" class="apikey-toggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
           </div>
         </label>
-      </div>
+      </div>`}
       ${showModel ? `
       <div class="field">
         <label>Model ID
@@ -322,6 +465,56 @@ function buildProviderCard(name, cfg, opts = {}) {
       const show = apiInput.type === 'password';
       apiInput.type = show ? 'text' : 'password';
       apiToggle.textContent = show ? '🙈' : '👁';
+    });
+  }
+
+  // Native-messaging bridge installer. One generic shim template serves every
+  // NM backend; the current extension ID (+ optional explicit binary path) is
+  // baked in. Primary path = download a double-clickable installer
+  // (.command/.sh/.bat, OS auto-detected); terminal paste stays available as
+  // copy/show for people who prefer reading what they run.
+  if (isNmAgent) {
+    const backend = isCodex ? 'codex' : 'codebuddy';
+    const osKind = /Win/i.test(navigator.userAgent) ? 'win' : /Mac/i.test(navigator.userAgent) ? 'mac' : 'linux';
+
+    const cmdPre = card.querySelector('[data-bridge-cmd]');
+    const binPath = () => card.querySelector(`[data-k="${backend}Bin"]`)?.value?.trim() || '';
+    const currentCmd = () => generateNmBridgeCommand(backend, osKind, binPath());
+
+    card.querySelector('[data-act="codex-download"]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      try {
+        const { filename, content } = await buildNmInstaller(backend, osKind, binPath());
+        const blob = new Blob([content], { type: osKind === 'win' ? 'application/x-bat' : 'text/x-shellscript' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        btn.textContent = '已下载 ✓';
+      } catch (err) {
+        btn.textContent = `生成失败：${err?.message || err}`;
+      }
+      setTimeout(() => { btn.textContent = '下载一键安装器'; }, 2500);
+    });
+    card.querySelector('[data-act="codex-copy"]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await navigator.clipboard.writeText(await currentCmd());
+      const btn = e.currentTarget;
+      btn.textContent = '已复制 ✓';
+      setTimeout(() => { btn.textContent = '复制命令'; }, 1500);
+    });
+    card.querySelector('[data-act="codex-show"]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (cmdPre.hidden) {
+        cmdPre.textContent = await currentCmd();
+        cmdPre.hidden = false;
+        e.currentTarget.textContent = '收起命令';
+      } else {
+        cmdPre.hidden = true;
+        e.currentTarget.textContent = '查看命令';
+      }
     });
   }
 
@@ -458,13 +651,19 @@ async function pingCard(name, card) {
 
   flashCard(card, '', 'Pinging…');
   try {
-    // OpenSquilla agent cards speak WebSocket RPC — the HTTP ping() would
-    // just fail on a ws:// URL. pingSquilla performs the real challenge /
-    // connect handshake, so a green ping also proves the gateway's origin
-    // guard lets this extension in.
+    // Agent cards speak their own protocol, not plain HTTP:
+    //   OpenSquilla — WebSocket RPC; pingSquilla performs the real challenge /
+    //   connect handshake, so a green ping also proves the gateway's origin
+    //   guard lets this extension in.
+    //   Codex — Native Messaging to the local bridge; codexPing does the real
+    //   app-server handshake and a failed bridge/binary surfaces distinctly.
     const reply = cfg.isSquilla
       ? await pingSquilla({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey })
-      : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
+      : cfg.isCodex
+        ? await codexPing()
+        : cfg.isWorkbuddy
+          ? await codebuddyPing()
+          : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -485,8 +684,9 @@ async function pingCard(name, card) {
     // Auto-detect capabilities and update isHermes accordingly. isHermes
     // gates the Hermes-only /v1/runs API (approval, clarification, tool
     // events) — so it should reflect run support, not the generic
-    // OpenAI-spec /v1/responses feature.
-    const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+    // OpenAI-spec /v1/responses feature. Codex isn't an HTTP provider at
+    // all — no capability probe applies.
+    const caps = (cfg.isCodex || cfg.isWorkbuddy) ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {

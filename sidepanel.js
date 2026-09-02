@@ -704,7 +704,7 @@ function populateProviderSelect(cfg) {
     const display = displayProviderName(name, pcfg);
     const models = providerModelList(pcfg);
     const modelList = (pcfg.type || 'llm') === 'llm' && models.length > 1 ? models : [''];
-    const configured = !!(pcfg?.baseUrl?.trim());
+    const configured = !!(pcfg?.baseUrl?.trim()) || !!(pcfg?.isCodex || pcfg?.isWorkbuddy); // NM agents have no URL — Ping is the gate
     let status;
     if (!configured)               status = 'not set';
     else if (pingStates[name] === 'reachable')   status = '● reachable';

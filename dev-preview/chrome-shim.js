@@ -120,7 +120,13 @@
       id: 'browsa-preview',
       connect(opts) { return fakePort((opts && opts.name) || 'default'); },
       sendMessage,
-      getURL(p) { return new URL(p, document.baseURI).href; },
+      getURL(p) {
+        // Extension resources are extension-ROOT-relative; preview pages live
+        // under /dev-preview/, so resolve against the repo root instead of
+        // the page (fetch('lib/nm-bridge.sh') from the options page used to
+        // land on /dev-preview/lib/... and 404 into an HTML error page).
+        return new URL(p.replace(/^\//, ''), new URL('../', document.baseURI)).href;
+      },
       openOptionsPage: noop,
       lastError: undefined,
     },
