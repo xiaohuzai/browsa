@@ -142,15 +142,13 @@ Notes: each browsa conversation maps to one gateway session (`agent:main:browsa:
 
 browsa can drive the OpenAI **Codex** engine installed on your own machine (CLI or the desktop app's managed copy) — the same `codex app-server` interface the VS Code extension uses. There is nothing to type: no Base URL, no API key — the connection is local and authenticated by your existing Codex login.
 
-A browser extension can't spawn processes, so browsa connects through [agent-bridge](https://github.com/xiaohuzai/agent-bridge) — a small, open, auditable Native-Messaging host. Install it once per machine, for all agent engines and all apps that use it:
+A browser extension can't spawn processes, so browsa connects through the Native-Messaging bridge that ships in this repo ([bridge/](bridge/README.md)) — a small, open, auditable host. You already have the code (you cloned browsa to load the extension), so installing is one command from the repo root:
 
 ```bash
-git clone https://github.com/xiaohuzai/agent-bridge
-cd agent-bridge
-node cli/agent-bridge.mjs install   # interactive: enable codex → allow browsa
+node bridge/cli/agent-bridge.mjs install   # wizard: enable codex → Enter to allow browsa
 ```
 
-The installer registers the bridge for your browsers (Chrome / Edge / Chromium), allowlists **exactly** the extensions you approve — no wildcard; an unapproved extension can never drive your local agents. Engine binary discovery (PATH → Codex desktop's managed copy) is agent-bridge's job; if your engine needs environment variables (e.g. an API-key provider), put `KEY=VALUE` lines in `~/.agent-bridge.env`.
+The wizard reads browsa's pinned extension ID straight from `manifest.json` (no IDs to copy), registers the bridge for your browsers (Chrome / Edge / Chromium), and allowlists **exactly** the extensions you approve — no wildcard; an unapproved extension can never drive your local agents. Engine binary discovery (PATH → Codex desktop's managed copy) is the bridge's job; if your engine needs environment variables (e.g. an API-key provider), put `KEY=VALUE` lines in `~/.agent-bridge.env`.
 
 **Then** restart the browser, open ⚙ Settings → select the **Codex** provider → **Ping** — it performs a real app-server handshake and shows the engine version + model count.
 

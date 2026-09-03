@@ -1,0 +1,36 @@
+{
+  "id": "codex",
+  "displayName": "Codex",
+  "binary": "codex",
+  "engineArgs": "app-server --stdio",
+  "discovery": {
+    "pathExtensions": [
+      "~/.local/bin",
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      "~/.cargo/bin"
+    ],
+    "managedCopies": [
+      "~/.codex/packages/standalone/current/codex"
+    ]
+  },
+  "controlFrame": {
+    "argv": true,
+    "charset": "[A-Za-z0-9._-]"
+  },
+  "session": {
+    "resumeMode": "in-band"
+  },
+  "protocol": {
+    "family": "jsonrpc-stdio",
+    "handshake": [
+      "initialize",
+      "initialized"
+    ],
+    "wire": "JSON-RPC 2.0 with the jsonrpc header omitted, newline-delimited",
+    "surface": "thread/start, thread/resume, turn/start, turn/interrupt; item/* and turn/completed notifications; execCommandApproval / applyPatchApproval server->client requests",
+    "notes": "app-server names SandboxPolicy in camelCase (workspaceWrite/networkAccess); the core protocol uses kebab-case. Protocol tests in the codex repo are the wire-shape source of truth.",
+    "minEngineVersion": "0.149.0"
+  },
+  "conformance": "conformance/fake-codex.mjs"
+}

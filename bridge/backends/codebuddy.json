@@ -1,0 +1,32 @@
+{
+  "id": "codebuddy",
+  "displayName": "WorkBuddy",
+  "binary": "codebuddy",
+  "engineArgs": "--input-format stream-json --output-format stream-json -p -y",
+  "discovery": {
+    "pathExtensions": [
+      "~/.local/bin",
+      "/usr/local/bin",
+      "/opt/homebrew/bin",
+      "~/.cargo/bin"
+    ],
+    "managedCopies": []
+  },
+  "controlFrame": {
+    "argv": true,
+    "charset": "[A-Za-z0-9._-]"
+  },
+  "session": {
+    "resumeMode": "spawn-flag",
+    "flag": "--resume"
+  },
+  "protocol": {
+    "family": "stream-json",
+    "handshake": [],
+    "wire": "one JSON object per line; client sends {type:'user',message:{role,content:[...]}}; engine emits system/init, assistant, task_*, result",
+    "surface": "assistant text/tool_use blocks, task_started/progress/updated events, terminal result with is_error/usage",
+    "notes": "Official headless mode (docs: codebuddy.ai/docs/cli/headless). -y is REQUIRED for non-interactive runs and --permission-prompt-tool is NOT supported: approvals cannot be forwarded, the engine auto-approves. Images ride as base64 content blocks.",
+    "minEngineVersion": "2.143.0"
+  },
+  "conformance": "conformance/fake-codebuddy.mjs"
+}

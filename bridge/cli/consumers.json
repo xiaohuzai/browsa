@@ -1,0 +1,8 @@
+{
+  "browsa": {
+    "name": "browsa（浏览器扩展）",
+    "kind": "chrome-extension",
+    "id": "apoodheofdhglelbnmggeokbhampbmgn",
+    "url": "https://github.com/xiaohuzai/browsa"
+  }
+}

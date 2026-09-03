@@ -282,7 +282,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       <div class="field field-full">
         <label><span>连接本机引擎
           <span class="tip" tabindex="0">?<span class="tip-bubble">浏览器扩展不能直接启动本地进程。agent-bridge 在你机器上注册一个小桥（Native Messaging，只对授权过的扩展放行），browsa 通过它驱动本机${isCodex ? ' codex 引擎（与 VS Code 扩展同一接口）' : ' CodeBuddy 引擎（官方无头模式）'}，不改引擎侧任何东西。</span></span></span>
-          <div class="bridge-hint">需要一次性安装 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge</a>：克隆仓库后运行 <code>node cli/agent-bridge.mjs install</code>，向导里启用 ${isCodex ? 'codex' : 'codebuddy'}、允许 browsa，然后重启浏览器、点 Ping 验证。引擎要环境变量时（如 ARK_API_KEY），把 KEY=VALUE 写进 ~/.agent-bridge.env。${isWorkbuddy ? '注意：无头模式无法转发审批（上游限制），引擎以 -y 自动批准——只让它在你信任的目录里干活。' : ''}</div>
+          <div class="bridge-hint">在 browsa 仓库里运行一次安装向导（它会自动认出本扩展的 ID）：终端进入 browsa 目录，执行 <code>node bridge/cli/agent-bridge.mjs install</code>，向导里启用 ${isCodex ? 'codex' : 'codebuddy'}、回车允许 browsa，然后重启浏览器、点 Ping 验证。详见 <a href="https://github.com/xiaohuzai/browsa/tree/main/bridge" target="_blank" rel="noopener noreferrer">bridge/ 说明</a>。引擎要环境变量时（如 ARK_API_KEY），把 KEY=VALUE 写进 ~/.agent-bridge.env。${isWorkbuddy ? '注意：无头模式无法转发审批（上游限制），引擎以 -y 自动批准——只让它在你信任的目录里干活。' : ''}</div>
         </label>
       </div>
       <div class="bridge-hint">沙箱与联网策略由引擎侧管理（${isCodex ? 'codex 桌面 app 的沙箱设置，或 ~/.codex/config.toml 的 sandbox_mode / network_access' : 'codebuddy 的配置'}）——browsa 不读取也不覆盖它们。</div>
