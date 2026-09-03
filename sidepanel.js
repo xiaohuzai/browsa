@@ -651,7 +651,7 @@ async function handleSelectionAction(action, text) {
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
-      appendAttachSystem(`📎 已附加：「${preview}」`, null, text);
+      appendAttachSystem(`📎 已附加：「${preview}」`, null, text, undefined, undefined, res.data?.attachId);
     } else {
       appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
     }
@@ -1523,7 +1523,7 @@ async function onAttachPage() {
           metaTitle: title }).catch(() => null);
         if (res?.data?.ok) nextHistoryIdx++;
         const screenshotEl = appendScreenshot(finalDataUrl);
-        appendAttachSystem(`📎 已附加截图："${title}"`, screenshotEl);
+        appendAttachSystem(`📎 已附加截图："${title}"`, screenshotEl, undefined, undefined, undefined, res?.data?.attachId);
       });
       return; // crop UI takes over; nothing else to do here
     }
@@ -1592,7 +1592,7 @@ async function onAttachPage() {
         const inspectCtx = confirmRes?.data?.contextText || pdfText;
         appendAttachSystem(
           `📎 已附加 PDF："${title}"（pdf-text${arxivLabel}${pagesLabel}${charLabel}${ocrLabel}${figLabel}${encLabel}${tblLabel}）`,
-          null, inspectCtx, pdfFigureImages
+          null, inspectCtx, pdfFigureImages, undefined, confirmRes?.data?.attachId
         );
       } else {
         appendError('PDF attach failed');
@@ -1751,7 +1751,7 @@ async function onAttachPage() {
         const subLabel = transcriptText
           ? `，${lineCount} 行${kindLabel === '视听精读' ? '精读' : '字幕'}${figures.length ? `，${figures.length} 张截图` : ''}`
           : (ctx.noTranscript === false ? '（解析失败，已保留原字幕）' : '（无字幕，已用视频信息代替）');
-        appendAttachSystem(`📎 已附加 ${platformLabel}${kindLabel}："${title}"（${analysisMode === 'video' ? '视频解析' : 'ASR'}${bytesLabel}${subLabel}）`, null, confirmText, figures);
+        appendAttachSystem(`📎 已附加 ${platformLabel}${kindLabel}："${title}"（${analysisMode === 'video' ? '视频解析' : 'ASR'}${bytesLabel}${subLabel}）`, null, confirmText, figures, undefined, confirmRes?.data?.attachId);
       } else {
         appendError('ASR attach failed');
       }
@@ -1771,7 +1771,7 @@ async function onAttachPage() {
     const noTranscriptHint = ctx.noTranscriptHint
       ? `⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。`
       : undefined;
-    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '', undefined, noTranscriptHint);
+    appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '', undefined, noTranscriptHint, res?.data?.attachId);
   } catch (e) {
     appendError('Page attach failed: ' + e.message);
   } finally {
@@ -3408,7 +3408,7 @@ function appendSystem(text) {
   return el;
 }
 
-function appendAttachSystem(text, relatedEl, ctxText, figures, hint) {
+function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
   const el = document.createElement('div');
   el.className = 'msg system attach-msg';
   const span = document.createElement('span');
@@ -3494,7 +3494,11 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint) {
   btn.title = '从会话中移除此次附加的页面内容';
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    const res = await sendMessage({ type: 'UNDO_ATTACH' }).catch(() => null);
+    // attachId identifies the history entry THIS label owns. Without it the
+    // handler removed the LAST page-context entry — with two attachments,
+    // undoing the older one deleted the newer entry and left the older
+    // content in context (the model then answered from the "undone" page).
+    const res = await sendMessage({ type: 'UNDO_ATTACH', attachId }).catch(() => null);
     // Handler returns { ok: removedIdx>=0, removedIdx } INSIDE the envelope —
     // read both off res.data (reading res.removedIdx off the envelope always
     // gave undefined, so the hidx shift never ran and indices drifted).

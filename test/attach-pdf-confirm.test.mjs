@@ -225,7 +225,7 @@ async function flush() {
   await new Promise((r) => setTimeout(r, 20));
 }
 
-test('ATTACH_PDF_CONFIRM: below-threshold PDF text gets no attachId, no summarize call', async () => {
+test('ATTACH_PDF_CONFIRM: below-threshold PDF text gets an attachId (undo identity) but no summarize call', async () => {
   let fetchCalled = false;
   globalThis.fetch = async () => { fetchCalled = true; return { ok: true, status: 200, body: sseFor('x'), text: async () => '' }; };
 
@@ -240,7 +240,11 @@ test('ATTACH_PDF_CONFIRM: below-threshold PDF text gets no attachId, no summariz
   assert.equal(res.ok, true);
   const history = await localArea.get('history');
   const entry = history.history[history.history.length - 1];
-  assert.equal(entry.attachId, undefined, 'short PDF attachments must not get an attachId');
+  // attachId is stamped on EVERY attach entry — the panel's 撤销 button
+  // removes the entry by this id (UNDO_ATTACH). Only the summarize
+  // pipeline stays threshold-gated.
+  assert.ok(entry.attachId, 'every PDF attachment gets an attachId (undo identity)');
+  assert.equal(typeof res.attachId, 'string', 'response carries the attachId');
   assert.equal(fetchCalled, false, 'no summarization call should happen for short content');
 });
 
