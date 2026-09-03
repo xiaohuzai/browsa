@@ -39,6 +39,7 @@ import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { fetchArxivMeta, formatArxivMeta, arxivIdFromUrl } from './lib/arxiv.js';
+import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
   largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
@@ -48,10 +49,10 @@ import {
 } from './lib/handlers/attach-asr.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
-// i18n convenience — EN fallback keeps jsdom tests chrome-free.
-function _t(key, fallback) {
-  return (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage(key)) || fallback;
-}
+// i18n convenience — existing call sites keep the short alias. t() resolves
+// explicit-language dict → chrome.i18n (browser language) → inline fallback,
+// so jsdom tests without chrome.i18n keep seeing the source strings.
+const _t = t;
 
 // Shared makeStreamRenderer() callbacks: addMsgActions/scrollToBottom are
 // sidepanel.js-owned UI concerns that lib/render.js deliberately doesn't
@@ -119,31 +120,28 @@ const slashSuggestEl = $('slash-suggest');
 
 init();
 
-// ─── i18n: fill static UI from _locales at init ─────────────────────────────
-// Static markup carries data-i18n* attributes; chrome.i18n resolves them against
-// the browser UI language. No-op when chrome.i18n is absent (dev preview harness).
-function applyI18n() {
-  if (typeof chrome === 'undefined' || !chrome.i18n) return;
-  for (const el of document.querySelectorAll('[data-i18n]')) {
-    const v = chrome.i18n.getMessage(el.dataset.i18n);
-    if (v) el.textContent = v;
-  }
-  for (const el of document.querySelectorAll('[data-i18n-title]')) {
-    const v = chrome.i18n.getMessage(el.dataset.i18nTitle);
-    if (v) el.title = v;
-  }
-  for (const el of document.querySelectorAll('[data-i18n-aria]')) {
-    const v = chrome.i18n.getMessage(el.dataset.i18nAria);
-    if (v) el.setAttribute('aria-label', v);
-  }
-  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) {
-    const v = chrome.i18n.getMessage(el.dataset.i18nPlaceholder);
-    if (v) el.placeholder = v;
-  }
+// 空状态提示在 CSS ::after content 里——CSS 无法走 chrome.i18n，按当前 UI 语言
+// 把文案写进 --empty-hint（语言切换时重跑）。引号转义防注入样式值。
+function applyEmptyHint() {
+  const text = _t('emptyHint', 'Ask anything about the current page').replaceAll("'", "\\'");
+  document.documentElement.style.setProperty('--empty-hint', `'${text}'`);
 }
 
 async function init() {
+  // 静态文案填充前先就绪语言偏好（显式选择过语言时要先加载覆盖字典）。
+  await initI18n();
   applyI18n();
+  applyEmptyHint();
+  // 设置里切换语言：静态文案重填 + provider 下拉按新语言重建（状态随 GET_CONFIG 刷新）。
+  watchUiLang(async () => {
+    applyI18n();
+    applyEmptyHint();
+    try {
+      const res = await sendMessage({ type: 'GET_CONFIG' });
+      const cfg = res?.data || res;
+      if (cfg?.providers) populateProviderSelect(cfg);
+    } catch { /* 重建下拉失败不打扰用户 */ }
+  });
   // Get current tab id (used for per-tab history)
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   currentTabId = tab?.id;
@@ -653,7 +651,7 @@ async function handleSelectionAction(action, text) {
         : text;
       appendAttachSystem(`📎 已附加：「${preview}」`, null, text, undefined, undefined, res.data?.attachId);
     } else {
-      appendError(res?.data?.error || '没有获取到选中文字，请重新选择');
+      appendError(res?.data?.error || _t('noSelectionText', '没有获取到选中文字，请重新选择'));
     }
     inputEl.focus();
     updateComposerInfo();
@@ -694,22 +692,23 @@ function populateProviderSelect(cfg) {
     })
     .map(({ name }) => name);
   providerSel.innerHTML = '';
-  // 多模型 provider（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按
-  // 「Alias · model」展示——一张网关卡（方舟 Coding / 兼容网关动辄几十个模型）
-  // 不用为每个模型建卡。单模型/Agent 卡保持纯 Alias 展示（与旧形态一致）。
+  // LLM 卡（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按「Alias · model」
+  // 展示——一张网关卡（方舟 Coding / 兼容网关动辄几十个模型）不用为每个模型建卡；
+  // 单模型卡同样带 Model ID 后缀，一眼看到当前用的模型。Agent 卡没有 Model ID，
+  // 保持纯 Alias 展示。
   let activeFallback = null;
   let anySelected = false;
   for (const name of providers) {
     const pcfg = cfg.providers[name];
     const display = displayProviderName(name, pcfg);
     const models = providerModelList(pcfg);
-    const modelList = (pcfg.type || 'llm') === 'llm' && models.length > 1 ? models : [''];
+    const modelList = (pcfg.type || 'llm') === 'llm' && models.length ? models : [''];
     const configured = !!(pcfg?.baseUrl?.trim());
     let status;
-    if (!configured)               status = 'not set';
-    else if (pingStates[name] === 'reachable')   status = '● reachable';
-    else if (pingStates[name] === 'unreachable') status = '○ unreachable';
-    else                           status = 'not pinged';
+    if (!configured)               status = _t('statusNotSet', 'not set');
+    else if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
+    else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
+    else                           status = _t('statusNotPinged', 'not pinged');
     for (const model of modelList) {
       const opt = document.createElement('option');
       opt.value = name;
@@ -1025,9 +1024,9 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
   let audio = null;
   if (needAudio && cached.audioFileId) {
     console.log('[ASR] reusing cached audio fileId', cached.audioFileId);
-    showAttachProgress('复用上次上传的音频文件（30 天内有效），跳过下载与上传…');
+    showAttachProgress(_t('progressReuseAudio', '复用上次上传的音频文件（30 天内有效），跳过下载与上传…'));
   } else if (needAudio) {
-    showAttachProgress('下载音频中…');
+    showAttachProgress(_t('progressDownloadAudio', '下载音频中…'));
     audio = await downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want: 'all' });
   }
   // 上传（XHR 进度）：视频可达几百 MB，先视频后音频，进度各自独立展示。
@@ -1054,7 +1053,7 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
   let vup;
   if (cached.videoFileId) {
     console.log('[ASR] reusing cached video fileId', cached.videoFileId);
-    showAttachProgress('复用上次上传的视频文件（30 天内有效），跳过上传…');
+    showAttachProgress(_t('progressReuseVideo', '复用上次上传的视频文件（30 天内有效），跳过上传…'));
     vup = { fileId: cached.videoFileId };
   } else {
     vup = await uploadWithProgress(videoBlob, fnameBase ? `${fnameBase}-video.mp4` : 'video.mp4', '视频');
@@ -1162,7 +1161,7 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
     // 抽帧任何失败都 fail-open 返回 []，绝不阻塞精读产物。
     let figures = [];
     if (videoBlob && keyframes.length) {
-      showAttachProgress('截取关键帧…');
+      showAttachProgress(_t('progressKeyframes', '截取关键帧…'));
       figures = await extractKeyframes(videoBlob, keyframes);
       console.log(`[ASR] keyframes: ${keyframes.length} markers -> ${figures.length} frames`);
     }
@@ -1317,7 +1316,7 @@ async function downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want =
     console.log('[ASR] downloaded m4s', dlBytes, 'bytes; url host:', (() => { try { return new URL(cand.url).host; } catch { return '?'; } })(), '| codec:', cand.codecs || '?', '| id:', cand.id || 0, '| label:', cand.label || '');
     // Transcode: decodeAudioData is an opaque black box (no sub-progress),
     // and resample+encode is fast — so show elapsed time, not a fake %.
-    showAttachProgress('转码音频中…（转为 WAV）');
+    showAttachProgress(_t('progressTranscodeAudio', '转码音频中…（转为 WAV）'));
     const trStart = Date.now();
     const trTimer = setInterval(() => {
       const secs = Math.round((Date.now() - trStart) / 1000);
@@ -1382,7 +1381,7 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
   let best = null;
   if (cached.audioFileId) {
     console.log('[ASR] reusing cached audio fileId', cached.audioFileId);
-    showAttachProgress('复用上次上传的音频文件（30 天内有效），跳过下载与上传…');
+    showAttachProgress(_t('progressReuseAudio', '复用上次上传的音频文件（30 天内有效），跳过下载与上传…'));
   } else {
     best = await downloadAndTranscodeAudioBest({ ctx, platform, wantDurSec, want: 'audio' });
   }
@@ -1395,7 +1394,7 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
   if (cached.audioFileId) {
     up = { fileId: cached.audioFileId };
   } else {
-    showAttachProgress('上传音频中…（0%）');
+    showAttachProgress(_t('progressUploadAudio', '上传音频中…（0%）'));
     const upStart = Date.now();
     up = await uploadBlobToArk({
       blob: best.wavBlob,
@@ -1496,12 +1495,12 @@ async function onAttachPage() {
   attachBtn.innerHTML = ICONS.retry;
   attachBtn.classList.add('is-attaching');
   attachBtn.title = 'Reading page…';
-  showAttachProgress('正在读取页面…');
+  showAttachProgress(_t('progressReadingPage', '正在读取页面…'));
 
   try {
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode, query: inputEl.value || '' });
     if (!res?.ok || !res.data?.ok) {
-      appendError(res?.data?.error || res?.error || 'Failed to read page');
+      appendError(res?.data?.error || res?.error || _t('readPageFailed', 'Failed to read page'));
       return;
     }
     const ctx = res.data?.ctx;
@@ -1534,7 +1533,7 @@ async function onAttachPage() {
     // never a stuck/broken state. History storage happens via ATTACH_PDF_CONFIRM.
     if (ctx?.mode === 'pdf-pending' && ctx?.pdfBase64) {
       attachBtn.title = '解析 PDF 中…';
-      showAttachProgress('解析 PDF 中…');
+      showAttachProgress(_t('progressParsingPdf', '解析 PDF 中…'));
       const attachT0 = performance.now();
       // arXiv enrichment runs alongside extraction: authors/categories/dates
       // for the context header. Best-effort + 6s timeout — never delays the
@@ -1595,7 +1594,7 @@ async function onAttachPage() {
           null, inspectCtx, pdfFigureImages, undefined, confirmRes?.data?.attachId
         );
       } else {
-        appendError('PDF attach failed');
+        appendError(_t('pdfAttachFailed', 'PDF attach failed'));
       }
       return;
     }
@@ -1647,7 +1646,7 @@ async function onAttachPage() {
         if (analysisMode === 'abort') return; // 卡片被会话切换等清掉 → 静默取消（finally 恢复按钮）
       } else {
         attachBtn.title = '转写音频中…';
-        showAttachProgress('下载并转写音频中…');
+        showAttachProgress(_t('progressDownloadTranscribe', '下载并转写音频中…'));
       }
       let transcriptText = '';
       let audioBytes = 0;
@@ -1681,14 +1680,16 @@ async function onAttachPage() {
         // 的 YouTube 视频会回退用自带字幕（其实足够），只有无字幕的才真是视频信息。
         const msg403 = /403/.test(e?.message || '');
         const fallbackLabel = (platform === 'youtube' && msg403)
-          ? (ctx.noTranscript === false ? '已回退使用自带字幕（YouTube 限制了音频下载）' : '已回退为视频信息（YouTube 限制了音频下载）')
-          : '已回退为视频信息';
+          ? (ctx.noTranscript === false
+            ? _t('asrFallbackOriginal', '已回退使用自带字幕（YouTube 限制了音频下载）')
+            : _t('asrFallbackVideoInfoYt', '已回退为视频信息（YouTube 限制了音频下载）'))
+          : _t('asrFallbackVideoInfo', '已回退为视频信息');
         // 401 + "API key format is incorrect" = key 类型不对（不是密码错）：Agent
         // Plan 专属 key 与标准方舟平台 key 官方明确不通用，而 ASR/视频解析走标准
         // 端点的 Files API。给出可操作的提示，别让用户去猜。
         const authHint = /API key format is incorrect|AuthenticationError/i.test(e?.message || '')
-          ? '——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）' : '';
-        showToast(`${analysisMode === 'video' ? '视频解析' : 'ASR 转写'}失败：${compactArkErrorText(e?.message || '未知错误')}${authHint}（${fallbackLabel}）`, 'error');
+          ? _t('asrAuthHint', '——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）') : '';
+        showToast(`${analysisMode === 'video' ? _t('asrModeVideo', '视频解析') : _t('asrModeTranscribe', 'ASR 转写')}${_t('failColon', '失败：')}${compactArkErrorText(e?.message || _t('unknownError', '未知错误'))}${authHint}（${fallbackLabel}）`, 'error');
       } finally {
         // Remove the Referer-injection rule now that the download is done.
         // (A download that never started, a throw, or a success all land here.)
@@ -1753,7 +1754,7 @@ async function onAttachPage() {
           : (ctx.noTranscript === false ? '（解析失败，已保留原字幕）' : '（无字幕，已用视频信息代替）');
         appendAttachSystem(`📎 已附加 ${platformLabel}${kindLabel}："${title}"（${analysisMode === 'video' ? '视频解析' : 'ASR'}${bytesLabel}${subLabel}）`, null, confirmText, figures, undefined, confirmRes?.data?.attachId);
       } else {
-        appendError('ASR attach failed');
+        appendError(_t('asrAttachFailed', 'ASR attach failed'));
       }
       return;
     }
@@ -1769,11 +1770,11 @@ async function onAttachPage() {
     // to opt into automatic subtitle transcription. Mode-specific label so the
     // hint reads naturally for B站 vs YouTube.
     const noTranscriptHint = ctx.noTranscriptHint
-      ? `⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。`
+      ? _t('noTranscriptHint', '⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。')
       : undefined;
     appendAttachSystem(`📎 已附加："${title}"（${modeLabel}${charLabel}）`, null, ctx?.text || '', undefined, noTranscriptHint, res?.data?.attachId);
   } catch (e) {
-    appendError('Page attach failed: ' + e.message);
+    appendError(tSub('pageAttachFailed', 'Page attach failed: $1', e.message));
   } finally {
     attachBtn.disabled = false;
     attachBtn.innerHTML = origAttachIcon;
@@ -1836,7 +1837,7 @@ async function newSession() {
   if (hasMessages) {
     const res = await sendMessage({ type: 'SAVE_SESSION' });
     if (res?.ok && res.data?.session) {
-      showToast(`Session saved: "${res.data.session.name}"`, 'success');
+      showToast(tSub('sessionSaved', 'Session saved: "$1"', res.data.session.name), 'success');
     }
   }
   await sendMessage({ type: 'CLEAR_HISTORY' });
@@ -1868,7 +1869,7 @@ async function clearChatHistory() {
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
   images.length = 0; refreshImageStrip();
   refreshTranscriptSource(); // 字幕随历史一起清掉了
-  showToast('Conversation cleared', 'success');
+  showToast(_t('conversationCleared', 'Conversation cleared'), 'success');
 }
 
 /**
@@ -1937,7 +1938,7 @@ function setStreamingUI(on) {
     sendBtn.innerHTML = STOP_ICON;
     sendBtn.classList.add('is-stopping');
     sendBtn.disabled = false;
-    sendBtn.title = (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage('cancelStream')) || 'Stop (Esc)';
+    sendBtn.title = _t('cancelStream', 'Stop (Esc)');
     setStatusDotState('streaming');
   } else {
     sendBtn.innerHTML = SEND_ICON;
@@ -2072,7 +2073,7 @@ async function openSettingsPage() {
     try {
       chrome.runtime.openOptionsPage();
     } catch (e2) {
-      appendError('Cannot open settings: ' + e2.message);
+      appendError(tSub('cannotOpenSettings', 'Cannot open settings: $1', e2.message));
     }
   }
 }
@@ -2083,7 +2084,7 @@ async function onProviderChange() {
   // 多模型 provider：选项按 Alias · model 展示，选中的具体模型随 provider 一起落存储
   const model = opt?.dataset?.model || '';
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name, model });
-  showToast(`Switched to ${opt?.dataset?.display || displayProviderName(name)}`, 'success');
+  showToast(tSub('switchedTo', 'Switched to $1', opt?.dataset?.display || displayProviderName(name)), 'success');
 }
 
 async function onContextModeChange() {
@@ -2106,7 +2107,7 @@ async function handleDroppedFiles(fileList) {
   const maxSize = 20 * 1024 * 1024; // 20 MB
   for (const f of fileList) {
     if (!f.type.startsWith('image/')) continue;
-    if (f.size > maxSize) { appendError(`Image too large: ${f.name}`); continue; }
+    if (f.size > maxSize) { appendError(tSub('imageTooLarge', 'Image too large: $1', f.name)); continue; }
     const dataUrl = await fileToDataUrl(f);
     images.push({ dataUrl, name: f.name });
   }
@@ -2301,8 +2302,8 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
       if (m.outputTruncated) {
         // 背景端已自动续写一次；走到这里说明续写后仍被上限截断。
-        showToast('回复仍被模型输出上限截断，可点「继续生成」或回复「继续」', 'info');
-        appendMsgAction(el, '→ 继续生成', () => { inputEl.value = '继续'; onSend(); });
+        showToast(_t('outputTruncatedToast', '回复仍被模型输出上限截断，可点「继续生成」或回复「继续」'), 'info');
+        appendMsgAction(el, _t('continueGenerate', '→ 继续生成'), () => { inputEl.value = '继续'; onSend(); });
       }
       if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
       // Detect max-turns: agent hit the tool-call ceiling and is asking
@@ -2346,7 +2347,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
 
 async function onSend() {
   if (!currentTabId) {
-    appendError('No active tab.');
+    appendError(_t('noActiveTab', 'No active tab.'));
     return;
   }
   const rawText = inputEl.value.trim();
@@ -2884,7 +2885,7 @@ async function seekVideo(vs, seconds) {
     chrome.tabs.create({ url: appendTimeParam(vs.url, seconds) });
     return true;
   }
-  showToast('视频源已失效，无法跳转');
+  showToast(_t('videoSourceGone', '视频源已失效，无法跳转'));
   return false;
 }
 
@@ -2925,7 +2926,7 @@ async function getVideoTranscriptSource() {
 // The user adds their reaction on top and sends; the [mm:ss] stays clickable.
 function noteFromTranscript(seconds, line) {
   if (seconds == null || !line) {
-    showToast('还没有可用的播放位置或字幕行');
+    showToast(_t('noTranscriptPosition', '还没有可用的播放位置或字幕行'));
     return;
   }
   const note = `[${formatTs(seconds)}] 「${line.label ? line.label + ' ' : ''}${line.text}」`;
@@ -3070,7 +3071,7 @@ function addMsgActions(el, getRaw) {
       try {
         await _copyText(text);
         copyBtn.textContent = '✓';
-        showToast('Copied', 'success');
+        showToast(_t('copied', 'Copied'), 'success');
         setTimeout(() => { copyBtn.innerHTML = ICONS.copy; }, 2000);
       } catch (_) {
         copyBtn.textContent = '✗';
@@ -3131,7 +3132,7 @@ async function regenerateReply(userBubble) {
   const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
   // 内层 ok:false（负索引等）说明 storage 没截成——此时绝不能清 DOM，否则
   // storage 里残留的后续轮次会和界面分叉，下一轮悄悄混进上下文。
-  if (!truncRes?.data?.ok) { showToast('历史截断失败，已取消重新生成', 'error'); return; }
+  if (!truncRes?.data?.ok) { showToast(_t('truncRegenCancelled', '历史截断失败，已取消重新生成'), 'error'); return; }
   let sib = userBubble.nextElementSibling;
   while (sib) {
     const next = sib.nextElementSibling;
@@ -3211,7 +3212,7 @@ function startMsgEdit(el) {
       if (activeController && !activeController.cancelled) cancelStream();
       // Truncate history from this point onward, then re-send
       const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
-      if (!truncRes?.data?.ok) { showToast('历史截断失败，未保存修改', 'error'); return; }
+      if (!truncRes?.data?.ok) { showToast(_t('truncEditNotSaved', '历史截断失败，未保存修改'), 'error'); return; }
       // Remove all DOM bubbles after this one (assistant reply + any following)
       let sib = el.nextElementSibling;
       while (sib) {
@@ -3310,7 +3311,7 @@ function showApprovalCard(bubbleEl, data) {
   card.querySelectorAll('.approval-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const res = await sendMessage({ type: 'APPROVAL_RESPOND', tabId: Number(card.dataset.tabId), choice: btn.dataset.choice }).catch(() => null);
-      if (!res?.data?.ok) showToast('审批发送失败：' + (res?.data?.error || res?.error || '后台状态已丢失'), 'error');
+      if (!res?.data?.ok) showToast(tSub('approvalSendFailed', '审批发送失败：$1', res?.data?.error || res?.error || _t('bgStateLost', '后台状态已丢失')), 'error');
       card.remove();
     });
   });
@@ -3338,7 +3339,7 @@ function showClarifyCard(bubbleEl, data) {
     const response = input.value.trim();
     if (!response) return;
     const res = await sendMessage({ type: 'CLARIFY_RESPOND', tabId: Number(card.dataset.tabId), response }).catch(() => null);
-    if (!res?.data?.ok) showToast('回复发送失败：' + (res?.data?.error || res?.error || '后台状态已丢失'), 'error');
+    if (!res?.data?.ok) showToast(tSub('replySendFailed', '回复发送失败：$1', res?.data?.error || res?.error || _t('bgStateLost', '后台状态已丢失')), 'error');
     card.remove();
   };
   submit.addEventListener('click', respond);
@@ -3465,7 +3466,7 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
       overlay.querySelector('.ctx-inspector-close').addEventListener('click', () => overlay.remove());
       overlay.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
         _copyText(ctxText || '');
-        showToast('已复制');
+        showToast(_t('copied', '已复制'));
       });
       overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
       document.addEventListener('keydown', function onKey(e) {
@@ -3738,7 +3739,7 @@ async function showEffectivePrompt() {
   const fullPrompt = sections.map(s => s.text).join('\n\n');
   copyBtn.addEventListener('click', async () => {
     await _copyText(fullPrompt).catch(() => {});
-    showToast('Copied', 'success');
+    showToast(_t('copied', 'Copied'), 'success');
   });
   const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
   closeBtn.addEventListener('click', close);
