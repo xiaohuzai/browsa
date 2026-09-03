@@ -18,7 +18,7 @@
 
 ---
 
-**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes, OpenSquilla) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
+**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
 
 ## See it in action
 
@@ -99,41 +99,6 @@ hermes gateway
 | API Key | value of `API_SERVER_KEY` |
 
 **5. Ping** to verify. `/v1/runs` support is auto-detected and enabled automatically.
-
-</details>
-
-<details>
-<summary><b>🦑 OpenSquilla Agent</b> — local desktop agent over gateway WebSocket</summary>
-
-[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local desktop agent (gateway + Web UI + Electron app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.
-
-**1. Install & start the gateway**
-
-```bash
-uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.4/opensquilla-0.5.4-py3-none-any.whl"
-opensquilla gateway start
-# → running: http://127.0.0.1:18791
-```
-
-**2. Let the extension in** — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to `~/.opensquilla/config.toml`:
-
-```toml
-[cors]
-allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
-```
-
-This is browsa's **pinned extension ID** (fixed via the manifest key, the same on every machine and matching the future store listing — verify at `chrome://extensions` → browsa → **ID**). Accepting `chrome-extension://` origins needs OpenSquilla's origin-guard extension for non-http(s) origins — current releases 403 them even when listed; it's a small upstream patch (`gateway/origin_guard.py`, same pattern as the registered desktop origin), PR pending.
-
-**3. Configure browsa** — open ⚙ Settings, select the **OpenSquilla** provider:
-
-| Field | Value |
-|---|---|
-| Base URL | `ws://127.0.0.1:18791/ws` |
-| API Key | only if your gateway requires a token (optional) |
-
-**4. Ping** to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.
-
-Notes: each browsa conversation maps to one gateway session (`agent:main:browsa:…`, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); pasted images stay in browsa's own history but are not forwarded to OpenSquilla yet (its `chat.send` attachment encoding is not documented — v1 sends text only); the reply-language preference is prepended to the message since this protocol has no system-prompt field.
 
 </details>
 

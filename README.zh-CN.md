@@ -18,7 +18,7 @@
 
 ---
 
-**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，附加页面——文章、视频、PDF——并用**你自己的**模型或智能体流式生成回复：任意 OpenAI、Anthropic、Ollama 兼容端点，或带工具、记忆与审批的完整智能体后端（Hermes、OpenSquilla）。无订阅、无加价——key 只存在你自己的机器上。
+**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，附加页面——文章、视频、PDF——并用**你自己的**模型或智能体流式生成回复：任意 OpenAI、Anthropic、Ollama 兼容端点，或带工具、记忆与审批的完整智能体后端（Hermes）。无订阅、无加价——key 只存在你自己的机器上。
 
 ## 实际效果
 
@@ -99,41 +99,6 @@ hermes gateway
 | API Key | `API_SERVER_KEY` 的值 |
 
 **5. 点击 Ping 验证**。会自动检测并启用 `/v1/runs` 支持。
-
-</details>
-
-<details>
-<summary><b>🦑 OpenSquilla Agent</b>——本地桌面智能体（gateway WebSocket）</summary>
-
-[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地桌面智能体（gateway + Web UI + Electron 应用），微内核设计省 token，带模型路由与技能。browsa 走它的 **gateway WebSocket**（`/ws`）——与它自家 Web UI 同一条通道——因此你能获得完整的智能体体验：服务端会话记忆、流式增量、思考输出、服务端取消。
-
-**1. 安装并启动 gateway**
-
-```bash
-uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/latest/download/opensquilla-0.5.4-py3-none-any.whl"
-opensquilla gateway start
-# → running: http://127.0.0.1:18791
-```
-
-**2. 让扩展进来**——gateway 的 origin 守卫会拒绝它不认识的浏览器来源（这正是恶意网页进不来的原因）。把 browsa 的来源加进 `~/.opensquilla/config.toml`：
-
-```toml
-[cors]
-allowed_origins = ["chrome-extension://<browsa-extension-id>"]
-```
-
-在 `chrome://extensions` → browsa → **ID** 查看扩展 ID。（未打包加载时 ID 由目录路径推导，每台机器不同。）接受 `chrome-extension://` 来源需要 OpenSquilla 的 origin-guard 支持非 http(s) 来源——当前版本即使列出来也会 403；这是一个很小的上游补丁（`gateway/origin_guard.py`，与已注册桌面来源同一模式），PR 已提交待合并。
-
-**3. 配置 browsa**——打开 ⚙ 设置，选择 **OpenSquilla** provider：
-
-| 字段 | 值 |
-|---|---|
-| Base URL | `ws://127.0.0.1:18791/ws` |
-| API Key | 仅当你的 gateway 要求 token 时填写（可选） |
-
-**4. 点 Ping 验证**——它会执行真实的 WebSocket 握手，绿灯即代表连通性与来源白名单都通过。
-
-说明：每个 browsa 会话映射到一个 gateway 会话（`agent:main:browsa:…`，清空 browsa 历史时重置）；粘贴的图片只留在 browsa 自己的历史里，暂不转发给 OpenSquilla（其 `chat.send` 附件编码没有文档——v1 只发文本）；回复语言偏好会前置到消息里，因为该协议没有系统提示词字段。
 
 </details>
 
