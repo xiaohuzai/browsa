@@ -47,7 +47,7 @@
 
 ```bash
 npm install          # first time only
-npm test             # run 800+ unit tests
+npm test             # run 1,000+ unit tests
 npm run package      # → browsa-v<version>.zip
 ```
 
@@ -149,8 +149,9 @@ The screenshots above are the shape of it — the full reference lives here:
 | **Think blocks** | `<think>` / `<thinking>` content in a collapsible block, auto-collapsed after streaming |
 | **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
-| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format |
+| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
 | **Detail thread ("细聊")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable |
+| **Outline rail** | from 4 turns on, a quiet tick rail tracks the conversation — click to jump, hover to preview |
 | **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
 | **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
 | **Error cards** | provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable |
@@ -191,6 +192,7 @@ The screenshots above are the shape of it — the full reference lives here:
 | **Domain rules** | per-URL-pattern extra system prompt (e.g. always respond in English on `github.com`) |
 | **Mask rules** | regex-based content redaction before anything is sent (e.g. strip phone numbers) |
 | **Reply language** | force replies in a specific language regardless of page language |
+| **UI language** | English, 中文, or Auto (follows the browser) — applies immediately, no reload |
 | **Max text chars** | cap how much page content is sent per turn |
 | **Auto-summarize long attachments** | pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background — the attachment returns instantly and later turns resend the compressed version; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
 | **llms.txt** | on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
@@ -245,6 +247,7 @@ Chrome / Edge 114+ (primary target); Brave 1.56+ should work (same Chromium surf
 ## Security
 
 - API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
+- Before page context is sent to your provider, every URL in it is masked locally: credentials hiding in query strings, userinfo, or fragments (tokens, passwords, signatures, session IDs) never leave your machine. URLs browsa itself fetches (media, images) are untouched.
 - PDFs are parsed entirely client-side (WASM + pdf.js) — the file's bytes never leave your device; only extracted text goes to your provider.
 - LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources; Mermaid's SVG output is stripped of `<script>` / event-handler attributes).
 - Content scripts only observe network requests; they never modify or block them.

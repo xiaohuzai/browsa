@@ -4,7 +4,7 @@
     "description": "Extension name"
   },
   "extensionDescription": {
-    "message": "Hand the current page to your AI agent",
+    "message": "AI sidebar that chats with the page you're on — articles, videos, PDFs — using your own model or agent. Open source, no account.",
     "description": "Extension description"
   },
   "openSidebar": {
