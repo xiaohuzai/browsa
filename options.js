@@ -2,7 +2,6 @@
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
-import { pingSquilla } from './lib/squilla-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
@@ -271,8 +270,8 @@ function buildProviderCard(name, cfg, opts = {}) {
         </label>
       </div>` : ''}
       <div class="field">
-        <label>${isAgent ? `<span>Base URL${cfg.isSquilla ? `<span class="tip" tabindex="0">?<span class="tip-bubble">OpenSquilla gateway WebSocket 地址，默认 ws://127.0.0.1:18791/ws（<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>）。gateway 需把本扩展 origin 加入 cors.allowed_origins</span></span>` : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span>`}</span>` : 'Base URL'}
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isSquilla ? 'ws://127.0.0.1:18791/ws' : 'http://127.0.0.1:8080') : ''}" />
+        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span></span>` : 'Base URL'}
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
         </label>
       </div>
       <div class="field">
@@ -458,13 +457,7 @@ async function pingCard(name, card) {
 
   flashCard(card, '', 'Pinging…');
   try {
-    // OpenSquilla agent cards speak WebSocket RPC — the HTTP ping() would
-    // just fail on a ws:// URL. pingSquilla performs the real challenge /
-    // connect handshake, so a green ping also proves the gateway's origin
-    // guard lets this extension in.
-    const reply = cfg.isSquilla
-      ? await pingSquilla({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey })
-      : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
+    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -640,7 +633,6 @@ function prettyProviderName(name) {
   const alias = cachedCfg?.providers?.[name]?.alias;
   if (alias && alias.trim()) return alias.trim();
   if (name === 'hermes') return 'Hermes Agent';
-  if (name === 'squilla') return 'OpenSquilla';
   const m = /^llm-(\d+)$/.exec(name);
   if (m) return `LLM ${m[1]}`;
   return name.charAt(0).toUpperCase() + name.slice(1);
