@@ -12,18 +12,35 @@
         <img src="icons/icon48.png" alt="" class="logo" />
         <div>
           <h1>browsa</h1>
-          <p class="subtitle">Settings</p>
+          <p class="subtitle" data-i18n="settingsSubtitle">Settings</p>
         </div>
       </header>
 
       <section class="card">
         <div class="card-header">
-          <h2>AI Providers</h2>
+          <h2 data-i18n="uiLangHeading">UI Language</h2>
+        </div>
+        <div class="card-body">
+          <p class="hint" data-i18n="uiLangHint">Switch the interface language. Default follows your browser.</p>
+          <div class="inline-field">
+            <label for="uiLang" data-i18n="uiLangLabel">Language</label>
+            <select id="uiLang">
+              <option value="auto" data-i18n="uiLangOptAuto">Auto (follow browser)</option>
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2 data-i18n="providersHeading">AI Providers</h2>
         </div>
         <div class="card-body">
           <div class="hint-line">
-            <span class="hint">Configure your AI providers.</span>
-            <span class="tip" tabindex="0">?<span class="tip-bubble"><b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.</span></span>
+            <span class="hint" data-i18n="providersHint">Configure your AI providers.</span>
+            <span class="tip" tabindex="0">?<span class="tip-bubble" data-i18n-html="providersTipHtml"><b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.</span></span>
           </div>
           <div id="providers"></div>
         </div>
@@ -31,19 +48,19 @@
 
       <section class="card">
         <div class="card-header">
-          <h2>System Prompt</h2>
+          <h2 data-i18n="systemPromptHeading">System Prompt</h2>
         </div>
         <div class="card-body">
-          <p class="hint">Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.</p>
-          <textarea id="systemPrompt" rows="5" placeholder="e.g. You are a helpful assistant. Use $...$ for inline math and $$...$$ for display math."></textarea>
+          <p class="hint" data-i18n-html="systemPromptHintHtml">Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.</p>
+          <textarea id="systemPrompt" rows="5" data-i18n-placeholder="systemPromptPlaceholder" placeholder="e.g. You are a helpful assistant. Use $...$ for inline math and $$...$$ for display math."></textarea>
           <div class="card-actions">
-            <button data-act="save-system-prompt" class="primary">Save</button>
-            <button data-act="reset-system-prompt">Reset to default</button>
+            <button data-act="save-system-prompt" class="primary" data-i18n="saveBtn">Save</button>
+            <button data-act="reset-system-prompt" data-i18n="resetToDefaultBtn">Reset to default</button>
           </div>
           <div class="inline-field mt-12">
-            <label for="replyLanguage">Reply language</label>
+            <label for="replyLanguage" data-i18n="replyLanguageLabel">Reply language</label>
             <select id="replyLanguage">
-              <option value="">Auto (follow system prompt)</option>
+              <option value="" data-i18n="replyLanguageAuto">Auto (follow system prompt)</option>
               <option value="en">English</option>
               <option value="zh">中文</option>
               <option value="ja">日本語</option>
@@ -52,38 +69,38 @@
               <option value="fr">Français</option>
               <option value="es">Español</option>
             </select>
-            <button data-act="save-reply-language" class="primary">Save</button>
+            <button data-act="save-reply-language" class="primary" data-i18n="saveBtn">Save</button>
           </div>
         </div>
       </section>
 
       <details class="advanced-section">
-        <summary class="advanced-summary">⚙ Advanced</summary>
+        <summary class="advanced-summary" data-i18n="advancedSummary">⚙ Advanced</summary>
 
         <section class="card">
           <div class="card-header">
-            <h2>Floating selection toolbar</h2>
+            <h2 data-i18n="toolbarCardHeading">Floating selection toolbar</h2>
           </div>
           <div class="card-body">
-            <p class="hint">A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.</p>
+            <p class="hint" data-i18n="toolbarCardHint">A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.</p>
             <label class="toggle-row">
               <input type="checkbox" id="showSelectionToolbar" />
-              <span>Show floating toolbar on text selection</span>
+              <span data-i18n-html="toolbarToggleLabelHtml">Show floating toolbar on text selection</span>
             </label>
             <label class="toggle-row mt-8">
               <input type="checkbox" id="llmsTxtEnabled" checked />
-              <span>Include <code>llms.txt</code> site instructions when attaching a page (📎)</span>
+              <span data-i18n-html="llmsTxtToggleLabelHtml">Include <code>llms.txt</code> site instructions when attaching a page (📎)</span>
             </label>
           </div>
         </section>
 
         <section class="card">
           <div class="card-header">
-            <h2>Chat Preferences</h2>
+            <h2 data-i18n="chatPrefsHeading">Chat Preferences</h2>
           </div>
           <div class="card-body">
             <div class="row">
-              <label>Message font size
+              <label><span data-i18n="fontSizeLabel">Message font size</span>
                 <div class="range-row mt-4">
                   <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" />
                   <span id="fontSizeVal" class="range-val">13.5px</span>
@@ -91,19 +108,19 @@
               </label>
             </div>
             <div class="row mt-12">
-              <label>Send shortcut
+              <label><span data-i18n="sendShortcutLabel">Send shortcut</span>
                 <select id="sendShortcut" class="mt-4">
-                  <option value="enter">Enter (Shift+Enter for newline)</option>
-                  <option value="shift-enter">Shift+Enter (Enter for newline)</option>
+                  <option value="enter" data-i18n="sendShortcutEnter">Enter (Shift+Enter for newline)</option>
+                  <option value="shift-enter" data-i18n="sendShortcutShiftEnter">Shift+Enter (Enter for newline)</option>
                 </select>
               </label>
             </div>
             <label class="toggle-row mt-12">
               <input type="checkbox" id="thoughtAutoCollapse" />
-              <span>Auto-collapse thinking blocks</span>
+              <span data-i18n="thoughtAutoCollapseLabel">Auto-collapse thinking blocks</span>
             </label>
                         <div class="card-actions">
-              <button data-act="save-chat-prefs" class="primary">Save</button>
+              <button data-act="save-chat-prefs" class="primary" data-i18n="saveBtn">Save</button>
               <span id="chat-prefs-status" class="card-status"></span>
             </div>
           </div>
@@ -111,35 +128,35 @@
 
         <section class="card">
           <div class="card-header">
-            <h2>ASR 字幕识别</h2>
+            <h2 data-i18n="asrHeading">ASR 字幕识别</h2>
           </div>
           <div class="card-body">
             <label class="toggle-row">
               <input type="checkbox" id="asrEnabled" />
-              <span>启用 ASR<span class="tip" tabindex="0">?<span class="tip-bubble">视频页附加时自动转写/解析。平台：仅支持 B 站。</span></span></span>
+              <span><span data-i18n="asrEnableLabel">启用 ASR</span><span class="tip" tabindex="0">?<span class="tip-bubble" data-i18n="asrEnableTip">视频页附加时自动转写/解析。平台：仅支持 B 站。</span></span></span>
             </label>
 
             <div class="fields">
               <div class="field">
                 <label for="asrProvider">
-                  <span class="field-title">服务商</span>
+                  <span class="field-title" data-i18n="asrProviderLabel">服务商</span>
                   <select id="asrProvider"></select>
                 </label>
               </div>
               <div class="field">
                 <label for="asrSubtitleSource">
-                  <span class="field-title">字幕来源</span>
+                  <span class="field-title" data-i18n="asrSubtitleSourceLabel">字幕来源</span>
                   <select id="asrSubtitleSource">
-                    <option value="original">优先视频自带字幕</option>
-                    <option value="asr">优先 ASR 解析字幕</option>
+                    <option value="original" data-i18n="asrSubtitleOriginal">优先视频自带字幕</option>
+                    <option value="asr" data-i18n="asrSubtitleAsr">优先 ASR 解析字幕</option>
                   </select>
                 </label>
               </div>
               <div class="field">
                 <label for="asrLanguage">
-                  <span class="field-title">语种</span>
+                  <span class="field-title" data-i18n="asrLanguageLabel">语种</span>
                   <select id="asrLanguage">
-                    <option value="auto">自动检测（Auto）</option>
+                    <option value="auto" data-i18n="asrLanguageAuto">自动检测（Auto）</option>
                     <option value="zh">中文（简体）</option>
                     <option value="zh-TW">中文（繁体）</option>
                     <option value="en">English</option>
@@ -172,22 +189,22 @@
               </div>
               <div class="field field-full">
                 <label for="asrModel">
-                  <span class="field-title">模型 ID（音频转写）</span>
+                  <span class="field-title" data-i18n="asrModelLabel">模型 ID（音频转写）</span>
                   <input id="asrModel" type="text" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrVideoModel">
-                  <span class="field-title">视频模型 ID（视频解析用，留空则用上面的模型）</span>
-                  <input id="asrVideoModel" type="text" placeholder="留空 = 同转写模型" />
+                  <span class="field-title" data-i18n="asrVideoModelLabel">视频模型 ID（视频解析用，留空则用上面的模型）</span>
+                  <input id="asrVideoModel" type="text" data-i18n-placeholder="asrVideoModelPlaceholder" placeholder="留空 = 同转写模型" />
                 </label>
               </div>
             </div>
 
             <div class="card-actions">
-              <button data-act="save-asr" class="primary">Save</button>
+              <button data-act="save-asr" class="primary" data-i18n="saveBtn">Save</button>
             </div>
-            <a class="doc-link" id="asrDocLink" target="_blank" rel="noopener noreferrer">
+            <a class="doc-link" id="asrDocLink" target="_blank" rel="noopener noreferrer" data-i18n="asrDocLink">
               📖 配置文档
             </a>
           </div>

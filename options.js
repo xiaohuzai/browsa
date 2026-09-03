@@ -4,8 +4,12 @@ import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
+import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
 
 const $ = (id) => document.getElementById(id);
+// i18n convenience — same idiom as sidepanel.js: t() resolves explicit-language
+// dict → chrome.i18n → inline fallback (jsdom tests stay chrome-free).
+const _t = t;
 const providersEl = $('providers');
 const statusEl = $('status');
 
@@ -23,6 +27,26 @@ const _pingState = {}; // name → 'reachable' | 'unreachable', persists across 
 init();
 
 async function init() {
+  // 语言偏好就绪后先填静态文案，再渲染动态区块（渲染函数里的文案同样走 t()）。
+  await initI18n();
+  document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
+  applyI18n();
+
+  // UI Language 下拉：选择即生效（写 storage），watchUiLang 统一重渲染。
+  const uiLangSel = $('uiLang');
+  if (uiLangSel) {
+    chrome.storage.local.get('uiLang', ({ uiLang }) => { uiLangSel.value = uiLang || 'auto'; });
+    uiLangSel.addEventListener('change', () => {
+      chrome.storage.local.set({ uiLang: uiLangSel.value });
+    });
+  }
+  watchUiLang(() => {
+    document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
+    applyI18n();
+    renderProviders();
+    syncAsrProviderUI();
+  });
+
   cachedCfg = await storage.getAll();
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
@@ -76,7 +100,7 @@ async function saveChatPrefs() {
   const statusEl = $('chat-prefs-status');
   if (statusEl) {
     statusEl.className = 'card-status ok';
-    statusEl.textContent = '✓ Saved';
+    statusEl.textContent = _t('savedFlash', '✓ Saved');
     setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'card-status'; }, 3000);
   }
 }
@@ -90,7 +114,7 @@ function syncAsrProviderUI() {
     for (const p of Object.values(ASR_PROVIDERS)) {
       const o = document.createElement('option');
       o.value = p.id;
-      o.textContent = p.label;
+      o.textContent = _t(`asrLabel_${p.id}`, p.label); // 字典按 provider id 覆盖，注册表原文兜底
       sel.appendChild(o);
     }
   }
@@ -98,27 +122,28 @@ function syncAsrProviderUI() {
   const baseEl = document.getElementById('asrBaseUrl');
   if (baseEl) baseEl.placeholder = p.defaultBaseUrl;
   const keyEl = document.getElementById('asrApiKey');
-  if (keyEl) keyEl.placeholder = p.apiKeyPlaceholder || 'API Key';
+  if (keyEl) keyEl.placeholder = _t(`asrApiKeyPlaceholder_${p.id}`, p.apiKeyPlaceholder || 'API Key');
   const modelEl = document.getElementById('asrModel');
   if (modelEl) modelEl.placeholder = p.defaultModel;
   const videoModelEl = document.getElementById('asrVideoModel');
   if (videoModelEl) {
     // 注册表带 defaultVideoModel 的供应商（转写/视频拆成两个模型）给出推荐值；单模型则提示留空回退
     videoModelEl.placeholder = p.defaultVideoModel
-      ? `${p.defaultVideoModel}（推荐）`
-      : '留空 = 同转写模型';
+      ? `${p.defaultVideoModel}${_t('videoModelRecommended', '（推荐）')}`
+      : _t('asrVideoModelPlaceholder', '留空 = 同转写模型');
   }
   const tip = document.getElementById('asrBaseUrlTip');
   if (tip) {
     // 文档链接并进气泡：? 气泡现在可驻留（hover 进去点链接不消失），读提示时
     // 就能直接跳文档，不必找到卡片底部那个常驻入口（两处都保留）。
-    tip.innerHTML = (p.baseUrlTip || '') +
-      (p.docUrl ? `<br><a href="${p.docUrl}" target="_blank" rel="noopener noreferrer">📖 ${p.docLabel || '配置文档'}</a>` : '');
+    const docLabel = _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
+    tip.innerHTML = _t(`asrBaseUrlTip_${p.id}`, p.baseUrlTip || '') +
+      (p.docUrl ? `<br><a href="${p.docUrl}" target="_blank" rel="noopener noreferrer">📖 ${docLabel}</a>` : '');
   }
   const doc = document.getElementById('asrDocLink');
   if (doc) {
     doc.href = p.docUrl || '';
-    doc.textContent = '📖 ' + (p.docLabel || '配置文档');
+    doc.textContent = '📖 ' + _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
   }
 }
 
@@ -169,7 +194,7 @@ async function saveAsr() {
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
   if (enabled && !apiKey) {
-    flash('err', '启用 ASR 需要填写 API Key。');
+    flash('err', _t('asrNeedApiKey', '启用 ASR 需要填写 API Key。'));
     return;
   }
   // 方舟 Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
@@ -180,11 +205,11 @@ async function saveAsr() {
   let savedBaseUrl = baseUrl;
   if (provider === 'ark' && baseUrl.includes('/api/plan')) {
     savedBaseUrl = normalizeArkBaseUrl(baseUrl);
-    flash('err', `已把 Base URL 从 Agent Plan 端点自动改为标准版 ${savedBaseUrl}（api/plan/v3 没有文件上传）。`);
+    flash('err', tSub('asrPlanUrlRewritten', `已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。`, savedBaseUrl));
   }
   cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
   await chrome.storage.local.set({ asr: cachedCfg.asr });
-  flash('ok', `ASR ${enabled ? '已启用' : '已停用'}（${p.label}，模型 ${model}）。`);
+  flash('ok', tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
 }
 
 function renderProviders() {
@@ -192,8 +217,8 @@ function renderProviders() {
   const providers = cachedCfg.providers || {};
 
   const groups = [
-    { type: 'agent', label: '🤖 Agent Providers', desc: 'Full agent backend — tool execution, file access, multi-step tasks' },
-    { type: 'llm',   label: '💬 LLM Providers',   desc: 'Language model endpoint — add as many as you like; each picks its own wire protocol' },
+    { type: 'agent', label: _t('agentGroupLabel', '🤖 Agent Providers'), desc: _t('agentGroupDesc', 'Full agent backend — tool execution, file access, multi-step tasks') },
+    { type: 'llm',   label: _t('llmGroupLabel', '💬 LLM Providers'),   desc: _t('llmGroupDesc', 'Language model endpoint — add as many as you like; each picks its own wire protocol') },
   ];
 
   for (const group of groups) {
@@ -231,7 +256,7 @@ function renderProviders() {
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'add-provider-btn';
-      addBtn.textContent = '＋ Add Provider';
+      addBtn.textContent = _t('addProviderBtn', '＋ Add Provider');
       addBtn.addEventListener('click', () => addProvider());
       details.appendChild(addBtn);
     }
@@ -254,49 +279,49 @@ function buildProviderCard(name, cfg, opts = {}) {
   // Restore ping state from memory
   const pinged = _pingState[name];
   const badgeCls  = pinged === 'reachable' ? 'reachable' : pinged === 'unreachable' ? 'unreachable' : (isConfigured ? 'configured' : 'unconfigured');
-  const badgeTxt  = pinged === 'reachable' ? '● reachable' : pinged === 'unreachable' ? '● unreachable' : (isConfigured ? '○ not pinged' : '○ not set');
+  const badgeTxt  = pinged === 'reachable' ? _t('statusReachableBadge', '● reachable') : pinged === 'unreachable' ? _t('statusUnreachableBadge', '● unreachable') : (isConfigured ? _t('badgeNotPinged', '○ not pinged') : _t('badgeNotSet', '○ not set'));
 
   card.innerHTML = `
-    <h3 class="provider-h3" title="${reserved ? 'Reserved empty slot — configure and Save to commit it' : 'Click to set as active provider'}">
+    <h3 class="provider-h3" title="${reserved ? _t('reservedSlotTitle', 'Reserved empty slot — configure and Save to commit it') : _t('clickToActivateTitle', 'Click to set as active provider')}">
       <span class="name">${escapeHtml(displayName)}</span>
       <span class="provider-badge ${badgeCls}">${badgeTxt}</span>
-      ${!isAgent && !reserved ? `<button type="button" class="provider-delete" data-act="delete" title="Remove this provider">${ICON_CLOSE}</button>` : ''}
+      ${!isAgent && !reserved ? `<button type="button" class="provider-delete" data-act="delete" title="${_t('removeProviderTitle', 'Remove this provider')}">${ICON_CLOSE}</button>` : ''}
     </h3>
     <div class="fields">
     ${!isAgent ? `
       <div class="field">
-        <label>Alias
-          <input data-k="alias" type="text" value="${escapeAttr(cfg.alias || '')}" placeholder="e.g. My OpenAI" />
+        <label>${_t('aliasLabel', 'Alias')}
+          <input data-k="alias" type="text" value="${escapeAttr(cfg.alias || '')}" placeholder="${_t('aliasPlaceholder', 'e.g. My OpenAI')}" />
         </label>
       </div>` : ''}
       <div class="field">
-        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span></span>` : 'Base URL'}
+        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span></span>` : _t('baseUrlLabel', 'Base URL')}
           <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
         </label>
       </div>
       <div class="field">
-        <label>API key
+        <label>${_t('apiKeyLabel', 'API key')}
           <div class="apikey-wrap">
             <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
-            <button type="button" class="apikey-toggle" title="Show / hide key" aria-label="Toggle API key visibility">👁</button>
+            <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
           </div>
         </label>
       </div>
       ${showModel ? `
       <div class="field">
-        <label>Model ID
+        <label>${_t('modelIdLabel', 'Model ID')}
           <div class="model-chips" data-model-chips>
             ${(cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).map((id) => `
-              <span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`).join('')}
-            <input class="chip-input" type="text" placeholder="add model id — Enter" aria-label="Add model ID" />
-            <button type="button" class="chip-add" title="Add model" aria-label="Add model ID">＋</button>
+              <span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="${_t('chipRemoveTitle', 'Remove model')}" aria-label="${_t('chipRemoveAria', 'Remove')} ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`).join('')}
+            <input class="chip-input" type="text" placeholder="${_t('chipInputPlaceholder', 'add model id — Enter')}" aria-label="${_t('chipInputAria', 'Add model ID')}" />
+            <button type="button" class="chip-add" title="${_t('chipAddTitle', 'Add model')}" aria-label="${_t('chipAddAria', 'Add model ID')}">＋</button>
           </div>
           <input type="hidden" data-k="model" value="${escapeAttr((cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).join(', '))}" />
         </label>
       </div>` : ''}
       ${!isAgent ? `
       <div class="field field-full">
-        <label>API
+        <label>${_t('apiLabel', 'API')}
           <select data-k="apiStyle" class="api-style-select">
             ${['chat', 'responses', 'anthropic'].map(s => `
               <option value="${s}"${(cfg.apiStyle || 'chat') === s ? ' selected' : ''}>${apiStyleLabel(s)}</option>`).join('')}
@@ -305,10 +330,10 @@ function buildProviderCard(name, cfg, opts = {}) {
       </div>` : ''}
     </div>
     <div class="row action-row">
-      <button data-act="save">Save</button>
-      <button data-act="ping">Ping</button>
-      <button data-act="reset">Reset</button>
-      <span class="card-status">${reserved ? 'Empty slot — configure and Save' : ''}</span>
+      <button data-act="save">${_t('saveBtn', 'Save')}</button>
+      <button data-act="ping">${_t('pingBtn', 'Ping')}</button>
+      <button data-act="reset">${_t('resetBtn', 'Reset')}</button>
+      <span class="card-status">${reserved ? _t('emptySlotStatus', 'Empty slot — configure and Save') : ''}</span>
     </div>
   `;
 
@@ -341,7 +366,7 @@ function buildProviderCard(name, cfg, opts = {}) {
         if (existing.has(id)) continue;
         existing.add(id);
         chipInput.insertAdjacentHTML('beforebegin',
-          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="Remove model" aria-label="Remove ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
+          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="${_t('chipRemoveTitle', 'Remove model')}" aria-label="${_t('chipRemoveAria', 'Remove')} ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
       }
       chipInput.value = '';
       syncChips();
@@ -431,7 +456,7 @@ async function saveCard(name, card) {
     renderProviders();
     card = document.querySelector(`.provider[data-name="${name}"]`) || card;
   }
-  flashCard(card, 'ok', '✓ Saved');
+  flashCard(card, 'ok', _t('savedFlash', '✓ Saved'));
 }
 
 async function pingCard(name, card) {
@@ -451,11 +476,11 @@ async function pingCard(name, card) {
 
   // Only LLM providers require a model ID
   if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) {
-    flashCard(card, 'err', '❌ Model ID is required for LLM providers');
+    flashCard(card, 'err', _t('modelRequiredErr', '❌ Model ID is required for LLM providers'));
     return;
   }
 
-  flashCard(card, '', 'Pinging…');
+  flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
     const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
@@ -472,7 +497,7 @@ async function pingCard(name, card) {
       await chrome.storage.local.set({ activeProvider: name, activeModel: '' });
       document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
-      activeNote = ' — set as active provider';
+      activeNote = _t('setActiveNote', ' — set as active provider');
     }
 
     // Auto-detect capabilities and update isHermes accordingly. isHermes
@@ -510,10 +535,10 @@ function setBadge(card, state, name) {
   if (!badge) return;
   if (state === 'reachable') {
     badge.className = 'provider-badge reachable';
-    badge.textContent = '● reachable';
+    badge.textContent = _t('statusReachableBadge', '● reachable');
   } else {
     badge.className = 'provider-badge unreachable';
-    badge.textContent = '● unreachable';
+    badge.textContent = _t('statusUnreachableBadge', '● unreachable');
   }
 }
 
@@ -584,12 +609,12 @@ function applySystemPrompt() {
   el.value = cachedCfg.systemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? '';
   document.querySelector('button[data-act="save-system-prompt"]')?.addEventListener('click', async () => {
     await chrome.storage.local.set({ systemPrompt: el.value });
-    flash('ok', 'System prompt saved.');
+    flash('ok', _t('systemPromptSaved', 'System prompt saved.'));
   });
   document.querySelector('button[data-act="reset-system-prompt"]')?.addEventListener('click', async () => {
     el.value = DEFAULT_SYSTEM_PROMPT;
     await chrome.storage.local.set({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
-    flash('ok', 'System prompt reset to default.');
+    flash('ok', _t('systemPromptReset', 'System prompt reset to default.'));
   });
 }
 
@@ -599,7 +624,7 @@ function applyReplyLanguage() {
   el.value = cachedCfg.replyLanguage || '';
   document.querySelector('button[data-act="save-reply-language"]')?.addEventListener('click', async () => {
     await chrome.storage.local.set({ replyLanguage: el.value });
-    flash('ok', el.value ? `Reply language set to "${el.options[el.selectedIndex]?.text}".` : 'Reply language: Auto.');
+    flash('ok', el.value ? tSub('replyLanguageSet', `Reply language set to "$1".`, el.options[el.selectedIndex]?.text) : _t('replyLanguageAutoSet', 'Reply language: Auto.'));
   });
 }
 
@@ -611,7 +636,7 @@ function applyToolbarToggle() {
   });
   el.addEventListener('change', () => {
     chrome.storage.local.set({ showSelectionToolbar: el.checked });
-    flash('ok', el.checked ? 'Floating toolbar enabled.' : 'Floating toolbar disabled.');
+    flash('ok', el.checked ? _t('toolbarEnabledFlash', 'Floating toolbar enabled.') : _t('toolbarDisabledFlash', 'Floating toolbar disabled.'));
   });
 }
 
@@ -623,7 +648,7 @@ function applyLlmsTxt() {
   });
   el.addEventListener('change', () => {
     chrome.storage.local.set({ llmsTxtEnabled: el.checked });
-    flash('ok', el.checked ? 'llms.txt will be included when attaching a page.' : 'llms.txt disabled.');
+    flash('ok', el.checked ? _t('llmsTxtOnFlash', 'llms.txt will be included when attaching a page.') : _t('llmsTxtOffFlash', 'llms.txt disabled.'));
   });
 }
 

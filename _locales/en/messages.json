@@ -326,5 +326,625 @@
   "outlineEmpty": {
     "message": "(empty message)",
     "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "UI Language",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "Language",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "Switch the interface language. Default follows your browser.",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "Auto (follow browser)",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "Settings",
+    "description": "Options page subtitle"
+  },
+  "providersHeading": {
+    "message": "AI Providers",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "Configure your AI providers.",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "System Prompt",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "e.g. You are a helpful assistant. Use $...$ for inline math and $$...$$ for display math.",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "Save",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "Reset to default",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "Reply language",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "Auto (follow system prompt)",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ Advanced",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "Floating selection toolbar",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "A mini toolbar appears above selected text with quick actions: Ask, Explain, Translate, Summarize.",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "Show floating toolbar on text selection",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "Include <code>llms.txt</code> site instructions when attaching a page (📎)",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "Chat Preferences",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "Message font size",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "Send shortcut",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter (Shift+Enter for newline)",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter (Enter for newline)",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "Auto-collapse thinking blocks",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "ASR Subtitles & Video",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "Enable ASR",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "Attach a video page to auto-transcribe/analyze. Platform: Bilibili only.",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "Provider",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "Subtitle source",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "Prefer built-in captions",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "Prefer ASR transcription",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "Language",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "Auto-detect",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "Model ID (audio transcription)",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "Video model ID (video analysis; empty = use the model above)",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "Leave empty = same as transcription model",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "Docs",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 Docs",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": " (recommended)",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "Volcengine Ark",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "Ark API key (UUID or ark- prefixed)",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "Use the standard <code>…/api/v3</code> endpoint: Agent Plan's <code>…/api/plan/v3</code> does not support file upload (Files API), as tested.",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "Why this config? → Ark audio understanding docs",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 Agent Providers",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "Full agent backend — tool execution, file access, multi-step tasks",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 LLM Providers",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "Language model endpoint — add as many as you like; each picks its own wire protocol",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ Add Provider",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "Reserved empty slot — configure and Save to commit it",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "Click to set as active provider",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "Remove this provider",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "Alias",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "e.g. My OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "Base URL",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "API key",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "Show / hide key",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "Toggle API key visibility",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "Model ID",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "Remove model",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "Remove",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "add model id — Enter",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "Add model ID",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "Add model",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "Add model ID",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● reachable",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● unreachable",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ not pinged",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ not set",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "Empty slot — configure and Save",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ Model ID is required for LLM providers",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Pinging…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " — set as active provider",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ Saved",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "Reset",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Hermes API Server setup & configuration docs",
+    "description": "Options: Hermes docs link text"
+  },
+  "systemPromptSaved": {
+    "message": "System prompt saved.",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "System prompt reset to default.",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "Reply language set to \"$1\".",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "Reply language: Auto.",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "Floating toolbar enabled.",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "Floating toolbar disabled.",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "llms.txt will be included when attaching a page.",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt disabled.",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "Enabling ASR requires an API key.",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "Base URL auto-corrected from the Agent Plan endpoint to the standard $1 (api/plan/v3 has no file upload).",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1 ($2, model $3).",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "enabled",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "disabled",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusNotSet": {
+    "message": "not set",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusReachable": {
+    "message": "● reachable",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ unreachable",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "not pinged",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "No text selected — select it again.",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "Reading page…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "Failed to read page",
+    "description": "Sidepanel: read page failed"
+  },
+  "progressParsingPdf": {
+    "message": "Parsing PDF…",
+    "description": "Sidepanel: attach progress"
+  },
+  "pdfAttachFailed": {
+    "message": "PDF attach failed",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "ASR attach failed",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "Page attach failed: $1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "Session saved: \"$1\"",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "conversationCleared": {
+    "message": "Conversation cleared",
+    "description": "Sidepanel: conversation cleared toast"
+  },
+  "cannotOpenSettings": {
+    "message": "Cannot open settings: $1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "Switched to $1",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "Image too large: $1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "outputTruncatedToast": {
+    "message": "Reply still hit the model's output limit — click “Continue” or reply 继续.",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ Continue",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "No active tab.",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "Video source is gone — cannot jump.",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "No playback position or subtitle line available yet.",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "Copied",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "Truncating history failed — regenerate cancelled.",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "Truncating history failed — edit not saved.",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "Failed to send approval: $1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "Failed to send reply: $1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "background state lost",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "Video analysis",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "ASR transcription",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": ": ",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "unknown error",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "— the ASR API key looks like an Agent Plan key, which is not interchangeable with the standard Ark platform key. Switch to a platform API key (UUID or ark- prefixed) in Settings → ASR.",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "Fell back to built-in captions (YouTube blocked the audio download)",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "Fell back to video metadata (YouTube blocked the audio download)",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "Fell back to video metadata",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ This video has no captions — kept as-is (video metadata only). To auto-transcribe, enable ASR in Settings and attach again.",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "Reusing previously uploaded audio (valid for 30 days) — skipping download & upload…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "Downloading audio…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "Reusing previously uploaded video (valid for 30 days) — skipping upload…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "Capturing keyframes…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "Transcoding audio… (to WAV)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "Uploading audio… (0%)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "Downloading & transcribing audio…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "Skip to composer",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "Message",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "Delete selected",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "Cancel",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "$1 selected",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "chars",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "tokens",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "Mermaid module failed to load — check the console.",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "Copy code",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "mermaidViewSource": {
+    "message": "View source",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "Zoom in",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "Zoom out",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "Reset",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportSvg": {
+    "message": "Export SVG",
+    "description": "Sidepanel: mermaid export svg title"
+  },
+  "mermaidExportPng": {
+    "message": "Export PNG",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "Ask anything about the current page",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "Fix with AI",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "Fixing…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "Repair failed: $1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "Syntax error on line $1: $2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
   }
 }

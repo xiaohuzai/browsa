@@ -326,5 +326,625 @@
   "outlineEmpty": {
     "message": "（空消息）",
     "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "界面语言",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "语言",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "切换界面语言。默认跟随浏览器。",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "自动（跟随浏览器）",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "设置",
+    "description": "Options page subtitle"
+  },
+  "providersHeading": {
+    "message": "AI 服务商",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "配置你的 AI 服务商。",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<b>Hermes Agent</b>：内置，填 Base URL + API Key 即可。<br><br><b>LLM</b>：任何 OpenAI Chat / OpenAI Responses / Anthropic 端点。给每张卡起个别名，<b>Ping</b> 验证连通。",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "系统提示词",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "每轮对话前以 <code>role: system</code> 注入。可用它设定回复语言、语气与格式规则。",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "例如：你是一个乐于助人的助手。行内公式用 $...$，独立公式用 $$...$$。",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "保存",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "恢复默认",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "回复语言",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "自动（跟随系统提示词）",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ 高级",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "划词悬浮工具条",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "划选文字后上方出现迷你工具条，快捷操作：提问、解释、翻译、总结。",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "划选文字时显示悬浮工具条",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "附加网页（📎）时携带站点的 <code>llms.txt</code> 说明",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "聊天偏好",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "消息字号",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "发送快捷键",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter 发送（Shift+Enter 换行）",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter 发送（Enter 换行）",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "自动折叠思考块",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "ASR 字幕识别",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "启用 ASR",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "视频页附加时自动转写/解析。平台：仅支持 B 站。",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "服务商",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "字幕来源",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "优先视频自带字幕",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "优先 ASR 解析字幕",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "语种",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "自动检测（Auto）",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "模型 ID（音频转写）",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "视频模型 ID（视频解析用，留空则用上面的模型）",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "留空 = 同转写模型",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "配置文档",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 配置文档",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": "（推荐）",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "火山方舟",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "标准方舟 API Key（UUID 或 ark- 前缀均可）",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "用标准版 <code>…/api/v3</code>：实测 Agent Plan 的 <code>…/api/plan/v3</code> 不支持文件上传（Files API）。",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "为什么要这样配置？→ 火山方舟音频理解文档",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 Agent 服务商",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "完整 Agent 后端——工具执行、文件访问、多步任务",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 LLM 服务商",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "语言模型端点——想加几张加几张，各自选择协议",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ 添加服务商",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "保留空卡——填写并保存后生效",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "点击设为当前使用的服务商",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "移除此服务商",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "别名",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "例如：My OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "Base URL",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "API Key",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "显示 / 隐藏密钥",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "切换 API Key 可见性",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "模型 ID",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "移除模型",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "移除",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "输入模型 ID，回车添加",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "添加模型 ID",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "添加模型",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "添加模型 ID",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● 可连通",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● 无法连通",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ 未 Ping",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ 未配置",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "空卡——填写并保存",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ LLM 服务商必须填模型 ID",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Ping 中…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " —— 已设为当前服务商",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ 已保存",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "重置",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Hermes API Server 启动与配置文档",
+    "description": "Options: Hermes docs link text"
+  },
+  "systemPromptSaved": {
+    "message": "系统提示词已保存。",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "系统提示词已恢复默认。",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "回复语言已设为「$1」。",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "回复语言：自动。",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "悬浮工具条已启用。",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "悬浮工具条已停用。",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "附加网页时将携带 llms.txt。",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt 已停用。",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "启用 ASR 需要填写 API Key。",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1（$2，模型 $3）。",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "已启用",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "已停用",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusNotSet": {
+    "message": "未配置",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusReachable": {
+    "message": "● 可连通",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ 无法连通",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "未 Ping",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "没有获取到选中文字，请重新选择",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "正在读取页面…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "读取网页失败",
+    "description": "Sidepanel: read page failed"
+  },
+  "progressParsingPdf": {
+    "message": "解析 PDF 中…",
+    "description": "Sidepanel: attach progress"
+  },
+  "pdfAttachFailed": {
+    "message": "PDF 附加失败",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "ASR 附加失败",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "页面附加失败：$1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "会话已保存：「$1」",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "conversationCleared": {
+    "message": "会话已清空",
+    "description": "Sidepanel: conversation cleared toast"
+  },
+  "cannotOpenSettings": {
+    "message": "无法打开设置：$1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "已切换到 $1",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "图片过大：$1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "outputTruncatedToast": {
+    "message": "回复仍被模型输出上限截断，可点「继续生成」或回复「继续」",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ 继续生成",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "没有活动标签页。",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "视频源已失效，无法跳转",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "还没有可用的播放位置或字幕行",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "已复制",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "历史截断失败，已取消重新生成",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "历史截断失败，未保存修改",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "审批发送失败：$1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "回复发送失败：$1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "后台状态已丢失",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "视频解析",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "ASR 转写",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": "失败：",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "未知错误",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "已回退使用自带字幕（YouTube 限制了音频下载）",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "已回退为视频信息（YouTube 限制了音频下载）",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "已回退为视频信息",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "复用上次上传的音频文件（30 天内有效），跳过下载与上传…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "下载音频中…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "复用上次上传的视频文件（30 天内有效），跳过上传…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "截取关键帧…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "转码音频中…（转为 WAV）",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "上传音频中…（0%）",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "下载并转写音频中…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "跳到输入框",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "消息内容",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "删除所选",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "取消",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "已选中 $1 项",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "字符",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "tokens",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "mermaid 模块加载失败，请检查控制台",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "复制代码",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "mermaidViewSource": {
+    "message": "查看源码",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "放大",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "缩小",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "重置",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportSvg": {
+    "message": "导出 SVG",
+    "description": "Sidepanel: mermaid export svg title"
+  },
+  "mermaidExportPng": {
+    "message": "导出 PNG",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "关于当前页面，随时提问",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "AI 修复重绘",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "修图中…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "修复失败：$1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "第 $1 行语法错误：$2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
   }
 }

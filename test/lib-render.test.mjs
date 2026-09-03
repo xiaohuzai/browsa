@@ -414,7 +414,7 @@ test('render.js estimates a placeholder height before rendering and retries via 
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
   assert.match(src, /import\s*\{[^}]*renderMermaidWithRetry[^}]*\}\s*from\s*['"]\.\/mermaid-utils\.js['"]/);
   assert.match(src, /pre\.style\.minHeight\s*=\s*estimatedHeight/, 'the code-fence placeholder must get the estimated height before the async render starts');
-  assert.match(src, /await renderMermaidWithRetry\(m, id, source, host\)/, 'must render through the retry helper, not a raw m.render() call');
+  assert.match(src, /await renderMermaidWithRetry\(m, id, source, (?:host|ownHost)\)/, 'must render through the retry helper, not a raw m.render() call');
 });
 
 test('render.js regression: the mermaid render host must be sized from the real container width, not a hardcoded pixel value', async () => {

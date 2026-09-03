@@ -21,6 +21,8 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { handleGetMediaStreams, handleDownloadMedia } from './lib/handlers/media-handler.js';
+import { repairMermaid } from './lib/handlers/mermaid-repair.js';
+import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
@@ -603,6 +605,23 @@ async function handle(msg, sender) {
       // 空串 = 未指定，聊天侧回退 provider.model
       await storage.setActiveProvider(msg.name, msg.model || '');
       return { activeProvider: msg.name };
+    }
+
+    case 'REPAIR_MERMAID': {
+      // 「AI 修复重绘」：用当前 provider 修复渲染失败的 mermaid 源码。一次独立
+      // 补全调用，不进聊天历史（view-only 修复，气泡原文不动）；修复稿由
+      // sidepanel 先过本地 mermaid parse 校验，通过才就地替换错误卡。
+      try {
+        const cfg = await storage.getAll();
+        const provider = cfg.providers?.[cfg.activeProvider];
+        if (!provider?.baseUrl?.trim()) return { ok: false, error: 'No active AI provider configured' };
+        const model = resolveChatModel(provider, cfg);
+        const source = await repairMermaid({ provider, model, source: String(msg.source || ''), errorText: String(msg.error || '') });
+        if (!source) return { ok: false, error: 'Model returned no mermaid code' };
+        return { ok: true, source };
+      } catch (e) {
+        return { ok: false, error: e?.message || String(e) };
+      }
     }
 
     case 'SET_CONTEXT_MODE': {
