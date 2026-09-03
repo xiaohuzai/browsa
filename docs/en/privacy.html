@@ -49,7 +49,7 @@
   <h2>Where network requests go</h2>
   <p>browsa only makes network requests when you act, and <b>only to destinations you configure yourself</b>:</p>
   <ul>
-    <li><b>AI chat:</b> requests are sent by your browser directly to the provider address you entered in Settings (OpenAI, Anthropic, any OpenAI-compatible API, or local Ollama). They never pass through an intermediary server.</li>
+    <li><b>AI chat:</b> requests are sent by your browser directly to the provider address you entered in Settings (OpenAI, Anthropic, any OpenAI-compatible API, or local Ollama). They never pass through an intermediary server. Page content attached to a conversation passes through a local preprocessing step: sensitive URL parameters such as passwords, tokens, and signatures are masked before anything is sent — entirely inside your browser.</li>
     <li><b>Speech transcription (optional):</b> only if you enable ASR and enter your own Volcengine Ark key — audio is transcoded locally, then uploaded by your browser straight to that service. If disabled, nothing runs.</li>
     <li><b>Site extraction:</b> reads data the page itself already loaded (subtitles, article bodies) — no re-authentication, no uploading to third parties.</li>
     <li><b>Media downloads:</b> connections open on demand, only when you click download.</li>

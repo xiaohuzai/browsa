@@ -34,6 +34,7 @@ export {
 import { extractActiveTab } from './lib/page-extractor.js';
 import { inlinePageImages } from './lib/page-images.js';
 import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
+import { redactUrlCredentials, redactTextUrls } from './lib/sanitize-url.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
 // ─── Media download: keep the DOWNLOAD_CALL simple ──────────────────────────
@@ -661,7 +662,7 @@ async function handle(msg, sender) {
       const { imageDataUrl, metaUrl, metaTitle } = msg;
       if (!imageDataUrl) return { ok: false, error: 'no imageDataUrl' };
       const contextText =
-        `${PAGE_CONTEXT_PREFIX}\nURL: ${metaUrl || ''}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
+        `${PAGE_CONTEXT_PREFIX}\nURL: ${redactUrlCredentials(metaUrl || '')}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
       // attachId = the entry's undo identity (panel's 撤销 removes THIS entry
       // by id, not by "last page-context" — see UNDO_ATTACH).
       const attachId = crypto.randomUUID();
@@ -725,11 +726,11 @@ async function handle(msg, sender) {
       };
       const contextText =
         `${PAGE_CONTEXT_PREFIX}\n` +
-        `URL: ${metaUrl || ''}\n` +
+        `URL: ${redactUrlCredentials(metaUrl || '')}\n` +
         `Title: ${metaTitle || ''}\n` +
         (headerBlock ? headerBlock : '') +
         `Mode: ${pdfCtx.mode}${pdfCtx.format ? ` | ${pdfCtx.format}` : ''}\n` +
-        `---\n\n${finalText}`;
+        `---\n\n${redactTextUrls(finalText)}`;
       // Store the page text plus figure JPEGs as a multimodal content array -
       // exactly like ATTACH_SCREENSHOT_CONFIRM - so figures are resent on every
       // turn alongside the text. buildMessages pushes history entries through

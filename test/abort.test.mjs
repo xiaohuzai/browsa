@@ -70,7 +70,7 @@ Object.defineProperty(globalThis, 'chrome', {
 });
 
 const bg = await import('../background.js');
-const { handle, streamState, streamPorts, chatControllers, initStreamState, appendToStreamState, clearStreamState } = bg;
+const { handle, streamState, streamPorts, chatControllers, activeRunIds, initStreamState, appendToStreamState, clearStreamState } = bg;
 
 // --------------- tests -------------------------------------------------------
 
@@ -116,6 +116,82 @@ test('STREAM_ABORT with no live controller is a safe no-op', async () => {
 
   const r = await handle({ type: 'STREAM_ABORT', tabId: 9999 });
   assert.equal(r.aborted, false, 'handler must report no-op when no controller exists');
+});
+
+test('STREAM_ABORT stops the server-side Hermes run and clears its registration', async () => {
+  streamState.clear();
+  chatControllers.clear();
+  activeRunIds.clear();
+
+  // Capture the stop request. The handler fire-and-forgets it (catch(() => {})),
+  // so wait a tick for the mocked fetch to run before asserting.
+  const stopCalls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { stopCalls.push({ url, opts }); return { ok: true }; };
+
+  try {
+    activeRunIds.set(7, { runId: 'run-abc', baseUrl: 'http://hermes.local:8642', apiKey: 'sk-test' });
+    await handle({ type: 'STREAM_ABORT', tabId: 7 });
+    await new Promise((r) => setTimeout(r, 10));
+
+    assert.equal(stopCalls.length, 1, 'exactly one stop request must be sent');
+    assert.equal(stopCalls[0].url, 'http://hermes.local:8642/v1/runs/run-abc/stop');
+    assert.equal(stopCalls[0].opts.method, 'POST');
+    assert.equal(stopCalls[0].opts.headers['Authorization'], 'Bearer sk-test');
+    assert.equal(activeRunIds.has(7), false, 'the run registration must be cleared so a later abort never double-stops');
+  } finally {
+    globalThis.fetch = realFetch;
+    activeRunIds.clear();
+  }
+});
+
+test('STREAM_ABORT without a registered Hermes run sends no stop request', async () => {
+  streamState.clear();
+  chatControllers.clear();
+  activeRunIds.clear();
+
+  const stopCalls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { stopCalls.push({ url, opts }); return { ok: true }; };
+  try {
+    await handle({ type: 'STREAM_ABORT', tabId: 8 });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(stopCalls.length, 0, 'non-Hermes (or already-deleted) aborts must not hit /stop');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('stopHermesRun is a guarded fire-and-forget (skips incomplete info, swallows errors)', async () => {
+  const { stopHermesRun } = await import('../lib/handlers/chat-handler.js');
+
+  let calls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { calls++; throw new Error('network dead'); };
+  try {
+    stopHermesRun(null);                       // no entry → no fetch, no throw
+    stopHermesRun({ baseUrl: 'http://x' });    // missing runId → no fetch
+    stopHermesRun({ runId: 'r1' });            // missing baseUrl → no fetch
+    assert.equal(calls, 0, 'incomplete run info must be skipped silently');
+
+    stopHermesRun({ runId: 'r 2', baseUrl: 'http://x', apiKey: 'k' }); // fetch throws → swallowed
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(calls, 1, 'complete run info must fire exactly one request');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('CHAT handler idle-timeout abort path also stops the server-side Hermes run', async () => {
+  // Idle-timeout aborts happen inside handleChat (no STREAM_ABORT ran), so the
+  // abort catch must stop the registered run itself — otherwise the agent keeps
+  // executing tools server-side with nobody listening.
+  const src = await (await import('fs/promises')).readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  const catchIdx = src.indexOf("if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {", src.indexOf('} catch (e)'));
+  assert.ok(catchIdx > 0, 'abort catch block must exist');
+  const block = src.slice(catchIdx, src.indexOf('throw e;', catchIdx));
+  assert.match(block, /stopHermesRun\(activeRunIds\.get\(tabId\)\)/,
+    'the abort catch must call stopHermesRun with the still-registered run');
 });
 
 test('CHAT handler stores AbortController in chatControllers before stream', async () => {
