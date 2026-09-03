@@ -2,6 +2,8 @@
 // build/package.mjs — package the extension into a versioned zip for
 // distribution. Strips the .git directory, node_modules, and the build
 // helper scripts; keeps everything the browser needs to load unpacked.
+// The manifest's "key" field is dropped in the zip (CWS forbids it) but
+// stays in the repo for stable unpacked-install IDs.
 
 import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
@@ -28,7 +30,7 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 // is unzipped and the user points at the parent, the extension
 // fails to load.
 const py = `
-import os, sys, zipfile
+import os, sys, json, zipfile
 root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test",
     # Dev-only trees: preview harness + its screenshot library (gitignored),
     # CWS store screenshots (gitignored), and the github.io website sources.
@@ -67,6 +69,15 @@ with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
             arcname = os.path.join(rel, fn) if rel else fn
             if any(arcname.startswith(p) for p in exclude_path_prefixes):
                 continue
+            if arcname == "manifest.json":
+                # CWS upload rejects a manifest containing a "key" field (the
+                # store assigns its own key and ID). The repo manifest keeps
+                # it so unpacked installs from Releases get a stable extension
+                # ID (chrome.storage.local is keyed by ID); strip it only here.
+                data = json.loads(open(full, encoding="utf-8").read())
+                if data.pop("key", None) is not None:
+                    zf.writestr(arcname, json.dumps(data, indent=2, ensure_ascii=False) + "\\n")
+                    continue
             zf.write(full, arcname)
 print(out)
 `;
