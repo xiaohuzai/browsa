@@ -11,7 +11,7 @@
    ↕  NM 帧（Chrome 只为 allowlist 里的扩展 ID 拉起宿主）
 宿主脚本（本目录 hosts/，随用随起，用完即走）
    ↕  newline-delimited JSON
-本机引擎（codex app-server / codebuddy stream-json / …）
+本机引擎（codex app-server / …）
 ```
 
 ## 安装（一次性）
@@ -50,7 +50,6 @@ install 是**追加**授权，不会撤销已授权的 app。没有通配符—�
 | id | 引擎 | 引擎参数 | 协议族 | 会话续接 |
 | --- | --- | --- | --- | --- |
 | `codex` | `codex`（CLI 或桌面版托管副本） | `app-server --stdio` | JSON-RPC stdio | in-band（`thread/resume`） |
-| `codebuddy` | `codebuddy`（CLI / WorkBuddy 桌面版） | `--input-format stream-json --output-format stream-json -p -y` | stream-json | 启动参数（控制帧传 `--resume <id>`） |
 
 一个后端就是一个 JSON 配方：二进制名、发现路径、引擎参数、协议说明。
 二进制不在标准位置时用 `--bin <backend>=<路径>` 显式指定。引擎需要环境变量

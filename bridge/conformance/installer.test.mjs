@@ -47,11 +47,10 @@ test('install: codex for browsa → neutral host com.agentbridge.codex, manifest
   assert.ok(!cmd.includes('browsa_codex'), 'no per-product host naming anywhere');
 });
 
-test('install: multiple backends and multiple consumers in one shot', () => {
+test('install: multiple consumers in one shot', () => {
   const other = 'b'.repeat(32);
-  const cmd = buildInstall(parseArgs(['node', 'ab', 'install', '--backend', 'codex', '--backend', 'codebuddy', '--allow', 'browsa', '--allow-extension', other, '--os', 'linux']));
+  const cmd = buildInstall(parseArgs(['node', 'ab', 'install', '--backend', 'codex', '--allow', 'browsa', '--allow-extension', other, '--os', 'linux']));
   assert.match(cmd, new RegExp(NM_HOST_PREFIX.replace(/\./g, '\\.') + '\\.codex'));
-  assert.match(cmd, new RegExp(NM_HOST_PREFIX.replace(/\./g, '\\.') + '\\.codebuddy'));
   assert.match(cmd, new RegExp(`chrome-extension://${other}/`), 'arbitrary extension id honored');
 });
 

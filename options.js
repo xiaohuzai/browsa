@@ -4,7 +4,6 @@ import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingSquilla } from './lib/squilla-client.js';
 import { codexPing } from './lib/codex-client.js';
-import { codebuddyPing } from './lib/codebuddy-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 
@@ -249,14 +248,13 @@ function buildProviderCard(name, cfg, opts = {}) {
   card.className = 'provider' + (name === cachedCfg.activeProvider ? ' active' : '') + (reserved ? ' reserved' : '');
   card.dataset.name = name;
 
-  // Native-messaging agent cards (Codex / WorkBuddy) have no URL to be
-  // "configured" — binary auto-discovery + the ping are the real gates, so
-  // their badge just starts at the neutral "not pinged".
-  const isConfigured = !!(cfg.baseUrl?.trim()) || !!cfg.isCodex || !!cfg.isWorkbuddy;
+  // Native-messaging agent cards (Codex) have no URL to be "configured" —
+  // binary auto-discovery + the ping are the real gates, so the badge just
+  // starts at the neutral "not pinged".
+  const isConfigured = !!(cfg.baseUrl?.trim()) || !!cfg.isCodex;
   const isAgent = (cfg.type || 'llm') === 'agent';
   const isCodex = !!cfg.isCodex;
-  const isWorkbuddy = !!cfg.isWorkbuddy;
-  const isNmAgent = isCodex || isWorkbuddy;
+  const isNmAgent = isCodex;
   const showModel = !isAgent; // Agent providers (Hermes) don't expose Model ID
   const displayName = prettyProviderName(name);
 
@@ -281,11 +279,11 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${isNmAgent ? `
       <div class="field field-full">
         <label><span>连接本机引擎
-          <span class="tip" tabindex="0">?<span class="tip-bubble">浏览器扩展不能直接启动本地进程。agent-bridge 在你机器上注册一个小桥（Native Messaging，只对授权过的扩展放行），browsa 通过它驱动本机${isCodex ? ' codex 引擎（与 VS Code 扩展同一接口）' : ' CodeBuddy 引擎（官方无头模式）'}，不改引擎侧任何东西。</span></span></span>
-          <div class="bridge-hint">在 browsa 仓库里运行一次安装向导（它会自动认出本扩展的 ID）：终端进入 browsa 目录，执行 <code>node bridge/cli/agent-bridge.mjs install</code>，向导里启用 ${isCodex ? 'codex' : 'codebuddy'}、回车允许 browsa，然后重启浏览器、点 Ping 验证。详见 <a href="https://github.com/xiaohuzai/browsa/tree/main/bridge" target="_blank" rel="noopener noreferrer">bridge/ 说明</a>。引擎要环境变量时（如 ARK_API_KEY），把 KEY=VALUE 写进 ~/.agent-bridge.env。${isWorkbuddy ? '注意：无头模式无法转发审批（上游限制），引擎以 -y 自动批准——只让它在你信任的目录里干活。' : ''}</div>
+          <span class="tip" tabindex="0">?<span class="tip-bubble">浏览器扩展不能直接启动本地进程。bridge 在你机器上注册一个小桥（Native Messaging，只对授权过的扩展放行），browsa 通过它驱动本机的 codex 引擎（与 VS Code 扩展同一接口），不改引擎侧任何东西。</span></span></span>
+          <div class="bridge-hint">在 browsa 仓库里运行一次安装向导（它会自动认出本扩展的 ID）：终端进入 browsa 目录，执行 <code>node bridge/cli/agent-bridge.mjs install</code>，向导里启用 codex、回车允许 browsa，然后重启浏览器、点 Ping 验证。详见 <a href="https://github.com/xiaohuzai/browsa/tree/main/bridge" target="_blank" rel="noopener noreferrer">bridge/ 说明</a>。引擎要环境变量时（如 ARK_API_KEY），把 KEY=VALUE 写进 ~/.agent-bridge.env。</div>
         </label>
       </div>
-      <div class="bridge-hint">沙箱与联网策略由引擎侧管理（${isCodex ? 'codex 桌面 app 的沙箱设置，或 ~/.codex/config.toml 的 sandbox_mode / network_access' : 'codebuddy 的配置'}）——browsa 不读取也不覆盖它们。</div>
+      <div class="bridge-hint">沙箱与联网策略由 codex 侧管理（桌面 app 的沙箱设置，或 ~/.codex/config.toml 的 sandbox_mode / network_access）——browsa 不读取也不覆盖它们。</div>
       ` : `
       <div class="field">
         <label>${isAgent ? `<span>Base URL${cfg.isSquilla ? `<span class="tip" tabindex="0">?<span class="tip-bubble">OpenSquilla gateway WebSocket 地址，默认 ws://127.0.0.1:18791/ws（<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>）。gateway 需把本扩展 origin 加入 cors.allowed_origins</span></span>` : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">Hermes API Server 启动与配置文档</a></span></span>`}</span>` : 'Base URL'}
@@ -485,9 +483,7 @@ async function pingCard(name, card) {
       ? await pingSquilla({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey })
       : cfg.isCodex
         ? await codexPing()
-        : cfg.isWorkbuddy
-          ? await codebuddyPing()
-          : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
+        : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -510,7 +506,7 @@ async function pingCard(name, card) {
     // events) — so it should reflect run support, not the generic
     // OpenAI-spec /v1/responses feature. Codex isn't an HTTP provider at
     // all — no capability probe applies.
-    const caps = (cfg.isCodex || cfg.isWorkbuddy) ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+    const caps = cfg.isCodex ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {

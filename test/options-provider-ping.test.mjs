@@ -328,11 +328,10 @@ async function addLlmCard() {
 
 test('options.js: init() renders the three fixed agent cards plus a reserved empty LLM slot', () => {
   const cards = providerCards();
-  assert.equal(cards.length, 5, 'Hermes Agent + OpenSquilla + Codex + WorkBuddy + one reserved empty LLM slot');
+  assert.equal(cards.length, 4, 'Hermes Agent + OpenSquilla + Codex + one reserved empty LLM slot');
   assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes Agent card present');
   assert.equal(findProviderCard('OpenSquilla') != null, true, 'OpenSquilla card present');
   assert.equal(findProviderCard('Codex') != null, true, 'Codex card present');
-  assert.equal(findProviderCard('WorkBuddy') != null, true, 'WorkBuddy card present');
   const reserved = document.querySelector('.provider.reserved');
   assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
   assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
@@ -354,13 +353,13 @@ test('options.js: configuring + saving the reserved slot does NOT auto-create an
 
   assert.equal(document.querySelector('.provider.reserved'), null, 'the reserved slot is consumed once a provider is committed');
   const names = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(names, ['Hermes Agent', 'OpenSquilla', 'Codex', 'WorkBuddy', 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
+  assert.deepEqual(names, ['Hermes Agent', 'OpenSquilla', 'Codex', 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
 
   // Now an explicit Add appends a new card BELOW the configured one.
   clickAddProvider();
   await new Promise((r) => setTimeout(r, 10));
   const after = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(after, ['Hermes Agent', 'OpenSquilla', 'Codex', 'WorkBuddy', 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
+  assert.deepEqual(after, ['Hermes Agent', 'OpenSquilla', 'Codex', 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
   const added = providerCards()[providerCards().length - 1];
   assert.ok(added.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
 });

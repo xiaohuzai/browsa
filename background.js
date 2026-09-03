@@ -934,9 +934,6 @@ async function handle(msg, sender) {
         if (allCfg.providers[name]?.isCodex) {
           await storage.clearCodexThreadId(name);
         }
-        if (allCfg.providers[name]?.isWorkbuddy) {
-          await storage.clearWorkbuddySessionId(name);
-        }
       }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };

@@ -1,4 +1,4 @@
-// conformance/bridge.test.mjs — engine-independent conformance suite.
+// bridge/conformance/bridge.test.mjs — engine-independent conformance suite.
 // Bakes the host templates for each backend recipe (engine binary overridden
 // to a fake engine), drives them with real Native-Messaging framing, and
 // asserts the transport contract: control-frame argv injection, frame
@@ -51,33 +51,19 @@ test('codex: resume argv rides the control frame', async () => {
   c.closeStdin();
 });
 
-// ── codebuddy family (stream-json) ───────────────────────────────────────────
-
-test('codebuddy: spawn-flag resume + stream-json round trip with usage', async () => {
-  const b = bake('codebuddy', { binOverride: join(ROOT, 'conformance', 'fake-codebuddy.mjs') });
-  const c = nmClient(b.host);
-  c.send({ argv: ['--resume', 'sess-abc-123'] });
-  const init = await c.wait((m) => m.type === 'system' && m.subtype === 'init', 'init');
-  assert.deepEqual(init.argv.slice(-2), ['--resume', 'sess-abc-123'],
-    'baked engine args + injected resume flag both reach the engine');
-  c.send({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: '你好世界' }] } });
-  await c.wait((m) => m.type === 'assistant' && m.message?.content?.[0]?.type === 'tool_use', 'tool_use');
-  const result = await c.wait((m) => m.type === 'result', 'result');
-  assert.equal(result.result, 'echo:你好世界');
-  assert.deepEqual(result.usage, { input_tokens: 10, output_tokens: 5 });
-  c.closeStdin();
-});
-
 // ── transport-level contract ─────────────────────────────────────────────────
 
 test('big frames (200 KB) survive the pump byte-exactly', async () => {
-  const b = bake('codebuddy', { binOverride: join(ROOT, 'conformance', 'fake-codebuddy.mjs') });
+  const b = bake('codex', { binOverride: join(ROOT, 'conformance', 'fake-codex.mjs') });
   const c = nmClient(b.host);
   c.send({ argv: [] });
-  const big = 'X'.repeat(200_000);
-  c.send({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: big }] } });
-  const result = await c.wait((m) => m.type === 'result', 'result', 15000);
-  assert.equal(result.result.length, 'echo:'.length + big.length);
+  c.send({ method: 'initialize', params: {}, id: 0 });
+  await c.wait((m) => m.id === 0, 'initialize');
+  c.send({ method: 'turn/start', params: { threadId: 'th-fake-1', input: [{ type: 'text', text: 'X'.repeat(200_000) }] }, id: 1 });
+  const item = await c.wait((m) => m.method === 'item/completed', 'item/completed', 15000);
+  // fake-codex echoes `echo:<text>|sandbox:<policy>` — account for the suffix.
+  assert.equal(item.params.item.text.length, 'echo:'.length + 200_000 + '|sandbox:null'.length,
+    '200 KB payload must round-trip byte-exactly');
   c.closeStdin();
 });
 
