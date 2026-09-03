@@ -78,6 +78,7 @@ browsa is an AI sidebar that chats with the page you're on — articles, YouTube
 
 🔒 PRIVACY BY ARCHITECTURE
 • Your API keys are stored only in your browser's local storage and sent nowhere except the endpoint you configure
+• Page context is sanitized locally before sending: credentials hiding in URLs (tokens, passwords, signatures) are masked so they never reach your provider
 • PDF parsing runs entirely on-device (WebAssembly) — file bytes never leave your machine
 • Model replies are sanitized (DOMPurify) before rendering; network interceptors only observe requests, never modify them
 • Open source (MIT): every line is auditable — https://github.com/xiaohuzai/browsa
@@ -90,6 +91,8 @@ Ctrl+Shift+H opens the sidebar · Enter/Shift+Enter configurable · Ctrl+F searc
 
 ──────────────────────────────
 browsa does not add markup to anyone's model bill — you pay your provider directly, or run local models for free. It collects no analytics and requires no sign-up.
+
+The UI follows your browser language (English / 中文), switchable in Settings.
 
 Install, open ⚙ Settings, paste a key (or point at localhost:11434), Ping to verify — you're chatting in under a minute.
 
@@ -143,6 +146,7 @@ browsa 是一个把「你正在看的页面」交给 AI 的浏览器侧边栏—
 
 🔒 隐私即架构
 • API Key 只存于你的浏览器本地，只发往你自己配置的端点
+• 页面内容发送前本地脱敏：藏在 URL 里的令牌、密码、签名参数自动隐去，不会到达 provider
 • PDF 全程本机解析，文件字节不出设备
 • 回复经 DOMPurify 消毒后再渲染；网络拦截器只观察、从不修改请求
 • MIT 开源：https://github.com/xiaohuzai/browsa
@@ -150,7 +154,7 @@ browsa 是一个把「你正在看的页面」交给 AI 的浏览器侧边栏—
 ✨ 富文本回复
 Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、ECharts 图表、Markmap 思维导图全部内联渲染；选中回复片段可开"细聊"侧对话。
 
-安装后打开 ⚙ 设置，贴入 Key（或指向 localhost:11434），Ping 通过即用。
+安装后打开 ⚙ 设置，贴入 Key（或指向 localhost:11434），Ping 通过即用。界面文字跟随浏览器语言（中/英），可在设置中切换。
 
 官网：https://xiaohuzai.github.io/browsa/
 ```
@@ -189,7 +193,7 @@ Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、EC
 | `storage` | Stores settings and conversation history locally in chrome.storage.local. Nothing syncs off-device except calls to the user-configured AI endpoint. |
 
 另外两条硬性前置：
-- **Privacy policy URL 必填且目前缺失** —— 建议在 docs/ 下加 `privacy.html` 挂到 github.io（内容可以把上面 🔒 三条展开成一页）。我可以直接写好这个页面。
+- **Privacy policy URL**：已上线，填 `https://xiaohuzai.github.io/browsa/privacy.html`（CWS 审核要求该 URL 不带登录墙，github.io 满足）。
 - 2025 年起若 listing 含联盟链接需披露；我们没有，勿添加返利链接。
 
 ---
@@ -197,8 +201,8 @@ Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、EC
 ## 6. 发布 checklist
 
 - [ ] Developer账号 $5（一次性）
-- [ ] zip：`npm run package` 当前 0.35.1 包已含最新设计
-- [ ] privacy policy 页面上线并把 URL 填入 dashboard
+- [ ] zip：`npm run package`（版本号取 manifest.json 当前值，打包前不擅自 bump）
+- [ ] privacy policy 已上线：https://xiaohuzai.github.io/browsa/privacy.html ，URL 填入 dashboard
 - [ ] 上传 5 张截图 + 440×280 宣传图
 - [ ] 权限说明逐条粘贴（上表）
 - [ ] 单一用途声明：`An AI sidebar that chats with the page you're viewing via the user's own configured model or agent.`

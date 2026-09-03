@@ -5,6 +5,7 @@
   "version": "0.35.10",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
+  "homepage_url": "https://xiaohuzai.github.io/browsa/",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjPKgdpR1tvewlfsIevifDyuIVs3sGjP2P6zJ1Jk/ZoOh5q87TRLnGmtzu/PZveDD6z0yOB5l0Z/i8OQ6bgeAAVAQA7g1DlTHDUAF4XTx+q4BfhwkWsPHUfb0lMszCHJgIzRNnoVX/mHp0MP/22XCaOEfYngPXSZowhHAQTw5LUCTYuu3G33QcVk60uvj4mLcwuiBqg1eMiRV+x5ZqM2vVwWmvJ1T07tjU3AgvCnNM96l4IPJQpFknUy74OFPX+KtHWrhPMQH3yqHOL9IznzRuyTEWnDRuEvl6nj3Hqo/7pW3KI/TtroLo6EM426A6qBdA/fT58Y/alw0iA/L4am80QIDAQAB",
   "permissions": [
     "sidePanel",

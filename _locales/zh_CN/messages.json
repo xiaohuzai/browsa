@@ -4,7 +4,7 @@
     "description": "Extension name"
   },
   "extensionDescription": {
-    "message": "把当前页面交给你的 AI 代理",
+    "message": "在侧边栏与当前页面对话——文章、视频、PDF，接你自己的模型或智能体。开源、无账号。",
     "description": "Extension description"
   },
   "openSidebar": {
