@@ -230,6 +230,31 @@ test('removeLastPageContext returns -1 when there is no page-context message', a
   assert.equal(await storage.removeLastPageContext(), -1);
 });
 
+test('removeHistoryEntryByAttachId removes the entry carrying that id — not the last one', async () => {
+  reset();
+  await storage.setHistory([
+    { role: 'user', attachId: 'id-A', content: `${PAGE_CONTEXT_PREFIX}\npage A` },
+    { role: 'user', attachId: 'id-B', content: `${PAGE_CONTEXT_PREFIX}\npage B` },
+  ]);
+  // The whole point of the id-based removal: undoing the OLDER attach (A)
+  // must remove A even though a newer page-context (B) exists — the legacy
+  // removeLastPageContext path removed B instead (2026-09-03 bug).
+  const removedIdx = await storage.removeHistoryEntryByAttachId('id-A');
+  assert.equal(removedIdx, 0);
+  const history = await storage.getHistory();
+  assert.equal(history.length, 1);
+  assert.equal(history[0].attachId, 'id-B', 'the newer attachment must survive');
+  assert.ok(history[0].content.includes('page B'));
+});
+
+test('removeHistoryEntryByAttachId returns -1 for unknown/missing id and leaves history untouched', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', attachId: 'id-A', content: `${PAGE_CONTEXT_PREFIX}\npage A` }]);
+  assert.equal(await storage.removeHistoryEntryByAttachId('nope'), -1);
+  assert.equal(await storage.removeHistoryEntryByAttachId(undefined), -1);
+  assert.equal((await storage.getHistory()).length, 1, 'history must be unchanged on miss');
+});
+
 // --------------- Hermes session identity (chrome.storage.session) -----------
 
 test('getOrCreateHermesSessionId creates once and returns the same id on subsequent calls', async () => {

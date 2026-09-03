@@ -107,7 +107,7 @@ async function flush() {
   await new Promise((r) => setTimeout(r, 20));
 }
 
-test('below-threshold attachment: no attachId stamped, no fetch call made', async () => {
+test('below-threshold attachment: attachId stamped (undo identity) but no summarize call made', async () => {
   const tabId = nextTabId++;
   let fetchCalled = false;
   globalThis.fetch = async () => { fetchCalled = true; return { ok: true, status: 200, body: sseFor('x'), text: async () => '' }; };
@@ -120,7 +120,11 @@ test('below-threshold attachment: no attachId stamped, no fetch call made', asyn
   assert.equal(res.ok, true);
   const history = await localArea.get('history');
   assert.equal(history.history.length, 1);
-  assert.equal(history.history[0].attachId, undefined, 'short attachments must not get an attachId');
+  // attachId is not a summarize marker anymore — EVERY attach entry carries
+  // one, because the panel's 撤销 button removes the entry by this id
+  // (UNDO_ATTACH). Only the summarize pipeline stays threshold-gated.
+  assert.ok(history.history[0].attachId, 'every attachment gets an attachId (undo identity)');
+  assert.equal(typeof res.attachId, 'string', 'ATTACH_PAGE returns the attachId for the label');
   assert.equal(fetchCalled, false, 'no summarization call should happen for short content');
 });
 
@@ -164,7 +168,9 @@ test('autoSummarizeAttachments: false disables the feature entirely, even above 
   assert.equal(res.ok, true);
   const history = await localArea.get('history');
   const entry = history.history[history.history.length - 1];
-  assert.equal(entry.attachId, undefined);
+  // attachId is unconditional now (undo identity); "disabled" means no
+  // summarize fetch happens — not "no attachId".
+  assert.ok(entry.attachId);
   assert.equal(fetchCalled, false);
   // restore for any subsequent tests in this file
   localArea._set({ autoSummarizeAttachments: true });

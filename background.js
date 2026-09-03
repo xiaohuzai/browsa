@@ -611,6 +611,18 @@ async function handle(msg, sender) {
     }
 
     case 'UNDO_ATTACH': {
+      // The panel sends the attachId stamped on the entry at attach time —
+      // undo must remove the entry the CLICKED label owns. With two
+      // attachments in history, removeLastPageContext() (the legacy no-id
+      // path below) always removes the LAST one, so undoing the older attach
+      // left its content in context and deleted the newer entry instead
+      // (2026-09-03: undo attach #1, ask, and the model still answered from
+      // page #1). Not-found (trimmed/undone race) is an honest ok:false —
+      // falling back to "last" would delete an unrelated attachment.
+      if (msg.attachId) {
+        const removedIdx = await storage.removeHistoryEntryByAttachId(msg.attachId);
+        return { ok: removedIdx >= 0, removedIdx };
+      }
       const removedIdx = await storage.removeLastPageContext();
       return { ok: removedIdx >= 0, removedIdx };
     }
@@ -631,14 +643,18 @@ async function handle(msg, sender) {
       if (!imageDataUrl) return { ok: false, error: 'no imageDataUrl' };
       const contextText =
         `${PAGE_CONTEXT_PREFIX}\nURL: ${metaUrl || ''}\nTitle: ${metaTitle || ''}\nMode: screenshot\n---\n\n(screenshot)`;
+      // attachId = the entry's undo identity (panel's 撤销 removes THIS entry
+      // by id, not by "last page-context" — see UNDO_ATTACH).
+      const attachId = crypto.randomUUID();
       await storage.appendToHistory({
         role: 'user',
+        attachId,
         content: [
           { type: 'text', text: contextText },
           { type: 'image_url', image_url: { url: imageDataUrl } }
         ]
       });
-      return { ok: true };
+      return { ok: true, attachId };
     }
 
     case 'ATTACH_PDF_CONFIRM': {
@@ -720,7 +736,9 @@ async function handle(msg, sender) {
       // LLM-based compression pass below, which most oversized-but-under-500K
       // PDFs (e.g. a 50-100 page document) would otherwise never get.
       const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
-      if (willSummarize) historyEntry.attachId = crypto.randomUUID();
+      // attachId is stamped on EVERY attach entry (not only summarized ones) —
+      // it's also the undo identity the panel's 撤销 button deletes by.
+      historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
       console.log(`browsa[bg]: pdf attached — ${finalText.length} chars, ${numPages || '?'} pages`);
       if (willSummarize) {
@@ -733,7 +751,7 @@ async function handle(msg, sender) {
       // contextText = the exact text the model receives (header incl. the
       // arXiv block + body incl. the Figures section) — the sidepanel's
       // 检查 dialog displays this, not the pre-header pdfText it holds.
-      return { ok: true, contextText };
+      return { ok: true, contextText, attachId: historyEntry.attachId };
     }
 
     case 'ATTACH_ASR_CONFIRM': {
@@ -791,7 +809,9 @@ async function handle(msg, sender) {
         tabId: msg.tabId ?? null,
       };
       const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(finalText, all.summarizeThresholdChars);
-      if (willSummarize) historyEntry.attachId = crypto.randomUUID();
+      // attachId is stamped on EVERY attach entry (not only summarized ones) —
+      // it's also the undo identity the panel's 撤销 button deletes by.
+      historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
       console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars${figures.length ? `, ${figures.length} keyframes` : ''}`);
       if (willSummarize) {
@@ -801,7 +821,7 @@ async function handle(msg, sender) {
           provider: all.providers?.[all.activeProvider]
         });
       }
-      return { ok: true };
+      return { ok: true, attachId: historyEntry.attachId };
     }
 
     case 'ASR_FRESH_URLS': {
@@ -1142,8 +1162,10 @@ async function handle(msg, sender) {
         // find this exact entry later, then kick it off fire-and-forget
         // AFTER the response below is prepared — the raw text is never
         // rendered in the chat bubble, so there's no UI to block on.
+        // Stamped on EVERY attach entry (not only summarized ones): it is
+        // also the undo identity the panel's 撤销 button deletes by.
         const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(ctx.text, all.summarizeThresholdChars);
-        if (willSummarize) historyEntry.attachId = crypto.randomUUID();
+        historyEntry.attachId = crypto.randomUUID();
         await storage.appendToHistory(historyEntry);
         console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`);
         if (willSummarize) {
@@ -1153,7 +1175,7 @@ async function handle(msg, sender) {
             provider: all.providers?.[all.activeProvider]
           });
         }
-        return { ok: true, ctx };
+        return { ok: true, ctx, attachId: historyEntry.attachId };
       } catch (e) {
         console.warn('browsa: ATTACH_PAGE failed', e);
         return { ok: false, error: e?.message || String(e) };
