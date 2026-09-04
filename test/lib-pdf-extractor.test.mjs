@@ -5,7 +5,7 @@
 // process doesn't have — confirmed while building this feature) — same
 // precedent as markmap/mermaid's real rendering not being unit-tested here.
 // This file checks the module's shape and capping logic via source
-// inspection; the CLAUDE.md/plan notes require a manual browser sanity check
+// inspection; the AGENTS.md/plan notes require a manual browser sanity check
 // (a real PDF, and a login-gated one) before considering this fully verified.
 
 import { test } from 'node:test';

@@ -6,7 +6,7 @@
 // The HTML sources load `InterVar.ttf` from this directory (font-weight variable font,
 // used for the display headline). If it is missing it is downloaded from Google Fonts.
 // Screenshots go through CDP Page.captureScreenshot (Playwright's page.screenshot has
-// a dark-mode artifact issue on this box — see CLAUDE.md history / dev-preview notes).
+// a dark-mode artifact issue on this box — see AGENTS.md history / dev-preview notes).
 
 import { chromium } from '/tmp/pwshot/node_modules/playwright-core/index.mjs';
 import fs from 'node:fs';

@@ -3,7 +3,7 @@
 // background.js ATTACH_PAGE / ATTACH_PDF_CONFIRM cases. pdf.js itself (real
 // Worker + binary parsing) can't be meaningfully exercised in this Node test
 // environment -- see test/lib-pdf-extractor.test.mjs for structural coverage
-// of lib/sidepanel/pdf-extractor.js, and the CLAUDE.md/plan notes for the
+// of lib/sidepanel/pdf-extractor.js, and the AGENTS.md/plan notes for the
 // required manual browser sanity check. This file only covers the
 // background.js message wiring: tryPdfExtraction's in-tab byte fetch +
 // fallback, and ATTACH_PDF_CONFIRM's history-storage path.

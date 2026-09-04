@@ -3,7 +3,7 @@
 // existing test file: llms.txt fetch/cache/TTL, the CHOICE_REQUEST
 // trailing-JSON parse/strip contract, and the SW_PING -> resetIdleTimer
 // wiring in background.js's browsa-chat
-// port handler (documented in CLAUDE.md as a real bug class: without it,
+// port handler (documented in AGENTS.md as a real bug class: without it,
 // long tool calls with minutes of SSE silence hit the 5-minute idle
 // timeout and get falsely cancelled).
 //
@@ -91,7 +91,7 @@ test('fetchLlmsTxt returns null immediately for an empty/falsy tabUrl (no networ
 
 // --------------- CHOICE_REQUEST trailing-JSON parse/strip -------------------
 // Mirrors the exact regex/flow from chat-handler.js's post-stream parse
-// step (search CHOICE_REQUEST_HINT in CLAUDE.md / background.js for the
+// step (search CHOICE_REQUEST_HINT in AGENTS.md / background.js for the
 // full contract): the agent may end its reply with a literal
 // `CHOICE_REQUEST:{"question":"...","choices":[...]}` block, which must be
 // parsed out, stripped from the text stored to history, and forwarded
