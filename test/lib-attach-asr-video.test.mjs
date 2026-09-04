@@ -84,6 +84,14 @@ test('video analysis prompt carries the same timestamp/speaker discipline as ASR
   assert.match(task, /画面：/);
   assert.match(task, /约 10 分钟/);
   assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /约 \d+ 分钟/);
+  // 全片覆盖硬约束（youtube-digest lateThreshold 思路，2026-09-04）：给具体的
+  // 90% 时刻锚点而非只有模糊措辞；时长未知时不出现锚点。
+  assert.match(task, /不得早于 \[09:00\]/);
+  assert.doesNotMatch(buildVideoAnalysisTaskText(0, 'zh'), /不得早于/);
+  const insDur = buildVideoAnalysisInstructions('zh', 600);
+  assert.match(insDur, /COVERAGE REQUIREMENT/);
+  assert.match(insDur, /\[09:00\]/);
+  assert.doesNotMatch(buildVideoAnalysisInstructions('zh'), /COVERAGE REQUIREMENT/, '时长未知不给覆盖锚点');
   // 截屏协议（2026-08-30 用户定调：内容/音频是主体，图只截关键的）：只截论证
   // 依赖的画面，软性密度参考（15-20 分钟 ≈ 6-10），禁截装饰性画面与重复画面；
   // 客户端只留安全阀。
