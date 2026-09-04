@@ -39,9 +39,10 @@ async function loadSiblingFn(name, file = join(ROOT, 'lib/page-extractor.js')) {
   return src.slice(start, i + 1);
 }
 
-async function runCleanup(html) {
+async function runCleanup(html, setup) {
   const fnBody = await loadSiblingFn('preExtractCleanup');
   const dom = new JSDOM(html, { url: 'https://example.com/' });
+  if (setup) setup(dom);
   const scrollToCalls = [];
   const ctx = vm.createContext({
     document: dom.window.document,
@@ -121,8 +122,28 @@ test('preExtractCleanup: clicks an aria-expanded=false element to expand collaps
 test('preExtractCleanup: expand clicks are capped at MAX_EXPAND (8)', async () => {
   const buttons = Array.from({ length: 12 }, (_, i) => `<button aria-expanded="false" id="e${i}">展开${i}</button>`).join('\n');
   const html = `<!doctype html><html><body><main>${buttons}</main></body></html>`;
-  const { result } = await runCleanup(html);
+  // Real expanders: each click appends fresh text, so the zero-delta
+  // bail-out must NOT fire and the pass runs to the MAX_EXPAND cap.
+  const { result } = await runCleanup(html, (dom) => {
+    for (let i = 0; i < 12; i++) {
+      dom.window.document.getElementById(`e${i}`).onclick = () => {
+        const p = dom.window.document.createElement('p');
+        p.textContent = `appended section ${i} `.repeat(4);
+        dom.window.document.querySelector('main').appendChild(p);
+      };
+    }
+  });
   assert.equal(result.expandedCount, 8, 'must stop at the MAX_EXPAND cap even with more candidates available');
+});
+
+test('preExtractCleanup: zero-delta bail — sterile expanders stop the pass after two clicks', async () => {
+  const buttons = Array.from({ length: 12 }, (_, i) => `<button aria-expanded="false" id="e${i}">展开${i}</button>`).join('\n');
+  const html = `<!doctype html><html><body><main>${buttons}</main></body></html>`;
+  // No-op buttons (clicks change nothing): decoration, not content gates —
+  // the crawl4ai-style zero-delta rule must cut the pass at two sterile
+  // clicks instead of burning the full budget on twelve.
+  const { result } = await runCleanup(html);
+  assert.equal(result.expandedCount, 2, 'two consecutive zero-delta clicks must stop the expansion pass');
 });
 
 test('preExtractCleanup: scroll step calls window.scrollTo and restores the original scroll position', async () => {

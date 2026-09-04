@@ -359,6 +359,14 @@ async function init() {
       return;
     }
 
+    if (msg.type === 'DEEP_EXTRACT_PROGRESS') {
+      // Live progress from background's deep-extraction pass, which runs
+      // inside the still-pending ATTACH_PAGE round trip; surface it on the
+      // same fixed pill the attach flow uses (cleared when attach lands).
+      if (msg.tabId === currentTabId && msg.text) showAttachProgress(msg.text);
+      return;
+    }
+
     if (msg.type === 'XHS_XHR_NOTE') {
       // Real XHR data from the content script. The most authoritative
       // source — the browser's own signed fetch, with cookies. We

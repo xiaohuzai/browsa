@@ -32,6 +32,7 @@ export {
   initStreamState, appendToStreamState, clearStreamState
 };
 import { extractActiveTab } from './lib/page-extractor.js';
+import { maybeDeepExtract } from './lib/agentic-extract.js';
 import { inlinePageImages } from './lib/page-images.js';
 import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
 import { redactUrlCredentials, redactTextUrls } from './lib/sanitize-url.js';
@@ -187,6 +188,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // like 小红书 — vanilla chrome.tabs.onUpdated does NOT fire for history-API
 // navigation.
 const navPorts = new Map(); // tabId -> Set<Port>
+
+// Deep-extraction progress rides the nav port the side panel already holds,
+// so the attach progress pill updates live while ATTACH_PAGE is still
+// awaiting (the pill is cleared by the attach flow when the response lands).
+function pushDeepProgress(tabId, text) {
+  const set = navPorts.get(tabId);
+  if (!set) return;
+  for (const p of set) {
+    try { p.postMessage({ type: 'DEEP_EXTRACT_PROGRESS', tabId, text }); } catch (_) {}
+  }
+}
 
 // Detail-thread ("SUBCHAT") port: opened fresh per send (one port per
 // subId), exactly like the main chat's per-turn browsa-chat port — NOT a
@@ -1055,6 +1067,31 @@ async function handle(msg, sender) {
                 }
               }
             } catch (_) { /* Jina fallback is best-effort; ignore errors */ }
+          }
+
+          // Deep extraction (auto-escalation): when the heuristic pass
+          // reports content it could not reach (URL pagination / load-more /
+          // leftover collapsed expanders), finish the job — walk next pages
+          // in a background tab and let the active provider click through
+          // what the heuristics missed. Provider-agnostic, hard-capped, and
+          // fail-open: any null/throw keeps the baseline result above.
+          // Generic modes only — site fast paths own their extraction.
+          if (['reader', 'dom', 'full', 'auto'].includes(ctx.mode) && all.deepExtractEnabled !== false) {
+            try {
+              const deep = await maybeDeepExtract({
+                tabId,
+                ctx,
+                textCap: all.maxTextChars,
+                query: msg.query || '',
+                redoMode: ctx.autoMode || ctx.mode,
+                sendProgress: (text) => pushDeepProgress(tabId, text)
+              });
+              if (deep) {
+                ctx.text = deep.text;
+                ctx.truncated.textLength = deep.text.length;
+                ctx.deepExtract = { clicks: deep.clicks, pages: deep.pages };
+              }
+            } catch (_) { /* fail-open: baseline result wins */ }
           }
         }
         // Screenshot mode: don't store to history yet. The side panel shows

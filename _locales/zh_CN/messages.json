@@ -946,5 +946,29 @@
   "mermaidSyntaxErrAt": {
     "message": "第 $1 行语法错误：$2",
     "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "页面内容没读全时，附加前自动展开并翻页（📎）",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "已启用：页面没读全时自动展开与翻页。",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "自动展开与翻页已停用。",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "内容似乎没读全，正在自动展开与翻页…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "自动展开内容中（$1/$2）…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "正在读取第 $1 页…",
+    "description": "Attach progress: deep extraction walking to page $1"
   }
 }

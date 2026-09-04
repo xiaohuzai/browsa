@@ -946,5 +946,29 @@
   "mermaidSyntaxErrAt": {
     "message": "Syntax error on line $1: $2",
     "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "When a page looks incomplete, automatically expand and page through it before attaching (📎)",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "Automatic expand-and-page on incomplete pages enabled.",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "Automatic expand-and-page disabled.",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "Page looks incomplete — expanding and paging through automatically…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "Expanding content automatically ($1/$2)…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "Reading page $1…",
+    "description": "Attach progress: deep extraction walking to page $1"
   }
 }
