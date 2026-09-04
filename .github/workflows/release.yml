@@ -96,17 +96,20 @@ jobs:
           PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "v$VERSION" | head -1)
           ARGS=(releases/generate-notes -f tag_name="v$VERSION")
           if [ -n "$PREV" ]; then ARGS+=(-f previous_tag_name="$PREV"); fi
-          # generate-notes 对刚推送的 tag 会短暂 404（notes 后端索引滞后于
-          # git ref 可见性，v0.35.2 发版实际翻车）：重试兜底，而不是整个
-          # 发版跟着失败。
+          # generate-notes 对刚推送的 tag 会 404：notes 后端索引滞后于 git
+          # ref 可见性（实测 30 秒内全 404、几分钟后才恢复，v0.35.2 因此翻
+          # 车两次）。以退出码为准判断成败——gh 出错时会把错误 JSON 打到
+          # stdout，BODY 是否为空不可靠；窗口给足 ~3 分钟。
           BODY=""
-          for i in 1 2 3 4 5; do
-            if BODY=$(gh api "${ARGS[@]}" -q .body); then break; fi
-            echo "::warning::generate-notes failed (attempt $i/5) — tag v$VERSION 刚推送、notes 后端索引滞后，5 秒后重试"
-            sleep 5
+          NOTES_OK=""
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if BODY=$(gh api "${ARGS[@]}" -q .body); then NOTES_OK=1; break; fi
+            echo "::warning::generate-notes failed (attempt $i/12) — tag v$VERSION 刚推送、notes 后端索引滞后，15 秒后重试"
+            BODY=""
+            sleep 15
           done
-          if [ -z "$BODY" ]; then
-            echo "::error::generate-notes 仍失败（已重试 5 次）——检查 tag v$VERSION 是否已推上 GitHub"
+          if [ -z "$NOTES_OK" ]; then
+            echo "::error::generate-notes 12 次尝试全部失败——tag v$VERSION 已确认推上 GitHub 仍 404，需人工介入"
             exit 1
           fi
           gh release create "v$VERSION" "browsa-v$VERSION.zip" \
