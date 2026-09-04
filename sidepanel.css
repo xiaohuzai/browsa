@@ -248,18 +248,13 @@ body {
   display: flex;
   gap: 2px;
 }
-/* Every action fades in on hover except copy — copy is the highest-frequency
-   action on an assistant reply, so it stays visible without requiring a
-   hover-to-discover step first. opacity lives per-icon (not on the .msg-actions
-   wrapper) so copy-icon's opacity:1 isn't multiplied down by a parent opacity:0. */
+/* Every action fades in on hover — one rule for the whole bar. The bar
+   floats over the bubble's top-right, so nothing may stay permanently
+   visible: a persistent icon occludes the message text it hovers over. */
 .msg-actions .msg-action-icon {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
-}
-.msg-actions .msg-action-icon.copy-icon {
-  opacity: 1;
-  pointer-events: auto;
 }
 .msg:hover .msg-actions .msg-action-icon {
   opacity: 1;

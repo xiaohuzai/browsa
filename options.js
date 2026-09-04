@@ -53,6 +53,7 @@ async function init() {
   applyAsr(cachedCfg);
   applyToolbarToggle();
   applyLlmsTxt();
+  applyDeepExtract();
   applySystemPrompt();
   applyReplyLanguage();
 
@@ -649,6 +650,20 @@ function applyLlmsTxt() {
   el.addEventListener('change', () => {
     chrome.storage.local.set({ llmsTxtEnabled: el.checked });
     flash('ok', el.checked ? _t('llmsTxtOnFlash', 'llms.txt will be included when attaching a page.') : _t('llmsTxtOffFlash', 'llms.txt disabled.'));
+  });
+}
+
+function applyDeepExtract() {
+  const el = $('deepExtractEnabled');
+  if (!el) return;
+  chrome.storage.local.get('deepExtractEnabled', ({ deepExtractEnabled }) => {
+    el.checked = deepExtractEnabled !== false; // default true
+  });
+  el.addEventListener('change', () => {
+    chrome.storage.local.set({ deepExtractEnabled: el.checked });
+    flash('ok', el.checked
+      ? _t('deepExtractOnFlash', 'Automatic expand-and-page on incomplete pages enabled.')
+      : _t('deepExtractOffFlash', 'Automatic expand-and-page disabled.'));
   });
 }
 
