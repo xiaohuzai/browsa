@@ -34,8 +34,8 @@ browsa.bundle
 # Local tool caches (e.g. CodeGraph indexer) — machine-local, never for committing.
 .codegraph/
 
-# Session-local Claude config (permission allowlists, plans)
-.claude/
+# Session-local ZCode CLI state (sessions, memories)
+.zcode/
 
 # Pi channel transcripts (Feishu chat logs) - local only, never commit
 .pi/

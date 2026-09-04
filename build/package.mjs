@@ -39,7 +39,7 @@ root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "bu
     # dev-preview/shots were silently swept in, bloating the zip from ~5.5MB
     # to 11.8MB -- same failure mode as the loose-PDF exclusion below.
     "dev-preview", "store-assets", "docs"}
-exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "CLAUDE.md", "skills-lock.json"}
+exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "AGENTS.md", "skills-lock.json"}
 # Dev/editor dot-directories (.pi channel transcripts, .claude local config,
 # .github workflows, .vscode, ...) must never ship in a distribution zip --
 # they can contain Feishu chat transcripts and local secrets. Handled below
