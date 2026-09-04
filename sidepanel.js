@@ -1453,6 +1453,9 @@ async function runAudioTranscribePipeline({ ctx, platform, wantDurSec }) {
       fileId: up.fileId,
       model: asr.model,
       language: asr.language,
+      // 全片覆盖硬约束：转写 prompt 也要具体的 90% 时刻锚点（与视频精读同款，
+      // 见 attach-asr.js coverageHintZh/En）——客户端 90% 守卫靠它提高一次过审率。
+      durationSec: wantDurSec,
       // 墙钟预算随视频时长缩放：单次转写整段音频所需时间 ≈ 音频时长 ÷ 转写
       // 速度（实测 ≥3.3 倍实时）。给到「音频时长 ÷ 2」（2 倍实时速度的余量），
       // 默认 10 分钟兜底、上限 45 分钟，防无限挂起；流式内部另有 60s 空闲超时。

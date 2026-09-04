@@ -257,6 +257,37 @@ test('transcribeAudio: empty language also falls back to auto-detect (no concret
   delete globalThis.fetch;
 });
 
+test('transcribeAudio: durationSec injects the concrete coverage anchor into instructions and task text', async () => {
+  let body;
+  globalThis.fetch = async (url, init) => {
+    assert.match(url, /\/responses$/);
+    body = JSON.parse(init.body);
+    return makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  };
+  await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', durationSec: 600, idleTimeoutMs: 1000 });
+  // 600s → 90% 锚点 = [09:00]（youtube-digest lateThreshold 思路：模糊的
+  // 「覆盖到结尾」拦不住模型提前收工，要给具体时刻）。
+  assert.match(body.instructions, /COVERAGE REQUIREMENT/);
+  assert.match(body.instructions, /\[09:00\]/);
+  const userText = body.input[0].content.find((p) => p.type === 'input_text').text;
+  assert.match(userText, /不得早于 \[09:00\]/);
+  assert.match(userText, /相邻时间戳的间隔不要超过约 5 分钟/);
+  delete globalThis.fetch;
+});
+
+test('transcribeAudio: no durationSec → no coverage anchor anywhere', async () => {
+  let body;
+  globalThis.fetch = async (url, init) => {
+    body = JSON.parse(init.body);
+    return makeSseResponse(SSE_DELTA_1, SSE_DELTA_2);
+  };
+  await transcribeAudio({ baseUrl: 'b', apiKey: 'k', fileId: 'f', model: 'm', idleTimeoutMs: 1000 });
+  assert.doesNotMatch(body.instructions, /COVERAGE REQUIREMENT/);
+  const userText = body.input[0].content.find((p) => p.type === 'input_text').text;
+  assert.doesNotMatch(userText, /不得早于/);
+  delete globalThis.fetch;
+});
+
 // ── 流式中止路径（2026-08-29 实测：81 分钟视频精读被 10 分钟墙钟中止，Chrome 报
 // "BodyStreamBuffer was aborted" 用户看不懂）——两种中止源必须给出可读报错。 ──
 
