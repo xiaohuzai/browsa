@@ -71,7 +71,7 @@ test('clicking quickbar-toggle again re-collapses it and persists that too', () 
     'must persist the re-collapsed state');
 });
 
-test('assistant reply\'s copy action carries the copy-icon class (kept visible without hover, unlike the other actions)', async () => {
+test('assistant reply\'s copy action is a plain msg-action-icon (no always-visible special case)', async () => {
   inputEl.value = 'hello';
   sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 50));
@@ -81,8 +81,14 @@ test('assistant reply\'s copy action carries the copy-icon class (kept visible w
   await new Promise((r) => setTimeout(r, 50));
 
   const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
-  const copyBtn = assistantEl.querySelector('.msg-action-icon.copy-icon');
-  assert.ok(copyBtn, 'the copy button must carry .copy-icon so CSS can keep it visible without a parent-opacity hover gate');
-  const replyOrDeleteBtn = assistantEl.querySelector('.msg-action-icon:not(.copy-icon):not(.fold-btn)');
-  assert.ok(replyOrDeleteBtn, 'sanity check: other action icons (reply/delete) must still exist, just without the always-visible class');
+  const copyBtn = assistantEl.querySelector('.msg-actions .msg-action-icon');
+  assert.ok(copyBtn, 'the copy button must exist in the hover actions row');
+  // The action bar floats over the bubble's top-right text, so NO action may
+  // carry an extra visibility class that CSS could pin permanently visible —
+  // every icon shares the hover fade-in. Regression guard for the retired
+  // copy-icon special case (it used to occlude message text).
+  const allowed = new Set(['msg-action-icon', 'msg-action-icon delete-icon', 'msg-action-icon fold-btn']);
+  const special = [...assistantEl.querySelectorAll('.msg-actions .msg-action-icon')]
+    .filter((b) => !allowed.has(b.className));
+  assert.equal(special.length, 0, `no action icon may opt out of the uniform hover gate, got: ${special.map((b) => b.className).join(', ')}`);
 });

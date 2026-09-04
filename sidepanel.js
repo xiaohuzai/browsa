@@ -3061,7 +3061,7 @@ function addMsgActions(el, getRaw) {
     buttons.push(regenBtn);
 
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'msg-action-icon copy-icon';
+    copyBtn.className = 'msg-action-icon';
     copyBtn.title = 'Copy response';
     copyBtn.innerHTML = ICONS.copy;
     copyBtn.addEventListener('click', async (e) => {
