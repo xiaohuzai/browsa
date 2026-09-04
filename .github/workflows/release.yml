@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   release:
@@ -65,44 +64,39 @@ jobs:
           fi
           ls -lh "$ZIP"
 
-      # main 有分支保护（PR + status check），不能直接 push。
-      # 版本号 bump 提交到 release/ 分支并开 PR，由用户手动合入。
-      # Release tag 指向这个已含新版本号的 release 分支 commit。
-      - name: Commit version bump to release branch + open PR
+      # bump 提交只留在本地 runner，随 tag 一起推送（tag 指向含新版本号的
+      # commit）。不开 release 分支、不开 PR：gh 在 Actions 里没有 GH_TOKEN
+      # 会静默失败，历史上 release PR 从未建成过，11 个 release 的 tag 因此
+      # 互相不成祖先，自动 notes 一路回退锚到 v0.31.2、把历史 PR 全量重列。
+      - name: Commit version bump + push tag
         id: bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION="${{ steps.ver.outputs.version }}"
+          git fetch origin --tags --quiet
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists — bump the version, or delete the old release+tag to redo."
+            exit 1
+          fi
           git add package.json package-lock.json manifest.json
-
-          if git diff --cached --quiet; then
-            echo "No version changes — tagging current HEAD"
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-            echo "pr=skipped" >> "$GITHUB_OUTPUT"
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release v$VERSION [skip ci]"
           fi
+          git tag -a "v$VERSION" -m "browsa v$VERSION"
+          git push origin "v$VERSION"
 
-          BRANCH="release/v${{ steps.ver.outputs.version }}"
-          git checkout -b "$BRANCH"
-          git commit -m "chore: release v${{ steps.ver.outputs.version }} [skip ci]"
-          git push origin "$BRANCH"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-          # 若已有同名 PR 则不重复创建（重跑同版本时）
-          PR_NUM=$(gh pr list --base main --head "$BRANCH" --state open --json number -q '.[0].number' 2>/dev/null || true)
-          if [ -z "$PR_NUM" ]; then
-            PR_NUM=$(gh pr create --base main --head "$BRANCH" \
-              --title "chore: release v${{ steps.ver.outputs.version }}" \
-              --body "由 Release workflow 自动生成的版本号 bump PR，合并即可。" | tail -1)
-          fi
-          echo "pr=$PR_NUM" >> "$GITHUB_OUTPUT"
-
-      # 创建 GitHub Release（tag 指向含新版本号的 release 分支 commit，zip 挂附件）
+      # notes 显式指定上一个 tag 生成（版本序次新），只含当前增量——
+      # 与 tag 之间的祖先关系、release PR 是否合入全部无关。
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: browsa v${{ steps.ver.outputs.version }}
-          target_commitish: ${{ steps.bump.outputs.sha }}
-          generate_release_notes: true
-          files: browsa-v${{ steps.ver.outputs.version }}.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "v$VERSION" | head -1)
+          ARGS=(releases/generate-notes -f tag_name="v$VERSION")
+          if [ -n "$PREV" ]; then ARGS+=(-f previous_tag_name="$PREV"); fi
+          BODY=$(gh api "${ARGS[@]}" -q .body)
+          gh release create "v$VERSION" "browsa-v$VERSION.zip" \
+            --title "browsa v$VERSION" \
+            --notes "$BODY"
