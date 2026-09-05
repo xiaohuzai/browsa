@@ -185,17 +185,17 @@ The screenshots above are the shape of it — the full reference lives here:
 </details>
 
 <details>
-<summary><b>Settings</b> — domain rules, masking, auto-summarize…</summary>
+<summary><b>Settings</b> — system prompt, languages, llms.txt, auto-summarize…</summary>
 
 | Setting | What it does |
 |---|---|
-| **Domain rules** | per-URL-pattern extra system prompt (e.g. always respond in English on `github.com`) |
-| **Mask rules** | regex-based content redaction before anything is sent (e.g. strip phone numbers) |
+| **System prompt** | prepended to every conversation as `role: system` — set reply language, tone, and format rules here |
 | **Reply language** | force replies in a specific language regardless of page language |
 | **UI language** | English, 中文, or Auto (follows the browser) — applies immediately, no reload |
-| **Max text chars** | cap how much page content is sent per turn |
-| **Auto-summarize long attachments** | pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background — the attachment returns instantly and later turns resend the compressed version; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
-| **llms.txt** | on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
+| **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
+| **Reading preferences** | message font size, send shortcut (Enter / Ctrl+Enter), auto-scroll toggle |
+| **ASR** | the speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source |
+| **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
 
 </details>
 
