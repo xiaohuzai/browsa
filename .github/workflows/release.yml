@@ -39,6 +39,14 @@ jobs:
           INPUT="${INPUT#v}"
           CURRENT=$(node -p "require('./package.json').version")
           if [ -n "$INPUT" ] && [ "$INPUT" != "$CURRENT" ]; then
+            # 版本回退防护（v0.35.3 翻车复盘）：package.json 已到 0.35.10 而
+            # 手填 0.35.3 时，npm version 会顺从地降级——打出比既有 tag 还小
+            # 的版本号，且 tag 指向 runner 本地提交。直接拒绝。
+            LOWER=$(node -e "const p=s=>s.split('.').map(Number);const i=p('$INPUT'),c=p('$CURRENT');for(let k=0;k<3;k++){if(i[k]!==c[k]){console.log(i[k]<c[k]?'yes':'no');process.exit(0)}}console.log('no')")
+            if [ "$LOWER" = "yes" ]; then
+              echo "::error::输入版本 v$INPUT 低于 package.json 当前版本 v$CURRENT — 版本不能回退。留空输入则按当前版本发 v$CURRENT。"
+              exit 1
+            fi
             npm version "$INPUT" --no-git-tag-version
           fi
           VERSION=$(node -p "require('./package.json').version")
@@ -97,20 +105,26 @@ jobs:
           ARGS=(releases/generate-notes -f tag_name="v$VERSION")
           if [ -n "$PREV" ]; then ARGS+=(-f previous_tag_name="$PREV"); fi
           # generate-notes 对刚推送的 tag 会 404：notes 后端索引滞后于 git
-          # ref 可见性（实测 30 秒内全 404、几分钟后才恢复，v0.35.2 因此翻
-          # 车两次）。以退出码为准判断成败——gh 出错时会把错误 JSON 打到
-          # stdout，BODY 是否为空不可靠；窗口给足 ~3 分钟。
+          # ref 可见性（v0.35.2 实测 ~30 秒，v0.35.3 实测可超过 6 分钟——
+          # 3 分钟窗口 12 次全 404 翻车）。以退出码为准判断成败——gh 出错时
+          # 会把错误 JSON 打到 stdout，BODY 是否为空不可靠。窗口加宽到
+          # ~7 分钟；仍失败则用 git log 本地生成 notes 兜底——zip/tests
+          # 都已跑完，release 不该死在 notes 上，PR 链接版可事后在 release
+          # 页编辑。
           BODY=""
           NOTES_OK=""
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          for i in $(seq 1 20); do
             if BODY=$(gh api "${ARGS[@]}" -q .body); then NOTES_OK=1; break; fi
-            echo "::warning::generate-notes failed (attempt $i/12) — tag v$VERSION 刚推送、notes 后端索引滞后，15 秒后重试"
+            echo "::warning::generate-notes failed (attempt $i/20) — tag v$VERSION 刚推送、notes 后端索引滞后，20 秒后重试"
             BODY=""
-            sleep 15
+            sleep 20
           done
           if [ -z "$NOTES_OK" ]; then
-            echo "::error::generate-notes 12 次尝试全部失败——tag v$VERSION 已确认推上 GitHub 仍 404，需人工介入"
-            exit 1
+            echo "::warning::generate-notes 20 次（~7 分钟）仍 404——git log 本地生成 notes 兜底发布，需要 PR 链接版请到 release 页编辑"
+            RANGE="v$VERSION"
+            [ -n "$PREV" ] && RANGE="v$PREV..v$VERSION"
+            BODY=$(git log --format='- %s' "$RANGE")
+            [ -z "$BODY" ] && BODY="browsa v$VERSION"
           fi
           gh release create "v$VERSION" "browsa-v$VERSION.zip" \
             --title "browsa v$VERSION" \
