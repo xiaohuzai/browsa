@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>设置与隐私 · browsa 指南</title>
-<meta name="description" content="browsa 设置一览：域名规则、脱敏规则、回复与界面语言、长度上限、长附件自动总结、llms.txt；以及数据流向的完整边界。">
+<meta name="description" content="browsa 设置一览：系统提示词、回复与界面语言、划词工具栏与 llms.txt、阅读偏好、ASR 字幕识别；以及数据流向的完整边界。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <link rel="stylesheet" href="../docs.css">
@@ -58,15 +58,19 @@
       <table class="doc-table">
         <thead><tr><th>设置</th><th>作用</th></tr></thead>
         <tbody>
-          <tr><td>域名规则</td><td>按 URL 模式追加系统提示词——比如让 <code>github.com</code> 上永远用英文回答</td></tr>
-          <tr><td>脱敏规则</td><td>发送前按正则抹掉内容——比如去掉手机号、工号；页面 URL 里的令牌、密码、签名参数本来就会自动隐去</td></tr>
+          <tr><td>系统提示词</td><td>每轮对话以 <code>role: system</code> 注入——回复语言、语气、格式规则都在这里定</td></tr>
           <tr><td>回复语言</td><td>不管页面是什么语言，固定用指定语言回答</td></tr>
           <tr><td>界面语言</td><td>English / 中文 / Auto（跟随浏览器），即时生效</td></tr>
-          <tr><td>最大文本字符数</td><td>限制每轮发送多少页面内容</td></tr>
-          <tr><td>长附件自动总结</td><td>超过阈值（默认 100,000 字符）的页面或字幕：附加立即返回，后台分块并行总结再合并；<code>[mm:ss]</code> 标记保留，时间戳照常可点；出错则安全回退到原文</td></tr>
-          <tr><td>llms.txt</td><td>附加页面时抓取一次站点自带的 LLM 指令并烘入上下文——尊重站点主给 AI 的「阅读须知」</td></tr>
+          <tr><td>划词工具栏与 llms.txt</td><td>开关划选文字时的浮动工具栏；附加页面时携带站点自带的 llms.txt 说明</td></tr>
+          <tr><td>阅读偏好</td><td>消息字号、发送快捷键（Enter / Ctrl+Enter）、自动滚动开关</td></tr>
+          <tr><td>ASR 字幕识别</td><td>无字幕视频的语音转写服务商（默认火山方舟）：API Key、语言、字幕来源</td></tr>
         </tbody>
       </table>
+      <figure class="shot">
+        <img src="../assets/guide/options-zh.png" alt="browsa 设置页：提供商卡片、语言与提示词、功能增强、阅读偏好与 ASR" loading="lazy">
+        <figcaption>设置页：提供商卡片、语言与提示词、功能增强、阅读偏好与 ASR。</figcaption>
+      </figure>
+      <p>另有两件事<strong>自动发生、无需配置</strong>：发送前，页面上下文里所有 URL 的凭据（令牌、密码、签名参数）在本机被抹掉；超过约 100,000 字符的长附件在后台分块总结、合并，<code>[mm:ss]</code> 时间标记保留。</p>
 
       <h2>数据流向哪里</h2>
       <p>browsa 的隐私边界只有一句话：<strong>你的数据只在你自己的浏览器和你自己配置的后端之间流动。</strong>具体到机制：</p>

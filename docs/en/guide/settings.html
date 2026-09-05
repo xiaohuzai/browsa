@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Settings &amp; privacy · browsa guide</title>
-<meta name="description" content="Every browsa setting explained: domain rules, mask rules, reply and UI language, length caps, long-attachment auto-summarization, llms.txt — plus exactly where your data flows.">
+<meta name="description" content="Every browsa setting explained: system prompt, reply and UI language, selection toolbar &amp; llms.txt, reading preferences, ASR — plus exactly where your data flows.">
 <link rel="icon" type="image/png" href="../../icon48.png">
 <link rel="stylesheet" href="../../site.css">
 <link rel="stylesheet" href="../../docs.css">
@@ -59,15 +59,19 @@
       <table class="doc-table">
         <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
         <tbody>
-          <tr><td>Domain rules</td><td>Append a system prompt per URL pattern — e.g. always answer in English on <code>github.com</code></td></tr>
-          <tr><td>Mask rules</td><td>Regex-based redaction before anything is sent — e.g. strip phone numbers; tokens, passwords, and signature params hiding in page URLs are masked automatically</td></tr>
+          <tr><td>System prompt</td><td>Prepended to every conversation as <code>role: system</code> — reply language, tone, and format rules live here</td></tr>
           <tr><td>Reply language</td><td>Force replies in a specific language regardless of the page's language</td></tr>
           <tr><td>UI language</td><td>English / 中文 / Auto (follows the browser) — immediate, no reload</td></tr>
-          <tr><td>Max text chars</td><td>Cap how much page content is sent per turn</td></tr>
-          <tr><td>Auto-summarize long attachments</td><td>Pages or transcripts past the threshold (default 100,000 chars): the attach returns instantly while chunked parallel summarization merges in the background; <code>[mm:ss]</code> markers are preserved so seek links keep working; any error fails open to the original text</td></tr>
-          <tr><td>llms.txt</td><td>On attach, the site's own LLM instructions are fetched once and folded into the page context — respecting the site's "notes for AI readers"</td></tr>
+          <tr><td>Selection toolbar &amp; llms.txt</td><td>Toggle the floating toolbar on text selection; attach pages with the site's own llms.txt instructions included</td></tr>
+          <tr><td>Reading preferences</td><td>Message font size, send shortcut (Enter / Ctrl+Enter), auto-scroll toggle</td></tr>
+          <tr><td>ASR</td><td>The speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source</td></tr>
         </tbody>
       </table>
+      <figure class="shot">
+        <img src="../../assets/guide/options-zh.png" alt="browsa settings: provider cards, languages and prompt, enhancements, reading preferences and ASR" loading="lazy">
+        <figcaption>Settings: provider cards, languages &amp; prompt, enhancements, reading preferences, ASR.</figcaption>
+      </figure>
+      <p>Two things also happen <strong>automatically, with no configuration</strong>: before sending, credentials in every URL within page context (tokens, passwords, signature params) are removed locally; attachments over ~100,000 characters are chunk-summarized and merged in the background, with <code>[mm:ss]</code> markers preserved.</p>
 
       <h2>Where your data flows</h2>
       <p>browsa's privacy boundary in one sentence: <strong>your data moves only between your own browser and the backend you configured.</strong> Mechanically:</p>

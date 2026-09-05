@@ -112,6 +112,8 @@ figure.shot{margin:22px 0}
   border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
 }
 .shot figcaption{margin-top:10px;text-align:center;font-size:13px;color:var(--ink-dim)}
+/* 窄幅面板截图：居中，不撑满正文宽 */
+.shot.slim img{max-width:460px;margin:0 auto}
 
 /* ─── 翻页 ──────────────────────────────────────────────────────────────── */
 .pager{
