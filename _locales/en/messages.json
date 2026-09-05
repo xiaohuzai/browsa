@@ -155,10 +155,6 @@
     "message": "Context mode",
     "description": "Context mode group aria-label"
   },
-  "mediaDownload": {
-    "message": "Download audio/video",
-    "description": "Media download button label/tooltip"
-  },
   "toolbarHide": {
     "message": "Hide on this page",
     "description": "Selection toolbar close button"

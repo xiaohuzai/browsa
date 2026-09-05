@@ -155,10 +155,6 @@
     "message": "上下文模式",
     "description": "Context mode group aria-label"
   },
-  "mediaDownload": {
-    "message": "下载音频/视频",
-    "description": "Media download button label/tooltip"
-  },
   "toolbarHide": {
     "message": "本页隐藏",
     "description": "Selection toolbar close button"
