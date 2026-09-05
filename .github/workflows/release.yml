@@ -92,6 +92,11 @@ jobs:
             git commit -m "chore: release v$VERSION [skip ci]"
           fi
           git tag -a "v$VERSION" -m "browsa v$VERSION"
+          # bump commit 同时推到 release/vX 分支：tag 若只挂在 runner 本地
+          # 提交上（分支不可达），generate-notes 的索引疑似走低优先级队列
+          # ——v0.35.2/v0.35.3/v0.35.10 三次实测全部 404 超 6 分钟；旧设计
+          # tag 打在已推分支上时无此现象。推不动不阻塞（只影响 notes 速度）。
+          git push origin "HEAD:refs/heads/release/v$VERSION" || echo "::warning::release 分支推送失败——tag 将分支不可达，notes 可能长时间 404"
           git push origin "v$VERSION"
 
       # notes 显式指定上一个 tag 生成（版本序次新），只含当前增量——
@@ -122,7 +127,9 @@ jobs:
           if [ -z "$NOTES_OK" ]; then
             echo "::warning::generate-notes 20 次（~7 分钟）仍 404——git log 本地生成 notes 兜底发布，需要 PR 链接版请到 release 页编辑"
             RANGE="v$VERSION"
-            [ -n "$PREV" ] && RANGE="v$PREV..v$VERSION"
+            # 注意 PREV 自带 v 前缀（git tag 输出），只给 VERSION 补 v——
+            # 写成 v$PREV 会变成 vv0.35.2，git fatal 128（v0.35.10 实测）。
+            [ -n "$PREV" ] && RANGE="$PREV..v$VERSION"
             BODY=$(git log --format='- %s' "$RANGE")
             [ -z "$BODY" ] && BODY="browsa v$VERSION"
           fi
