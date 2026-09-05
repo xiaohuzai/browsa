@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cheat sheet · browsa guide</title>
+<meta name="description" content="The complete browsa cheat sheet: slash commands and keyboard shortcuts.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/reference.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quick start</a>
+        <a href="reading.html">Reading pages</a>
+        <a href="video.html">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html">Connecting backends</a>
+        <a href="settings.html">Settings &amp; privacy</a>
+        <a href="reference.html" class="cur" aria-current="page">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Cheat sheet</p>
+      <h1>Cheat sheet</h1>
+      <p class="page-lead">The complete list of slash commands and keyboard shortcuts.</p>
+
+      <h2>Slash commands</h2>
+      <p>Type <code>/</code> in the composer for autocomplete. Every command accepts extra instructions: <code>/summarize focus on the methodology</code>:</p>
+      <table class="doc-table">
+        <thead><tr><th>Command</th><th>Prompt sent to the model</th></tr></thead>
+        <tbody>
+          <tr><td><code>/summarize</code></td><td>3–5 bullet summary</td></tr>
+          <tr><td><code>/translate</code></td><td>Translate to Chinese</td></tr>
+          <tr><td><code>/rewrite</code></td><td>More concise rewrite, keeping all facts</td></tr>
+          <tr><td><code>/explain</code></td><td>Explain for a beginner in simple language</td></tr>
+          <tr><td><code>/outline</code></td><td>Nested outline of headings only</td></tr>
+          <tr><td><code>/keypoints</code></td><td>Top 5 takeaways</td></tr>
+          <tr><td><code>/prompt</code></td><td>Show the current active system prompt (not sent to the model)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Quick actions</h2>
+      <p>One-click buttons above the composer: <strong>Summarize / Key Points / Explain / Outline</strong> — equivalent to the matching slash commands.</p>
+      <p>When you <strong>select text on a page</strong>, the floating toolbar offers Ask · Explain · Translate · Summarize; the right-click menu (browsa › …) carries the same four.</p>
+
+      <h2>Keyboard shortcuts</h2>
+      <table class="doc-table">
+        <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl+Shift+H</kbd> (macOS <kbd>Command+Shift+H</kbd>)</td><td>Open / close side panel</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Send message (configurable in Settings)</td></tr>
+          <tr><td><kbd>Shift+Enter</kbd></td><td>New line</td></tr>
+          <tr><td><kbd>Ctrl+K</kbd></td><td>Clear history (undoable for 5 seconds)</td></tr>
+          <tr><td><kbd>Ctrl+/</kbd></td><td>Cycle context mode (Auto ↔ Screenshot)</td></tr>
+          <tr><td><kbd>Ctrl+F</kbd></td><td>Open in-conversation search</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Cancel stream / close search / close drawer</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>↓</kbd> (empty composer)</td><td>Recall input history</td></tr>
+        </tbody>
+      </table>
+
+      <nav class="pager">
+        <a href="settings.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">Settings &amp; privacy</span>
+        </a>
+        <a href="./" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Back to the guide overview</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/reference.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reading pages · browsa guide</title>
+<meta name="description" content="Attaching the current tab with 📎: Auto and Screenshot modes, asking about a text selection, images, PDFs, GitHub files, and deep extraction on 12 sites.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/reading.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quick start</a>
+        <a href="reading.html" class="cur" aria-current="page">Reading pages</a>
+        <a href="video.html">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html">Connecting backends</a>
+        <a href="settings.html">Settings &amp; privacy</a>
+        <a href="reference.html">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Reading pages</p>
+      <h1>Reading pages</h1>
+      <p class="page-lead">
+        "Reading" is browsa's foundation: one click on 📎 brings the page you're on
+        into the conversation. This page covers what it reads, how, and the other
+        ways in besides 📎.
+      </p>
+
+      <h2>📎 Attach the current page</h2>
+      <p>Click 📎 next to the composer and the <strong>current tab</strong> is attached to the conversation. The default <strong>Auto mode</strong> picks its reading strategy in a cascade: clean article text first (Readability), falling back to the structured DOM tree, then to full page text. You never choose — the note above the composer tells you which reading was used.</p>
+      <p>One attach, lasting context: every following turn carries the page content with it, until you clear history or re-attach a different page.</p>
+
+      <h2>📷 Screenshot mode</h2>
+      <p>Sends the <strong>visible area</strong> of the tab as an image to a multimodal model — for questions plain text can't answer, like "which curve rises here". Toggle with <kbd>Ctrl+/</kbd> or pick it in 📎's mode menu.</p>
+
+      <h2>Ask about a text selection</h2>
+      <p>Only care about one paragraph? Select it on the page:</p>
+      <ul>
+        <li>A <strong>floating toolbar</strong> appears on release: Ask · Explain · Translate · Summarize;</li>
+        <li>or right-click → <strong>browsa</strong> › Ask / Explain / Translate / Summarize.</li>
+      </ul>
+      <p>The selection rides into the panel automatically — no need to click 📎 first.</p>
+
+      <h2>Images</h2>
+      <p><strong>Drag</strong> an image into the composer or paste a screenshot with <kbd>Ctrl+V</kbd> (multimodal models only — GPT-4o, Claude, and other vision models).</p>
+
+      <h2>PDF: parsed on your machine, figures included</h2>
+      <p>Attach a PDF — or open a page that turns out to be one — and no mode picking is needed:</p>
+      <ul>
+        <li>Parsing happens entirely in your browser (WASM + pdf.js); <strong>the file's bytes never leave your device</strong>;</li>
+        <li>Tables, headings, and multi-column layout are reconstructed — the model reads structure, not scrambled text;</li>
+        <li>Figure regions are cropped out and sent <strong>as images</strong> to vision models, paired with their captions — the model can actually <em>see</em> Figure 1.</li>
+      </ul>
+      <figure class="shot">
+        <img src="../../assets/readme/pdf-figures.png" alt="browsa explaining Figure 1 of a paper next to the PDF" loading="lazy">
+        <figcaption>Papers: figure regions are cropped, captioned, and sent to vision models — the answer points at the figure.</figcaption>
+      </figure>
+
+      <h2>GitHub file pages</h2>
+      <p>On <code>github.com</code> file pages, browsa fetches the raw source from <code>raw.githubusercontent.com</code> directly — Markdown and code keep their structure instead of the rendered page.</p>
+
+      <h2>Deep extraction on known sites</h2>
+      <p>For the sites below, browsa observes the requests the browser itself makes and reads the page's already-loaded structured data — subtitles, comments, note text — rather than guessing. No re-authentication, nothing sent to third parties.</p>
+      <div class="site-strip">
+        <span class="site-chip">YouTube<span class="en">transcripts/chapters</span></span>
+        <span class="site-chip">Bilibili<span class="en">transcripts/ASR/stats</span></span>
+        <span class="site-chip">Xiaohongshu<span class="en">notes/comments</span></span>
+        <span class="site-chip">Feishu / Lark<span class="en">docs/tables</span></span>
+        <span class="site-chip">Juejin<span class="en">article source</span></span>
+        <span class="site-chip">Zhihu<span class="en">posts/answers</span></span>
+        <span class="site-chip">X / Twitter<span class="en">tweets/replies</span></span>
+        <span class="site-chip">Reddit<span class="en">posts/comments</span></span>
+        <span class="site-chip">Xueqiu<span class="en">quotes/posts</span></span>
+        <span class="site-chip">Xiaoyuzhou<span class="en">podcasts</span></span>
+        <span class="site-chip">Dedao<span class="en">articles</span></span>
+        <span class="site-chip">Geektime<span class="en">articles</span></span>
+      </div>
+      <figure class="shot">
+        <img src="../../assets/readme/deep-extraction.png" alt="browsa extracting decision-ready key points from a Xiaohongshu note" loading="lazy">
+        <figcaption>A Xiaohongshu note: the page's own data, read directly — content and comments alike.</figcaption>
+      </figure>
+      <p>Pages not on the list work too — via the Auto cascade, just not as deep.</p>
+
+      <div class="tip"><b>Very long page?</b> Pages and transcripts past the threshold (default 100,000 characters) are chunked, summarized in parallel, and merged in the background — the attach returns instantly and later turns send the compact version. Threshold and toggle live in <a href="settings.html">Settings &amp; privacy</a>.</div>
+
+      <nav class="pager">
+        <a href="quickstart.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">Quick start</span>
+        </a>
+        <a href="video.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Video workflow</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/reading.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

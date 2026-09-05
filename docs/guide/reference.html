@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>速查表 · browsa 指南</title>
+<meta name="description" content="browsa 斜杠命令与键盘快捷键完整清单。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/reference.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html" class="cur" aria-current="page">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 速查表</p>
+      <h1>速查表</h1>
+      <p class="page-lead">斜杠命令与键盘快捷键的完整清单。</p>
+
+      <h2>斜杠命令</h2>
+      <p>在输入框输入 <code>/</code> 呼出补全。所有命令都能追加额外指令，如 <code>/summarize 重点讲方法论</code>：</p>
+      <table class="doc-table">
+        <thead><tr><th>命令</th><th>发给模型的提示</th></tr></thead>
+        <tbody>
+          <tr><td><code>/summarize</code></td><td>3–5 条要点总结</td></tr>
+          <tr><td><code>/translate</code></td><td>翻译成中文</td></tr>
+          <tr><td><code>/rewrite</code></td><td>更简洁的改写，保留全部事实</td></tr>
+          <tr><td><code>/explain</code></td><td>用简单语言向新手解释</td></tr>
+          <tr><td><code>/outline</code></td><td>仅标题的嵌套大纲</td></tr>
+          <tr><td><code>/keypoints</code></td><td>前 5 条要点</td></tr>
+          <tr><td><code>/prompt</code></td><td>显示当前生效的系统提示词（不发送给模型）</td></tr>
+        </tbody>
+      </table>
+
+      <h2>快捷操作按钮</h2>
+      <p>输入框上方常驻一键按钮：<strong>总结 / 要点 / 解释 / → 中文 / 大纲</strong>——等价于对应的斜杠命令。</p>
+      <p>在网页上<strong>划选文字</strong>时，浮动工具栏给出：<strong>提问 · 解释 · → 中文 · 总结</strong>；右键菜单 browsa › 提问 / 解释 / 翻译 / 总结 同款。</p>
+
+      <h2>键盘快捷键</h2>
+      <table class="doc-table">
+        <thead><tr><th>快捷键</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Ctrl+Shift+H</kbd>（macOS <kbd>Command+Shift+H</kbd>）</td><td>打开 / 关闭侧边栏</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>发送消息（可在设置里改为别的键）</td></tr>
+          <tr><td><kbd>Shift+Enter</kbd></td><td>换行</td></tr>
+          <tr><td><kbd>Ctrl+K</kbd></td><td>清空历史（5 秒内可撤销）</td></tr>
+          <tr><td><kbd>Ctrl+/</kbd></td><td>切换上下文模式（Auto ↔ 截图）</td></tr>
+          <tr><td><kbd>Ctrl+F</kbd></td><td>对话内搜索</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>停止回答 / 关闭搜索 / 关闭抽屉</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>↓</kbd>（输入框为空时）</td><td>召回输入历史</td></tr>
+        </tbody>
+      </table>
+
+      <nav class="pager">
+        <a href="settings.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">设置与隐私</span>
+        </a>
+        <a href="./" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">回到指南总览</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/reference.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

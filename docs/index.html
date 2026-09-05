@@ -28,6 +28,7 @@
       <span class="wordmark">browsa</span>
     </a>
     <nav class="nav-links" aria-label="页面导航">
+      <a href="guide/">指南</a>
       <a href="#how">怎么用</a>
       <a href="#features">功能</a>
       <a href="#sites" class="hide-m">站点</a>
@@ -279,6 +280,7 @@
           <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes Agent。界面文字跟随浏览器语言，也可手动切换中英文。</p>
         </div>
       </div>
+      <p class="site-note">装好了？<a href="guide/quickstart.html">快速上手</a>带你完成第一次提问；<a href="guide/">完整使用指南</a>覆盖读取、视频、渲染、会话、后端与设置。</p>
     </div>
   </section>
 
@@ -300,6 +302,16 @@
             <li>📷 截图模式，把可见区域发给多模态模型</li>
             <li>PDF 本地解析：WASM 重建表格 / 标题 / 版式，图片区域自动裁剪</li>
             <li>GitHub 文件页直接取 raw 源码，不走页面清理</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">select</span>
+          <h3>划词提问</h3>
+          <p>在任意网页划选一段文字，直接问：</p>
+          <ul>
+            <li>浮动工具栏：提问 · 解释 · → 中文 · 总结</li>
+            <li>右键菜单 browsa › 提问 / 解释 / 翻译 / 总结</li>
+            <li>选区自动送进侧边栏，不用先点 📎</li>
           </ul>
         </div>
         <div class="feature reveal">
@@ -344,6 +356,16 @@
             <li>页面内容发送前本地脱敏——URL 中的令牌、密码、签名参数自动隐去</li>
             <li>PDF 全程本地解析，字节不出设备</li>
             <li>内容只发给你自己配置的后端地址</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">rules</span>
+          <h3>规则与脱敏</h3>
+          <p>让 browsa 在特定站点按你的规矩来：</p>
+          <ul>
+            <li>域名规则：按 URL 模式追加提示词（github.com 永远英文回复）</li>
+            <li>脱敏规则：发送前按正则抹掉手机号等内容</li>
+            <li>回复语言与界面语言随手切换，即时生效</li>
           </ul>
         </div>
         <div class="feature reveal">
@@ -477,7 +499,7 @@
     <div class="foot-links">
       <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
-      <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md" target="_blank" rel="noopener">文档</a>
+      <a href="guide/">使用指南</a>
       <a href="privacy.html">隐私政策</a>
       <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
       <a class="lang" href="en/" lang="en">English ↗</a>

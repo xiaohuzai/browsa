@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video workflow · browsa guide</title>
+<meta name="description" content="Taking notes next to YouTube and Bilibili videos: summaries with clickable [mm:ss] timestamps, a transcript drawer that follows playback, ASR and visual analysis for subtitle-less videos.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/video.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quick start</a>
+        <a href="reading.html">Reading pages</a>
+        <a href="video.html" class="cur" aria-current="page">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html">Connecting backends</a>
+        <a href="settings.html">Settings &amp; privacy</a>
+        <a href="reference.html">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Video workflow</p>
+      <h1>Video workflow</h1>
+      <p class="page-lead">
+        Watching a video with the AI alongside is browsa's most complete scenario:
+        summaries carry timestamps, the transcript jumps back, and subtitle-less
+        videos still work. YouTube and Bilibili both supported.
+      </p>
+
+      <figure class="shot">
+        <img src="../../assets/readme/video-notes.png" alt="browsa summarizing a Bilibili video into clickable timestamped notes" loading="lazy">
+        <figcaption>Video notes: key points carry [mm:ss] — click one to jump back to that moment.</figcaption>
+      </figure>
+
+      <h2>Notes with clickable timestamps</h2>
+      <p>Attach the video page with 📎 and ask normally: "summarize this", "what methods does the author present". YouTube and Bilibili transcripts are extracted structurally (not OCR'd off the screen), so the <code>[mm:ss]</code> timestamps in the reply are <strong>clickable</strong> — the video jumps to that moment.</p>
+      <p>If the current tab is that video, the seek happens in place; only when the panel is following a different tab does a new tab open.</p>
+
+      <h2>The transcript drawer</h2>
+      <p>In a conversation where a video was attached, a transcript-drawer button appears in the top bar. It lays the whole transcript out as a clickable timeline:</p>
+      <ul>
+        <li><strong>Playback follow</strong>: the row at the video's current position stays highlighted, auto-scrolled into view;</li>
+        <li><strong>Click any row</strong>: the video seeks to that line;</li>
+        <li><strong>记一笔 (jot a note)</strong>: drops the current line, with its timestamp, into the composer so you can ask about it;</li>
+        <li><strong>Search</strong>: find a phrase in the transcript, every match highlighted.</li>
+      </ul>
+
+      <h2>Videos without subtitles</h2>
+      <p>Many Bilibili videos have no subtitles. When you attach one, a choice card appears with two paths:</p>
+      <ul>
+        <li><strong>Audio transcription (ASR)</strong>: the audio stream is fetched and transcribed locally — needs a <strong>Volcengine Ark key</strong> in Settings (pay-as-you-go; a 20-minute video typically costs a few cents). Fast, and light on chat tokens.</li>
+        <li><strong>Visual analysis (视频精读)</strong>: the visuals (slides, on-screen code) and the speech are understood <strong>together</strong> — right for lectures and demos. More accurate, but slower and heavier on tokens.</li>
+      </ul>
+      <div class="tip"><b>Audio transcription is always the default</b> — visual analysis is a deliberate trade of tokens for visual information, never something that happens on its own.</div>
+
+      <h2>Long videos</h2>
+      <p>For hour-plus videos the transcript is compacted into key points at attach time, timestamps preserved — summaries and seeking keep working while the context stays small. See "Auto-summarize long attachments" in <a href="settings.html">Settings &amp; privacy</a>.</p>
+
+      <div class="tip"><b>Switched videos?</b> Just click 📎 again — what's attached is always the current tab's content.</div>
+
+      <nav class="pager">
+        <a href="reading.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">Reading pages</span>
+        </a>
+        <a href="rendering.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Output &amp; rendering</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/video.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -28,6 +28,7 @@
       <span class="wordmark">browsa</span>
     </a>
     <nav class="nav-links" aria-label="Page navigation">
+      <a href="guide/">Guide</a>
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#sites" class="hide-m">Sites</a>
@@ -283,6 +284,7 @@
           <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API or Hermes Agent. The UI follows your browser language — English / 中文 switchable.</p>
         </div>
       </div>
+      <p class="site-note">Installed? <a href="guide/quickstart.html">Quick start</a> walks you through the first question; the <a href="guide/">full guide</a> covers reading, video, rendering, sessions, backends and settings.</p>
     </div>
   </section>
 
@@ -304,6 +306,16 @@
             <li>📷 Screenshot mode, for multimodal models</li>
             <li>PDF parsed locally: WASM rebuilds tables / headings / layout, figures auto-cropped</li>
             <li>GitHub file pages pull raw source directly, skipping page cleanup</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">select</span>
+          <h3>Selection Q&amp;A</h3>
+          <p>Select any text on any page and ask directly:</p>
+          <ul>
+            <li>Floating toolbar: Ask · Explain · Translate · Summarize</li>
+            <li>Right-click → browsa › Ask / Explain / Translate / Summarize</li>
+            <li>The selection rides into the panel — no 📎 needed first</li>
           </ul>
         </div>
         <div class="feature reveal">
@@ -347,6 +359,16 @@
             <li>URLs in page context are masked locally before sending — tokens, passwords and signatures stripped</li>
             <li>PDFs parsed entirely on-device — bytes never leave</li>
             <li>Content goes only to the backend you configure</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <span class="f-tag">rules</span>
+          <h3>Rules &amp; masking</h3>
+          <p>Make browsa follow your rules on specific sites:</p>
+          <ul>
+            <li>Domain rules: per-URL-pattern prompts (always English on github.com)</li>
+            <li>Mask rules: regex-redact phone numbers &amp; friends before anything is sent</li>
+            <li>Reply &amp; UI language switch, effective immediately</li>
           </ul>
         </div>
         <div class="feature reveal">
@@ -479,7 +501,7 @@
     <div class="foot-links">
       <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
-      <a href="https://github.com/xiaohuzai/browsa/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+      <a href="guide/">Guide</a>
       <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
       <a href="../privacy.html">Privacy</a>
       <a class="lang" href="../" lang="zh-CN">简体中文 ↗</a>

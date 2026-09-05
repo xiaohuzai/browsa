@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connecting backends · browsa guide</title>
+<meta name="description" content="Connect browsa to your own models: OpenAI / Anthropic / Ollama / self-hosted gateways, multiple protocols and models per card; installing Hermes Agent and its approval flow.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/providers.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quick start</a>
+        <a href="reading.html">Reading pages</a>
+        <a href="video.html">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html" class="cur" aria-current="page">Connecting backends</a>
+        <a href="settings.html">Settings &amp; privacy</a>
+        <a href="reference.html">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Connecting backends</p>
+      <h1>Connecting backends</h1>
+      <p class="page-lead">
+        No accounts, no subscription, no markup — browsa simply brings your own
+        model endpoints into the side panel. Cloud, local, or self-hosted: all
+        welcome.
+      </p>
+
+      <h2>Two kinds of backends</h2>
+      <ul>
+        <li><strong>LLM providers</strong> — plain chat endpoints, covering nearly every service: OpenAI, Anthropic, Ollama, Groq, LiteLLM, aggregation gateways.</li>
+        <li><strong>Hermes Agent</strong> — a self-hosted agent with server-side tool execution: it can search, run commands, and operate files. Built into browsa; just point it at your server.</li>
+      </ul>
+
+      <h2>Filling in a provider card</h2>
+      <p>Open ⚙ Settings → LLM Providers. An empty <strong>LLM 1</strong> card is reserved for you — fill it in and Save, or use <strong>＋ Add Provider</strong> anytime:</p>
+      <table class="doc-table">
+        <thead><tr><th>Field</th><th>What to put</th></tr></thead>
+        <tbody>
+          <tr><td>Alias</td><td>A name you choose ("My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple cards stay distinguishable</td></tr>
+          <tr><td>Base URL</td><td>Root path only, e.g. <code>https://api.openai.com</code> — protocol paths are appended automatically</td></tr>
+          <tr><td>API Key</td><td>Your key, stored locally only (see <a href="settings.html">privacy</a>)</td></tr>
+          <tr><td>Model ID</td><td>Required, e.g. <code>gpt-4o</code>; <strong>comma-separate several</strong> — one card covers an entire gateway's catalog</td></tr>
+          <tr><td>API protocol</td><td>What this endpoint speaks: Chat Completions / Responses / Anthropic</td></tr>
+        </tbody>
+      </table>
+      <p>Save, then hit <strong>Ping</strong>: connectivity is verified and capabilities auto-detected. The first provider to ping successfully becomes active automatically; switch anytime from the dropdown at the top of the panel — multi-model cards expand to one "Alias · model" entry each.</p>
+      <figure class="shot">
+        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, and Hermes Agent provider cards" loading="lazy">
+        <figcaption>Settings: each card carries its own protocol and alias; ping state at a glance.</figcaption>
+      </figure>
+
+      <h2>Hermes Agent</h2>
+      <p>Hermes is a self-hosted AI agent with built-in tools (web search, terminal, files, memory). browsa speaks its <code>/v1/runs</code> protocol — which adds <strong>live tool progress</strong> and <strong>approval cards for dangerous actions</strong> (approve first, execute after):</p>
+      <ol>
+        <li>Install: <code>pip install hermes-agent</code> (or follow the official guide);</li>
+        <li>Add to <code>~/.hermes/.env</code>: <code>API_SERVER_ENABLED=true</code> and <code>API_SERVER_KEY=your-secret-key</code>;</li>
+        <li>Start: <code>hermes gateway</code> — look for <code>API server listening on http://127.0.0.1:8642</code>;</li>
+        <li>In browsa settings, select the <strong>Hermes Agent</strong> card, fill Base URL (e.g. <code>http://127.0.0.1:8642</code>) and API Key, then Ping.</li>
+      </ol>
+      <p>The Hermes card is fixed and always present; it needs only a Base URL and key — the protocol is auto-detected, falling back to plain chat if the server doesn't advertise <code>/v1/runs</code>.</p>
+
+      <h2>Ollama, locally</h2>
+      <p>Running Ollama on your machine? Base URL <code>http://localhost:11434</code>, protocol Chat Completions (Ollama speaks the OpenAI format), Model ID set to a pulled model such as <code>qwen3:32b</code>. Fully <strong>offline-capable</strong>.</p>
+
+      <div class="tip"><b>Ping failing?</b> Check in order: Base URL ends at the root (no <code>/v1/chat/completions</code> tail); the key is valid; a local model is actually running; your network doesn't block the domain. Errors in the panel come as classified error cards with the raw message expandable and copyable.</div>
+
+      <nav class="pager">
+        <a href="sessions.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">Sessions &amp; organizing</span>
+        </a>
+        <a href="settings.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Settings &amp; privacy</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/providers.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
