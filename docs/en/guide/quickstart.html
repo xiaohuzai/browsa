@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick start · browsa guide</title>
+<meta name="description" content="Five minutes to a working browsa: load the extension, open the side panel, connect your own model, ask your first question with page context.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/quickstart.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html" class="cur" aria-current="page">Quick start</a>
+        <a href="reading.html">Reading pages</a>
+        <a href="video.html">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html">Connecting backends</a>
+        <a href="settings.html">Settings &amp; privacy</a>
+        <a href="reference.html">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Quick start</p>
+      <h1>Quick start</h1>
+      <p class="page-lead">
+        Four steps: install the extension → open the side panel → connect your own
+        model → ask your first question. About five minutes total.
+      </p>
+
+      <h2>1 · Install the extension</h2>
+      <div class="install-steps">
+        <div class="step">
+          <span class="no">1</span>
+          <div>
+            <h4>Get the code</h4>
+            <p><code>git clone</code> the repo, or grab a zip from <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> and unpack it.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="no">2</span>
+          <div>
+            <h4>Load it</h4>
+            <p>Open <code>chrome://extensions</code> (Edge: <code>edge://extensions</code>) → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → select the <code>browsa/</code> directory. Requires Chrome / Edge <strong>114+</strong> — any recently auto-updated browser qualifies.</p>
+          </div>
+        </div>
+      </div>
+      <p>browsa is an unpacked extension loaded through developer mode. It costs nothing and asks for nothing beyond what it needs.</p>
+
+      <h2>2 · Open the side panel</h2>
+      <p>On any page, press <kbd>Ctrl+Shift+H</kbd> (macOS: <kbd>Command+Shift+H</kbd>) or click the browsa toolbar icon. The panel opens on the right side of the page and follows whichever tab you switch to.</p>
+
+      <h2>3 · Connect your own model</h2>
+      <p>browsa ships with no model of its own — it brings <strong>the backend you configure</strong> into the panel. Click <strong>⚙ Settings</strong> in the panel's top bar:</p>
+      <ul>
+        <li><strong>Plain chat models</strong>: any endpoint compatible with OpenAI, Anthropic, or Ollama. Fill in <strong>Base URL + API Key + Model ID</strong>, then Save.</li>
+        <li><strong>Hermes Agent</strong>: an optional self-hosted agent with tool execution — see <a href="providers.html">Connecting backends</a>.</li>
+      </ul>
+      <p>Then hit <strong>Ping</strong> to verify — the first provider that pings successfully becomes active automatically.</p>
+      <div class="tip"><b>No API key?</b> Install Ollama locally (<code>localhost:11434</code>) for fully offline use, or grab a key from any cloud provider's console. Field-by-field details live on the <a href="providers.html">Connecting backends</a> page.</div>
+
+      <h2>4 · Ask your first question</h2>
+      <ol>
+        <li>Open an article (or a video, or a PDF), press <kbd>Ctrl+Shift+H</kbd>.</li>
+        <li>Click <strong>📎</strong> next to the composer — the current page is attached, and a note above the input confirms what was read.</li>
+        <li>Type your question and press <kbd>Enter</kbd>. The reply streams in token by token, with Markdown, formulas, and diagrams rendered right in the panel.</li>
+      </ol>
+      <p>Don't feel like typing? Use the quick-action buttons above the composer — <strong>Summarize / Key Points / Explain / Outline</strong> — one click runs the task on the current page.</p>
+
+      <div class="tip"><b>browsa's habit is "attach first, ask later."</b> Once a page is attached it stays in context for every following turn — so click 📎 now and think about the question while the reply is streaming.</div>
+
+      <h2>UI language</h2>
+      <p>Settings lets you switch the interface to <strong>English / 中文 / Auto</strong> (follows the browser) — effective immediately, no reload. The language replies come back in can be pinned separately via the reply-language setting.</p>
+
+      <nav class="pager">
+        <a href="./">
+          <span class="dir">‹ prev</span>
+          <span class="t">Guide overview</span>
+        </a>
+        <a href="reading.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Reading pages</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/quickstart.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

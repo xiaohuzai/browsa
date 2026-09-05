@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>连接后端 · browsa 指南</title>
+<meta name="description" content="把 browsa 连到你自己的模型：OpenAI / Anthropic / Ollama / 自建网关，多协议多模型；Hermes Agent 的安装步骤与工具审批流。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/providers.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html" class="cur" aria-current="page">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 连接后端</p>
+      <h1>连接后端</h1>
+      <p class="page-lead">
+        browsa 没有账号、没有订阅、不加价——它只是把你自己的模型接口搬进侧边栏。
+        云端的、本地的、自建的，都行。
+      </p>
+
+      <h2>两类后端</h2>
+      <ul>
+        <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
+        <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
+      </ul>
+
+      <h2>配一张提供商卡</h2>
+      <p>打开 ⚙ 设置 → LLM Providers。页面上预留了一张空的 <strong>LLM 1</strong> 卡，填完点 Save 即生效；也可以用 <strong>＋ Add Provider</strong> 随时加卡：</p>
+      <table class="doc-table">
+        <thead><tr><th>字段</th><th>填什么</th></tr></thead>
+        <tbody>
+          <tr><td>Alias（别名）</td><td>你起的名字，如「My OpenAI」「本地模型」——显示在侧边栏下拉里，多张卡靠它区分</td></tr>
+          <tr><td>Base URL</td><td>到根路径即可，如 <code>https://api.openai.com</code>，协议路径自动补全</td></tr>
+          <tr><td>API Key</td><td>你的密钥，只存本机（见<a href="settings.html">隐私</a>）</td></tr>
+          <tr><td>Model ID</td><td>必填，如 <code>gpt-4o</code>；<strong>逗号分隔可填多个</strong>——一张卡覆盖一个网关上的全部模型</td></tr>
+          <tr><td>API 协议</td><td>该端点说的语言：Chat Completions / Responses / Anthropic</td></tr>
+        </tbody>
+      </table>
+      <p>保存后点 <strong>Ping</strong>：验证连通性并自动识别模型能力。第一个 Ping 通的提供商会自动设为当前使用；之后在侧边栏顶部下拉里随时切换，多模型的卡会按「别名 · 模型」逐个列出。</p>
+      <figure class="shot">
+        <img src="../assets/readme/providers-zh.png" alt="browsa 设置页：OpenAI、Claude、Ollama 与 Hermes Agent 四张提供商卡" loading="lazy">
+        <figcaption>设置页：每张卡独立协议、独立别名，Ping 状态一目了然。</figcaption>
+      </figure>
+
+      <h2>Hermes Agent</h2>
+      <p>Hermes 是自托管 AI 智能体，带搜索、终端、文件、记忆等内置工具。browsa 用它的 <code>/v1/runs</code> 协议——比普通对话多出<strong>工具执行进度直播</strong>和<strong>危险操作审批卡</strong>（先批准，再执行）：</p>
+      <ol>
+        <li>安装：<code>pip install hermes-agent</code>（或按官方指引）；</li>
+        <li>在 <code>~/.hermes/.env</code> 里加 <code>API_SERVER_ENABLED=true</code> 和 <code>API_SERVER_KEY=你的密钥</code>；</li>
+        <li>启动：<code>hermes gateway</code>，看到 <code>API server listening on http://127.0.0.1:8642</code> 即成功；</li>
+        <li>在 browsa 设置里选中 <strong>Hermes Agent</strong> 卡，填 Base URL（如 <code>http://127.0.0.1:8642</code>）与 API Key，Ping 验证。</li>
+      </ol>
+      <p>Hermes 卡固定存在、不可删除，只需 Base URL 和 Key——协议自动识别，服务端不支持 <code>/v1/runs</code> 时会自动回退到普通对话。</p>
+
+      <h2>Ollama 本地模型</h2>
+      <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>
+
+      <div class="tip"><b>Ping 不通？</b>按顺序核对：Base URL 是否到根路径（不要带 <code>/v1/chat/completions</code> 尾巴）；Key 是否有效；本机模型是否已启动；公司网络是否拦了该域名。报错信息在侧边栏的错误卡里有分类说明，原始错误可展开复制。</div>
+
+      <nav class="pager">
+        <a href="sessions.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">会话与整理</span>
+        </a>
+        <a href="settings.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">设置与隐私</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/providers.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

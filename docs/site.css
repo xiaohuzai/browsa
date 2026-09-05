@@ -574,6 +574,7 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
   margin-top:22px;font-size:13.5px;color:var(--ink-dim);max-width:640px;line-height:1.8;
 }
 .site-note b{color:var(--ink-2);font-weight:600}
+.site-note a{color:var(--mark);text-decoration:underline;text-underline-offset:2px;font-weight:500}
 
 /* ─── 安装 ──────────────────────────────────────────────────────────────── */
 .install-steps{max-width:680px}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置与隐私 · browsa 指南</title>
+<meta name="description" content="browsa 设置一览：域名规则、脱敏规则、回复与界面语言、长度上限、长附件自动总结、llms.txt；以及数据流向的完整边界。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/settings.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html" class="cur" aria-current="page">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 设置与隐私</p>
+      <h1>设置与隐私</h1>
+      <p class="page-lead">
+        设置不多，每一条都解决一个具体问题。这一页同时把「数据流向哪里」讲透。
+      </p>
+
+      <h2>设置一览</h2>
+      <table class="doc-table">
+        <thead><tr><th>设置</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td>域名规则</td><td>按 URL 模式追加系统提示词——比如让 <code>github.com</code> 上永远用英文回答</td></tr>
+          <tr><td>脱敏规则</td><td>发送前按正则抹掉内容——比如去掉手机号、工号；页面 URL 里的令牌、密码、签名参数本来就会自动隐去</td></tr>
+          <tr><td>回复语言</td><td>不管页面是什么语言，固定用指定语言回答</td></tr>
+          <tr><td>界面语言</td><td>English / 中文 / Auto（跟随浏览器），即时生效</td></tr>
+          <tr><td>最大文本字符数</td><td>限制每轮发送多少页面内容</td></tr>
+          <tr><td>长附件自动总结</td><td>超过阈值（默认 100,000 字符）的页面或字幕：附加立即返回，后台分块并行总结再合并；<code>[mm:ss]</code> 标记保留，时间戳照常可点；出错则安全回退到原文</td></tr>
+          <tr><td>llms.txt</td><td>附加页面时抓取一次站点自带的 LLM 指令并烘入上下文——尊重站点主给 AI 的「阅读须知」</td></tr>
+        </tbody>
+      </table>
+
+      <h2>数据流向哪里</h2>
+      <p>browsa 的隐私边界只有一句话：<strong>你的数据只在你自己的浏览器和你自己配置的后端之间流动。</strong>具体到机制：</p>
+      <ul>
+        <li><strong>API Key 只存本机</strong>（<code>chrome.storage.local</code>），除了你填的 Base URL 之外不发往任何地方；</li>
+        <li><strong>没有账号、没有遥测</strong>——安装即用，没有任何数据流经开发者；</li>
+        <li><strong>PDF 全程本机解析</strong>（WASM + pdf.js），文件字节不出设备，只有提取出的文本发给你配置的模型；</li>
+        <li><strong>发送前本地脱敏</strong>：页面内容里所有 URL 的凭据（token、密码、签名、会话 ID）在本机就被抹掉；</li>
+        <li><strong>内容脚本只观察</strong>网络请求，从不修改、拦截或重放它们；</li>
+        <li><strong>模型回复先过 DOMPurify 消毒</strong>再渲染，Mermaid 的 SVG 另行剥离脚本与事件属性。</li>
+      </ul>
+      <p>完整版见<a href="../privacy.html">隐私政策</a>。</p>
+
+      <h2>浏览器兼容</h2>
+      <p>Chrome / Edge <strong>114 及以上</strong>（主要目标）；Brave 1.56+ 理论可用（同一 Chromium 内核）。Firefox 不支持——没有侧边栏 API。</p>
+
+      <nav class="pager">
+        <a href="providers.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">连接后端</span>
+        </a>
+        <a href="reference.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">速查表</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/settings.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

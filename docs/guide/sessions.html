@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会话与整理 · browsa 指南</title>
+<meta name="description" content="保存与恢复命名会话、置顶与重命名、导出 Markdown、全文搜索、批量删除与可撤销清空；输入历史与草稿。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/sessions.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html" class="cur" aria-current="page">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 会话与整理</p>
+      <h1>会话与整理</h1>
+      <p class="page-lead">
+        历史就是一个不断增长的对话，别怕它变长——保存、搜索、导出、批量整理，
+        工具都在抽屉和快捷键里。
+      </p>
+
+      <h2>保存与恢复会话</h2>
+      <p>顶栏的 🕐 打开会话抽屉：<strong>保存当前对话</strong>并起个名字，之后随时恢复。列表按时间分组（今天 / 昨天 / 本周 / 更早），常用的可以<strong>置顶</strong>在列表上方。</p>
+      <ul>
+        <li>恢复一个会话 = 整段历史回到侧边栏，可以接着聊；</li>
+        <li>任意会话可 <strong>导出为 Markdown 文件</strong>；</li>
+        <li>会话可重命名。</li>
+      </ul>
+      <div class="tip"><b>换话题就存一个会话。</b>browsa 的对话是全局一份的——用「保存会话 + 清空」来整理话题，是最顺手的工作流。</div>
+
+      <h2>搜索</h2>
+      <ul>
+        <li><kbd>Ctrl+F</kbd>：在<strong>当前对话</strong>里全文搜索，所有匹配处高亮，计数、循环跳转；</li>
+        <li>会话抽屉的搜索框：按标题<strong>和消息内容</strong>过滤所有已存会话——只命中内容时会有一个小标记提示。</li>
+      </ul>
+
+      <h2>删除，但留后悔药</h2>
+      <ul>
+        <li>消息支持<strong>多选批量删除</strong>；</li>
+        <li>会话删除是<strong>两步确认</strong>：点一下进入待删状态，再点一下才真删（Ctrl/Cmd+点击可跳过）；</li>
+        <li><kbd>Ctrl+K</kbd> 清空当前历史，<strong>5 秒内可撤销</strong>。</li>
+      </ul>
+
+      <h2>输入也讲效率</h2>
+      <ul>
+        <li><kbd>↑</kbd>/<kbd>↓</kbd> 召回之前发送过的消息，改改就能重发；</li>
+        <li>写到一半关掉面板？草稿还在，下次打开接着写；</li>
+        <li>斜杠命令、快捷按钮、划词提问——见<a href="reference.html">速查表</a>。</li>
+      </ul>
+
+      <nav class="pager">
+        <a href="rendering.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">输出与渲染</span>
+        </a>
+        <a href="providers.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">连接后端</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/sessions.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

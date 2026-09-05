@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频工作流 · browsa 指南</title>
+<meta name="description" content="在 YouTube 和 B 站视频页旁做笔记：带可点击 [mm:ss] 时间戳的总结、随播放高亮的字幕抽屉、无字幕视频的 ASR 转写与视频精读。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/video.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html" class="cur" aria-current="page">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 视频工作流</p>
+      <h1>视频工作流</h1>
+      <p class="page-lead">
+        边看视频边和 AI 讨论，是 browsa 最完整的场景：总结带时间戳、字幕可回跳、
+        没有字幕也能转写。YouTube 与 B 站都支持。
+      </p>
+
+      <figure class="shot">
+        <img src="../assets/readme/video-notes.png" alt="browsa 把 B 站视频总结成带时间戳的笔记" loading="lazy">
+        <figcaption>视频笔记：要点自带 [mm:ss]，点击直接跳回对应画面。</figcaption>
+      </figure>
+
+      <h2>带时间戳的视频笔记</h2>
+      <p>在视频页点 📎 附加，然后像平常一样问：「总结一下」「老师讲了哪些方法」。YouTube 与 B 站的字幕是结构化提取的（不是从画面上抠字），所以回答里的 <code>[mm:ss]</code> 时间戳<strong>可以点击</strong>——点一下，视频跳到那个时刻。</p>
+      <p>只要当前标签页就是那个视频，点击时间戳就在原页面跳转；如果侧边栏跟着你切到了别的标签页，才会新开一个。</p>
+
+      <h2>字幕抽屉</h2>
+      <p>附加过视频的会话里，顶栏会出现字幕抽屉入口。它把整条字幕铺成一列可点击的时间线：</p>
+      <ul>
+        <li><strong>播放跟随</strong>：视频播到哪一行，哪一行就高亮，列表自动滚动跟上；</li>
+        <li><strong>点击任意行</strong>：视频跳到那句；</li>
+        <li><strong>记一笔</strong>：把当前这句连同时间戳填进输入框，方便就此追问；</li>
+        <li><strong>搜索</strong>：在字幕里找某句话，全部匹配行高亮标出。</li>
+      </ul>
+
+      <h2>没有字幕的视频</h2>
+      <p>B 站很多视频没有字幕，附加时会弹出选择卡片，两条路：</p>
+      <ul>
+        <li><strong>音频转写（ASR）</strong>：把音频流拉下来本地转写——需要在设置里填一个<strong>火山方舟 Key</strong>（按量计费，一条 20 分钟的视频通常只花几分钱）。速度快，token 消耗少。</li>
+        <li><strong>视频精读</strong>：画面（幻灯片、屏幕上的代码、板书）和语音<strong>一起</strong>理解，适合讲课、演示类视频。更准确，但更慢、token 消耗更高。</li>
+      </ul>
+      <div class="tip"><b>默认永远是音频转写</b>——精读是主动多花 token 换画面信息的选择，不是默认行为。</div>
+
+      <h2>长视频</h2>
+      <p>一小时以上的视频，字幕会在附加时自动压缩成要点，时间标记保留——总结和跳转照常可用，上下文却不会爆掉。细节见<a href="settings.html">设置与隐私</a>里的「长附件自动总结」。</p>
+
+      <div class="tip"><b>换了一个视频？</b>重新点一次 📎 即可——附加的永远是「当前标签页」的内容。</div>
+
+      <nav class="pager">
+        <a href="reading.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">读取页面</span>
+        </a>
+        <a href="rendering.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">输出与渲染</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/video.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

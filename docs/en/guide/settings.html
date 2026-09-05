@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings &amp; privacy · browsa guide</title>
+<meta name="description" content="Every browsa setting explained: domain rules, mask rules, reply and UI language, length caps, long-attachment auto-summarization, llms.txt — plus exactly where your data flows.">
+<link rel="icon" type="image/png" href="../../icon48.png">
+<link rel="stylesheet" href="../../site.css">
+<link rel="stylesheet" href="../../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../../" aria-label="browsa home">
+      <img src="../../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="Page navigation">
+      <a href="../../">Home</a>
+      <a href="../../#install" class="hide-m">Install</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../../guide/settings.html" lang="zh-CN" aria-label="简体中文">中文</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="Guide contents">
+      <p class="side-label">Guide</p>
+      <nav>
+        <a href="./">Overview</a>
+        <a href="quickstart.html">Quick start</a>
+        <a href="reading.html">Reading pages</a>
+        <a href="video.html">Video workflow</a>
+        <a href="rendering.html">Output &amp; rendering</a>
+        <a href="sessions.html">Sessions &amp; organizing</a>
+        <a href="providers.html">Connecting backends</a>
+        <a href="settings.html" class="cur" aria-current="page">Settings &amp; privacy</a>
+        <a href="reference.html">Cheat sheet</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">Guide</a> / Settings &amp; privacy</p>
+      <h1>Settings &amp; privacy</h1>
+      <p class="page-lead">
+        The settings are few, and each solves a specific problem. This page also
+        lays out exactly where your data goes.
+      </p>
+
+      <h2>Settings, one by one</h2>
+      <table class="doc-table">
+        <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Domain rules</td><td>Append a system prompt per URL pattern — e.g. always answer in English on <code>github.com</code></td></tr>
+          <tr><td>Mask rules</td><td>Regex-based redaction before anything is sent — e.g. strip phone numbers; tokens, passwords, and signature params hiding in page URLs are masked automatically</td></tr>
+          <tr><td>Reply language</td><td>Force replies in a specific language regardless of the page's language</td></tr>
+          <tr><td>UI language</td><td>English / 中文 / Auto (follows the browser) — immediate, no reload</td></tr>
+          <tr><td>Max text chars</td><td>Cap how much page content is sent per turn</td></tr>
+          <tr><td>Auto-summarize long attachments</td><td>Pages or transcripts past the threshold (default 100,000 chars): the attach returns instantly while chunked parallel summarization merges in the background; <code>[mm:ss]</code> markers are preserved so seek links keep working; any error fails open to the original text</td></tr>
+          <tr><td>llms.txt</td><td>On attach, the site's own LLM instructions are fetched once and folded into the page context — respecting the site's "notes for AI readers"</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Where your data flows</h2>
+      <p>browsa's privacy boundary in one sentence: <strong>your data moves only between your own browser and the backend you configured.</strong> Mechanically:</p>
+      <ul>
+        <li><strong>API keys are stored on your machine only</strong> (<code>chrome.storage.local</code>) and sent nowhere except the Base URL you entered;</li>
+        <li><strong>No accounts, no telemetry</strong> — install and use; no data ever flows through the developer;</li>
+        <li><strong>PDFs are parsed entirely client-side</strong> (WASM + pdf.js); the file's bytes never leave your device — only extracted text goes to your model;</li>
+        <li><strong>Masked before sending</strong>: credentials in every URL within page content (tokens, passwords, signatures, session IDs) are removed locally;</li>
+        <li><strong>Content scripts only observe</strong> network requests — they never modify, block, or replay them;</li>
+        <li><strong>Replies are sanitized with DOMPurify</strong> before rendering; Mermaid SVG output is additionally stripped of scripts and event handlers.</li>
+      </ul>
+      <p>The long version: <a href="../privacy.html">privacy policy</a>.</p>
+
+      <h2>Browser compatibility</h2>
+      <p>Chrome / Edge <strong>114+</strong> (primary target); Brave 1.56+ should work (same Chromium surface). Firefox is not supported — no side-panel API.</p>
+
+      <nav class="pager">
+        <a href="providers.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">Connecting backends</span>
+        </a>
+        <a href="reference.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">Cheat sheet</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../../">Home</a>
+      <a href="./">Guide</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">Privacy</a>
+      <a class="lang" href="../../guide/settings.html" lang="zh-CN">简体中文 ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · read anywhere, ask anywhere</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

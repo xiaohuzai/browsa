@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>读取页面 · browsa 指南</title>
+<meta name="description" content="📎 附加当前页面的两种模式；划选文字直接提问；图片、PDF、GitHub 文件页，以及 YouTube / B 站 / 小红书等 12 个站点的深度提取。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/reading.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html">快速上手</a>
+        <a href="reading.html" class="cur" aria-current="page">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 读取页面</p>
+      <h1>读取页面</h1>
+      <p class="page-lead">
+        「读」是 browsa 的根基：点一下 📎，你正在看的页面就进入了对话。
+        这一页讲清楚它读什么、怎么读，以及 📎 之外的几种入口。
+      </p>
+
+      <h2>📎 一键附加当前页面</h2>
+      <p>点击输入框旁的 📎，<strong>当前标签页</strong>的内容被附加进对话。默认使用 <strong>Auto 模式</strong>，它按级联自动选择读法：先尝试提取干净的正文（Readability），不够详细再退到保留结构的 DOM 树，最后退到全文。你不需要选，附加后输入框上方会写明这次用了哪种读法。</p>
+      <p>附加一次，一直有效：之后每一轮提问都会带着这份页面内容，直到你清空历史或换页面重新附加。</p>
+
+      <h2>📷 截图模式</h2>
+      <p>把当前标签页的<strong>可见画面</strong>作为图片发给多模态模型——适合「这张图里哪条曲线涨了」这类文字读不出来的问题。按 <kbd>Ctrl+/</kbd> 在 Auto 和截图之间切换，也可以在 📎 的模式菜单里选。</p>
+
+      <h2>划选文字，直接提问</h2>
+      <p>只想问一小段？在页面上划选文字：</p>
+      <ul>
+        <li>松开鼠标会出现 <strong>浮动工具栏</strong>：提问 · 解释 · → 中文 · 总结；</li>
+        <li>或右键 → <strong>browsa</strong> › 提问 / 解释 / 翻译 / 总结。</li>
+      </ul>
+      <p>选区会作为问题的一部分自动送进侧边栏，不用先点 📎。</p>
+
+      <h2>图片</h2>
+      <p>把图片<strong>拖入</strong>输入框，或直接 <kbd>Ctrl+V</kbd> 粘贴截图（需要多模态模型，如 GPT-4o、Claude 或其他视觉模型）。</p>
+
+      <h2>PDF：本机解析，图表也发给模型</h2>
+      <p>附加一个 PDF——或者打开一个其实是 PDF 的页面——无需选模式，自动处理：</p>
+      <ul>
+        <li>解析完全在你的浏览器里完成（WASM + pdf.js），<strong>文件字节不出设备</strong>；</li>
+        <li>表格、标题、多栏版式会被重建，模型读到的是结构而不是乱序文字；</li>
+        <li>插图区域自动裁剪出来、配着图注一起<strong>作为图片</strong>发给视觉模型——模型能真正「看见」Figure 1。</li>
+      </ul>
+      <figure class="shot">
+        <img src="../assets/readme/pdf-figures.png" alt="browsa 在 arXiv 论文页旁讲解 Figure 1" loading="lazy">
+        <figcaption>论文场景：插图裁剪后与图注配对发给视觉模型，回答直接指着图讲。</figcaption>
+      </figure>
+
+      <h2>GitHub 文件页</h2>
+      <p>在 <code>github.com</code> 上打开某个文件时，browsa 直接抓取 <code>raw.githubusercontent.com</code> 的原始源码——Markdown 和代码保持原有结构，而不是页面上渲染后的样子。</p>
+
+      <h2>站点深度提取</h2>
+      <p>对下面这些站点，browsa 会观察浏览器自己发出的请求，直接读取页面已加载的结构化数据——字幕、评论、笔记正文——而不是靠猜。不需要重新登录，也没有任何数据流向第三方。</p>
+      <div class="site-strip">
+        <span class="site-chip">YouTube<span class="en">字幕/章节</span></span>
+        <span class="site-chip">Bilibili<span class="en">字幕/ASR/统计</span></span>
+        <span class="site-chip">小红书<span class="en">笔记/评论</span></span>
+        <span class="site-chip">飞书<span class="en">文档/表格</span></span>
+        <span class="site-chip">掘金<span class="en">文章源码</span></span>
+        <span class="site-chip">知乎<span class="en">文章/回答</span></span>
+        <span class="site-chip">X / Twitter<span class="en">推文/回复</span></span>
+        <span class="site-chip">Reddit<span class="en">帖子/评论</span></span>
+        <span class="site-chip">雪球<span class="en">行情/帖子</span></span>
+        <span class="site-chip">小宇宙<span class="en">播客</span></span>
+        <span class="site-chip">得到<span class="en">文章</span></span>
+        <span class="site-chip">极客时间<span class="en">文章</span></span>
+      </div>
+      <figure class="shot">
+        <img src="../assets/readme/deep-extraction.png" alt="browsa 从小红书笔记中提取决策要点" loading="lazy">
+        <figcaption>小红书笔记：直接读页面数据，评论、正文一条不落。</figcaption>
+      </figure>
+      <p>不在此列的网页同样可用——走 Auto 级联，只是没这么「深」。</p>
+
+      <div class="tip"><b>页面太长？</b>超过阈值（默认 100,000 字符）的页面与字幕会自动分块总结、后台合并，后续轮次只发压缩版——附加立即返回，不用等。阈值与开关见<a href="settings.html">设置与隐私</a>。</div>
+
+      <nav class="pager">
+        <a href="quickstart.html">
+          <span class="dir">‹ prev</span>
+          <span class="t">快速上手</span>
+        </a>
+        <a href="video.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">视频工作流</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/reading.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

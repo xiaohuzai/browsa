@@ -1,0 +1,150 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   browsa 使用指南 · 文档版式层
+   只做「文档」特有的布局：左侧目录 + 正文 + 表格/提示框/截图/翻页。
+   全部颜色、字体、圆角、阴影取自 site.css 的 ：root 变量 —— 两层叠加使用：
+   <link site.css> + <link docs.css>。落地页不引本文件，互不影响。
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ─── 骨架：目录 + 正文 ─────────────────────────────────────────────────── */
+.docs-shell{
+  display:grid;grid-template-columns:216px minmax(0,1fr);
+  gap:56px;padding-top:44px;padding-bottom:88px;align-items:start;
+}
+
+/* 左侧目录：吸顶，当前页用校对红标记 */
+.docs-side{position:sticky;top:84px}
+.side-label{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.2em;color:var(--ink-dim);margin-bottom:12px;
+}
+.docs-side nav{display:flex;flex-direction:column;gap:2px}
+.docs-side nav a{
+  display:block;padding:6px 10px;border-radius:8px;
+  font-size:13.5px;color:var(--ink-dim);text-decoration:none;
+  border-left:2px solid transparent;
+  transition:color .15s ease,background .15s ease;
+}
+.docs-side nav a:hover{color:var(--ink);background:var(--paper-3)}
+.docs-side nav a.cur{
+  color:var(--mark);font-weight:600;
+  background:rgba(194,65,12,.06);border-left-color:var(--mark);
+}
+
+/* ─── 正文 ──────────────────────────────────────────────────────────────── */
+.docs-body{max-width:720px}
+.crumb{
+  font-family:var(--mono);font-size:12.5px;color:var(--ink-dim);
+  margin-bottom:14px;letter-spacing:.02em;
+}
+.crumb a{color:var(--ink-dim);text-decoration:none}
+.crumb a:hover{color:var(--mark)}
+.docs-body h1{
+  font-size:clamp(28px,4vw,36px);font-weight:800;letter-spacing:-.02em;
+  line-height:1.2;margin-bottom:10px;
+}
+.page-lead{
+  font-size:16px;color:var(--ink-2);line-height:1.85;
+  margin-bottom:12px;max-width:640px;
+}
+.docs-body h2{
+  font-size:21px;font-weight:700;letter-spacing:-.01em;
+  margin:46px 0 14px;line-height:1.35;
+}
+.docs-body h3{font-size:15.5px;font-weight:700;margin:26px 0 10px}
+.docs-body p{font-size:14.5px;color:var(--ink-2);line-height:1.85;margin:10px 0}
+.docs-body p strong,.docs-body li strong{color:var(--ink);font-weight:600}
+.docs-body a{color:var(--mark);text-decoration:underline;text-underline-offset:2px}
+.docs-body a:hover{color:var(--mark-deep)}
+
+.docs-body code,.docs-body td code{
+  font-family:var(--mono);font-size:12.5px;color:var(--ink);
+  background:var(--paper-3);border:1px solid var(--line-2);
+  padding:1px 6px;border-radius:5px;white-space:nowrap;
+}
+
+/* 列表：与落地页功能卡同一支 › 记号 */
+.docs-body ul{list-style:none;margin:12px 0;display:flex;flex-direction:column;gap:7px}
+.docs-body ul li{
+  padding-left:20px;position:relative;
+  font-size:14.5px;color:var(--ink-2);line-height:1.8;
+}
+.docs-body ul li::before{content:"›";position:absolute;left:4px;color:var(--mark);font-weight:700}
+.docs-body ol{margin:12px 0;padding-left:24px;display:flex;flex-direction:column;gap:7px}
+.docs-body ol li{font-size:14.5px;color:var(--ink-2);line-height:1.8;padding-left:4px}
+.docs-body ol li::marker{font-family:var(--mono);color:var(--mark);font-weight:600}
+
+/* ─── 表格 ──────────────────────────────────────────────────────────────── */
+.doc-table{
+  width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;
+}
+.doc-table th{
+  text-align:left;font-weight:600;font-size:13px;color:var(--ink);
+  background:var(--paper-3);border:1px solid var(--line-2);padding:8px 12px;
+  white-space:nowrap;
+}
+.doc-table td{
+  border:1px solid var(--line-2);padding:8px 12px;
+  color:var(--ink-2);line-height:1.7;vertical-align:top;
+}
+.doc-table code{white-space:nowrap}
+
+/* ─── 快捷键 ────────────────────────────────────────────────────────────── */
+kbd{
+  font-family:var(--mono);font-size:12px;color:var(--ink);
+  background:var(--paper-2);border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:6px;padding:1px 7px;white-space:nowrap;
+}
+
+/* ─── 提示框 ────────────────────────────────────────────────────────────── */
+.tip{
+  margin:18px 0;padding:12px 16px;
+  border-left:2px solid var(--gold);
+  background:color-mix(in srgb,var(--gold) 5%,var(--paper-2));
+  border-radius:0 10px 10px 0;
+  font-size:14px;color:var(--ink-2);line-height:1.8;
+}
+.tip b{color:var(--gold-ink);font-weight:600}
+
+/* ─── 截图 ──────────────────────────────────────────────────────────────── */
+figure.shot{margin:22px 0}
+.shot img{
+  width:100%;display:block;
+  border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+}
+.shot figcaption{margin-top:10px;text-align:center;font-size:13px;color:var(--ink-dim)}
+
+/* ─── 翻页 ──────────────────────────────────────────────────────────────── */
+.pager{
+  margin-top:56px;padding-top:22px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:16px;
+}
+.pager a{text-decoration:none;max-width:48%}
+.pager .dir{
+  display:block;font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;color:var(--ink-dim);margin-bottom:3px;
+}
+.pager .t{font-size:15px;font-weight:600;color:var(--mark)}
+.pager a:hover .t{text-decoration:underline;text-underline-offset:3px}
+.pager .next{text-align:right;margin-left:auto}
+
+/* ─── 总览卡片：复用落地页 .feature，这里是 <a> ─────────────────────────── */
+a.feature{text-decoration:none;color:inherit;display:block}
+a.feature .go{
+  display:inline-block;margin-top:14px;
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--mark);
+}
+a.feature:hover .go{transform:translateX(3px)}
+a.feature .go{transition:transform .15s ease}
+
+/* ─── 响应式 ────────────────────────────────────────────────────────────── */
+@media (max-width:900px){
+  .docs-shell{display:block;padding-top:28px;padding-bottom:64px}
+  .docs-side{position:static;margin-bottom:24px}
+  .docs-side nav{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:8px}
+  .docs-side nav a{
+    white-space:nowrap;border-left:none;
+    border:1px solid var(--line);border-radius:999px;
+    padding:5px 13px;background:var(--paper-2);
+  }
+  .docs-side nav a.cur{border-color:var(--mark);background:rgba(194,65,12,.06)}
+}

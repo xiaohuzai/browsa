@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快速上手 · browsa 指南</title>
+<meta name="description" content="五分钟装好 browsa：加载扩展、打开侧边栏、连接你自己的模型、发出第一个带页面上下文的问题。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<span class="cropmark cm-br" aria-hidden="true"></span>
+<span class="rail-caption" aria-hidden="true">BROWSER SIDE-PANEL AI · GUIDE</span>
+
+<header class="nav">
+  <div class="container">
+    <a class="brand" href="../" aria-label="browsa 首页">
+      <img src="../icon48.png" alt="" width="24" height="24">
+      <span class="wordmark">browsa</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="../">首页</a>
+      <a href="../#install" class="hide-m">安装</a>
+      <a class="nav-gh" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="lang" href="../en/guide/quickstart.html" lang="en" aria-label="English">EN</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="docs">
+  <div class="container docs-shell">
+    <aside class="docs-side" aria-label="指南目录">
+      <p class="side-label">指南</p>
+      <nav>
+        <a href="./">总览</a>
+        <a href="quickstart.html" class="cur" aria-current="page">快速上手</a>
+        <a href="reading.html">读取页面</a>
+        <a href="video.html">视频工作流</a>
+        <a href="rendering.html">输出与渲染</a>
+        <a href="sessions.html">会话与整理</a>
+        <a href="providers.html">连接后端</a>
+        <a href="settings.html">设置与隐私</a>
+        <a href="reference.html">速查表</a>
+      </nav>
+    </aside>
+
+    <article class="docs-body">
+      <p class="crumb"><a href="./">指南</a> / 快速上手</p>
+      <h1>快速上手</h1>
+      <p class="page-lead">
+        四步：装好扩展 → 打开侧边栏 → 连接你自己的模型 → 发出第一个问题。全程约五分钟。
+      </p>
+
+      <h2>1 · 安装扩展</h2>
+      <div class="install-steps">
+        <div class="step">
+          <span class="no">1</span>
+          <div>
+            <h4>获取代码</h4>
+            <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压。</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="no">2</span>
+          <div>
+            <h4>加载扩展</h4>
+            <p>打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。需要 Chrome / Edge <strong>114 及以上</strong>——近年自动更新过的浏览器都满足。</p>
+          </div>
+        </div>
+      </div>
+      <p>browsa 是未打包扩展，通过开发者模式加载，不收取任何费用，也不会申请安装时弹窗之外的任何东西。</p>
+
+      <h2>2 · 打开侧边栏</h2>
+      <p>在任意网页按 <kbd>Ctrl+Shift+H</kbd>（macOS 为 <kbd>Command+Shift+H</kbd>），或点击工具栏里的 browsa 图标。侧边栏随即出现在页面右侧，你切到哪个标签页，它就跟到哪个标签页。</p>
+
+      <h2>3 · 连接你自己的模型</h2>
+      <p>browsa 不内置任何模型——它把<b>你自己配置的后端</b>搬进侧边栏。点击侧边栏右上角的 <strong>⚙ 设置</strong>：</p>
+      <ul>
+        <li><strong>普通对话模型</strong>：任何兼容 OpenAI、Anthropic 或 Ollama 的端点。填 <strong>Base URL + API Key + 模型 ID</strong>，点 Save 保存。</li>
+        <li><strong>Hermes Agent</strong>：自带工具执行的自托管智能体（可选，安装方法见<a href="providers.html">连接后端</a>）。</li>
+      </ul>
+      <p>保存后点 <strong>Ping</strong> 验证连通性——第一个 Ping 通的提供商会自动设为当前使用。</p>
+      <div class="tip"><b>没有 API Key？</b>本机装一个 Ollama（<code>localhost:11434</code>）就能完全离线使用；各云服务商的控制台也都提供 Key。字段含义与多模型配置见<a href="providers.html">连接后端</a>一页。</div>
+
+      <h2>4 · 发出第一个问题</h2>
+      <ol>
+        <li>打开一篇你想读的文章（或视频、PDF），按 <kbd>Ctrl+Shift+H</kbd> 打开侧边栏。</li>
+        <li>点击输入框旁的 <strong>📎</strong>——当前页面被附加进对话，输入框上方会显示一条「已附加」的说明。</li>
+        <li>输入问题，<kbd>Enter</kbd> 发送。回答逐字流式渲染，Markdown、公式、图表都直接画在面板里。</li>
+      </ol>
+      <p>不想打字也可以用输入框上方的快捷按钮：<strong>总结 / 要点 / 解释 / → 中文 / 大纲</strong>，一键对当前页面执行对应任务。</p>
+
+      <div class="tip"><b>browsa 的使用习惯是「先附加，后提问」。</b>页面内容附加一次就一直在上下文里，之后每一轮提问都带着它——所以先点 📎，再慢慢想问什么，完全来得及。</div>
+
+      <h2>界面语言</h2>
+      <p>设置里可以把界面文字切换为 <strong>English / 中文 / Auto</strong>（跟随浏览器语言），即时生效，无需重载。回答用什么语言，可以在设置里用「回复语言」固定下来。</p>
+
+      <nav class="pager">
+        <a href="./">
+          <span class="dir">‹ prev</span>
+          <span class="t">指南总览</span>
+        </a>
+        <a href="reading.html" class="next">
+          <span class="dir">next ›</span>
+          <span class="t">读取页面</span>
+        </a>
+      </nav>
+    </article>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="foot-brand">
+      <img src="../icon48.png" alt="" width="20" height="20">
+      <span class="wordmark">browsa</span>
+    </div>
+    <div class="foot-links">
+      <a href="../">首页</a>
+      <a href="./">使用指南</a>
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="../privacy.html">隐私政策</a>
+      <a class="lang" href="../en/guide/quickstart.html" lang="en">English ↗</a>
+    </div>
+    <div class="foot-meta">
+      <span>browser side-panel AI · 读到哪里，问到哪里</span>
+      <span class="mono">browsa · MIT License</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
