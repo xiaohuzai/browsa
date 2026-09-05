@@ -1,6 +1,6 @@
 // test/bilibili-streams.test.mjs
 // Tests for readBilibiliMediaStreams - extracts downloadable audio/video/muxed
-// stream URLs from window.__playinfo__. Used by the media-download feature.
+// stream URLs from window.__playinfo__. Used by the ASR pending-context builder.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

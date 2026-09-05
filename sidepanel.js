@@ -11,7 +11,7 @@ import {
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
-import { initMediaDownload } from './lib/sidepanel/media-download.js';
+import { registerMediaHeaders, readPlatformCookie } from './lib/sidepanel/media-headers.js';
 import { classifyErrorText } from './lib/sidepanel/error-classifier.js';
 import {
   initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups
@@ -39,6 +39,7 @@ import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { extractPdfContent } from './lib/sidepanel/pdf-extractor.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { fetchArxivMeta, formatArxivMeta, arxivIdFromUrl } from './lib/arxiv.js';
+import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
@@ -88,7 +89,6 @@ if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user 
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const pagemetaEl = $('pagemeta');
-let mediaDownloadRefresh = null;  // set by initMediaDownload in init(); called on tab changes
 const diagnosticsEl = $('diagnostics');
 const imagePreviewsEl = $('imagepreviews');
 const imageInfoEl = $('imageinfo');
@@ -159,7 +159,6 @@ async function init() {
     releaseLock: () => { deleteLock = false; },
     reconcile: () => { reconcileHistoryIdx(); },
   });
-  mediaDownloadRefresh = initMediaDownload({ getTabId: () => currentTabId }).refresh;
 
   // Load config
   const cfgRes = await sendMessage({ type: 'GET_CONFIG' });
@@ -310,7 +309,6 @@ async function init() {
     pagemetaEl.href = tab.url || '#';
     pagemetaEl.title = tab.url || '';
   }
-  mediaDownloadRefresh?.();
 
   // Update page meta when tab changes — save/restore conversation DOM
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
@@ -329,7 +327,6 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
-    mediaDownloadRefresh?.();
     if (navPort) {
       try { navPort.postMessage({ type: 'NAV_FOLLOW', tabId }); } catch (_) {}
     }
@@ -340,7 +337,6 @@ async function init() {
       pagemetaEl.href = t.url || '#';
       pagemetaEl.title = t.url || '';
     }
-    mediaDownloadRefresh?.();
   });
 
   // Long-lived nav port. The background pushes NAVIGATED events for ANY
@@ -407,7 +403,6 @@ async function init() {
         pagemetaEl.textContent = msg.url;
       }
     }
-    mediaDownloadRefresh?.();
     // Re-probe the new URL. If it's a 小红书 explore page, the
     // diagnostics banner needs to update. We don't await — the new
     // banner will appear when the probe finishes (a few hundred ms).
@@ -888,51 +883,8 @@ function compactArkErrorText(msg) {
 }
 
 // Session DNR rule：给 ASR 媒体下载注入平台 CDN 要求的头（Referer/Origin/Cookie），
-// 音频/视频两条管线共用（自 sidepanel 内联块原样提取；每条头为什么必须注入的完整
-// 历史见 background.js DOWNLOAD_MEDIA 与下方注释）。
-async function registerAsrDnrRule(ruleId, platform, ctx) {
-  const dnrReferer = platform === 'youtube' ? 'https://www.youtube.com' : 'https://www.bilibili.com';
-  const dnrOrigin = platform === 'youtube' ? 'https://www.youtube.com' : 'chrome-extension://' + chrome.runtime.id;
-  const dnrUrlFilter = platform === 'youtube' ? 'googlevideo' : 'bilivideo';
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [ruleId],
-    addRules: [{
-      id: ruleId,
-      priority: 1,
-      action: {
-        type: 'modifyHeaders',
-        // Cookie 注入对齐 cat-catch 的 setHeaders：跨源（chrome-extension:// →
-        // CDN）带 SameSite cookie 的唯一可靠方式就是 DNR set。platformCookie
-        // 是 buildAsrPendingCtx 用 chrome.cookies.getAll 读到的完整 cookie
-        //（含 HttpOnly，见 background.js buildAsrPendingCtx 注释）。
-        requestHeaders: [
-          { header: 'referer', operation: 'set', value: dnrReferer },
-          // YouTube 的 googlevideo 拒绝 chrome-extension origin——必须改成
-          // youtube.com（实测 403 根因之一）。B站 bilivideo 不校验 Origin，
-          // 原样保留扩展 origin 不影响（与旧行为一致）。
-          { header: 'origin', operation: 'set', value: dnrOrigin },
-          ...(ctx.biliCookie ? [{ header: 'cookie', operation: 'set', value: ctx.biliCookie }] : []),
-        ]
-      },
-      condition: {
-        // 只作用于扩展上下文（sidepanel）自己发起的下载请求——对齐
-        // cat-catch setRequestHeaders 的 initiatorDomains:[chrome.runtime.id]
-        // 做法，确保规则命中 sidepanel 的 fetch 而不是误伤页面请求。
-        initiatorDomains: [chrome.runtime.id],
-        // 'bilivideo' covers BOTH .com and .cn B站 CDN hosts; 'googlevideo'
-        // covers YouTube's CDN. A rule scoped to a single host silently
-        // misses mirrors (403 — a real bug found via live testing 2026-08-15).
-        urlFilter: dnrUrlFilter,
-        // Full list (same as DOWNLOAD_MEDIA): the CDN 302-redirects
-        // the download to mirror hosts, and a redirect keeps the original
-        // request's resourceType, so every type must be listed to survive
-        // the redirect with the injected Referer intact.
-        resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'webtransport', 'webbundle', 'other']
-      }
-    }]
-  });
-}
-
+// 音频/视频两条管线共用（配方实现见 lib/sidepanel/media-headers.js，每条头为什么
+// 必须注入的完整论证在该文件注释里）。
 // 播放地址过期（deadline 签名 URL → CDN 无条件 403）的自愈：让页面重拉 playurl
 // 换全新签名 URL。want='audio' 只刷音频流（纯 ASR）；'all' 连 video/muxed 一起刷
 //（视频解析管线用）。返回流数组；失败返回 null（调用方走现有兜底），不抛错。
@@ -1185,7 +1137,10 @@ async function runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec }
 // 静默取消本次解析（attach 按钮由 onAttachPage 的 finally 恢复）。
 function showAsrModeCard({ ctx, videoPick, durationSec }) {
   return new Promise((resolve) => {
-    const fmtMB = (b) => (b > 0 ? `约 ${(b / 1024 / 1024).toFixed(0)}MB` : '体积未知');
+    // 体积估不出来（playurl 元数据缺失）时整个省略「下载…」子句——「体积未知」
+    // 是用户无法行动的噪音，只在有真实数字时才展示（2026-09-05 用户反馈）。
+    const fmtMB = (b) => (b > 0 ? `下载约 ${(b / 1024 / 1024).toFixed(0)}MB` : '');
+    const joinSub = (parts) => parts.filter(Boolean).join(' · ');
     // 音频预估用候选列表的第一项（buildAsrPendingCtx 按码率升序排，[0] 是实际
     // 先试的最低码率流——下载体积最小的那条）。
     const audioCand = Array.isArray(ctx.audioCandidates) ? ctx.audioCandidates[0] : null;
@@ -1213,9 +1168,9 @@ function showAsrModeCard({ ctx, videoPick, durationSec }) {
       b.addEventListener('click', () => { card.remove(); resolve(mode); });
       return b;
     };
-    row.appendChild(mkBtn('audio', '音频转写（字幕）', `下载${fmtMB(audioEst)} · 快 · token 消耗少`));
+    row.appendChild(mkBtn('audio', '音频转写（字幕）', joinSub([fmtMB(audioEst), '快', 'token 消耗少'])));
     if (videoPick) {
-      const vSub = `${videoPick.stream.label || 'video'} · 下载${fmtMB(videoPick.estBytes)} · 慢 · token 消耗高`;
+      const vSub = joinSub([videoPick.stream.label || '', fmtMB(videoPick.estBytes), '慢', 'token 消耗高']);
       row.appendChild(mkBtn('video', '视频精读（画面＋语音）', vSub));
     }
     card.appendChild(row);
@@ -1618,8 +1573,8 @@ async function onAttachPage() {
     // found in the field: the original MAIN-world-injected downloadAndUpload
     // returned "Failed to fetch" on the upload). B站 m4s download also works
     // here (host_permissions exempt it from CORS), and a session DNR rule
-    // injects the bilibili.com Referer the CDN checks (same pattern as
-    // DOWNLOAD_MEDIA) — set right before the fetch, removed right after. The
+    // injects the bilibili.com Referer the CDN checks (the registerMediaHeaders
+    // rule below) — set right before the fetch, removed right after. The
     // m4s is an MP4 container 方舟 misclassifies as video (file status failed:
     // Invalid video_url), so the bytes are transcoded to 16kHz mono WAV via Web
     // Audio API (Chrome decodes fMP4 natively) before upload — verified
@@ -1668,7 +1623,7 @@ async function onAttachPage() {
         // 0. Register the session DNR rule injecting the platform CDN's required
         // headers (Referer/Origin/Cookie) onto the media downloads — shared by the
         // audio and video pipelines (the helper holds the per-header history).
-        await registerAsrDnrRule(dnrRuleId, platform, ctx);
+        await registerMediaHeaders(dnrRuleId, platform, ctx.biliCookie || await readPlatformCookie(platform));
         if (analysisMode === 'video') {
           // —— 视频精读管线（v1，当前暂时只支持 B 站；durl 合一流走单文件，否则视频＋音频双文件）——
           const r = await runVideoAnalysisPipeline({ ctx, platform, videoPick, wantDurSec });
@@ -2879,12 +2834,28 @@ async function onTimestampClick(ts) {
   await seekVideo(vs, seconds);
 }
 
+// Which tab still shows the video this videoSrc was stamped from? Priority:
+// the stamped tabId first (the attach-time source tab — seeking it in place
+// is the established behavior even when the user has since switched tabs),
+// then the tab the panel is currently following. Covers the recycle cases the
+// stamped id alone can't: browser restart (ids recycled), source tab closed
+// or navigated away while the same video is open (or reopened) in the tab
+// the panel now follows. URL-judged via videoUrlMatches — no network.
+function resolveVideoTabId(vs) {
+  return resolveMatchingTabId(
+    [vs?.tabId, currentTabId],
+    async (id) => (await chrome.tabs.get(id))?.url,
+    vs?.url
+  );
+}
+
 // Seek the given video source ({platform,url,tabId}) to `seconds`. Returns
 // true when a seek path (in-place or new tab) was taken.
 async function seekVideo(vs, seconds) {
-  if (vs?.tabId) {
+  const tabId = await resolveVideoTabId(vs);
+  if (tabId != null) {
     try {
-      const res = await sendMessage({ type: 'SEEK_VIDEO', tabId: vs.tabId, seconds, url: vs.url });
+      const res = await sendMessage({ type: 'SEEK_VIDEO', tabId, seconds, url: vs.url });
       // background envelopes every reply as { ok, data } — res.ok is just
       // "the handler didn't throw" and is true even when the seek itself
       // failed (tab gone / no <video>). The inner data.ok is the real
@@ -2892,12 +2863,24 @@ async function seekVideo(vs, seconds) {
       if (res?.data?.ok) return true;
     } catch (_) {}
   }
+  // No live tab shows this video (stamped id stale AND current tab is not
+  // the video) — only now is opening a fresh tab the right move.
   if (vs?.url) {
     chrome.tabs.create({ url: appendTimeParam(vs.url, seconds) });
     return true;
   }
   showToast(_t('videoSourceGone', '视频源已失效，无法跳转'));
   return false;
+}
+
+// The drawer's follow poll and row seeks both run off videoSrc.tabId. When
+// the stamped tab is gone but the panel's current tab shows the same video,
+// retarget so playback-follow keeps working instead of failing 4 ticks and
+// going quiet (same stale-id cases resolveVideoTabId covers for seekVideo).
+async function retargetVideoSrcToLiveTab(vs) {
+  if (!vs) return vs;
+  const liveId = await resolveVideoTabId(vs);
+  return liveId != null && liveId !== vs.tabId ? { ...vs, tabId: liveId } : vs;
 }
 
 // Transcript drawer source scan: the LAST user history entry stamped with
@@ -2911,7 +2894,7 @@ async function getVideoTranscriptSource() {
       const m = list[i];
       if (m?.role !== 'user' || !m.videoSrc) continue;
       if (typeof m.content === 'string') {
-        return { raw: m.content, videoSrc: m.videoSrc, figures: [] };
+        return { raw: m.content, videoSrc: await retargetVideoSrcToLiveTab(m.videoSrc), figures: [] };
       }
       // 交错多模态条目（视频精读 + 关键帧）：text 部件拼接为时间线原文，
       // image 部件按序抽出——[图N] 锚点行渲染成内联截图卡片。
@@ -2925,7 +2908,7 @@ async function getVideoTranscriptSource() {
           .filter((p) => p.type === 'image_url')
           .map((p) => (typeof p.image_url === 'string' ? p.image_url : p.image_url?.url))
           .filter(Boolean);
-        return { raw, videoSrc: m.videoSrc, figures };
+        return { raw, videoSrc: await retargetVideoSrcToLiveTab(m.videoSrc), figures };
       }
     }
   } catch (_) {}

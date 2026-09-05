@@ -20,10 +20,10 @@ import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handle
 import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
-import { handleGetMediaStreams, handleDownloadMedia } from './lib/handlers/media-handler.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
+import { videoUrlMatches } from './lib/video-url.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
   streamPorts, streamState, chatControllers,
@@ -37,18 +37,6 @@ import { inlinePageImages } from './lib/page-images.js';
 import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
 import { redactUrlCredentials, redactTextUrls } from './lib/sanitize-url.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
-
-// ─── Media download: keep the DOWNLOAD_CALL simple ──────────────────────────
-// DOWNLOAD_MEDIA (background.js) primarily uses chrome.downloads.download
-// ({saveAs:true}) with a session DNR rule injecting the B站 Referer - the
-// browser's downloader carries the site's cookies (login-scoped m4s 403
-// otherwise) and streams straight to disk. A page-world fetch+blob+<a
-// download> fallback covers CDNs that reject the browser downloader. There is
-// deliberately NO success watcher, auto-cancel/erase, or panel-side search
-// cycle: a freshly created saveAs download transiently reports
-// state:'interrupted' while the dialog is open, and every watcher that
-// treated that as failure has caused a false "重试" (three times). The browser's
-// own download bar owns progress/completion; the panel just shows "已开始下载".
 
 // Capability hints: browsa rendering rules injected automatically so users
 // never need to configure them manually. Shared by both CHAT (full turn,
@@ -386,21 +374,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// True when `tabUrl` is still the same video page as the stamped source URL:
-// same origin + path, and the same `v` query param when either side has one
-// (YouTube watch URLs differ only there; Bilibili identity is in the path).
-function videoUrlMatches(tabUrl, sourceUrl) {
-  if (!tabUrl || !sourceUrl) return false;
-  try {
-    const a = new URL(tabUrl), b = new URL(sourceUrl);
-    if (a.origin !== b.origin || a.pathname !== b.pathname) return false;
-    const va = a.searchParams.get('v'), vb = b.searchParams.get('v');
-    if (va || vb) return va === vb;
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+// videoUrlMatches now lives in lib/video-url.js (shared with the side
+// panel's live-tab resolution for seekVideo / the transcript drawer).
 
 async function tabMatchesVideo(tabId, sourceUrl) {
   // A missing source URL (older stamps) can't be verified — allow, matching
@@ -606,12 +581,6 @@ async function handle(msg, sender) {
         return { ok: false, error: e?.message || String(e) };
       }
     }
-
-    case 'GET_MEDIA_STREAMS':
-      return handleGetMediaStreams(msg);
-
-    case 'DOWNLOAD_MEDIA':
-      return handleDownloadMedia(msg);
 
     case 'SET_ACTIVE_PROVIDER': {
       // model 可空：多模型 provider 上主页下拉选中的具体模型（Alias · model），
