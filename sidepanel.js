@@ -3519,14 +3519,9 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
   }
 
   // Optional hint line (e.g. "video has no subtitles, enable ASR") rendered
-  // as an extra span after the main label, before the 撤销/检查 buttons.
-  if (hint) {
-    const hintEl = document.createElement('span');
-    hintEl.className = 'attach-hint';
-    hintEl.textContent = hint;
-    el.appendChild(hintEl);
-  }
-
+  // as a FULL-WIDTH second row under the pill — appended after the 撤销/检查
+  // buttons so flex-wrap puts it on its own line instead of squeezing it into
+  // a skinny column between the label and the buttons.
   const btn = document.createElement('button');
   btn.className = 'undo-attach';
   btn.textContent = '撤销';
@@ -3565,6 +3560,12 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
     }
   });
   el.appendChild(btn);
+  if (hint) {
+    const hintEl = document.createElement('span');
+    hintEl.className = 'attach-hint';
+    hintEl.textContent = hint;
+    el.appendChild(hintEl);
+  }
   messagesEl.appendChild(el);
   scrollToBottom(true);
 }

@@ -134,7 +134,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
 | Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more) |
 
-To ask about a text selection, highlight it and use the **floating toolbar** or **right-click menu** (Ask / Explain / Translate / Summarize) — no need to click 📎.
+Highlight text on a page and the **floating toolbar** appears: **Explain** and **Translate** answer inline — a streaming card right next to the selection, no panel needed — while **Ask** and **Summarize** (and the right-click menu) ride into the panel. No need to click 📎.
 
 ## Features
 
@@ -180,7 +180,7 @@ The screenshots above are the shape of it — the full reference lives here:
 | **Input history & drafts** | ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel |
 | **Slash commands** | type `/` for completions — see the table below |
 | **Quick actions** | one-click Summarize / Key Points / Explain / → 中文 / Outline above the composer |
-| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · → 中文 · Summarize; or right-click → browsa › Ask / Explain / Translate / Summarize |
+| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · → 中文 · Summarize — Explain / Translate answer inline (streaming, in place); Ask / Summarize and the right-click menu go to the panel |
 
 </details>
 

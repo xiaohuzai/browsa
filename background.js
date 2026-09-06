@@ -21,6 +21,7 @@ import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
+import { handleExplainPort } from './lib/handlers/selection-explain.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 import { videoUrlMatches } from './lib/video-url.js';
@@ -284,6 +285,14 @@ chrome.runtime.onConnect.addListener((port) => {
         subChatPorts.delete(claimedSubId);
       }
     });
+    return;
+  }
+
+  if (port.name === 'browsa-explain') {
+    // 划词内联解释：content script 的浮层每点一次「解释」开一条一次性端口，
+    // 首条消息即请求（无需 HELLO 握手——connect 本身唤醒 SW，onConnect 必然
+    // 先于端口消息注册好监听，不存在 subchat 当年的重连竞态）。断开即中止。
+    handleExplainPort(port);
     return;
   }
 
