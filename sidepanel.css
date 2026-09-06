@@ -407,14 +407,17 @@ body {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.attach-msg { display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* attach 提示行：主行（标签 + 检查/撤销按钮）居中；带 hint 时 hint 以
+   flex-basis:100% 独占第二行（DOM 里 hint 排在按钮之后），避免长警告被
+   挤成 pill 行中间的细窄竖条。 */
+.attach-msg { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; row-gap: 4px; }
 .attach-hint {
+  flex-basis: 100%;
   font-size: 11px;
   color: var(--muted);
-  max-width: 260px;
   white-space: normal;
-  line-height: 1.4;
-  text-align: left;
+  line-height: 1.5;
+  text-align: center;
 }
 .undo-attach {
   font: inherit;
