@@ -37,6 +37,48 @@
     };
   }
 
+  // 划词内联解释预览：模拟 background 的 browsa-explain per-request 端口
+  // （EXPLAIN_REQUEST → CHUNK* → DONE，~150ms/chunk——快到不拖最终态截图，
+  // 又够抓一张流式中间态）。词/短语与整句两种分支都给出，演示 prompt 的
+  // 词典式/概括式两种形态。返回形状对照 lib/handlers/selection-explain.js。
+  const EXPLAIN_FAKE_WORD = [
+    '**serendipity** /ˌserənˈdɪpəti/ n. 偶然发现美好事物的运气',
+    '',
+    '- 指「不期而遇的幸运发现」：机遇本身，加上发现者认出价值的眼光，缺一不可',
+    '- 源自 1754 年 Horace Walpole 从波斯童话 *The Three Princes of Serendip* 杜撰而来',
+    '- 常见搭配：a serendipitous encounter（不期而遇）、by pure serendipity（纯属机缘巧合）',
+  ].join('\n');
+  const EXPLAIN_FAKE_SENTENCE =
+    '这句话的核心是「**先理解，再评判**」：反对一个立场的前提，是能把它复述到对方满意。\n\n- 学术阅读里这叫 steel-man：先写下对方论点的最强版本，再写自己的反驳\n- 和 straw-man（树靶子）相对——后者把对方观点弱化后再攻击';
+  const EXPLAIN_FAKE_TRANSLATE =
+    '**文档；记载；证明**\n\n- 作动词时：to document = 记载、用文件证明\n- 同源：documentary（adj. 纪实的；n. 纪录片）';
+  function explainPort() {
+    const listeners = [];
+    return {
+      name: 'browsa-explain',
+      onMessage: { addListener(f) { listeners.push(f); } },
+      onDisconnect: { addListener() {} },
+      postMessage(msg) {
+        if (!msg || msg.type !== 'EXPLAIN_REQUEST') return;
+        const words = String(msg.text || '').trim().split(/\s+/).filter(Boolean).length;
+        const answer = msg.mode === 'translate' ? EXPLAIN_FAKE_TRANSLATE
+          : words <= 3 ? EXPLAIN_FAKE_WORD : EXPLAIN_FAKE_SENTENCE;
+        const lines = answer.split('\n');
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i < lines.length) {
+            const delta = lines[i++] + (i < lines.length ? '\n' : '');
+            for (const f of [...listeners]) f({ type: 'EXPLAIN_CHUNK', delta });
+          } else {
+            clearInterval(timer);
+            for (const f of [...listeners]) f({ type: 'EXPLAIN_DONE' });
+          }
+        }, 150);
+      },
+      disconnect() {},
+    };
+  }
+
   // ── sendMessage envelope ({ok, data}) by msg.type ───────────────────────
   // Supports BOTH the callback form (ui-utils.js style) and the promise form.
   const pageMeta = seedConfig.__pageMeta || { id: 7, title: '示例页面 — browsa 预览', url: 'https://www.bilibili.com/video/BV1preview' };
@@ -118,7 +160,10 @@
   window.chrome = {
     runtime: {
       id: 'browsa-preview',
-      connect(opts) { return fakePort((opts && opts.name) || 'default'); },
+      connect(opts) {
+        const name = (opts && opts.name) || 'default';
+        return name === 'browsa-explain' ? explainPort() : fakePort(name);
+      },
       sendMessage,
       getURL(p) { return new URL(p, document.baseURI).href; },
       openOptionsPage: noop,
