@@ -89,6 +89,19 @@
       </ol>
       <p>Hermes 卡固定存在、不可删除，只需 Base URL 和 Key——协议自动识别，服务端不支持 <code>/v1/runs</code> 时会自动回退到普通对话。</p>
 
+      <h3>自建实例：让回答更快的服务端配置</h3>
+      <p>Hermes 默认给 API 客户端挂载<strong>全量工具集</strong>——终端、浏览器、定时任务等十几组工具的定义会随每一轮请求重复发送（实测约 2.3 万 token），而浏览问答用不到其中大半；思考模式也默认全开，等待同样落在首字之前。在 <code>~/.hermes/config.yaml</code> 里收紧这两项：</p>
+      <pre class="doc-code">platform_toolsets:
+  api_server:          # 只影响 API 客户端（browsa），Telegram 等通道不受影响
+    - web              # 搜索、网页提取
+    - vision           # 图片理解
+    - clarify          # 反向提问
+    - memory           # 跨会话记忆
+agent:
+  reasoning_overrides: # 按模型覆盖思考力度（全局项是 agent.reasoning_effort）
+    你的模型名: medium</pre>
+      <p>改完执行 <code>hermes gateway restart</code> 生效。作者实测（qwen3.8-flash、8 万 token 长上下文）：工具集瘦身让每轮请求少背约 1.4 万 token，思考降档直接缩短首字前的等待。另外模型服务普遍对 5 分钟内的连续追问做前缀缓存加速——<strong>连续提问比隔几分钟再问快得多</strong>，这是模型侧行为，无需任何配置。</p>
+
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>
 
