@@ -596,7 +596,11 @@ body {
 /* When the full raw block is open, hide the clamped duplicate above it. */
 .msg.error.has-detail:has(.err-more[open]) .err-detail { display: none; }
 
-.tool-progress {
+/* .wait-indicator shares the tool-progress slot/styles — it IS a process
+   indicator ("thinking… Ns" before the first streamed token) that hands the
+   slot over to real tool-progress rows on the first event. */
+.tool-progress,
+.wait-indicator {
   display: flex;
   align-items: center;
   gap: 6px;

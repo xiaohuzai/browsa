@@ -966,5 +966,9 @@
   "deepExtractPage": {
     "message": "Reading page $1…",
     "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "Thinking… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
   }
 }

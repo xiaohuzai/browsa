@@ -966,5 +966,9 @@
   "deepExtractPage": {
     "message": "正在读取第 $1 页…",
     "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "思考中… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
   }
 }
