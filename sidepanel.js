@@ -123,7 +123,9 @@ init();
 // 空状态提示在 CSS ::after content 里——CSS 无法走 chrome.i18n，按当前 UI 语言
 // 把文案写进 --empty-hint（语言切换时重跑）。引号转义防注入样式值。
 function applyEmptyHint() {
-  const text = _t('emptyHint', 'Ask anything about the current page').replaceAll("'", "\\'");
+  // 空态背景中央这一行是「先附加再提问」循环的唯一教学位——有消息即消失
+  // （.messages:not(:has(.msg))::after），无需任何显隐维护。
+  const text = _t('emptyHint', 'Click 📎 to attach the current page').replaceAll("'", "\\'");
   document.documentElement.style.setProperty('--empty-hint', `'${text}'`);
 }
 
@@ -1835,7 +1837,6 @@ async function clearChatHistory() {
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
   images.length = 0; refreshImageStrip();
   refreshTranscriptSource(); // 字幕随历史一起清掉了
-  showToast(_t('conversationCleared', 'Conversation cleared'), 'success');
 }
 
 /**

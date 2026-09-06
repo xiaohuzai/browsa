@@ -40,7 +40,7 @@
     "description": "Auto-attach checkbox"
   },
   "inputPlaceholder": {
-    "message": "问点什么… 点 📎 附加当前页面",
+    "message": "问点什么…（Enter 发送，Shift+Enter 换行）",
     "description": "Composer placeholder"
   },
   "sendButton": {
@@ -739,10 +739,6 @@
     "message": "会话已保存：「$1」",
     "description": "Sidepanel: session saved toast ($1 = name)"
   },
-  "conversationCleared": {
-    "message": "会话已清空",
-    "description": "Sidepanel: conversation cleared toast"
-  },
   "cannotOpenSettings": {
     "message": "无法打开设置：$1",
     "description": "Sidepanel: cannot open settings ($1 = error)"
@@ -924,7 +920,7 @@
     "description": "Sidepanel: chart export png title"
   },
   "emptyHint": {
-    "message": "关于当前页面，随时提问",
+    "message": "点击 📎 附加当前页面",
     "description": "Sidepanel: empty state hint (injected into CSS var)"
   },
   "mermaidAIFix": {

@@ -162,7 +162,7 @@ body {
 .messages:not(:has(.msg))::after {
   /* 文案由 sidepanel.js 按当前 UI 语言注入 --empty-hint（CSS content 无法走
      chrome.i18n，字面量只是无 JS 时的兜底）。 */
-  content: var(--empty-hint, 'Ask anything about the current page');
+  content: var(--empty-hint, 'Click 📎 to attach the current page');
   display: block;
   color: var(--fg-dim);
   font-size: 12.5px;
