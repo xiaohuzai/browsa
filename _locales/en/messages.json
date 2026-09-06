@@ -679,6 +679,10 @@
     "message": "Hermes API Server setup & configuration docs",
     "description": "Options: Hermes docs link text"
   },
+  "opencodeTip": {
+    "message": "browsa can connect to any opencode serve address. Bare <code>opencode serve</code> picks a random port that changes on every restart — pin one (<code>--port 4096</code>) for a set-and-forget setup, or just type the address shown in the startup banner (update it after each restart). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server docs</a>",
+    "description": "Options: opencode server setup tip"
+  },
   "systemPromptSaved": {
     "message": "System prompt saved.",
     "description": "Options: system prompt saved flash"

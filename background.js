@@ -22,6 +22,7 @@ import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { handleExplainPort } from './lib/handlers/selection-explain.js';
+import { respondOpencodePermission, respondOpencodeQuestion } from './lib/opencode-client.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 import { videoUrlMatches } from './lib/video-url.js';
@@ -955,6 +956,11 @@ async function handle(msg, sender) {
         if (allCfg.providers[name]?.isHermes) {
           await storage.resetHermesSessionId(name);
         }
+        if (allCfg.providers[name]?.isOpencode) {
+          // New conversation → fresh opencode server session (the agent's
+          // transcript would otherwise carry over across "clear history").
+          await storage.clearOpencodeSessionId(name);
+        }
       }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
@@ -1283,9 +1289,26 @@ async function handle(msg, sender) {
 
     case 'APPROVAL_RESPOND': {
       // User clicked Allow/Deny on an approval card. Relay the choice to
-      // the Hermes agent via POST /v1/runs/{id}/approval so it can resume.
+      // the agent so it can resume. opencode pending entries carry the
+      // server session + request id and reply via the opencode endpoint;
+      // card choices (once/always/deny) map onto opencode's reply enum
+      // (deny → reject) — see showApprovalCard's btnLabels.
       const pending = pendingApprovals.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending approval' };
+      if (pending.kind === 'opencode') {
+        try {
+          await respondOpencodePermission({
+            baseUrl: pending.baseUrl,
+            apiKey: pending.apiKey,
+            sessionId: pending.sessionId,
+            requestId: pending.requestId,
+            reply: msg.choice === 'deny' ? 'reject' : (msg.choice === 'always' ? 'always' : 'once'),
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e?.message };
+        }
+      }
       try {
         const res = await fetch(
           `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/approval`,
@@ -1305,9 +1328,26 @@ async function handle(msg, sender) {
     }
 
     case 'CLARIFY_RESPOND': {
-      // User submitted a clarification response. Relay to Hermes agent.
+      // User submitted a clarification response. Relay to the agent. The
+      // opencode question flow expects {answers: [[label, …], …]} — browsa's
+      // clarify card is free-text, so the response rides as the single
+      // selected label (opencode's QuestionInfo has a `custom` answer path).
       const pending = pendingClarifications.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending clarification' };
+      if (pending.kind === 'opencode') {
+        try {
+          await respondOpencodeQuestion({
+            baseUrl: pending.baseUrl,
+            apiKey: pending.apiKey,
+            sessionId: pending.sessionId,
+            requestId: pending.requestId,
+            answers: [[String(msg.response ?? '')]],
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e?.message };
+        }
+      }
       try {
         const res = await fetch(
           `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/clarifications/${encodeURIComponent(pending.clarifyId)}/respond`,

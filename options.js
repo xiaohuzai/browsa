@@ -2,6 +2,7 @@
 import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
+import { pingOpencode } from './lib/opencode-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
@@ -276,6 +277,13 @@ function buildProviderCard(name, cfg, opts = {}) {
   const isAgent = (cfg.type || 'llm') === 'agent';
   const showModel = !isAgent; // Agent providers (Hermes) don't expose Model ID
   const displayName = prettyProviderName(name);
+  // Base URL tip bubble per agent provider. Precomputed OUTSIDE the card
+  // template on purpose: a conditional template literal nested three levels
+  // deep inside card.innerHTML's template made V8's parser bail with
+  // "missing ) after argument list" — same HTML, one less nesting level.
+  const agentBaseUrlTip = !isAgent ? '' : cfg.isOpencode
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', 'browsa 能连任意 opencode serve 地址。裸 <code>opencode serve</code> 默认随机选端口且每次重启都会变——推荐 <code>opencode serve --port 4096</code> 固定端口一劳永逸；用随机端口的话，把启动横幅里显示的实际地址填到这里即可（每次重启需更新）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
+    : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
 
   // Restore ping state from memory
   const pinged = _pingState[name];
@@ -296,8 +304,8 @@ function buildProviderCard(name, cfg, opts = {}) {
         </label>
       </div>` : ''}
       <div class="field">
-        <label>${isAgent ? `<span>Base URL<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span></span>` : _t('baseUrlLabel', 'Base URL')}
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? 'http://127.0.0.1:8080' : ''}" />
+        <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
         </label>
       </div>
       <div class="field">
@@ -483,7 +491,17 @@ async function pingCard(name, card) {
 
   flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
-    const reply = await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
+    // opencode agent cards speak their own HTTP API (GET /api/health) — the
+    // generic OpenAI-style ping() would 404 on a healthy server. pingOpencode
+    // returning ok:false is normalized into a throw so the shared error
+    // flash/badge path below handles both families identically.
+    const reply = cfg.isOpencode
+      ? await (async () => {
+          const r = await pingOpencode({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+          if (!r.ok) throw new Error(r.error || `no healthy opencode server at ${r.url}`);
+          return 'opencode server healthy';
+        })()
+      : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
     // it the active one -- otherwise it's easy to ping-verify e.g.
@@ -504,8 +522,9 @@ async function pingCard(name, card) {
     // Auto-detect capabilities and update isHermes accordingly. isHermes
     // gates the Hermes-only /v1/runs API (approval, clarification, tool
     // events) — so it should reflect run support, not the generic
-    // OpenAI-spec /v1/responses feature.
-    const caps = await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+    // OpenAI-spec /v1/responses feature. opencode is identified by its
+    // fixed isOpencode flag — never flip it from capability probing.
+    const caps = cfg.isOpencode ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
@@ -673,6 +692,7 @@ function prettyProviderName(name) {
   const alias = cachedCfg?.providers?.[name]?.alias;
   if (alias && alias.trim()) return alias.trim();
   if (name === 'hermes') return 'Hermes Agent';
+  if (name === 'opencode') return 'OpenCode Agent';
   const m = /^llm-(\d+)$/.exec(name);
   if (m) return `LLM ${m[1]}`;
   return name.charAt(0).toUpperCase() + name.slice(1);

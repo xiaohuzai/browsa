@@ -103,6 +103,19 @@ hermes gateway
 </details>
 
 <details>
+<summary><b>🔧 OpenCode Agent</b>——连接 <code>opencode</code> 命令行智能体</summary>
+
+[opencode](https://opencode.ai) 自带官方无头服务器——browsa 直连即可（会话、流式回复、工具进度，以及危险操作——比如执行 shell 命令——的审批卡片）。browsa 能连**任意** `opencode serve` 地址——但裸 `opencode serve` 会随机选端口且每次重启都变，所以省心的做法是固定一个：
+
+```bash
+opencode serve --port 4096
+```
+
+打开 ⚙ 设置，选择 **OpenCode Agent** provider（Base URL 默认 `http://127.0.0.1:4096`），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
+
+</details>
+
+<details>
 <summary><b>💬 LLM Providers</b>——OpenAI · Anthropic · Ollama · Groq · LiteLLM · 任意兼容端点</summary>
 
 任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。

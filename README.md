@@ -103,6 +103,19 @@ hermes gateway
 </details>
 
 <details>
+<summary><b>🔧 OpenCode Agent</b> — connect the <code>opencode</code> CLI agent</summary>
+
+[opencode](https://opencode.ai) ships a first-party headless server — browsa connects to it directly (sessions, streaming, tool progress, and approval prompts for dangerous actions like shell commands). Browsa can connect to **any** `opencode serve` address — but bare `opencode serve` picks a random port that changes on every restart, so the set-and-forget move is to pin one:
+
+```bash
+opencode serve --port 4096
+```
+
+Open ⚙ Settings, select the **OpenCode Agent** provider (Base URL defaults to `http://127.0.0.1:4096`), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
+
+</details>
+
+<details>
 <summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).

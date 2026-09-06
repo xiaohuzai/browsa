@@ -679,6 +679,10 @@
     "message": "Hermes API Server 启动与配置文档",
     "description": "Options: Hermes docs link text"
   },
+  "opencodeTip": {
+    "message": "browsa 能连任意 opencode serve 地址。裸 <code>opencode serve</code> 默认随机选端口且每次重启都会变——推荐 <code>opencode serve --port 4096</code> 固定端口一劳永逸；用随机端口的话，把启动横幅里显示的实际地址填到这里即可（每次重启需更新）。<a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server 文档</a>",
+    "description": "Options: opencode server setup tip"
+  },
   "systemPromptSaved": {
     "message": "系统提示词已保存。",
     "description": "Options: system prompt saved flash"
