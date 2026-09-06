@@ -56,14 +56,62 @@ test('anthropicStream: POSTs to /v1/messages with system + max_tokens and stream
 
   assert.equal(cap.url, 'http://test/v1/messages');
   assert.equal(cap.body.model, 'claude-3-5-sonnet');
-  assert.equal(cap.body.system, 'Be concise.');
+  assert.deepEqual(cap.body.system, [{ type: 'text', text: 'Be concise.', cache_control: { type: 'ephemeral' } }],
+    'system is sent as a block carrying a cache_control breakpoint (Anthropic caches nothing without one)');
   assert.equal(cap.body.stream, true);
   assert.equal(cap.body.temperature, 0.3);
   assert.ok(cap.body.max_tokens > 0, 'max_tokens must ALWAYS be sent — Anthropic 400s without it');
-  assert.deepEqual(cap.body.messages, [{ role: 'user', content: 'hi' }]);
+  assert.deepEqual(cap.body.messages, [{
+    role: 'user',
+    content: [{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }],
+  }], 'the last message carries the moving cache_control breakpoint');
   assert.equal(full, 'Hello, world');
   assert.equal(result.full, 'Hello, world');
   assert.equal(result.finishReason, 'stop');
+});
+
+test('anthropicStream: cache_control breakpoints — system + last message (string and array content)', async () => {
+  const { anthropicStream } = await import('../lib/llm-client.js');
+  const cap = {};
+  mockFetchWithStream([
+    { event: 'message_stop', data: { type: 'message_stop' } },
+  ], cap);
+  await anthropicStream({
+    baseUrl: 'http://test', apiKey: 'k',
+    system: 'sys prompt',
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: 'page context...' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AA' } }] },
+      { role: 'assistant', content: 'ok' },
+      { role: 'user', content: 'question?' },
+    ],
+  });
+  // Last message: string content converted to a single text block with the breakpoint.
+  const last = cap.body.messages[2];
+  assert.deepEqual(last.content, [{ type: 'text', text: 'question?', cache_control: { type: 'ephemeral' } }]);
+  // Earlier messages must NOT be mutated (breakpoint only on the last).
+  assert.deepEqual(cap.body.messages[0].content[0], { type: 'text', text: 'page context...' });
+  assert.equal(cap.body.messages[1].content, 'ok');
+  // System block breakpoint.
+  assert.equal(cap.body.system[0].cache_control.type, 'ephemeral');
+});
+
+test('anthropicStream: array content on the last message gets the breakpoint on its LAST block; empty content skipped', async () => {
+  const { anthropicStream } = await import('../lib/llm-client.js');
+  const cap = {};
+  mockFetchWithStream([{ event: 'message_stop', data: { type: 'message_stop' } }], cap);
+  await anthropicStream({
+    baseUrl: 'http://test', apiKey: 'k',
+    messages: [{ role: 'user', content: [{ type: 'text', text: 'a' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AA' } }] }],
+  });
+  const blocks = cap.body.messages[0].content;
+  assert.equal(blocks[0].cache_control, undefined, 'earlier blocks untouched');
+  assert.deepEqual(blocks[1].cache_control, { type: 'ephemeral' }, 'breakpoint rides the last block (image blocks accept it too)');
+
+  const cap2 = {};
+  mockFetchWithStream([{ event: 'message_stop', data: { type: 'message_stop' } }], cap2);
+  await anthropicStream({ baseUrl: 'http://test', apiKey: 'k', messages: [{ role: 'user', content: '   ' }] });
+  assert.deepEqual(cap2.body.messages, [{ role: 'user', content: '   ' }],
+    'whitespace-only string content left untouched (empty text blocks would 400)');
 });
 
 test('anthropicStream: explicit provider maxTokens overrides the default and is sent as-is', async () => {

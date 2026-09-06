@@ -90,6 +90,19 @@
       </ol>
       <p>The Hermes card is fixed and always present; it needs only a Base URL and key — the protocol is auto-detected, falling back to plain chat if the server doesn't advertise <code>/v1/runs</code>.</p>
 
+      <h3>Self-hosting: server-side settings for faster replies</h3>
+      <p>By default Hermes mounts its <strong>full toolset</strong> for API clients — the definitions of a dozen-plus tool groups (terminal, browser, cron jobs, …) ride along with <em>every</em> request (about 23K tokens measured), and casual page Q&amp;A uses a fraction of them. Thinking mode is also on by default, and that wait lands before the first word. Tighten both in <code>~/.hermes/config.yaml</code>:</p>
+      <pre class="doc-code">platform_toolsets:
+  api_server:          # affects API clients (browsa) only — Telegram etc. keep their own
+    - web              # search, page extraction
+    - vision           # image understanding
+    - clarify          # follow-up questions
+    - memory           # cross-session memory
+agent:
+  reasoning_overrides: # per-model thinking effort (the global knob is agent.reasoning_effort)
+    your-model: medium</pre>
+      <p>Run <code>hermes gateway restart</code> to apply. Measured by the author (qwen3.8-flash, an 80K-token context): the slimmed toolset sheds about 14K tokens per request, and the lower thinking effort directly cuts the wait before the first word. Also note that model services generally accelerate consecutive follow-ups within ~5 minutes via prefix caching — <strong>asking in a row is much faster than returning after a few minutes</strong>. That part is on the model side; nothing to configure.</p>
+
       <h2>Ollama, locally</h2>
       <p>Running Ollama on your machine? Base URL <code>http://localhost:11434</code>, protocol Chat Completions (Ollama speaks the OpenAI format), Model ID set to a pulled model such as <code>qwen3:32b</code>. Fully <strong>offline-capable</strong>.</p>
 

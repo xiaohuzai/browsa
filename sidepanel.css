@@ -162,7 +162,7 @@ body {
 .messages:not(:has(.msg))::after {
   /* 文案由 sidepanel.js 按当前 UI 语言注入 --empty-hint（CSS content 无法走
      chrome.i18n，字面量只是无 JS 时的兜底）。 */
-  content: var(--empty-hint, 'Ask anything about the current page');
+  content: var(--empty-hint, 'Click 📎 to attach the current page');
   display: block;
   color: var(--fg-dim);
   font-size: 12.5px;
@@ -596,7 +596,11 @@ body {
 /* When the full raw block is open, hide the clamped duplicate above it. */
 .msg.error.has-detail:has(.err-more[open]) .err-detail { display: none; }
 
-.tool-progress {
+/* .wait-indicator shares the tool-progress slot/styles — it IS a process
+   indicator ("thinking… Ns" before the first streamed token) that hands the
+   slot over to real tool-progress rows on the first event. */
+.tool-progress,
+.wait-indicator {
   display: flex;
   align-items: center;
   gap: 6px;

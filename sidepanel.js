@@ -123,7 +123,9 @@ init();
 // 空状态提示在 CSS ::after content 里——CSS 无法走 chrome.i18n，按当前 UI 语言
 // 把文案写进 --empty-hint（语言切换时重跑）。引号转义防注入样式值。
 function applyEmptyHint() {
-  const text = _t('emptyHint', 'Ask anything about the current page').replaceAll("'", "\\'");
+  // 空态背景中央这一行是「先附加再提问」循环的唯一教学位——有消息即消失
+  // （.messages:not(:has(.msg))::after），无需任何显隐维护。
+  const text = _t('emptyHint', 'Click 📎 to attach the current page').replaceAll("'", "\\'");
   document.documentElement.style.setProperty('--empty-hint', `'${text}'`);
 }
 
@@ -1835,7 +1837,6 @@ async function clearChatHistory() {
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
   images.length = 0; refreshImageStrip();
   refreshTranscriptSource(); // 字幕随历史一起清掉了
-  showToast(_t('conversationCleared', 'Conversation cleared'), 'success');
 }
 
 /**
@@ -1912,6 +1913,7 @@ function setStreamingUI(on) {
     sendBtn.disabled = false;
     sendBtn.title = '';
     setStatusDotState('idle');
+    stopWaitingIndicator(); // catch-all: cancel / resume-end / error teardown
   }
 }
 
@@ -1975,6 +1977,7 @@ function cancelStream() {
     // mid-rewrite (or mid-tool-call) doesn't leave the status lingering
     // above the now-finalized bubble.
     clearToolProgress(cancelledEl);
+    stopWaitingIndicator();
     cancelledRenderStream?.destroy?.();
   }
   activeController = null;
@@ -2214,18 +2217,22 @@ function waitForStreamHelloAck(port, tabId, { onAck } = {}) {
 }
 
 function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAlive, onRetry, afterDone, onAborted }) {
+  startWaitingIndicator(getEl);
   port.onMessage.addListener(async (m) => {
     if (m.type === 'CHUNK') {
+      stopWaitingIndicator();
       if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
       state.acc += m.delta;
       getRenderer()(m.delta, false); // pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
 
     } else if (m.type === 'TOOL_PROGRESS') {
+      stopWaitingIndicator();
       state.toolEvents.push(m.text);
       showToolProgress(getEl(), m.text);
 
     } else if (m.type === 'TS_STATUS') {
+      stopWaitingIndicator();
       // Transient status from the background's auto timestamp-rewrite
       // (video notes whose first reply lacked [mm:ss]). Shown like
       // tool-progress but NOT recorded into toolEvents, so DONE's
@@ -2234,9 +2241,11 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       showToolProgress(getEl(), m.text, 'warn');
 
     } else if (m.type === 'APPROVAL') {
+      stopWaitingIndicator();
       showApprovalCard(getEl(), m.data);
 
     } else if (m.type === 'CLARIFY') {
+      stopWaitingIndicator();
       showClarifyCard(getEl(), m.data);
 
     } else if (m.type === 'RETRY') {
@@ -2245,6 +2254,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
     } else if (m.type === 'DONE') {
       const el = getEl();
       const r = getRenderer();
+      stopWaitingIndicator();
       clearToolProgress(el);
       _findCard(el, 'approval-card')?.remove();
       _findCard(el, 'clarify-card')?.remove();
@@ -2293,6 +2303,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
     } else if (m.type === 'ERROR') {
       // Only ABORTED reaches here — real errors are re-thrown by background
       // and handled via the !res.ok block below (no pushChunk for real errors).
+      stopWaitingIndicator();
       stopKeepAlive();
       if (m.code === 'ABORTED') {
         const r = getRenderer();
@@ -3245,6 +3256,39 @@ function classifyToolTier(text) {
 }
 
 /** Show a faint "tool progress" line above a streaming bubble, alongside thinking. */
+// ---- Waiting indicator (first-token latency) ----
+// Between send and the first CHUNK / TOOL_PROGRESS / reasoning event the
+// background pushes NOTHING (measured 2026-09-06 on Hermes /v1/runs: even
+// reasoning text only arrives at step end), so on big-context turns the user
+// stared at a silent blinking cursor for the whole prefill+thinking window.
+// A 1s tick renders elapsed time in the same pre-bubble slot .tool-progress
+// uses; the first real event stops it and hands the slot over.
+let _waitTimer = null;
+let _waitEl = null;
+function startWaitingIndicator(getEl) {
+  stopWaitingIndicator();
+  const t0 = Date.now();
+  const render = () => {
+    const el = getEl?.();
+    if (!el || !el.isConnected) return;
+    if (!_waitEl || !_waitEl.isConnected) {
+      _waitEl = document.createElement('div');
+      _waitEl.className = 'wait-indicator';
+      el.parentNode.insertBefore(_waitEl, el);
+    }
+    _waitEl.innerHTML =
+      `<span class="tp-icon">${ICONS.gear}</span>` +
+      `<span class="tp-text">${escM(tSub('waitThinking', '思考中… $1s', Math.round((Date.now() - t0) / 1000)))}</span>`;
+  };
+  render();
+  _waitTimer = setInterval(render, 1000);
+}
+function stopWaitingIndicator() {
+  if (_waitTimer) { clearInterval(_waitTimer); _waitTimer = null; }
+  _waitEl?.remove();
+  _waitEl = null;
+}
+
 function showToolProgress(bubbleEl, text, tierOverride) {
   if (!bubbleEl) return;
   // Positioned before the bubble (grouped with the live-think box, which

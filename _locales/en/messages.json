@@ -739,10 +739,6 @@
     "message": "Session saved: \"$1\"",
     "description": "Sidepanel: session saved toast ($1 = name)"
   },
-  "conversationCleared": {
-    "message": "Conversation cleared",
-    "description": "Sidepanel: conversation cleared toast"
-  },
   "cannotOpenSettings": {
     "message": "Cannot open settings: $1",
     "description": "Sidepanel: cannot open settings ($1 = error)"
@@ -924,7 +920,7 @@
     "description": "Sidepanel: chart export png title"
   },
   "emptyHint": {
-    "message": "Ask anything about the current page",
+    "message": "Click 📎 to attach the current page",
     "description": "Sidepanel: empty state hint (injected into CSS var)"
   },
   "mermaidAIFix": {
@@ -966,5 +962,9 @@
   "deepExtractPage": {
     "message": "Reading page $1…",
     "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "Thinking… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
   }
 }

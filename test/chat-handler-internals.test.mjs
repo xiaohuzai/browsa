@@ -665,3 +665,50 @@ test('chat-handler: continuation reuses the silent-second-pass contract (TS_STAT
   assert.match(block, /_stCont\.acc = ''/, 'stream-state accumulator reset before the silent pass (no v1+v2 double in PEEK)');
   assert.match(block, /_stCont\.acc = fullReply/, 'acc holds the MERGED text after the continuation (tab-switch PEEK correctness)');
 });
+
+// --------------- buildTimestampRewriteHistory (rewrite pass trimming) -------
+
+let _buildTimestampRewriteHistory;
+async function buildTimestampRewriteHistory(history, videoSrc, userText, assistantReply) {
+  if (!_buildTimestampRewriteHistory) {
+    ({ buildTimestampRewriteHistory: _buildTimestampRewriteHistory } =
+      await import('../lib/handlers/chat-handler.js'));
+  }
+  return _buildTimestampRewriteHistory(history, videoSrc, userText, assistantReply);
+}
+
+test('buildTimestampRewriteHistory: trims to video attach entry + user turn + v1 reply', async () => {
+  const videoAttach = { role: 'user', content: '[Page context attached by browsa]\n[00:12] line\n[01:40] line', videoSrc: { tabId: 7, url: 'https://youtu.be/x' } };
+  const older = { role: 'user', content: '[Page context attached by browsa]\nURL: https://a.com\n\nhuge old page text' };
+  const history = [
+    older,
+    { role: 'assistant', content: 'old answer' },
+    videoAttach,
+    { role: 'assistant', content: 'v1 notes without timestamps' },
+  ];
+  const out = await buildTimestampRewriteHistory(history, videoAttach.videoSrc, '总结视频', 'v1 notes without timestamps');
+  assert.deepEqual(out, [
+    videoAttach,
+    { role: 'user', content: '总结视频' },
+    { role: 'assistant', content: 'v1 notes without timestamps' },
+  ], 'rewrite pass must NOT resend the whole session — only the video transcript + this turn + v1');
+});
+
+test('buildTimestampRewriteHistory: falls back to full history when no videoSrc entry exists', async () => {
+  const history = [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'hello' }];
+  const out = await buildTimestampRewriteHistory(history, null, 'q', 'a');
+  assert.equal(out.length, 4);
+  assert.deepEqual(out[0], history[0]);
+  assert.deepEqual(out[3], { role: 'assistant', content: 'a' });
+});
+
+test('chat-handler: rewrite + continuation branches rebuild every apiStyle input', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  const cont = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
+  assert.match(cont, /apiStyle === 'responses'/, 'continuation must rebuild responsesInput (was chat-only — responses providers resent the original request)');
+  assert.match(cont, /apiStyle === 'anthropic'/, 'continuation must rebuild anthropicMessages');
+  const rewrite = src.slice(src.indexOf('Auto timestamp rewrite (video notes)'));
+  assert.match(rewrite, /apiStyle === 'responses'/, 'rewrite must rebuild responsesInput');
+  assert.match(rewrite, /apiStyle === 'anthropic'/, 'rewrite must rebuild anthropicMessages');
+  assert.match(rewrite, /buildTimestampRewriteHistory\(history, videoSrc/, 'rewrite history built from the RAW history (aged copy may have stubbed the transcript)');
+});
