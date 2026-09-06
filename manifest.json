@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "short_name": "browsa",
-  "version": "0.35.10",
+  "version": "0.35.11",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "homepage_url": "https://xiaohuzai.github.io/browsa/",
