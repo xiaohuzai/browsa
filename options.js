@@ -282,7 +282,7 @@ function buildProviderCard(name, cfg, opts = {}) {
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
   const agentBaseUrlTip = !isAgent ? '' : cfg.isOpencode
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', 'browsa 能连任意 opencode serve 地址。裸 <code>opencode serve</code> 默认随机选端口且每次重启都会变——推荐 <code>opencode serve --port 4096</code> 固定端口一劳永逸；用随机端口的话，把启动横幅里显示的实际地址填到这里即可（每次重启需更新）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
 
   // Restore ping state from memory

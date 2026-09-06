@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>browsa — Side-panel AI for your browser</title>
-<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API or Hermes Agent.">
+<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API, or the Hermes / opencode agents.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — Side-panel AI for your browser">
@@ -281,7 +281,7 @@
         <div class="how reveal">
           <span class="no">03</span>
           <h3>Stream replies <span class="tag">any backend</span></h3>
-          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API or Hermes Agent. The UI follows your browser language — English / 中文 switchable.</p>
+          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, or the Hermes / opencode agents. The UI follows your browser language — English / 中文 switchable.</p>
         </div>
       </div>
       <p class="site-note">Installed? <a href="guide/quickstart.html">Quick start</a> walks you through the first question; the <a href="guide/">full guide</a> covers reading, video, rendering, sessions, backends and settings.</p>
@@ -345,6 +345,7 @@
           <p>No vendor lock-in — connect your own models:</p>
           <ul>
             <li>Hermes Agent: tool execution, approval for risky actions, progress display</li>
+            <li>OpenCode Agent: direct line to the opencode CLI agent — same full tool &amp; approval flow</li>
             <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
             <li>Multiple models per card (comma-separated) — switch via “Alias · model” in the sidebar</li>
             <li>Ping to verify connectivity and capabilities</li>
@@ -449,6 +450,11 @@
             <span class="prov-ava pa-hermes">H</span>
             <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approvals</span></span>
             <span class="prov-badge pb-ok">reachable</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-opencode">oc</span>
+            <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">not pinged</span>
           </div>
         </div>
       </div>

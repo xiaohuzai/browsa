@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>browsa — 浏览器侧边栏 AI</title>
-<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API 与 Hermes Agent。读到哪里，问到哪里。">
+<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API 与 Hermes / opencode 智能体。读到哪里，问到哪里。">
 <link rel="icon" type="image/png" href="icon48.png">
 <link rel="stylesheet" href="site.css">
 <meta property="og:title" content="browsa — 浏览器侧边栏 AI">
@@ -277,7 +277,7 @@
         <div class="how reveal">
           <span class="no">03</span>
           <h3>流式回答 <span class="tag">任意后端</span></h3>
-          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes Agent。界面文字跟随浏览器语言，也可手动切换中英文。</p>
+          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes / opencode 智能体。界面文字跟随浏览器语言，也可手动切换中英文。</p>
         </div>
       </div>
       <p class="site-note">装好了？<a href="guide/quickstart.html">快速上手</a>带你完成第一次提问；<a href="guide/">完整使用指南</a>覆盖读取、视频、渲染、会话、后端与设置。</p>
@@ -342,6 +342,7 @@
           <p>不用厂商锁定，连你自己的模型：</p>
           <ul>
             <li>Hermes Agent：工具执行、危险操作审批、进度展示</li>
+            <li>OpenCode Agent：opencode CLI 智能体直连，同样是完整的工具与审批流</li>
             <li>多协议接入：OpenAI（Chat / Responses）、Anthropic Messages、Ollama、LiteLLM…</li>
             <li>一张卡可填多个模型（逗号分隔），侧边栏按「别名 · 模型」逐个切换</li>
             <li>Ping 一键检测连通性与模型能力</li>
@@ -447,6 +448,11 @@
             <span class="prov-ava pa-hermes">H</span>
             <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · 工具执行 · 危险操作先审批</span></span>
             <span class="prov-badge pb-ok">reachable</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-opencode">oc</span>
+            <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · 工具执行 · 危险操作先审批</span></span>
+            <span class="prov-badge pb-idle">not pinged</span>
           </div>
         </div>
       </div>

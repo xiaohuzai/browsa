@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>连接后端 · browsa 指南</title>
-<meta name="description" content="把 browsa 连到你自己的模型：OpenAI / Anthropic / Ollama / 自建网关，多协议多模型；Hermes Agent 的安装步骤与工具审批流。">
+<meta name="description" content="把 browsa 连到你自己的模型：OpenAI / Anthropic / Ollama / 自建网关，多协议多模型；Hermes / opencode 智能体的安装步骤与工具审批流。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <link rel="stylesheet" href="../docs.css">
@@ -59,6 +59,7 @@
       <ul>
         <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
         <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
+        <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
       </ul>
 
       <h2>配一张提供商卡</h2>
@@ -75,7 +76,7 @@
       </table>
       <p>保存后点 <strong>Ping</strong>：验证连通性并自动识别模型能力。第一个 Ping 通的提供商会自动设为当前使用；之后在侧边栏顶部下拉里随时切换，多模型的卡会按「别名 · 模型」逐个列出。</p>
       <figure class="shot">
-        <img src="../assets/readme/providers-zh.png" alt="browsa 设置页：OpenAI、Claude、Ollama 与 Hermes Agent 四张提供商卡" loading="lazy">
+        <img src="../assets/readme/providers-zh.png" alt="browsa 设置页：OpenAI、Claude、Ollama、Hermes Agent 与 OpenCode Agent 五张提供商卡" loading="lazy">
         <figcaption>设置页：每张卡独立协议、独立别名，Ping 状态一目了然。</figcaption>
       </figure>
 
@@ -101,6 +102,18 @@ agent:
   reasoning_overrides: # 按模型覆盖思考力度（全局项是 agent.reasoning_effort）
     你的模型名: medium</pre>
       <p>改完执行 <code>hermes gateway restart</code> 生效。作者实测（qwen3.8-flash、8 万 token 长上下文）：工具集瘦身让每轮请求少背约 1.4 万 token，思考降档直接缩短首字前的等待。另外模型服务普遍对 5 分钟内的连续追问做前缀缓存加速——<strong>连续提问比隔几分钟再问快得多</strong>，这是模型侧行为，无需任何配置。</p>
+
+      <h2>OpenCode Agent</h2>
+      <p><a href="https://opencode.ai">opencode</a> 是开源命令行智能体，自带官方无头服务器——browsa 直连它即可（多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话）。服务器在哪个目录启动，agent 就在哪个项目上干活：</p>
+      <ol>
+        <li>安装：<code>npm i -g opencode-ai</code>，首次运行按引导登录模型服务；</li>
+        <li>启动：<code>opencode serve --port 4096</code>。<strong>建议固定端口</strong>——裸 <code>opencode serve</code> 会随机选端口且每次重启都变，固定后 browsa 里配置一次就不用再动；</li>
+        <li>在 browsa 设置里选中 <strong>OpenCode Agent</strong> 卡，Base URL 填 <code>http://127.0.0.1:4096</code>（占位符即此建议值），Ping 验证。</li>
+      </ol>
+      <p>当 opencode 要执行危险操作（如 shell 命令）时，审批卡会直接出现在 browsa 面板里。要启用这一步，在 <code>~/.config/opencode/opencode.json</code> 里把权限设为询问：</p>
+      <pre class="doc-code">{
+  "permission": { "bash": "ask", "edit": "ask" }
+}</pre>
 
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connecting backends · browsa guide</title>
-<meta name="description" content="Connect browsa to your own models: OpenAI / Anthropic / Ollama / self-hosted gateways, multiple protocols and models per card; installing Hermes Agent and its approval flow.">
+<meta name="description" content="Connect browsa to your own models: OpenAI / Anthropic / Ollama / self-hosted gateways, multiple protocols and models per card; installing Hermes / opencode agents and their approval flows.">
 <link rel="icon" type="image/png" href="../../icon48.png">
 <link rel="stylesheet" href="../../site.css">
 <link rel="stylesheet" href="../../docs.css">
@@ -60,6 +60,7 @@
       <ul>
         <li><strong>LLM providers</strong> — plain chat endpoints, covering nearly every service: OpenAI, Anthropic, Ollama, Groq, LiteLLM, aggregation gateways.</li>
         <li><strong>Hermes Agent</strong> — a self-hosted agent with server-side tool execution: it can search, run commands, and operate files. Built into browsa; just point it at your server.</li>
+        <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
       </ul>
 
       <h2>Filling in a provider card</h2>
@@ -76,7 +77,7 @@
       </table>
       <p>Save, then hit <strong>Ping</strong>: connectivity is verified and capabilities auto-detected. The first provider to ping successfully becomes active automatically; switch anytime from the dropdown at the top of the panel — multi-model cards expand to one "Alias · model" entry each.</p>
       <figure class="shot">
-        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, and Hermes Agent provider cards" loading="lazy">
+        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, Hermes Agent, and OpenCode Agent provider cards" loading="lazy">
         <figcaption>Settings: each card carries its own protocol and alias; ping state at a glance.</figcaption>
       </figure>
 
@@ -102,6 +103,18 @@ agent:
   reasoning_overrides: # per-model thinking effort (the global knob is agent.reasoning_effort)
     your-model: medium</pre>
       <p>Run <code>hermes gateway restart</code> to apply. Measured by the author (qwen3.8-flash, an 80K-token context): the slimmed toolset sheds about 14K tokens per request, and the lower thinking effort directly cuts the wait before the first word. Also note that model services generally accelerate consecutive follow-ups within ~5 minutes via prefix caching — <strong>asking in a row is much faster than returning after a few minutes</strong>. That part is on the model side; nothing to configure.</p>
+
+      <h2>OpenCode Agent</h2>
+      <p><a href="https://opencode.ai">opencode</a> is an open-source CLI agent that ships a first-party headless server — browsa connects to it directly (multi-turn context lives in the opencode session; browsa just sends your turns). The agent works on whatever directory the server was started in:</p>
+      <ol>
+        <li>Install: <code>npm i -g opencode-ai</code>, then follow the first-run login flow;</li>
+        <li>Start: <code>opencode serve --port 4096</code>. <strong>Pin the port</strong> — bare <code>opencode serve</code> picks a random one that changes on every restart; a pinned port is a set-and-forget config in browsa;</li>
+        <li>In browsa settings, select the <strong>OpenCode Agent</strong> card, fill Base URL <code>http://127.0.0.1:4096</code> (the placeholder suggests it), then Ping.</li>
+      </ol>
+      <p>When opencode wants to run a dangerous action (like a shell command), the approval card appears right in the browsa panel. To enable that, mark the permissions as ask-once in <code>~/.config/opencode/opencode.json</code>:</p>
+      <pre class="doc-code">{
+  "permission": { "bash": "ask", "edit": "ask" }
+}</pre>
 
       <h2>Ollama, locally</h2>
       <p>Running Ollama on your machine? Base URL <code>http://localhost:11434</code>, protocol Chat Completions (Ollama speaks the OpenAI format), Model ID set to a pulled model such as <code>qwen3:32b</code>. Fully <strong>offline-capable</strong>.</p>

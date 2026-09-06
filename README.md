@@ -18,7 +18,7 @@
 
 ---
 
-**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
+**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes, or the opencode CLI agent) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
 
 ## See it in action
 
@@ -111,7 +111,7 @@ hermes gateway
 opencode serve --port 4096
 ```
 
-Open ⚙ Settings, select the **OpenCode Agent** provider (Base URL defaults to `http://127.0.0.1:4096`), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
+Open ⚙ Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
 
 </details>
 
@@ -130,7 +130,7 @@ Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for
 | Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in Hermes agent card is fixed and not removable).
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode — are fixed and not removable).
 
 </details>
 
@@ -249,7 +249,7 @@ Type `/` in the composer to see autocomplete. All commands accept extra instruct
 
 - **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
 - **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, detail thread each live in `lib/sidepanel/`.
-- **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming client (`/v1/chat/completions` + Hermes `/v1/runs`), `chrome.storage.local` wrapper, content scripts.
+- **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming client (`/v1/chat/completions` + Hermes `/v1/runs` + opencode server), `chrome.storage.local` wrapper, content scripts.
 
 </details>
 

@@ -549,7 +549,7 @@ main section{padding:88px 0;scroll-margin-top:64px;counter-increment:sec;positio
   display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;
 }
-.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--mark)}
+.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--mark)}.pa-opencode{background:#7c5cff}
 .prov-info{flex:1;min-width:0}
 .prov-name{display:block;font-size:13px;font-weight:600;color:var(--ink);line-height:1.3}
 .prov-model{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
