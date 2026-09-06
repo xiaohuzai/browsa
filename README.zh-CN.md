@@ -18,7 +18,7 @@
 
 ---
 
-**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，附加页面——文章、视频、PDF——并用**你自己的**模型或智能体流式生成回复：任意 OpenAI、Anthropic、Ollama 兼容端点，或带工具、记忆与审批的完整智能体后端（Hermes）。无订阅、无加价——key 只存在你自己的机器上。
+**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，附加页面——文章、视频、PDF——并用**你自己的**模型或智能体流式生成回复：任意 OpenAI、Anthropic、Ollama 兼容端点，或带工具、记忆与审批的完整智能体后端（Hermes、opencode CLI 智能体）。无订阅、无加价——key 只存在你自己的机器上。
 
 ## 实际效果
 
@@ -111,7 +111,7 @@ hermes gateway
 opencode serve --port 4096
 ```
 
-打开 ⚙ 设置，选择 **OpenCode Agent** provider（Base URL 默认 `http://127.0.0.1:4096`），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
+打开 ⚙ 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
 
 </details>
 
@@ -130,7 +130,7 @@ opencode serve --port 4096
 | Model ID | **必填**——例如 `gpt-4o`、`claude-sonnet-4-6`；可填多个（逗号分隔），侧边栏下拉按「Alias · 模型」逐个选择 |
 | API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
-想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置 Hermes 智能体卡片固定不可删）。
+想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenCode 智能体卡片固定不可删）。
 
 </details>
 

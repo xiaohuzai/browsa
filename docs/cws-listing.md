@@ -69,7 +69,7 @@ browsa is an AI sidebar that chats with the page you're on — articles, YouTube
 🤖 BRING YOUR OWN MODEL — OR YOUR OWN AGENT
 • Any OpenAI-compatible endpoint: ChatGPT, Claude, Gemini, Groq, LiteLLM…
 • Local & offline models via Ollama / LM Studio / vLLM
-• Agent backends too (e.g. self-hosted Hermes): tool execution, streaming progress, human approval before risky actions
+• Agent backends too (self-hosted Hermes, the opencode CLI agent): tool execution, streaming progress, human approval before risky actions
 • Three wire protocols per provider: Chat Completions, Responses, Anthropic Messages
 
 🌐 DEEP SITE EXTRACTION (not just "grab the text")
@@ -138,7 +138,7 @@ browsa 是一个把「你正在看的页面」交给 AI 的浏览器侧边栏—
 🤖 自选模型与智能体
 • OpenAI 兼容端点通吃：ChatGPT、Claude、Gemini、Groq、LiteLLM…
 • 本地离线模型：Ollama / LM Studio / vLLM
-• 也支持智能体后端（如自建 Hermes）：工具执行、过程直播、危险操作先审批
+• 也支持智能体后端（自建 Hermes、opencode CLI 智能体）：工具执行、过程直播、危险操作先审批
 
 🌐 深度站点提取
 • YouTube、B站、小红书、知乎、雪球、掘金、X/Twitter、Reddit、得到、极客时间、小宇宙播客、飞书/Lark 文档
@@ -170,7 +170,7 @@ Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、EC
 | 1 | **主图 Hero**：B站视频页 + 侧边栏结构化笔记，金色 `[07:42]` 时间戳清晰可见 | Chat with video |
 | 2 | 无字幕视频 → ASR 转写中（进度提示）→ 出现带 `[mm:ss]` 的笔记 | works without subtitles |
 | 3 | 论文 PDF + 侧边栏提问，附图中裁出的 Figure 3 | chat with PDF |
-| 4 | 设置页 Provider 卡片：OpenAI / Claude / **Ollama(localhost)** / Hermes 四张卡 | Your keys, your agent |
+| 4 | 设置页 Provider 卡片：OpenAI / Claude / **Ollama(localhost)** / Hermes / OpenCode 五张卡 | Your keys, your agent |
 | 5 | 小红书/飞书文档提取前后对比（左：页面；右：干净的结构化正文） | deep extraction |
 | 6（440×280） | 冷纸白底 + mono 字标 "browsa" + 一句话 “Your keys. Your agent.” | 品牌 |
 

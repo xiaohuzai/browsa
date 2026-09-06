@@ -37,8 +37,9 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(PORT, r));
 
 const jobs = [
-  { html: 'og-en.html',   w: 1200, h: 630, out: 'docs/assets/readme/hero-en.png' },
-  { html: 'keys-en.html', w: 1280, h: 800, out: 'docs/assets/readme/providers-en.png' },
+  { html: 'og-en.html',   w: 1200, h: 630, out: 'docs/assets/readme/hero-en.png', scale: 2 },
+  { html: 'keys-en.html', w: 1280, h: 800, out: 'docs/assets/readme/providers-en.png', scale: 2 },
+  { html: 'keys-zh.html', w: 1280, h: 800, out: 'docs/assets/readme/providers-zh.png', scale: 1 },
 ];
 const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
 for (const j of jobs) {
@@ -49,7 +50,7 @@ for (const j of jobs) {
   const client = await p.context().newCDPSession(p);
   const s = await client.send('Page.captureScreenshot', {
     format: 'png',
-    clip: { x: 0, y: 0, width: j.w, height: j.h, scale: 2 },
+    clip: { x: 0, y: 0, width: j.w, height: j.h, scale: j.scale ?? 2 },
   });
   fs.writeFileSync(path.join(root, j.out), Buffer.from(s.data, 'base64'));
   console.log('saved', j.out);
