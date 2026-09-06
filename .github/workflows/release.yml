@@ -78,61 +78,98 @@ jobs:
       # 互相不成祖先，自动 notes 一路回退锚到 v0.31.2、把历史 PR 全量重列。
       - name: Commit version bump + push tag
         id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION="${{ steps.ver.outputs.version }}"
           git fetch origin --tags --quiet
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "::error::Tag v$VERSION already exists — bump the version, or delete the old release+tag to redo."
-            exit 1
+            # tag 已存在 = 上次发版跑到一半的残留（tag 推送在 release 创建之前）。
+            # release 也在 → 已完整发过，直接收尾；release 缺失 → 跳过 bump/tag
+            # 往下走，由 Create 步骤补建 release——把"手动删 tag 重来"变成
+            # "重跑一次"。能走到这里的重跑只有"当前版本补完"一种：给旧版本
+            # 补发已被 Bump 步骤的版本回退防护挡住。
+            if gh release view "v$VERSION" >/dev/null 2>&1; then
+              echo "::notice::v$VERSION 已完整发布（tag + release 均在）——本次运行无事可做，若 notes 是兜底版会在下一步顺手升级。"
+            else
+              echo "::notice::tag v$VERSION 已存在但 release 缺失（上次运行失败残留）——跳过 bump/tag，按当前代码补建 release。"
+            fi
+            exit 0
           fi
           git add package.json package-lock.json manifest.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: release v$VERSION [skip ci]"
           fi
           git tag -a "v$VERSION" -m "browsa v$VERSION"
-          # bump commit 同时推到 release/vX 分支：tag 若只挂在 runner 本地
-          # 提交上（分支不可达），generate-notes 的索引疑似走低优先级队列
-          # ——v0.35.2/v0.35.3/v0.35.10 三次实测全部 404 超 6 分钟；旧设计
-          # tag 打在已推分支上时无此现象。推不动不阻塞（只影响 notes 速度）。
-          git push origin "HEAD:refs/heads/release/v$VERSION" || echo "::warning::release 分支推送失败——tag 将分支不可达，notes 可能长时间 404"
+          # bump commit 同时推到 release/vX 分支，让 tag 指向的提交保持分支
+          # 可达（克隆/浅检出可解析，不悬空）。注意：实测这对 generate-notes
+          # 的 404 滞后没有影响——v0.35.11 推了分支仍 404 满 7 分钟，v0.35.2
+          # 未推分支反而一次成功（Create 步骤注释）。推不动不阻塞。
+          git push origin "HEAD:refs/heads/release/v$VERSION" || echo "::warning::release 分支推送失败——tag 指向的提交将仅由 tag 引用保持可达"
           git push origin "v$VERSION"
 
-      # notes 显式指定上一个 tag 生成（版本序次新），只含当前增量——
-      # 与 tag 之间的祖先关系、release PR 是否合入全部无关。
+      # 发布顺序（v0.35.11 复盘后倒转）：zip/tests 都已跑完，release 本身
+      # 不该等 notes——generate-notes 后端对刚推 tag 的 404 滞后实测在
+      # 30 秒～1 小时+ 之间波动（v0.35.3/v0.35.10/v0.35.11 三次翻车全部
+      # 源于此；且与 tag 是否在已推分支上无关）。所以：
+      #   1) 先试一次 generate-notes（成功即带完整 notes 发布，常态路径零改动）；
+      #   2) 404 则立即用本地 git log 兜底发布——zip 上线是主要交付物；
+      #   3) 发布后再给后端 ~2 分钟（6×20s）窗口升级 notes，升级失败不
+      #      影响发布结果，warning 里给后端恢复后的手动刷新命令。
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.ver.outputs.version }}"
+          # notes 显式指定上一个 tag 生成（版本序次新），只含当前增量——
+          # 与 tag 之间的祖先关系、release PR 是否合入全部无关。
           PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "v$VERSION" | head -1)
           ARGS=(releases/generate-notes -f tag_name="v$VERSION")
           if [ -n "$PREV" ]; then ARGS+=(-f previous_tag_name="$PREV"); fi
-          # generate-notes 对刚推送的 tag 会 404：notes 后端索引滞后于 git
-          # ref 可见性（v0.35.2 实测 ~30 秒，v0.35.3 实测可超过 6 分钟——
-          # 3 分钟窗口 12 次全 404 翻车）。以退出码为准判断成败——gh 出错时
-          # 会把错误 JSON 打到 stdout，BODY 是否为空不可靠。窗口加宽到
-          # ~7 分钟；仍失败则用 git log 本地生成 notes 兜底——zip/tests
-          # 都已跑完，release 不该死在 notes 上，PR 链接版可事后在 release
-          # 页编辑。
-          BODY=""
-          NOTES_OK=""
-          for i in $(seq 1 20); do
-            if BODY=$(gh api "${ARGS[@]}" -q .body); then NOTES_OK=1; break; fi
-            echo "::warning::generate-notes failed (attempt $i/20) — tag v$VERSION 刚推送、notes 后端索引滞后，20 秒后重试"
-            BODY=""
-            sleep 20
-          done
-          if [ -z "$NOTES_OK" ]; then
-            echo "::warning::generate-notes 20 次（~7 分钟）仍 404——git log 本地生成 notes 兜底发布，需要 PR 链接版请到 release 页编辑"
-            RANGE="v$VERSION"
-            # 注意 PREV 自带 v 前缀（git tag 输出），只给 VERSION 补 v——
-            # 写成 v$PREV 会变成 vv0.35.2，git fatal 128（v0.35.10 实测）。
-            [ -n "$PREV" ] && RANGE="$PREV..v$VERSION"
-            BODY=$(git log --format='- %s' "$RANGE")
-            [ -z "$BODY" ] && BODY="browsa v$VERSION"
+          # 以退出码为准判断成败——gh 出错时会把错误 JSON 打到 stdout，
+          # 捕获变量是否为空不可靠（PR #97 的退出码门闸）。
+          UPGRADED=""
+          if NOTES=$(gh api "${ARGS[@]}" -q .body); then
+            UPGRADED=1
+          else
+            NOTES=""
           fi
-          gh release create "v$VERSION" "browsa-v$VERSION.zip" \
-            --title "browsa v$VERSION" \
-            --notes "$BODY"
+          # 本地兜底。注意 PREV 自带 v 前缀，只给 VERSION 补 v——写成 v$PREV
+          # 会变成 vv0.35.2，git fatal 128（v0.35.10 实测翻车点）。
+          if [ -z "$NOTES" ]; then
+            RANGE="v$VERSION"
+            [ -n "$PREV" ] && RANGE="$PREV..v$VERSION"
+            NOTES=$(git log --format='- %s' "$RANGE")
+            [ -z "$NOTES" ] && NOTES="browsa v$VERSION"
+          fi
+          PREEXIST=""
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            PREEXIST=1
+            echo "::notice::release v$VERSION 已存在——跳过创建，仅尝试升级 notes。"
+          else
+            gh release create "v$VERSION" "browsa-v$VERSION.zip" \
+              --title "browsa v$VERSION" \
+              --notes "$NOTES"
+          fi
+          if [ -z "$UPGRADED" ]; then
+            for i in $(seq 1 6); do
+              sleep 20
+              if NEW=$(gh api "${ARGS[@]}" -q .body); then
+                if gh release edit "v$VERSION" --notes "$NEW" >/dev/null; then
+                  echo "::notice::notes 已升级为 generate-notes 版（第 $i 次重试）"
+                  UPGRADED=1
+                  break
+                fi
+              fi
+            done
+            if [ -z "$UPGRADED" ]; then
+              echo "::warning::generate-notes 后端 ~2 分钟内未恢复（实测滞后可达 1 小时+），release 已带本地兜底 notes 发布。后端恢复后手动刷新："
+              echo "::warning::gh api \"repos/$GITHUB_REPOSITORY/releases/generate-notes\" -f tag_name=v$VERSION -f previous_tag_name=$PREV -q .body | gh release edit v$VERSION --notes-file -"
+            fi
+          elif [ -n "$PREEXIST" ]; then
+            # 重跑补完场景：release 已在但挂着旧兜底 notes，顺手升级。
+            gh release edit "v$VERSION" --notes "$NOTES" >/dev/null && \
+              echo "::notice::旧兜底 notes 已升级为 generate-notes 版"
+          fi
