@@ -381,6 +381,73 @@ test('loadSession returns 0 for an unknown session id and does not touch history
   assert.deepEqual((await storage.getHistory()).map(m => m.content), ['untouched']);
 });
 
+// --------------- 会话归属（activeSessionId）-----------------------------------
+
+test('activeSessionId defaults to empty and round-trips through set/get', async () => {
+  reset();
+  assert.equal(await storage.getActiveSessionId(), '');
+  await storage.setActiveSessionId('s1');
+  assert.equal(await storage.getActiveSessionId(), 's1');
+  await storage.setActiveSessionId('');
+  assert.equal(await storage.getActiveSessionId(), '');
+});
+
+test('updateSessionHistory writes the live history back in place (no new entry, metadata untouched)', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'v1' }]);
+  const session = await storage.saveCurrentSession('My session');
+  await storage.pinSession(session.id, true);
+
+  // Conversation continues after being loaded, then gets written back.
+  await storage.setHistory([{ role: 'user', content: 'v1' }, { role: 'assistant', content: 'v2' }]);
+  const updated = await storage.updateSessionHistory(session.id);
+  assert.ok(updated, 'must return the updated session');
+  assert.equal(updated.id, session.id);
+
+  const list = await storage.getSavedSessions();
+  assert.equal(list.length, 1, 'write-back must NOT fork a new entry');
+  assert.equal(list[0].pinned, true, 'pin flag survives the write-back');
+  const full = await storage.getSessionFull(session.id);
+  assert.equal(full.name, 'My session', 'name survives the write-back');
+  assert.equal(full.createdAt, session.createdAt, 'createdAt survives the write-back');
+  assert.deepEqual(full.history.map(m => m.content), ['v1', 'v2'], 'history snapshot is the latest live one');
+});
+
+test('updateSessionHistory returns null for an unknown id or empty live history (caller falls back to create)', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'x' }]);
+  assert.equal(await storage.updateSessionHistory('does-not-exist'), null);
+  assert.equal(await storage.updateSessionHistory(''), null);
+
+  // Session exists but live history is empty: write-back must be refused,
+  // the stored snapshot stays intact.
+  await storage.setHistory([{ role: 'user', content: 'snapshot' }]);
+  const session = await storage.saveCurrentSession('has snapshot');
+  await storage.setHistory([]);
+  assert.equal(await storage.updateSessionHistory(session.id), null);
+  const full = await storage.getSessionFull(session.id);
+  assert.deepEqual(full.history.map(m => m.content), ['snapshot']);
+});
+
+test('emptying history clears the session-identity pointer (all setHistory paths)', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'x' }]);
+  await storage.setActiveSessionId('s1');
+  // Multiselect delete-all / undo-attach / truncate-to-0 all funnel into setHistory([]).
+  await storage.setHistory([]);
+  assert.equal(await storage.getActiveSessionId(), '', 'setHistory([]) must drop the pointer');
+
+  await storage.setHistory([{ role: 'user', content: 'y' }]);
+  await storage.setActiveSessionId('s2');
+  await storage.clearHistory();
+  assert.equal(await storage.getActiveSessionId(), '', 'clearHistory must drop the pointer');
+
+  // A non-empty setHistory must NOT touch the pointer.
+  await storage.setActiveSessionId('s3');
+  await storage.setHistory([{ role: 'user', content: 'z' }]);
+  assert.equal(await storage.getActiveSessionId(), 's3');
+});
+
 test('deleteSession removes only the targeted session', async () => {
   reset();
   await storage.setHistory([{ role: 'user', content: 'one' }]);

@@ -20,6 +20,9 @@ let serverSessions = [
   { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
   { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
 ];
+// Generic chrome.storage.local KV backing store (activeSessionId 等 history
+// 之外的键)；history 走上面的 storageHistory 变量，测试用例直接改写它。
+let localStore = {};
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
@@ -43,7 +46,17 @@ globalThis.chrome = {
     },
     lastError: undefined,
   },
-  storage: { local: { get: async () => ({ history: storageHistory }) } },
+  storage: {
+    local: {
+      get: async (keys) => {
+        const wanted = keys == null ? Object.keys(localStore) : Array.isArray(keys) ? keys : [keys];
+        const out = {};
+        for (const k of wanted) out[k] = k === 'history' ? storageHistory : localStore[k];
+        return out;
+      },
+      set: async (obj) => { Object.assign(localStore, obj); },
+    },
+  },
 };
 
 const {
@@ -67,6 +80,7 @@ initSessionsUI({
 function setupDom() {
   sentMessages.length = 0;
   deps.cancelled = false; deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
+  localStore = {}; // 归属指针等 local 键随用例复位
   serverSessions = [
     { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
     { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
@@ -217,4 +231,27 @@ test('loadSession does not SAVE_SESSION when there is no existing conversation t
   storageHistory = [];
   await loadSession('s1', 'First session');
   assert.ok(!sentMessages.some(m => m.type === 'SAVE_SESSION'));
+});
+
+// ─── 会话归属：切走已归属的对话必须原地写回，而不是 fork 新条目 ────────────────
+
+test('loadSession writes back into the session the conversation belongs to and re-points the identity at the loaded one', async () => {
+  // 模拟“s1 之前被加载过、之后没改过内容”的状态——这是 bug 的最纯复现：
+  // 再点一次历史清单，旧行为会 fork 出一份 s1 副本。
+  storageHistory = [{ role: 'user', content: 'from s1' }];
+  localStore.activeSessionId = 's1';
+  await loadSession('s2', 'Second session');
+  const save = sentMessages.find(m => m.type === 'SAVE_SESSION');
+  assert.ok(save, 'auto-save still runs');
+  assert.equal(save.id, 's1', 'SAVE_SESSION must carry the active id → background writes back in place, no fork');
+  assert.equal(localStore.activeSessionId, 's2', 'identity pointer must move to the loaded session');
+});
+
+test('loadSession with a fresh (untracked) conversation saves without an id — the first-archive safety net', async () => {
+  storageHistory = [{ role: 'user', content: 'brand new talk' }];
+  await loadSession('s2', 'Second session');
+  const save = sentMessages.find(m => m.type === 'SAVE_SESSION');
+  assert.ok(save, 'fresh conversation still gets archived before switching');
+  assert.equal(save.id, undefined, 'no activeSessionId → plain create, background falls back to a new entry');
+  assert.equal(localStore.activeSessionId, 's2', 'identity pointer lands on the loaded session');
 });
