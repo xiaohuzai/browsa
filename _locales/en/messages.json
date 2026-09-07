@@ -683,6 +683,10 @@
     "message": "Start <code>opencode serve --port 4096</code> in a terminal and fill in the address it prints (pinning the port is recommended — otherwise it changes on every restart). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server docs</a>",
     "description": "Options: opencode server setup tip"
   },
+  "bridgeTip": {
+    "message": "Run the local bridge in a terminal first (requires the codex CLI — a ChatGPT subscription login, an API key, or a custom provider all work): clone the agent-bridge repo (github.com/xiaohuzai/agent-bridge) and run <code>node cli.mjs codex --port 3948</code> from it, then fill in the bridge's address here. See its README.",
+    "description": "Options: agent-bridge setup tip"
+  },
   "systemPromptSaved": {
     "message": "System prompt saved.",
     "description": "Options: system prompt saved flash"

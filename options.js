@@ -3,6 +3,7 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingOpencode } from './lib/opencode-client.js';
+import { pingBridge } from './lib/bridge-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
@@ -281,7 +282,9 @@ function buildProviderCard(name, cfg, opts = {}) {
   // template on purpose: a conditional template literal nested three levels
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
-  const agentBaseUrlTip = !isAgent ? '' : cfg.isOpencode
+  const agentBaseUrlTip = !isAgent ? '' : cfg.isBridge
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '先在本机终端启动本地桥（需已安装 codex CLI：ChatGPT 订阅登录、API key 或自定义 provider 均可）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），在仓库目录运行 <code>node cli.mjs codex --port 3948</code>，然后把桥的地址填到这里。用法见其 README。')}</span></span>`
+    : cfg.isOpencode
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
 
@@ -305,7 +308,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       </div>` : ''}
       <div class="field">
         <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isBridge ? 'http://127.0.0.1:3948' : cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
         </label>
       </div>
       <div class="field">
@@ -491,11 +494,17 @@ async function pingCard(name, card) {
 
   flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
-    // opencode agent cards speak their own HTTP API (GET /api/health) — the
-    // generic OpenAI-style ping() would 404 on a healthy server. pingOpencode
-    // returning ok:false is normalized into a throw so the shared error
-    // flash/badge path below handles both families identically.
-    const reply = cfg.isOpencode
+    // Agent cards speak their own HTTP APIs — the generic OpenAI-style
+    // ping() would 404 on a healthy server. bridge pings GET /health,
+    // opencode GET /api/health. A failed ping is normalized into a throw so
+    // the shared error flash/badge path below handles all families alike.
+    const reply = cfg.isBridge
+      ? await (async () => {
+          const r = await pingBridge({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+          if (!r.ok) throw new Error(r.error || `no agent-bridge at ${r.url}`);
+          return `agent-bridge (${r.agent}) healthy`;
+        })()
+      : cfg.isOpencode
       ? await (async () => {
           const r = await pingOpencode({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
           if (!r.ok) throw new Error(r.error || `no healthy opencode server at ${r.url}`);
@@ -524,7 +533,7 @@ async function pingCard(name, card) {
     // events) — so it should reflect run support, not the generic
     // OpenAI-spec /v1/responses feature. opencode is identified by its
     // fixed isOpencode flag — never flip it from capability probing.
-    const caps = cfg.isOpencode ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+    const caps = (cfg.isOpencode || cfg.isBridge) ? null : await getCapabilities({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
     if (caps?.features) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
@@ -693,6 +702,7 @@ function prettyProviderName(name) {
   if (alias && alias.trim()) return alias.trim();
   if (name === 'hermes') return 'Hermes Agent';
   if (name === 'opencode') return 'OpenCode Agent';
+  if (name === 'bridge') return 'Agent Bridge';
   const m = /^llm-(\d+)$/.exec(name);
   if (m) return `LLM ${m[1]}`;
   return name.charAt(0).toUpperCase() + name.slice(1);
