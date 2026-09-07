@@ -3,6 +3,7 @@
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
+import { getActiveSessionId } from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
@@ -1803,7 +1804,10 @@ async function newSession() {
   const { history } = await chrome.storage.local.get('history');
   const hasMessages = Array.isArray(history) && history.some(m => m.role === 'user' || m.role === 'assistant');
   if (hasMessages) {
-    const res = await sendMessage({ type: 'SAVE_SESSION' });
+    // 会话归属同 loadSession：已归属的对话原地写回，全新对话才新建条目。
+    // 之后的 CLEAR_HISTORY 会把归属指针一并清掉（storage.clearHistory）。
+    const activeId = await getActiveSessionId();
+    const res = await sendMessage({ type: 'SAVE_SESSION', id: activeId || undefined });
     if (res?.ok && res.data?.session) {
       showToast(tSub('sessionSaved', 'Session saved: "$1"', res.data.session.name), 'success');
     }
