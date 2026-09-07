@@ -23,6 +23,7 @@ import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { handleExplainPort } from './lib/handlers/selection-explain.js';
 import { respondOpencodePermission, respondOpencodeQuestion } from './lib/opencode-client.js';
+import { respondBridgeApproval } from './lib/bridge-client.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, resolveVideoDurationSec } from './lib/handlers/attach-asr.js';
 import { videoUrlMatches } from './lib/video-url.js';
@@ -961,6 +962,10 @@ async function handle(msg, sender) {
           // transcript would otherwise carry over across "clear history").
           await storage.clearOpencodeSessionId(name);
         }
+        if (allCfg.providers[name]?.isBridge) {
+          // Same for the bridge provider's agent thread (codex thread id).
+          await storage.clearBridgeSessionId(name);
+        }
       }
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
@@ -1295,6 +1300,21 @@ async function handle(msg, sender) {
       // (deny → reject) — see showApprovalCard's btnLabels.
       const pending = pendingApprovals.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending approval' };
+      if (pending.kind === 'bridge') {
+        // agent-bridge daemon: relay the card choice to POST /approvals/:id
+        // (the bridge maps it onto the codex decision vocabulary).
+        try {
+          await respondBridgeApproval({
+            baseUrl: pending.baseUrl,
+            apiKey: pending.apiKey,
+            requestId: pending.requestId,
+            choice: msg.choice,
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e?.message };
+        }
+      }
       if (pending.kind === 'opencode') {
         try {
           await respondOpencodePermission({

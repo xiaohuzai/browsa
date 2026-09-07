@@ -683,6 +683,10 @@
     "message": "先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server 文档</a>",
     "description": "Options: opencode server setup tip"
   },
+  "bridgeTip": {
+    "message": "先在本机终端启动本地桥（需已安装 codex CLI：ChatGPT 订阅登录、API key 或自定义 provider 均可）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），在仓库目录运行 <code>node cli.mjs codex --port 3948</code>，然后把桥的地址填到这里。用法见其 README。",
+    "description": "Options: agent-bridge setup tip"
+  },
   "systemPromptSaved": {
     "message": "系统提示词已保存。",
     "description": "Options: system prompt saved flash"
