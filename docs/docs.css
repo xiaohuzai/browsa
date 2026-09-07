@@ -1,160 +1,218 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   browsa 使用指南 · 文档版式层
-   只做「文档」特有的布局：左侧目录 + 正文 + 表格/提示框/截图/翻页。
-   全部颜色、字体、圆角、阴影取自 site.css 的 ：root 变量 —— 两层叠加使用：
-   <link site.css> + <link docs.css>。落地页不引本文件，互不影响。
+   browsa 使用指南 · 文档布局层（Material for MkDocs 骨架）
+   三栏：左栏导航（含搜索）· 正文 · 右栏页内目录（site.js 自动生成）。
+   断点对齐 mkdocs-material：≥1220px 三栏，≥960px 双栏，<960px 单栏。
+   颜色/字体全部取自 site.css 的 Material 令牌，两 scheme 自动跟随。
+   <link site.css> + <link docs.css>；落地页不引本文件。
    ───────────────────────────────────────────────────────────────────────── */
 
-/* ─── 骨架：目录 + 正文 ─────────────────────────────────────────────────── */
+/* ─── 三栏骨架 ─────────────────────────────────────────────────────────── */
 .docs-shell{
-  display:grid;grid-template-columns:216px minmax(0,1fr);
-  gap:56px;padding-top:44px;padding-bottom:88px;align-items:start;
+  max-width:76rem;margin:0 auto;padding:24px 16px 0;
+  display:grid;grid-template-columns:12.1rem minmax(0,48rem) 12.1rem;
+  gap:32px;justify-content:center;align-items:start;
+  padding-bottom:72px;
 }
 
-/* 左侧目录：吸顶，当前页用校对红标记 */
-.docs-side{position:sticky;top:84px}
+/* ─── 左栏：导航（Material md-sidebar--primary） ────────────────────────── */
+.docs-side{position:sticky;top:calc(var(--header-h) + 24px);max-height:calc(100vh - var(--header-h) - 48px);overflow-y:auto}
 .side-label{
   font-family:var(--mono);font-size:11px;font-weight:600;
-  letter-spacing:.2em;color:var(--ink-dim);margin-bottom:12px;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--md-fg-light);margin-bottom:10px;
 }
-.docs-side nav{display:flex;flex-direction:column;gap:2px}
+.docs-side nav{display:flex;flex-direction:column;gap:1px}
 .docs-side nav a{
-  display:block;padding:6px 10px;border-radius:8px;
-  font-size:13.5px;color:var(--ink-dim);text-decoration:none;
-  border-left:2px solid transparent;
+  display:block;padding:5px 10px;border-radius:4px;
+  font-size:13.2px;line-height:1.5;color:var(--md-fg-light);text-decoration:none;
   transition:color .15s ease,background .15s ease;
 }
-.docs-side nav a:hover{color:var(--ink);background:var(--paper-3)}
+.docs-side nav a:hover{color:var(--md-fg);background:var(--md-fg-lightest)}
 .docs-side nav a.cur{
-  color:var(--mark);font-weight:600;
-  background:rgba(194,65,12,.06);border-left-color:var(--mark);
+  color:var(--md-link);font-weight:600;background:var(--md-fg-lightest);
 }
 
-/* ─── 正文 ──────────────────────────────────────────────────────────────── */
-.docs-body{max-width:720px}
-.crumb{
-  font-family:var(--mono);font-size:12.5px;color:var(--ink-dim);
-  margin-bottom:14px;letter-spacing:.02em;
+/* 左栏搜索（Material md-search 的静态站等价物，site.js 提供行为） */
+.doc-search{position:relative;margin-bottom:16px}
+.doc-search .doc-search-icon{
+  position:absolute;left:9px;top:50%;transform:translateY(-50%);
+  width:15px;height:15px;fill:var(--md-fg-lighter);pointer-events:none;
 }
-.crumb a{color:var(--ink-dim);text-decoration:none}
-.crumb a:hover{color:var(--mark)}
+.doc-search input{
+  width:100%;font-family:var(--sans);font-size:13px;color:var(--md-fg);
+  background:var(--md-bg-alt);border:1px solid transparent;border-radius:6px;
+  padding:7px 10px 7px 30px;outline:none;
+  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+.doc-search input::placeholder{color:var(--md-fg-lighter)}
+.doc-search input:focus{
+  background:var(--md-bg);border-color:var(--md-link);
+  box-shadow:var(--md-shadow);
+}
+.doc-search-results{
+  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:50;
+  background:var(--md-bg);border:1px solid var(--md-hairline);border-radius:var(--radius);
+  box-shadow:var(--md-shadow-lg);overflow:hidden;display:none;
+}
+.doc-search-results.open{display:block}
+.doc-search-results a{
+  display:block;padding:8px 12px;text-decoration:none;
+  font-size:13px;color:var(--md-fg);line-height:1.45;
+}
+.doc-search-results a:hover{background:var(--md-fg-lightest)}
+.doc-search-results a .t{font-weight:600;display:block}
+.doc-search-results a .s{
+  font-size:12px;color:var(--md-fg-light);display:block;margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.doc-search-results .none{padding:8px 12px;font-size:12.5px;color:var(--md-fg-light)}
+
+/* ─── 正文（Material md-typeset） ───────────────────────────────────────── */
+.docs-body{max-width:48rem;min-width:0;padding-top:10px}
 .docs-body h1{
-  font-size:clamp(28px,4vw,36px);font-weight:800;letter-spacing:-.02em;
-  line-height:1.2;margin-bottom:10px;
+  font-size:26px;font-weight:600;letter-spacing:-.01em;
+  line-height:1.3;margin-bottom:10px;
 }
 .page-lead{
-  font-size:16px;color:var(--ink-2);line-height:1.85;
-  margin-bottom:12px;max-width:640px;
+  font-size:16px;color:var(--md-fg-light);line-height:1.75;
+  margin-bottom:10px;
 }
 .docs-body h2{
-  font-size:21px;font-weight:700;letter-spacing:-.01em;
-  margin:46px 0 14px;line-height:1.35;
+  font-size:21px;font-weight:600;line-height:1.35;
+  margin:40px 0 12px;scroll-margin-top:calc(var(--header-h) + 16px);
 }
-.docs-body h3{font-size:15.5px;font-weight:700;margin:26px 0 10px}
-.docs-body p{font-size:14.5px;color:var(--ink-2);line-height:1.85;margin:10px 0}
-.docs-body p strong,.docs-body li strong{color:var(--ink);font-weight:600}
-.docs-body a{color:var(--mark);text-decoration:underline;text-underline-offset:2px}
-.docs-body a:hover{color:var(--mark-deep)}
+.docs-body h3{
+  font-size:16.5px;font-weight:600;
+  margin:26px 0 8px;scroll-margin-top:calc(var(--header-h) + 16px);
+}
+.docs-body p{font-size:15.5px;line-height:1.75;margin:10px 0;color:var(--md-fg)}
+.docs-body p strong,.docs-body li strong{color:var(--md-fg);font-weight:600}
+.docs-body a{color:var(--md-link);text-decoration:none}
+.docs-body a:hover{color:var(--md-link-hover);text-decoration:underline;text-underline-offset:2px}
 
 .docs-body code,.docs-body td code{
-  font-family:var(--mono);font-size:12.5px;color:var(--ink);
-  background:var(--paper-3);border:1px solid var(--line-2);
-  padding:1px 6px;border-radius:5px;white-space:nowrap;
+  font-family:var(--mono);font-size:.85em;color:var(--md-code-fg);
+  background:var(--md-bg-alt);
+  padding:.1em .35em;border-radius:4px;white-space:nowrap;
 }
 
 /* 配置片段块（providers 页的服务端 config.yaml 等） */
 .docs-body pre.doc-code{
-  font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--ink);
-  background:var(--paper-3);border:1px solid var(--line-2);border-radius:8px;
-  padding:14px 16px;margin:12px 0;overflow-x:auto;white-space:pre;
+  font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--md-code-fg);
+  background:var(--md-bg-alt);border:none;border-radius:4px;
+  padding:14px 16px;margin:14px 0;overflow-x:auto;white-space:pre;
 }
-.docs-body pre.doc-code code{background:none;border:none;padding:0;white-space:pre}
+.docs-body pre.doc-code code{background:none;padding:0;white-space:pre;color:inherit;font-size:inherit}
 
-/* 列表：与落地页功能卡同一支 › 记号 */
-.docs-body ul{list-style:none;margin:12px 0;display:flex;flex-direction:column;gap:7px}
-.docs-body ul li{
-  padding-left:20px;position:relative;
-  font-size:14.5px;color:var(--ink-2);line-height:1.8;
-}
-.docs-body ul li::before{content:"›";position:absolute;left:4px;color:var(--mark);font-weight:700}
-.docs-body ol{margin:12px 0;padding-left:24px;display:flex;flex-direction:column;gap:7px}
-.docs-body ol li{font-size:14.5px;color:var(--ink-2);line-height:1.8;padding-left:4px}
-.docs-body ol li::marker{font-family:var(--mono);color:var(--mark);font-weight:600}
+/* 列表：Material 原生圆点/序号 */
+.docs-body ul{margin:12px 0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
+.docs-body ul li{font-size:15.5px;color:var(--md-fg);line-height:1.75;padding-left:2px}
+.docs-body ul li::marker{color:var(--md-fg-light)}
+.docs-body ol{margin:12px 0;padding-left:1.6em;display:flex;flex-direction:column;gap:6px}
+.docs-body ol li{font-size:15.5px;color:var(--md-fg);line-height:1.75}
+.docs-body ol li::marker{font-family:var(--mono);color:var(--md-fg-light);font-size:.9em}
 
-/* ─── 表格 ──────────────────────────────────────────────────────────────── */
+/* ─── 表格（Material typeset table：横线式） ────────────────────────────── */
 .doc-table{
   width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;
+  border-bottom:1px solid var(--md-hairline);
 }
 .doc-table th{
-  text-align:left;font-weight:600;font-size:13px;color:var(--ink);
-  background:var(--paper-3);border:1px solid var(--line-2);padding:8px 12px;
-  white-space:nowrap;
+  text-align:left;font-weight:600;font-size:13px;color:var(--md-fg);
+  border-bottom:1px solid var(--md-fg-lighter);
+  padding:8px 12px;white-space:nowrap;
 }
 .doc-table td{
-  border:1px solid var(--line-2);padding:8px 12px;
-  color:var(--ink-2);line-height:1.7;vertical-align:top;
+  border-bottom:1px solid var(--md-fg-lightest);
+  padding:8px 12px;color:var(--md-fg);line-height:1.7;vertical-align:top;
 }
+.doc-table tr:last-child td{border-bottom:none}
 .doc-table code{white-space:nowrap}
 
 /* ─── 快捷键 ────────────────────────────────────────────────────────────── */
 kbd{
-  font-family:var(--mono);font-size:12px;color:var(--ink);
-  background:var(--paper-2);border:1px solid var(--line);border-bottom-width:2px;
-  border-radius:6px;padding:1px 7px;white-space:nowrap;
+  font-family:var(--mono);font-size:12px;color:var(--md-code-fg);
+  background:var(--md-bg-alt);border:1px solid var(--md-hairline);border-bottom-width:2px;
+  border-radius:4px;padding:1px 7px;white-space:nowrap;
 }
 
-/* ─── 提示框 ────────────────────────────────────────────────────────────── */
+/* ─── 提示框（Material admonition 解剖：竖条 + 浅底） ────────────────────── */
 .tip{
   margin:18px 0;padding:12px 16px;
-  border-left:2px solid var(--gold);
-  background:color-mix(in srgb,var(--gold) 5%,var(--paper-2));
-  border-radius:0 10px 10px 0;
-  font-size:14px;color:var(--ink-2);line-height:1.8;
+  border-left:4px solid var(--md-accent);
+  background:var(--md-accent-trans);
+  border-radius:0 var(--radius) var(--radius) 0;
+  font-size:14.5px;color:var(--md-fg);line-height:1.75;
 }
-.tip b{color:var(--gold-ink);font-weight:600}
+.tip b{font-weight:600}
 
 /* ─── 截图 ──────────────────────────────────────────────────────────────── */
 figure.shot{margin:22px 0}
 .shot img{
   width:100%;display:block;
-  border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  border:1px solid var(--md-hairline);border-radius:var(--radius);box-shadow:var(--md-shadow);
 }
-.shot figcaption{margin-top:10px;text-align:center;font-size:13px;color:var(--ink-dim)}
-/* 窄幅面板截图：居中，不撑满正文宽 */
+.shot figcaption{margin-top:8px;text-align:center;font-size:13px;color:var(--md-fg-light)}
 .shot.slim img{max-width:460px;margin:0 auto}
 
-/* ─── 翻页 ──────────────────────────────────────────────────────────────── */
+/* ─── 翻页（Material footer-nav 风格） ──────────────────────────────────── */
 .pager{
-  margin-top:56px;padding-top:22px;border-top:1px solid var(--line);
+  margin-top:52px;padding-top:20px;border-top:1px solid var(--md-hairline);
   display:flex;justify-content:space-between;gap:16px;
 }
 .pager a{text-decoration:none;max-width:48%}
 .pager .dir{
   display:block;font-family:var(--mono);font-size:11px;
-  letter-spacing:.1em;color:var(--ink-dim);margin-bottom:3px;
+  letter-spacing:.1em;color:var(--md-fg-light);margin-bottom:3px;
 }
-.pager .t{font-size:15px;font-weight:600;color:var(--mark)}
+.pager .t{font-size:15px;font-weight:600;color:var(--md-link)}
 .pager a:hover .t{text-decoration:underline;text-underline-offset:3px}
 .pager .next{text-align:right;margin-left:auto}
 
 /* ─── 总览卡片：复用落地页 .feature，这里是 <a> ─────────────────────────── */
 a.feature{text-decoration:none;color:inherit;display:block}
 a.feature .go{
-  display:inline-block;margin-top:14px;
-  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--mark);
+  display:inline-block;margin-top:12px;
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--md-link);
 }
-a.feature:hover .go{transform:translateX(3px)}
 a.feature .go{transition:transform .15s ease}
+a.feature:hover .go{transform:translateX(3px)}
+
+/* ─── 右栏：页内目录（Material md-sidebar--secondary，site.js 生成） ─────── */
+.md-sidebar--secondary{
+  position:sticky;top:calc(var(--header-h) + 24px);
+  max-height:calc(100vh - var(--header-h) - 48px);overflow-y:auto;
+  font-size:12.8px;
+}
+.toc-label{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--md-fg-light);margin-bottom:10px;
+}
+.toc-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.toc-list a{
+  display:block;padding:3.5px 10px;border-left:2px solid transparent;
+  color:var(--md-fg-light);text-decoration:none;line-height:1.5;
+  transition:color .15s ease,border-color .15s ease;
+}
+.toc-list a:hover{color:var(--md-fg)}
+.toc-list a.cur{color:var(--md-link);border-left-color:var(--md-link)}
+.toc-list ul{list-style:none;margin:0;padding:0}
+.toc-list .lvl2 a{padding-left:22px;font-size:12.2px}
 
 /* ─── 响应式 ────────────────────────────────────────────────────────────── */
-@media (max-width:900px){
-  .docs-shell{display:block;padding-top:28px;padding-bottom:64px}
-  .docs-side{position:static;margin-bottom:24px}
+@media (max-width:1220px){
+  .docs-shell{grid-template-columns:12.1rem minmax(0,1fr);max-width:64rem}
+  .md-sidebar--secondary{display:none}
+}
+@media (max-width:960px){
+  .docs-shell{display:block;padding-top:20px}
+  .docs-side{position:static;max-height:none;overflow:visible;margin-bottom:24px}
   .docs-side nav{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:8px}
   .docs-side nav a{
-    white-space:nowrap;border-left:none;
-    border:1px solid var(--line);border-radius:999px;
-    padding:5px 13px;background:var(--paper-2);
+    white-space:nowrap;border:1px solid var(--md-hairline);
+    border-radius:999px;padding:5px 13px;background:var(--md-bg);
   }
-  .docs-side nav a.cur{border-color:var(--mark);background:rgba(194,65,12,.06)}
+  .docs-side nav a.cur{border-color:var(--md-link)}
+  .doc-search{display:none}
 }
