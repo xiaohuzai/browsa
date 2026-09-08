@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — 浏览器侧边栏 AI</title>
-<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API 与 Hermes / opencode 智能体。读到哪里，问到哪里。">
+<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API，接 Hermes / opencode 智能体，或经 agent-bridge 桥接你的 Codex / Claude Code。读到哪里，问到哪里。">
 <link rel="icon" type="image/png" href="icon48.png">
 <link rel="stylesheet" href="site.css">
 <meta property="og:title" content="browsa — 浏览器侧边栏 AI">
@@ -284,7 +284,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>流式回答 <span class="tag">任意后端</span></h3>
-          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes / opencode 智能体。界面文字跟随浏览器语言，也可手动切换中英文。</p>
+          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes / opencode 智能体，也可以用 agent-bridge 桥接订阅登录的 Codex / Claude Code。界面文字跟随浏览器语言，也可手动切换中英文。</p>
         </div>
       </div>
       <p class="site-note">装好了？<a href="guide/quickstart.html">快速上手</a>带你完成第一次提问；<a href="guide/">完整使用指南</a>覆盖读取、视频、渲染、会话、后端与设置。</p>
@@ -350,6 +350,7 @@
           <ul>
             <li>Hermes Agent：工具执行、危险操作审批、进度展示</li>
             <li>OpenCode Agent：opencode CLI 智能体直连，同样是完整的工具与审批流</li>
+            <li>Agent Bridge：桥接订阅登录的 Codex / Claude Code——无需 API key，一张卡可同时连多个 agent</li>
             <li>多协议接入：OpenAI（Chat / Responses）、Anthropic Messages、Ollama、LiteLLM…</li>
             <li>一张卡可填多个模型（逗号分隔），侧边栏按「别名 · 模型」逐个切换</li>
             <li>Ping 一键检测连通性与模型能力</li>

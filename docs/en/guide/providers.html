@@ -123,14 +123,27 @@ agent:
 }</pre>
 
 
-      <h2>Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as your chat backend, no API key needed:</p>
+      <h2 id="agent-bridge">Agent Bridge</h2>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as your chat backend, no API key needed.</p>
+      <p><strong>Prerequisites</strong>: <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+ on the machine, plus the agent CLI you want to bridge, logged in (e.g. <code>codex login</code> with your ChatGPT subscription account).</p>
       <ol>
-        <li>Clone the repo and start it from the repo directory: <code>node cli.mjs serve --config agents.example.json</code> starts several agents at once (one bridge per address per port), or <code>node cli.mjs codex --port 3948</code> for a single one;</li>
-        <li>In browsa settings, select the <strong>Agent Bridge</strong> card and fill Base URL with the bridge address — <strong>comma-separate multiple agents</strong>. Ping discovers each agent's name automatically, and the sidebar dropdown lists them as "Agent Bridge · codex";</li>
-        <li>Each agent keeps its own independent session thread.</li>
+        <li>Clone and start (from the agent-bridge repo directory):
+<pre class="doc-code">git clone https://github.com/xiaohuzai/agent-bridge
+cd agent-bridge
+
+# Option A: a single codex bridge (--approval on-request enables approval cards)
+node cli.mjs codex --port 3948 --approval on-request
+
+# Option B: several agents at once from a config (codex, claude… one bridge per port)
+node cli.mjs serve --config agents.example.json
+#   agent-bridge serve: 2 bridges on http://127.0.0.1
+#     codex      :3948  (no api key — loopback only)
+#     claude     :3949  (no api key — loopback only)</pre></li>
+        <li>In browsa ⚙ settings, select the <strong>Agent Bridge</strong> card and fill Base URL with the bridge address (e.g. <code>http://127.0.0.1:3948</code>). Multiple agents go in the same field, <strong>comma-separated</strong>: <code>http://127.0.0.1:3948, http://127.0.0.1:3949</code>;</li>
+        <li>Hit <strong>Ping</strong> — every address is probed and each agent's name shows up in the status (e.g. <code>×2/2 healthy (codex, claude)</code>);</li>
+        <li>Back in the sidebar, the top dropdown lists them as "Agent Bridge · codex". Each agent keeps its own independent session thread; when you switch mid-conversation, browsa asks whether to <strong>carry the conversation over</strong> or <strong>start a new session</strong>.</li>
       </ol>
-      <p>Approval cards for dangerous actions appear right in the panel (enable ask-side permissions in the agent, e.g. codex's <code>--approval on-request</code>); screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn).</p>
+      <p>Screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Two reminders: in serve mode, approval cards need <code>"approval": "on-request"</code> on the corresponding bridge (the <code>--approval on-request</code> flag in single-agent mode); if a bridge restarts on a different port, update Base URL to match — pinning <code>--port</code> makes this a non-issue.</p>
       <h2>Ollama, locally</h2>
       <p>Running Ollama on your machine? Base URL <code>http://localhost:11434</code>, protocol Chat Completions (Ollama speaks the OpenAI format), Model ID set to a pulled model such as <code>qwen3:32b</code>. Fully <strong>offline-capable</strong>.</p>
 

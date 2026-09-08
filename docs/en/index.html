@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — Side-panel AI for your browser</title>
-<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API, or the Hermes / opencode agents.">
+<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API, the Hermes / opencode agents, or your Codex / Claude Code via agent-bridge.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — Side-panel AI for your browser">
@@ -288,7 +288,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>Stream replies <span class="tag">any backend</span></h3>
-          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, or the Hermes / opencode agents. The UI follows your browser language — English / 中文 switchable.</p>
+          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, the Hermes / opencode agents — or your subscription-logged-in Codex / Claude Code via agent-bridge. The UI follows your browser language — English / 中文 switchable.</p>
         </div>
       </div>
       <p class="site-note">Installed? <a href="guide/quickstart.html">Quick start</a> walks you through the first question; the <a href="guide/">full guide</a> covers reading, video, rendering, sessions, backends and settings.</p>
@@ -353,6 +353,7 @@
           <ul>
             <li>Hermes Agent: tool execution, approval for risky actions, progress display</li>
             <li>OpenCode Agent: direct line to the opencode CLI agent — same full tool &amp; approval flow</li>
+            <li>Agent Bridge: bridges your subscription-logged-in Codex / Claude Code — no API key, one card connects several agents at once</li>
             <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
             <li>Multiple models per card (comma-separated) — switch via “Alias · model” in the sidebar</li>
             <li>Ping to verify connectivity and capabilities</li>
