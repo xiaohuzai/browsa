@@ -2532,6 +2532,25 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   transition: opacity var(--t);
 }
 .asr-mode-btn:hover { opacity: 0.85; }
+
+/* 切换 provider 选择卡（仿 ASR 模式卡）：备注行说明「直接发送」的默认行为 */
+.provider-switch-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  opacity: 0.75;
+}
+
+/* 回复来源标注：沿用下拉框对该 provider/agent 的命名，恒显但克制 */
+.msg-provider {
+  display: block;
+  font-size: 9.5px;
+  color: var(--fg-dim);
+  opacity: 0.6;
+  margin-top: 4px;
+  text-align: right;
+  user-select: none;
+}
 .asr-mode-main { font-weight: 500; color: var(--fg); }
 .asr-mode-sub { font-size: 0.85em; color: var(--fg-dim); }
 

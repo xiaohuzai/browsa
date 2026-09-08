@@ -8,6 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAgentTurn,
+  buildAgentBackfill,
+  agentSwitchNeedsPrompt,
   pickTurnImages,
   withTurnImages,
   isAgentImageUrl,
@@ -121,4 +123,60 @@ test('buildAgentTurn — no page context, no images: empty images array', () => 
   const t = buildAgentTurn({ userText: 'hi' }, [{ role: 'user', content: 'old' }]);
   assert.equal(t.text, 'hi');
   assert.deepEqual(t.images, []);
+});
+
+// ─── buildAgentTurn backfill (provider-switch continuation) ──────────────────
+
+test('buildAgentTurn backfill — prepends transcript, excludes the trailing page-context run', () => {
+  const history = [
+    { role: 'user', content: 'first question' },
+    { role: 'assistant', content: 'first answer' },
+    { role: 'user', content: `${PCP}\nURL: https://a.com\n---\n\nattached page body` },
+  ];
+  const t = buildAgentTurn({ userText: '现在继续' }, history, { backfill: true });
+  // transcript covers everything BEFORE the trailing run; the run itself
+  // still rides natively in the forward section (no double-send)
+  assert.match(t.text, /^以下是切换对话对象之前的聊天记录，供接续上下文：\n\n用户：first question\n\n助手：first answer\n\n\[Page context attached by browsa\]/);
+  assert.match(t.text, /不要重新访问或抓取该 URL。）\n\n现在继续$/);
+  assert.match(t.text, /attached page body/);
+  assert.ok(t.text.indexOf('attached page body') > t.text.indexOf('first answer'));
+  assert.ok(!t.text.includes('用户：[Page context'), 'attach entries must not be re-rendered as transcript turns');
+});
+
+test('buildAgentTurn backfill — array-content turns render text parts and an image marker', () => {
+  const history = [
+    { role: 'user', content: [
+      { type: 'text', text: '看看这张图' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AA' } },
+    ] },
+    { role: 'assistant', content: '图里是红色' },
+  ];
+  const t = buildAgentTurn({ userText: '继续' }, history, { backfill: true });
+  assert.match(t.text, /用户：看看这张图（附图，未随记录转发）/);
+  assert.match(t.text, /助手：图里是红色/);
+});
+
+test('buildAgentTurn backfill — no prior turns → no prefix; backfill off → byte-identical text', () => {
+  const empty = buildAgentTurn({ userText: 'hi' }, [], { backfill: true });
+  assert.equal(empty.text, 'hi');
+  const history = [{ role: 'user', content: 'q' }, { role: 'assistant', content: 'a' }];
+  const off = buildAgentTurn({ userText: 'next' }, history);
+  const on = buildAgentTurn({ userText: 'next' }, history, { backfill: false });
+  assert.equal(off.text, 'next');
+  assert.equal(on.text, off.text);
+});
+
+// ─── agentSwitchNeedsPrompt (switch-to-agent choice card) ────────────────────
+
+test('agentSwitchNeedsPrompt — only agent targets with a different previous reply prompt', () => {
+  const last = { name: 'llm-1', model: 'glm-5.3-flash' };
+  assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: true, currentKey: { name: 'bridge', model: 'http://127.0.0.1:3948' }, lastKey: last }), true);
+  // same agent endpoint re-selected → its own transcript already holds the thread
+  assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: true, currentKey: { name: 'bridge', model: 'http://127.0.0.1:3948' }, lastKey: { name: 'bridge', model: 'http://127.0.0.1:3948' } }), false);
+  // same card, different endpoint (codex → claude) → prompt
+  assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: true, currentKey: { name: 'bridge', model: 'http://127.0.0.1:3949' }, lastKey: { name: 'bridge', model: 'http://127.0.0.1:3948' } }), true);
+  // LLM target never prompts (full history resent every turn)
+  assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: false, currentKey: { name: 'llm-2', model: 'doubao' }, lastKey: last }), false);
+  // no previous reply (fresh conversation) → nothing to carry
+  assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: true, currentKey: { name: 'bridge', model: 'http://127.0.0.1:3948' }, lastKey: null }), false);
 });

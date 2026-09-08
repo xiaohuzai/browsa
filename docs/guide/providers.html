@@ -66,6 +66,7 @@
         <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
         <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude…）：独立守护进程把订阅登录的 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
       </ul>
+      <p>切换到任一智能体时，browsa 会询问当前对话的去留——把对话记录作为第一条消息带给新 agent 接续上下文，或新建会话从零开始；每条回复都标注来自哪个 provider / agent。</p>
 
       <h2>配一张提供商卡</h2>
       <p>打开 ⚙ 设置 → LLM Providers。页面上预留了一张空的 <strong>LLM 1</strong> 卡，填完点 Save 即生效；也可以用 <strong>＋ Add Provider</strong> 随时加卡：</p>

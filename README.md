@@ -201,6 +201,7 @@ The full reference lives here:
 | **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
 | **Error cards** | provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable |
 | **Copy & timestamps** | ⎘ copies the full raw Markdown; hover any message to see its send time |
+| **Reply source labels** | every reply is stamped with the provider / agent that produced it (same name as the sidebar dropdown); switching to an agent asks whether to carry the conversation over as its first message or start a new session (sending without choosing continues without context) |
 
 </details>
 

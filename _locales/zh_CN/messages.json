@@ -1014,5 +1014,26 @@
   "waitThinking": {
     "message": "思考中… $1s",
     "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "已切换到 $1。当前对话怎么处理？"
+  },
+  "providerSwitchCarry": {
+    "message": "带上当前对话继续"
+  },
+  "providerSwitchCarrySub": {
+    "message": "对话记录作为第一条消息发给它"
+  },
+  "providerSwitchCarryToast": {
+    "message": "下一条消息会把当前对话带给 $1"
+  },
+  "providerSwitchFresh": {
+    "message": "新建会话"
+  },
+  "providerSwitchFreshSub": {
+    "message": "当前对话归档，从零开始"
+  },
+  "providerSwitchDirectHint": {
+    "message": "不选择直接发送，则不带上下文继续"
   }
 }
