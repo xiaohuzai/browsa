@@ -124,7 +124,8 @@ agent:
 
 
       <h2 id="agent-bridge">Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as your chat backend, no API key needed.</p>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as the model source — no separate model-API purchase needed.</p>
+      <p><strong>About the API Key field</strong>: the card's API Key is the bridge's OWN access token (<code>--api-key</code> at launch), not a model-service key — leave both empty for purely local use; when the bridge is exposed beyond this machine via <code>--bind</code>, the daemon requires <code>--api-key</code> and browsa fills in the same value.</p>
       <p><strong>Prerequisites</strong>: <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+ on the machine, plus the agent CLI you want to bridge, logged in (e.g. <code>codex login</code> with your ChatGPT subscription account).</p>
       <ol>
         <li>Clone and start (from the agent-bridge repo directory):
