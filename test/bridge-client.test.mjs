@@ -173,3 +173,36 @@ test('respondBridgeApproval: POST /approvals/:id with the choice', async () => {
   assert.deepEqual(JSON.parse(calls[0].opts.body), { choice: 'once' });
   assert.equal(calls[0].opts.headers.Authorization, 'Bearer k');
 });
+
+// ─── image forwarding (wire v1: /turns {text, sessionId?, images?}) ──────────
+
+test('bridgeStream: images ride in the POST body; junk filtered; >8 sliced; omitted when empty', async () => {
+  const streamOk = () => sseResponse(['data: {"type":"done","full":"ok"}\n\n']);
+  const IMG = (n) => `data:image/png;base64,${n}`;
+  const capture = () => captureFetch(() => streamOk());
+
+  // happy path: https + data URLs pass, junk dropped, cap 8 applied
+  let calls = capture();
+  await bridgeStream({
+    baseUrl: 'http://127.0.0.1:3948', text: 'q',
+    images: [
+      IMG('A'), 'https://example.com/x.jpg', 'not-a-url', '', 42,
+      IMG('1'), IMG('2'), IMG('3'), IMG('4'), IMG('5'), IMG('6'), IMG('7'), IMG('8'), IMG('9'),
+    ],
+  });
+  let body = JSON.parse(calls[0].opts.body);
+  assert.equal(body.images.length, 8); // 2 valid + first 6 of the overflow batch
+  assert.deepEqual(body.images.slice(0, 2), [IMG('A'), 'https://example.com/x.jpg']);
+  assert.ok(!body.images.includes('not-a-url'));
+
+  // no images / empty array → no images key (pre-images body shape intact)
+  calls = capture();
+  await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 'q' });
+  body = JSON.parse(calls[0].opts.body);
+  assert.deepEqual(body, { text: 'q' });
+
+  calls = capture();
+  await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 'q', images: [] });
+  body = JSON.parse(calls[0].opts.body);
+  assert.deepEqual(body, { text: 'q' });
+});

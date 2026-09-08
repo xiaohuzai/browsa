@@ -3,9 +3,10 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingOpencode } from './lib/opencode-client.js';
-import { pingBridge } from './lib/bridge-client.js';
+import { pingBridge, normalizeBridgeUrl } from './lib/bridge-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
+import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -283,7 +284,7 @@ function buildProviderCard(name, cfg, opts = {}) {
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
   const agentBaseUrlTip = !isAgent ? '' : cfg.isBridge
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '先在本机终端启动本地桥（需已安装 codex CLI：ChatGPT 订阅登录、API key 或自定义 provider 均可）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），在仓库目录运行 <code>node cli.mjs codex --port 3948</code>，然后把桥的地址填到这里。用法见其 README。')}</span></span>`
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '先在本机终端启动本地桥（需已安装 CLI agent）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），运行 <code>node cli.mjs serve --config agents.example.json</code> 可同时启动多个 agent（codex、claude…一桥一地址一端口），或 <code>node cli.mjs codex --port 3948</code> 只起单个。这里填桥的地址，<b>多个地址用逗号分隔</b>（每个地址一个 agent，主页下拉逐个选择；Ping 后自动显示各 agent 的名字）。支持发图（截图/粘贴/PDF 图表，单条 ≤8 张、总 3MB）。用法见其 README。')}</span></span>`
     : cfg.isOpencode
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
@@ -308,7 +309,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       </div>` : ''}
       <div class="field">
         <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isBridge ? 'http://127.0.0.1:3948' : cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isBridge ? 'http://127.0.0.1:3948, http://127.0.0.1:3949' : cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
         </label>
       </div>
       <div class="field">
@@ -455,6 +456,27 @@ async function saveCard(name, card) {
     cachedCfg.providers[name].models = modelList;
     cachedCfg.providers[name].model = modelList[0] || '';
   }
+  // bridge 卡：Base URL 一格填多个桥地址（逗号分隔，一地址一 agent）——
+  // 复用多模型卡的 models 槽存端点 URL 列表，主页下拉逐端点展开、选中项落
+  // activeModel（resolveBridgeEndpoint 消费）。每个地址过一遍 normalizeBridgeUrl
+  // （补 scheme、去尾斜杠/路径）。baseUrl/model 保持指向首个端点，老消费方语义不变。
+  // bridgeAgents（Ping 时 /health 自动发现的 agent 名，下拉里的 alias）里已删除的
+  // 端点条目一并清掉。
+  if (cachedCfg.providers[name].isBridge) {
+    const urls = [...new Set(
+      String(data.baseUrl || '')
+        .split(/[\n,;]+/)
+        .map((s) => normalizeBridgeUrl(s))
+        .filter(Boolean)
+    )];
+    cachedCfg.providers[name].models = urls;
+    cachedCfg.providers[name].model = urls[0] || '';
+    cachedCfg.providers[name].baseUrl = urls[0] || '';
+    const agents = cachedCfg.providers[name].bridgeAgents || {};
+    cachedCfg.providers[name].bridgeAgents = Object.fromEntries(
+      Object.entries(agents).filter(([u]) => urls.includes(u))
+    );
+  }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
   chrome.storage.local.get('pingStates', ({ pingStates }) => {
@@ -495,14 +517,25 @@ async function pingCard(name, card) {
   flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
     // Agent cards speak their own HTTP APIs — the generic OpenAI-style
-    // ping() would 404 on a healthy server. bridge pings GET /health,
-    // opencode GET /api/health. A failed ping is normalized into a throw so
-    // the shared error flash/badge path below handles all families alike.
+    // ping() would 404 on a healthy server. bridge pings GET /health PER
+    // configured endpoint (one endpoint = one agent; aliases come back in
+    // the `agent` field and are persisted to the card for the sidebar
+    // dropdown), opencode GET /api/health. A failed ping is normalized into
+    // a throw so the shared error flash/badge path below handles all
+    // families alike (bridge: reachable ⇔ at least one endpoint answers).
     const reply = cfg.isBridge
       ? await (async () => {
-          const r = await pingBridge({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
-          if (!r.ok) throw new Error(r.error || `no agent-bridge at ${r.url}`);
-          return `agent-bridge (${r.agent}) healthy`;
+          const urls = providerModelList(cfg);
+          const results = await Promise.all(urls.map((u) => pingBridge({ baseUrl: u, apiKey: cfg.apiKey })));
+          const okUrls = results.filter((r) => r.ok);
+          if (!okUrls.length) {
+            throw new Error(results[0]?.error || `no agent-bridge at ${results[0]?.url}`);
+          }
+          cfg.bridgeAgents = Object.fromEntries(okUrls.map((r) => [r.url, r.agent || '']));
+          await chrome.storage.local.set({ providers: cachedCfg.providers });
+          const downs = results.length - okUrls.length;
+          const names = okUrls.map((r) => r.agent || String(r.url).replace(/^https?:\/\//, '')).join(', ');
+          return `agent-bridge ×${okUrls.length}/${results.length} healthy (${names})${downs ? ` — ${downs} down` : ''}`;
         })()
       : cfg.isOpencode
       ? await (async () => {

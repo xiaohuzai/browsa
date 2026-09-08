@@ -162,3 +162,41 @@ test('persisted activeProvider 选中不受排序影响（reachable 的排前面
   storageListener({ activeProvider: { newValue: 'llm-1' } }, 'local');
   await new Promise((r) => setTimeout(r, 20));
 });
+
+test('bridge 卡按端点展开：alias 后缀（/health 发现），未知 alias 用 host:port 兜底', async () => {
+  fakeCfg.providers.bridge = {
+    type: 'agent', isBridge: true, alias: 'Agent Bridge',
+    baseUrl: 'http://127.0.0.1:3948', model: 'http://127.0.0.1:3948',
+    models: ['http://127.0.0.1:3948', 'http://127.0.0.1:3949'],
+    // 3948 从未 ping 出名字（alias 未知），3949 ping 到了 claude
+    bridgeAgents: { 'http://127.0.0.1:3949': 'claude' },
+  };
+  fakeCfg.pingStates.bridge = 'reachable';
+  storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
+  await new Promise((r) => setTimeout(r, 20));
+
+  const opts = [...providerSel.options].filter((o) => o.value === 'bridge');
+  assert.equal(opts.length, 2, '每个端点 URL 一个选项');
+  assert.match(opts[0].textContent, /^Agent Bridge · 127\.0\.0\.1:3948 — ● reachable/,
+    'alias 未知的端点用 host:port 兜底');
+  assert.match(opts[1].textContent, /^Agent Bridge · claude — ● reachable/,
+    'alias 来自 Ping 时 /health 的 agent 字段');
+  assert.equal(opts[0].dataset.model, 'http://127.0.0.1:3948');
+  assert.equal(opts[1].dataset.model, 'http://127.0.0.1:3949', 'dataset.model 存端点 URL（activeModel 槽）');
+
+  // 选中一个端点 → SET_ACTIVE_PROVIDER 携带该端点 URL
+  sent.length = 0;
+  opts[1].selected = true;
+  providerSel.dispatchEvent(new window.Event('change'));
+  await new Promise((r) => setTimeout(r, 20));
+  const msg = sent.find((m) => m.type === 'SET_ACTIVE_PROVIDER');
+  assert.ok(msg);
+  assert.equal(msg.name, 'bridge');
+  assert.equal(msg.model, 'http://127.0.0.1:3949');
+
+  // 还原，避免污染（本文件此用例之后无其它用例，仍保持习惯）
+  delete fakeCfg.providers.bridge;
+  delete fakeCfg.pingStates.bridge;
+  storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
+  await new Promise((r) => setTimeout(r, 20));
+});
