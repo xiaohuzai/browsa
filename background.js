@@ -1249,7 +1249,9 @@ async function handle(msg, sender) {
         inFlight: true,
         acc: st.acc,
         startedAt: st.startedAt,
-        lastDeltaAt: st.lastDeltaAt
+        lastDeltaAt: st.lastDeltaAt,
+        providerLabel: st.providerLabel,
+        providerKey: st.providerKey
       };
     }
 

@@ -1014,5 +1014,26 @@
   "waitThinking": {
     "message": "Thinking… $1s",
     "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "Switched to $1. What should happen with the current conversation?"
+  },
+  "providerSwitchCarry": {
+    "message": "Carry the conversation over"
+  },
+  "providerSwitchCarrySub": {
+    "message": "the transcript becomes its first message"
+  },
+  "providerSwitchCarryToast": {
+    "message": "The conversation will be sent to $1 with your next message"
+  },
+  "providerSwitchFresh": {
+    "message": "New session"
+  },
+  "providerSwitchFreshSub": {
+    "message": "archives the current conversation, starts fresh"
+  },
+  "providerSwitchDirectHint": {
+    "message": "Send without choosing = continue without context"
   }
 }

@@ -42,6 +42,8 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import { fetchArxivMeta, formatArxivMeta, arxivIdFromUrl } from './lib/arxiv.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
+import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
+import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
 import {
   downloadAudioBytes, transcodeAudioBlob, uploadBlobToArk, pollFileStatus, asrAdapterFor, formatAsrTranscript, transcriptEndSec,
   largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
@@ -681,7 +683,10 @@ async function handleSelectionAction(action, text) {
 
 
 
+let cachedProviders = {};
+
 function populateProviderSelect(cfg) {
+  cachedProviders = cfg.providers || {};
   const pingStates = cfg.pingStates || {};
   // Reachable providers first (stable sort — ties keep their original
   // relative order), so a provider you've actually verified works doesn't
@@ -720,10 +725,7 @@ function populateProviderSelect(cfg) {
     else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
     else                           status = _t('statusNotPinged', 'not pinged');
     for (const model of modelList) {
-      let suffix = model;
-      if (isBridgeCard && model) {
-        suffix = pcfg.bridgeAgents?.[model] || String(model).replace(/^https?:\/\//, '');
-      }
+      const suffix = providerEntrySuffix(pcfg, model);
       const opt = document.createElement('option');
       opt.value = name;
       opt.dataset.model = model;
@@ -737,16 +739,6 @@ function populateProviderSelect(cfg) {
     }
   }
   if (!anySelected && activeFallback) activeFallback.selected = true;
-}
-
-// Show the user-set alias when present; fall back to a readable internal name.
-function displayProviderName(name, pcfg) {
-  const alias = pcfg?.alias;
-  if (alias && alias.trim()) return alias.trim();
-  if (name === 'hermes') return 'Hermes Agent';
-  const m = /^llm-(\d+)$/.exec(name);
-  if (m) return `LLM ${m[1]}`;
-  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -2066,6 +2058,82 @@ async function onProviderChange() {
   const model = opt?.dataset?.model || '';
   await sendMessage({ type: 'SET_ACTIVE_PROVIDER', name, model });
   showToast(tSub('switchedTo', 'Switched to $1', opt?.dataset?.display || displayProviderName(name)), 'success');
+  // 背填是一次性意图，绑定「切过去后的下一轮」——换目标（含切回）即作废
+  pendingAgentBackfill = false;
+  await maybeProviderSwitchCard();
+}
+
+// 切到 agent 类 provider 时询问当前对话的去留（仿 ASR 模式选择卡）：上下文对
+// agent 天然不延续（agent 自己持有 transcript，browsa 只发单轮），跨 provider
+// 切换后它对之前聊过的内容一无所知。切回原 provider 卡片自动消失（= 撤销）；
+// 两个选项：带上当前对话继续（背填）或新建会话。切到 LLM 不问——LLM 每轮
+// 全量重发历史，上下文天然连续。
+async function maybeProviderSwitchCard() {
+  document.querySelectorAll('.provider-switch-card').forEach((c) => c.remove());
+  const name = providerSel.value;
+  const pcfg = cachedProviders[name];
+  if (!pcfg) return;
+  const opt = providerSel.selectedOptions[0];
+  const model = opt?.dataset?.model || '';
+  const needs = agentSwitchNeedsPrompt({
+    currentIsAgent: (pcfg.type || 'llm') === 'agent',
+    currentKey: { name, model },
+    lastKey: lastReplyKey,
+  });
+  if (!needs) return;
+  showProviderSwitchCard(opt?.dataset?.display || displayProviderName(name, pcfg));
+}
+
+function showProviderSwitchCard(label) {
+  const card = document.createElement('div');
+  card.className = 'msg system asr-mode-card provider-switch-card';
+  const title = document.createElement('div');
+  title.className = 'asr-mode-title';
+  title.textContent = tSub('providerSwitchTitle', '已切换到 $1。当前对话怎么处理？', label);
+  card.appendChild(title);
+  const row = document.createElement('div');
+  row.className = 'asr-mode-row';
+  const mkBtn = (main, sub, onClick) => {
+    const b = document.createElement('button');
+    b.className = 'asr-mode-btn';
+    b.type = 'button';
+    const m1 = document.createElement('span');
+    m1.className = 'asr-mode-main';
+    m1.textContent = main;
+    const m2 = document.createElement('span');
+    m2.className = 'asr-mode-sub';
+    m2.textContent = sub;
+    b.appendChild(m1);
+    b.appendChild(m2);
+    b.addEventListener('click', () => { card.remove(); onClick(); });
+    return b;
+  };
+  row.appendChild(mkBtn(
+    _t('providerSwitchCarry', '带上当前对话继续'),
+    _t('providerSwitchCarrySub', '对话记录作为第一条消息发给它'),
+    () => {
+      pendingAgentBackfill = true;
+      showToast(tSub('providerSwitchCarryToast', '下一条消息会把当前对话带给 $1', label), 'success');
+    }
+  ));
+  row.appendChild(mkBtn(
+    _t('providerSwitchFresh', '新建会话'),
+    _t('providerSwitchFreshSub', '当前对话归档，从零开始'),
+    () => { newSession(); }
+  ));
+  card.appendChild(row);
+  const note = document.createElement('div');
+  note.className = 'provider-switch-note';
+  note.textContent = _t('providerSwitchDirectHint', '不选择直接发送，则不带上下文继续');
+  card.appendChild(note);
+  // 卡片在用户选择前被移除（会话切换/newSession 重渲染消息流）→ 静默消失，
+  // 与 ASR 模式卡同一防挂起语义；重新弹出由下次 onProviderChange 决定。
+  const obs = new MutationObserver(() => {
+    if (!card.isConnected) obs.disconnect();
+  });
+  obs.observe(messagesEl, { childList: true });
+  messagesEl.appendChild(card);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 async function onContextModeChange() {
@@ -2283,6 +2351,8 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       addCodeCopyButtons();
       renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      if (m.providerLabel) addProviderLabel(el, m.providerLabel);
+      if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
       // Show token usage if the provider returned it
       if (m.usage) showTokenUsage(el, m.usage);
@@ -2478,13 +2548,18 @@ async function onSend() {
     images.length = 0;
     refreshImageStrip();
 
+    // 切换卡还没选就直接发送 = 「不带上下文继续」（今天的默认行为），卡撤销
+    document.querySelectorAll('.provider-switch-card').forEach((c) => c.remove());
+    const backfill = pendingAgentBackfill;
+    pendingAgentBackfill = false; // 一次性：无论本轮是否 agent，意图已消费
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,
       userText: text,
       stream: true,
       portName: 'browsa-chat',
-      images: imageDataUrls
+      images: imageDataUrls,
+      backfill
     });
     if (!res.ok) {
       // Real error (re-thrown by background, port receives nothing).
@@ -2623,6 +2698,7 @@ async function resumeInFlightStream(tabId) {
   // wireChatStreamPort is correct because we seed state.acc from
   // peek.acc, not ''.
   if (state.acc) renderStream(state.acc, false);
+  if (peek.providerLabel) addProviderLabel(assistantEl, peek.providerLabel);
   // HELLO the background so it knows this port owns the stream now.
   // Wait for ACK so any in-flight delta that's about to fire from the
   // LLM (after the PEEK/HELLO race window) goes to a port that's
@@ -3634,6 +3710,22 @@ function renderChoiceRequest(bubbleEl, req) {
 }
 
 /** Append a small action button row directly after a message bubble. */
+// Reply-source chip: names the provider/agent that produced this reply,
+// using the SAME label the sidebar dropdown shows for the selection
+// (lib/provider-display.js). Stamped by the background on the assistant
+// history entry + DONE chunk + stream state; added here on history render
+// and on DONE. Must survive the async renderSafe upgrade (it wipes
+// innerHTML) — same re-add discipline as .msg-actions.
+function addProviderLabel(el, label) {
+  if (!label || el.querySelector('.msg-provider')) return;
+  const chip = document.createElement('span');
+  chip.className = 'msg-provider';
+  chip.textContent = label;
+  const actions = el.querySelector('.msg-actions');
+  if (actions) el.insertBefore(chip, actions);
+  else el.appendChild(chip);
+}
+
 function appendMsgAction(bubbleEl, label, onClick, icon) {
   // Remove any existing action row on this bubble first (avoid stacking).
   bubbleEl.nextElementSibling?.classList.contains('msg-action-row') &&
@@ -3800,6 +3892,9 @@ async function showEffectivePrompt() {
 }
 
 
+let pendingAgentBackfill = false; // one-shot: carry the conversation into the next agent turn
+let lastReplyKey = null;         // {name, model} of the provider that wrote the latest reply
+
 async function renderHistory() {
   messagesEl.innerHTML = '';
   const { history } = await chrome.storage.local.get('history');
@@ -3842,9 +3937,13 @@ async function renderHistory() {
       el.dataset.hidx = i;
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       addMsgActions(el, () => rawContent);
-      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs });
+      addProviderLabel(el, m.providerLabel);
+      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs, providerLabel: m.providerLabel });
     }
   }
+  // Switch-prompt decision input: which provider/endpoint produced the most
+  // recent reply (null when the conversation has no replies yet).
+  lastReplyKey = [...list].reverse().find((m) => m.role === 'assistant' && m.providerKey)?.providerKey || null;
 
   // Synchronous rendering done — panel is visible. Wire shallow decorations
   // (copy buttons, timestamps) on the fast-rendered content now so they work
@@ -3867,7 +3966,7 @@ async function renderHistory() {
   // formula in message 3 doesn't delay message 5 from upgrading.
   if (asyncUpgrades.length > 0) {
     showHistoryUpgradeIndicator();
-    Promise.all(asyncUpgrades.map(async ({ el, rawContent, figs }) => {
+    Promise.all(asyncUpgrades.map(async ({ el, rawContent, figs, providerLabel }) => {
       const html = await renderSafe(rawContent);
       el.innerHTML = html;
       decorateLinks(el);
@@ -3880,6 +3979,7 @@ async function renderHistory() {
       // addMsgActions is idempotent (no-ops if .msg-actions already present),
       // but since innerHTML just destroyed the old one, this always re-creates it.
       addMsgActions(el, () => rawContent);
+      addProviderLabel(el, providerLabel);
     })).finally(hideHistoryUpgradeIndicator);
   }
 }
