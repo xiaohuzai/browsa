@@ -14,7 +14,7 @@
 
 ---
 
-**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，把正在看的页面——文章、视频、PDF——读出来，交给**你自己的**智能体或模型。可以直接接 **Codex、Claude Code** 这类本地 CLI 智能体（订阅登录即可，无需 API key），也能连 opencode、Hermes 或任意 OpenAI / Anthropic / Ollama 兼容端点。key 只存在你自己的机器上。
+**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，把正在看的页面——文章、视频、PDF——读出来，交给**你自己的**智能体或模型。可以直接接 **Codex、Claude Code** 这类本地 CLI 智能体（模型侧订阅登录即可，无需另购模型 API），也能连 opencode、Hermes 或任意 OpenAI / Anthropic / Ollama 兼容端点。key 只存在你自己的机器上。
 
 ## 亮点
 
@@ -24,8 +24,8 @@
 
 | Agent | 接入方式 | 登录 |
 |---|---|---|
-| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | ChatGPT Plus / Pro **订阅登录即可，无需 API key** |
-| **Claude Code**（Anthropic） | agent-bridge 本地桥 | Claude Pro **订阅登录即可，无需 API key** |
+| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | ChatGPT Plus / Pro **订阅登录即可，无需另购模型 API** |
+| **Claude Code**（Anthropic） | agent-bridge 本地桥 | Claude Pro **订阅登录即可，无需另购模型 API** |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 
@@ -86,7 +86,7 @@ npm run package      # → browsa-v<version>.zip
 <details>
 <summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的小型本地守护进程：把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当聊天后端，无需 API key：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的小型本地守护进程：把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当模型来源，无需另购模型 API：
 
 ```bash
 # 克隆 agent-bridge 仓库后，在仓库目录：

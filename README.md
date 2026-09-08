@@ -14,7 +14,7 @@
 
 ---
 
-**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, reads the page you're viewing — article, video, or PDF — and hands it to **your own** agent or model. Plug in the local CLI agents you already use — **Codex, Claude Code** (subscription login, no API key needed) — or connect opencode, Hermes, or any OpenAI / Anthropic / Ollama-compatible endpoint. Your keys stay on your machine.
+**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, reads the page you're viewing — article, video, or PDF — and hands it to **your own** agent or model. Plug in the local CLI agents you already use — **Codex, Claude Code** (subscription login — no separate model-API purchase needed) — or connect opencode, Hermes, or any OpenAI / Anthropic / Ollama-compatible endpoint. Your keys stay on your machine.
 
 ## Highlights
 
@@ -24,8 +24,8 @@ However you use Codex / Claude Code in your terminal, that's how you use it in b
 
 | Agent | How to connect | Sign-in |
 |---|---|---|
-| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | ChatGPT Plus / Pro **subscription login — no API key** |
-| **Claude Code** (Anthropic) | agent-bridge local daemon | Claude Pro **subscription login — no API key** |
+| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | ChatGPT Plus / Pro **subscription login — no separate model-API purchase** |
+| **Claude Code** (Anthropic) | agent-bridge local daemon | Claude Pro **subscription login — no separate model-API purchase** |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 
@@ -86,7 +86,7 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as your chat backend, no API key needed:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as the model source — no separate model-API purchase needed:
 
 ```bash
 # from the cloned agent-bridge repo:
