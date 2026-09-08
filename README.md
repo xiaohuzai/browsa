@@ -3,36 +3,57 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/hero-en.png" alt="browsa — read anywhere, ask anywhere" width="100%" />
-</p>
-
-<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website</strong></a> · <a href="#see-it-in-action"><strong>Screenshots</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website (screenshots & demo)</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
 </p>
 
 ---
 
-**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, attaches the page — article, video, or PDF — and streams replies from **your own** model or agent: any OpenAI, Anthropic, or Ollama-compatible API, or a full agent backend (Hermes, or the opencode CLI agent) with tools, memory, and approvals. No subscription, no markup — your keys stay on your machine.
+**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, reads the page you're viewing — article, video, or PDF — and hands it to **your own** agent or model. Plug in the local CLI agents you already use — **Codex, Claude Code** (subscription login, no API key needed) — or connect opencode, Hermes, or any OpenAI / Anthropic / Ollama-compatible endpoint. Your keys stay on your machine.
 
-## See it in action
+## Highlights
 
-**Video pages** — ask for a summary and the key points come back as clickable `[mm:ss]` timestamps; click one to jump straight back to the moment. No subtitles? browsa transcribes the audio (ASR) or reads the visuals.
+### 1. Connect the agent you already use
 
-![browsa summarizing a Bilibili video into clickable timestamped notes](docs/assets/readme/video-notes.png)
+However you use Codex / Claude Code in your terminal, that's how you use it in browsa — same subscription sign-in, same tool abilities (run commands, read/write files, web search), now with eyes on the browser: browsa feeds web content to the agent, tool execution streams live, and approval cards for dangerous actions appear right in the panel.
 
-**Papers & PDFs** — parsed entirely on your machine, nothing uploaded: tables, headings, and multi-column layout reconstructed, and actual figure regions cropped out and sent as images, so a vision model can actually *see* Figure 1.
+| Agent | How to connect | Sign-in |
+|---|---|---|
+| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | ChatGPT Plus / Pro **subscription login — no API key** |
+| **Claude Code** (Anthropic) | agent-bridge local daemon | Claude Pro **subscription login — no API key** |
+| opencode | official headless server, direct | whatever model you configure it with |
+| Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 
-![browsa explaining Figure 1 of the Attention Is All You Need paper on arXiv](docs/assets/readme/pdf-figures.png)
+One browsa card connects to several agents at once; the sidebar dropdown switches between them.
 
-**Feeds & messy pages** — where plain readers give up, browsa reads the page's own data directly: subtitles, comments, note content. No re-auth, no signing in.
+### 2. Reads the whole web — videos included
 
-![browsa extracting decision-ready key points from a Xiaohongshu note](docs/assets/readme/deep-extraction.png)
+- **Videos**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too
+- **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
+- **Articles & messy pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
+
+Full list under "What browsa reads" below.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    B["browsa side panel<br/>read · chat · approvals"]
+    subgraph Y["Your backends — local or self-hosted"]
+        A1["Codex · Claude Code<br/>via agent-bridge · subscription login"]
+        A2["opencode · Hermes<br/>official server, direct"]
+        A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
+    end
+    P -->|"📎 attach: text / subtitles / tables / figures"| B
+    B -->|"page content + your question"| Y
+    Y -->|"streamed reply · tool progress · approvals"| B
+```
 
 ## Install
 
@@ -57,14 +78,38 @@ npm run package      # → browsa-v<version>.zip
 
 ## Connect a provider
 
-browsa works with two kinds of backends:
+Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active. Two kinds of backends:
 
 - **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
-Open ⚙ Settings, fill in Base URL + API key, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active.
+<details>
+<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>…)</summary>
 
-![browsa settings listing OpenAI, Claude, Ollama, and Hermes Agent providers](docs/assets/readme/providers-en.png)
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as your chat backend, no API key needed:
+
+```bash
+# from the cloned agent-bridge repo:
+node cli.mjs serve --config agents.example.json   # multi-agent: one bridge per address per port
+node cli.mjs codex --port 3948                    # or a single codex bridge
+```
+
+Open ⚙ Settings, select the **Agent Bridge** card, fill Base URL with the bridge address — **comma-separate multiple agents** (one address per agent; Ping discovers each agent's name automatically, and the sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
+
+</details>
+
+<details>
+<summary><b>🔧 OpenCode Agent</b> — connect the <code>opencode</code> CLI agent</summary>
+
+[opencode](https://opencode.ai) ships a first-party headless server — browsa connects to it directly (sessions, streaming, tool progress, and approval prompts for dangerous actions like shell commands). Browsa can connect to **any** `opencode serve` address — but bare `opencode serve` picks a random port that changes on every restart, so the set-and-forget move is to pin one:
+
+```bash
+opencode serve --port 4096
+```
+
+Open ⚙ Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
+
+</details>
 
 <details>
 <summary><b>🤖 Hermes Agent</b> — self-hosted agent with built-in tools</summary>
@@ -103,19 +148,6 @@ hermes gateway
 </details>
 
 <details>
-<summary><b>🔧 OpenCode Agent</b> — connect the <code>opencode</code> CLI agent</summary>
-
-[opencode](https://opencode.ai) ships a first-party headless server — browsa connects to it directly (sessions, streaming, tool progress, and approval prompts for dangerous actions like shell commands). Browsa can connect to **any** `opencode serve` address — but bare `opencode serve` picks a random port that changes on every restart, so the set-and-forget move is to pin one:
-
-```bash
-opencode serve --port 4096
-```
-
-Open ⚙ Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
-
-</details>
-
-<details>
 <summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
@@ -130,7 +162,7 @@ Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for
 | Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode — are fixed and not removable).
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode, Agent Bridge — are fixed and not removable).
 
 </details>
 
@@ -151,7 +183,7 @@ Highlight text on a page and the **floating toolbar** appears: **Explain** and *
 
 ## Features
 
-The screenshots above are the shape of it — the full reference lives here:
+The full reference lives here:
 
 <details>
 <summary><b>Chat</b> — streaming, thinking blocks, diagrams, detail thread…</summary>
@@ -240,16 +272,12 @@ Type `/` in the composer to see autocomplete. All commands accept extra instruct
 
 ## How it works
 
-```
-[Web page]  →  [browsa side panel]  →  [your model / agent]  →  streaming reply
-```
-
 <details>
 <summary><b>Code map</b></summary>
 
 - **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
 - **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, detail thread each live in `lib/sidepanel/`.
-- **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming client (`/v1/chat/completions` + Hermes `/v1/runs` + opencode server), `chrome.storage.local` wrapper, content scripts.
+- **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming clients (`/v1/chat/completions`, Hermes `/v1/runs`, the opencode / agent-bridge agent clients), `chrome.storage.local` wrapper, content scripts.
 
 </details>
 
