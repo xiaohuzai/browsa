@@ -25,6 +25,10 @@ function makeStorageArea() {
     async set(obj) {
       store = { ...store, ...obj };
     },
+    async remove(keys) {
+      const list = Array.isArray(keys) ? keys : [keys];
+      for (const k of list) delete store[k];
+    },
     _reset() { store = {}; },
     _dump() { return store; }
   };
@@ -516,4 +520,34 @@ test('saveCurrentSession evicts the oldest session once MAX_SESSIONS (50) is exc
   assert.equal(list.length, 50, 'only the newest 50 sessions must be retained');
   assert.ok(!list.some(s => s.name === 'Session 0'), 'the oldest session (0) must have been evicted');
   assert.ok(list.some(s => s.name === 'Session 50'), 'the newest session must be present');
+});
+
+// --------------- bridge session identity (per-endpoint keys) -----------------
+
+test('bridge session ids are keyed PER ENDPOINT and isolated across agents', async () => {
+  reset();
+  await storage.setBridgeSessionId('bridge', 'thread-codex', 'http://127.0.0.1:3948');
+  await storage.setBridgeSessionId('bridge', 'thread-claude', 'http://127.0.0.1:3949');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:3948'), 'thread-codex');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:3949'), 'thread-claude');
+  // scheme-normalized lookup: https vs http host forms hit the same key
+  assert.equal(await storage.getBridgeSessionId('bridge', 'https://127.0.0.1:3948'), 'thread-codex');
+  // unknown endpoint → null (fresh thread on first turn)
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:4000'), null);
+  // endpoint-less calls fall back to the legacy single key shape
+  await storage.setBridgeSessionId('bridge', 'thread-legacy');
+  assert.equal(await storage.getBridgeSessionId('bridge'), 'thread-legacy');
+});
+
+test('clearBridgeSessionId(provider) wipes the legacy key AND every endpoint key', async () => {
+  reset();
+  await storage.setBridgeSessionId('bridge', 'legacy');
+  await storage.setBridgeSessionId('bridge', 't1', 'http://127.0.0.1:3948');
+  await storage.setBridgeSessionId('bridge', 't2', 'http://127.0.0.1:3949');
+  await storage.setBridgeSessionId('opencode-x', 'unrelated'); // other provider untouched
+  await storage.clearBridgeSessionId('bridge');
+  assert.equal(await storage.getBridgeSessionId('bridge'), null);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:3948'), null);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:3949'), null);
+  assert.equal(await storage.getBridgeSessionId('opencode-x'), 'unrelated');
 });

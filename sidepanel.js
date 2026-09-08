@@ -700,15 +700,19 @@ function populateProviderSelect(cfg) {
   providerSel.innerHTML = '';
   // LLM 卡（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按「Alias · model」
   // 展示——一张网关卡（方舟 Coding / 兼容网关动辄几十个模型）不用为每个模型建卡；
-  // 单模型卡同样带 Model ID 后缀，一眼看到当前用的模型。Agent 卡没有 Model ID，
-  // 保持纯 Alias 展示。
+  // 单模型卡同样带 Model ID 后缀，一眼看到当前用的模型。bridge 卡同构地按端点
+  // 展开（models 槽存 URL，后缀是 /health 发现的 agent 名）。其余 Agent 卡没有
+  // Model ID，保持纯 Alias 展示。
   let activeFallback = null;
   let anySelected = false;
   for (const name of providers) {
     const pcfg = cfg.providers[name];
     const display = displayProviderName(name, pcfg);
+    const isBridgeCard = !!pcfg?.isBridge;
     const models = providerModelList(pcfg);
-    const modelList = (pcfg.type || 'llm') === 'llm' && models.length ? models : [''];
+    // bridge 卡：models 槽存的是端点 URL（一地址一 agent），同样逐个展开；
+    // 展示名用 Ping 时 /health 发现的 agent 名（alias），未 Ping 过用 host:port 兜底。
+    const modelList = ((pcfg.type || 'llm') === 'llm' || isBridgeCard) && models.length ? models : [''];
     const configured = !!(pcfg?.baseUrl?.trim());
     let status;
     if (!configured)               status = _t('statusNotSet', 'not set');
@@ -716,11 +720,15 @@ function populateProviderSelect(cfg) {
     else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
     else                           status = _t('statusNotPinged', 'not pinged');
     for (const model of modelList) {
+      let suffix = model;
+      if (isBridgeCard && model) {
+        suffix = pcfg.bridgeAgents?.[model] || String(model).replace(/^https?:\/\//, '');
+      }
       const opt = document.createElement('option');
       opt.value = name;
       opt.dataset.model = model;
-      opt.dataset.display = model ? `${display} · ${model}` : display;
-      opt.textContent = model ? `${display} · ${model} — ${status}` : `${display} — ${status}`;
+      opt.dataset.display = suffix ? `${display} · ${suffix}` : display;
+      opt.textContent = suffix ? `${display} · ${suffix} — ${status}` : `${display} — ${status}`;
       if (name === cfg.activeProvider) {
         if ((model || '') === String(cfg.activeModel || '')) { opt.selected = true; anySelected = true; }
         else if (!activeFallback) activeFallback = opt;

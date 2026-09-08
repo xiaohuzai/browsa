@@ -65,6 +65,7 @@
         <li><strong>LLM providers</strong> — plain chat endpoints, covering nearly every service: OpenAI, Anthropic, Ollama, Groq, LiteLLM, aggregation gateways.</li>
         <li><strong>Hermes Agent</strong> — a self-hosted agent with server-side tool execution: it can search, run commands, and operate files. Built into browsa; just point it at your server.</li>
         <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
+        <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude…): a standalone daemon turns subscription-logged-in CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
       </ul>
 
       <h2>Filling in a provider card</h2>
@@ -120,6 +121,15 @@ agent:
   "permission": { "bash": "ask", "edit": "ask" }
 }</pre>
 
+
+      <h2>Agent Bridge</h2>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as your chat backend, no API key needed:</p>
+      <ol>
+        <li>Clone the repo and start it from the repo directory: <code>node cli.mjs serve --config agents.example.json</code> starts several agents at once (one bridge per address per port), or <code>node cli.mjs codex --port 3948</code> for a single one;</li>
+        <li>In browsa settings, select the <strong>Agent Bridge</strong> card and fill Base URL with the bridge address — <strong>comma-separate multiple agents</strong>. Ping discovers each agent's name automatically, and the sidebar dropdown lists them as "Agent Bridge · codex";</li>
+        <li>Each agent keeps its own independent session thread.</li>
+      </ol>
+      <p>Approval cards for dangerous actions appear right in the panel (enable ask-side permissions in the agent, e.g. codex's <code>--approval on-request</code>); screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn).</p>
       <h2>Ollama, locally</h2>
       <p>Running Ollama on your machine? Base URL <code>http://localhost:11434</code>, protocol Chat Completions (Ollama speaks the OpenAI format), Model ID set to a pulled model such as <code>qwen3:32b</code>. Fully <strong>offline-capable</strong>.</p>
 

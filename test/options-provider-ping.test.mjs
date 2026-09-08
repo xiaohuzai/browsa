@@ -271,10 +271,16 @@ const setCalls = [];
 globalThis.chrome = {
   storage: {
     local: {
-      get: async (keys) => {
-        if (keys == null) return { ...storedData };
-        if (typeof keys === 'string') return { [keys]: storedData[keys] };
-        return { ...storedData };
+      get: async (keys, cb) => {
+        // real chrome.storage.local.get supports BOTH promise and callback
+        // styles; options.js's setBadge() uses the callback form.
+        const result = (() => {
+          if (keys == null) return { ...storedData };
+          if (typeof keys === 'string') return { [keys]: storedData[keys] };
+          return { ...storedData };
+        })();
+        if (typeof cb === 'function') cb(result);
+        return result;
       },
       set: async (obj) => { setCalls.push(obj); Object.assign(storedData, obj); },
     },
@@ -627,4 +633,76 @@ test('options.js: re-pinging an already-reachable provider does not steal active
   await new Promise((r) => setTimeout(r, 20));
   const second = setCalls.filter((c) => 'activeProvider' in c);
   assert.equal(second.length, 0, 're-pinging an already-reachable provider must not change the active provider');
+});
+
+// ─── Agent Bridge multi-endpoint card (serve mode: one address per agent) ────
+
+function bridgeCard() { return findProviderCard('Agent Bridge'); }
+
+test('options.js: bridge Base URL normalizes a comma-separated endpoint list into models + first-url fields', async () => {
+  const card = bridgeCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948/, 127.0.0.1:3949, http://127.0.0.1:3948';
+  card.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const providersSet = setCalls.filter((c) => c.providers).pop();
+  const bridge = providersSet.providers.bridge;
+  assert.deepEqual(bridge.models, ['http://127.0.0.1:3948', 'http://127.0.0.1:3949'], 'split + scheme-fill + dedupe, order kept');
+  assert.equal(bridge.model, 'http://127.0.0.1:3948', 'model = first endpoint (legacy consumers)');
+  assert.equal(bridge.baseUrl, 'http://127.0.0.1:3948', 'baseUrl = first endpoint (resolveProvider guard)');
+  // the input re-render keeps the joined form for display
+});
+
+test('options.js: bridge Ping probes EVERY endpoint and persists discovered aliases', async () => {
+  const card = bridgeCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  const hitUrls = [];
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes(':3948/health') || u.includes(':3949/health')) {
+      hitUrls.push(u);
+      const agent = u.includes(':3948') ? 'codex' : 'claude';
+      return { ok: true, json: async () => ({ ok: true, agent }) };
+    }
+    return { ok: false, status: 404 };
+  };
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(hitUrls.filter((u) => u.includes(':3948')).length, 1, 'each endpoint pinged exactly once');
+  assert.equal(hitUrls.filter((u) => u.includes(':3949')).length, 1);
+  assert.match(card.querySelector('.card-status').textContent, /×2\/2 healthy \(codex, claude\)/);
+  const providersSet = setCalls.filter((c) => c.providers).pop();
+  const bridge = providersSet.providers.bridge;
+  assert.deepEqual(bridge.bridgeAgents, {
+    'http://127.0.0.1:3948': 'codex',
+    'http://127.0.0.1:3949': 'claude',
+  }, 'aliases from /health.agent persisted per endpoint URL');
+  const pingSet = setCalls.filter((c) => c.pingStates).pop();
+  assert.equal(pingSet.pingStates.bridge, 'reachable');
+});
+
+test('options.js: bridge Ping stays reachable when SOME endpoints are down (×N/M + down note)', async () => {
+  const card = bridgeCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes(':3948/health')) return { ok: true, json: async () => ({ ok: true, agent: 'codex' }) };
+    return { ok: false, status: 500 };
+  };
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.match(card.querySelector('.card-status').textContent, /×1\/2 healthy \(codex\) — 1 down/);
+  const pingSet = setCalls.filter((c) => c.pingStates).pop();
+  assert.equal(pingSet.pingStates.bridge, 'reachable', 'reachable ⇔ at least one endpoint answers');
+});
+
+test('options.js: bridge Ping fails only when NO endpoint answers (shared error path)', async () => {
+  const card = bridgeCard();
+  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  globalThis.fetch = async () => ({ ok: false, status: 500 });
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.match(card.querySelector('.card-status').textContent, /❌/);
+  const pingSet = setCalls.filter((c) => c.pingStates).pop();
+  assert.equal(pingSet.pingStates.bridge, 'unreachable');
 });

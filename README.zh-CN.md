@@ -3,36 +3,57 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/hero-zh.png" alt="browsa —— 读到哪里，问到哪里" width="100%" />
-</p>
-
-<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#安装开发者模式"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网</strong></a> · <a href="#实际效果"><strong>截图</strong></a> · <a href="#安装开发者模式"><strong>安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网（截图与演示）</strong></a> · <a href="#安装开发者模式"><strong>安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
 </p>
 
 ---
 
-**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，附加页面——文章、视频、PDF——并用**你自己的**模型或智能体流式生成回复：任意 OpenAI、Anthropic、Ollama 兼容端点，或带工具、记忆与审批的完整智能体后端（Hermes、opencode CLI 智能体）。无订阅、无加价——key 只存在你自己的机器上。
+**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，把正在看的页面——文章、视频、PDF——读出来，交给**你自己的**智能体或模型。可以直接接 **Codex、Claude Code** 这类本地 CLI 智能体（订阅登录即可，无需 API key），也能连 opencode、Hermes 或任意 OpenAI / Anthropic / Ollama 兼容端点。key 只存在你自己的机器上。
 
-## 实际效果
+## 亮点
 
-**视频页**——让它总结，要点就带可点击的 `[mm:ss]` 时间戳，点一下跳回原时刻。没有字幕？browsa 自动转写音频（ASR）或直接读画面。
+### 一、接你正在用的 Agent
 
-![browsa 把 B 站视频总结成可点击时间戳的笔记](docs/assets/readme/video-notes.png)
+你在终端里怎么用 Codex / Claude Code，在 browsa 里就怎么用——同一份订阅登录、同一套工具能力（跑命令、读写文件、联网搜索），现在多了浏览器的眼睛：browsa 把网页内容喂给 agent，工具执行进度实时直播，危险操作的审批卡直接出现在面板里。
 
-**论文与 PDF**——全程本机解析，不上传任何内容：重建表格、标题与多栏版式，裁出真正的插图区域作为图片发送，让视觉模型真的「看见」Figure 1。
+| Agent | 接入方式 | 登录 |
+|---|---|---|
+| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | ChatGPT Plus / Pro **订阅登录即可，无需 API key** |
+| **Claude Code**（Anthropic） | agent-bridge 本地桥 | Claude Pro **订阅登录即可，无需 API key** |
+| opencode | 官方无头服务器直连 | 你给它配置的模型 |
+| Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 
-![browsa 在 arXiv 上解读 Attention Is All You Need 的 Figure 1](docs/assets/readme/pdf-figures.png)
+一张 browsa 卡可以同时连多个 agent，侧边栏下拉逐个切换。
 
-**信息流与乱页面**——普通阅读器放弃的地方，browsa 直接读页面自己的数据：字幕、评论、笔记正文。无需重新登录。
+### 二、读得动整个网页——视频也行
 
-![browsa 从小红书笔记提取能直接做决定的要点](docs/assets/readme/deep-extraction.png)
+- **视频**：字幕或自动转写（ASR）→ 带可点击 `[mm:ss]` 时间戳的笔记，点一下跳回原时刻；无字幕的视频还能直接「看」画面
+- **PDF / 论文**：全程本机解析——表格、多栏、标题原样重建，插图区域裁出来发给视觉模型
+- **文章与乱页面**：读出干净正文；信息流页面直接读页面自己的数据（YouTube、Bilibili、小红书…）
+
+完整清单见下方「browsa 读什么」。
+
+## 架构
+
+```mermaid
+flowchart LR
+    P["当前标签页<br/>文章 · 视频 · PDF · 乱页面"]
+    B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
+    subgraph Y["你的后端 —— 本机或自托管"]
+        A1["Codex · Claude Code<br/>agent-bridge 桥 · 订阅登录即可"]
+        A2["opencode · Hermes<br/>官方服务直连"]
+        A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
+    end
+    P -->|"📎 读出正文 / 字幕 / 表格 / 插图"| B
+    B -->|"页面内容 + 你的问题"| Y
+    Y -->|"流式回复 · 工具进度 · 审批"| B
+```
 
 ## 安装（开发者模式）
 
@@ -57,14 +78,38 @@ npm run package      # → browsa-v<version>.zip
 
 ## 连接 Provider
 
-browsa 支持两类后端：
+打开 ⚙ 设置，填好地址、点 **Ping**——验证连通性并自动检测能力；第一个验证通过的 provider 自动设为激活。两类后端：
 
 - **Agent Provider（智能体）**——完整的智能体后端，在服务端执行工具（bash、文件操作、联网搜索……）。AI 真的能*做事*。
 - **LLM Provider（纯语言模型）**——仅用于对话的聊天端点。需填写模型 ID。
 
-打开 ⚙ 设置，填入 Base URL + API key，点 **Ping**——验证连通性并自动检测能力；第一个验证通过的 provider 自动设为激活。
+<details>
+<summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>…）</summary>
 
-![browsa 设置页列出 OpenAI、Claude、Ollama 与 Hermes Agent](docs/assets/readme/providers-zh.png)
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的小型本地守护进程：把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当聊天后端，无需 API key：
+
+```bash
+# 克隆 agent-bridge 仓库后，在仓库目录：
+node cli.mjs serve --config agents.example.json   # 多 agent：一桥一地址一端口
+node cli.mjs codex --port 3948                    # 或只起单个 codex
+```
+
+打开 ⚙ 设置，选择 **Agent Bridge** 卡，Base URL 填桥的地址——**多个 agent 用逗号分隔**（每个地址一个 agent；Ping 后自动识别各 agent 的名字，侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
+
+</details>
+
+<details>
+<summary><b>🔧 OpenCode Agent</b>——连接 <code>opencode</code> 命令行智能体</summary>
+
+[opencode](https://opencode.ai) 自带官方无头服务器——browsa 直连即可（会话、流式回复、工具进度，以及危险操作——比如执行 shell 命令——的审批卡片）。browsa 能连**任意** `opencode serve` 地址——但裸 `opencode serve` 会随机选端口且每次重启都变，所以省心的做法是固定一个：
+
+```bash
+opencode serve --port 4096
+```
+
+打开 ⚙ 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
+
+</details>
 
 <details>
 <summary><b>🤖 Hermes Agent</b>——自托管、内置工具的智能体</summary>
@@ -103,19 +148,6 @@ hermes gateway
 </details>
 
 <details>
-<summary><b>🔧 OpenCode Agent</b>——连接 <code>opencode</code> 命令行智能体</summary>
-
-[opencode](https://opencode.ai) 自带官方无头服务器——browsa 直连即可（会话、流式回复、工具进度，以及危险操作——比如执行 shell 命令——的审批卡片）。browsa 能连**任意** `opencode serve` 地址——但裸 `opencode serve` 会随机选端口且每次重启都变，所以省心的做法是固定一个：
-
-```bash
-opencode serve --port 4096
-```
-
-打开 ⚙ 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
-
-</details>
-
-<details>
 <summary><b>💬 LLM Providers</b>——OpenAI · Anthropic · Ollama · Groq · LiteLLM · 任意兼容端点</summary>
 
 任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。
@@ -130,7 +162,7 @@ opencode serve --port 4096
 | Model ID | **必填**——例如 `gpt-4o`、`claude-sonnet-4-6`；可填多个（逗号分隔），侧边栏下拉按「Alias · 模型」逐个选择 |
 | API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
-想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenCode 智能体卡片固定不可删）。
+想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenCode / Agent Bridge 智能体卡片固定不可删）。
 
 </details>
 
@@ -151,7 +183,7 @@ opencode serve --port 4096
 
 ## 功能
 
-上面的截图就是它的样子——完整清单收在这里：
+完整清单收在这里：
 
 <details>
 <summary><b>聊天</b>——流式回复、思考块、图表、细聊……</summary>
@@ -240,16 +272,12 @@ opencode serve --port 4096
 
 ## 工作原理
 
-```
-[Web 页面]  →  [browsa 侧边栏]  →  [你的模型 / 智能体]  →  流式回复
-```
-
 <details>
 <summary><b>代码地图</b></summary>
 
 - **`background.js`**——MV3 服务工作线程，单一消息路由器；通过每轮端口流式传输，超大附件自动总结。
 - **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、细聊各在 `lib/sidepanel/` 下。
-- **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions` + Hermes `/v1/runs`）、`chrome.storage.local` 封装、内容脚本。
+- **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions`、Hermes `/v1/runs`、opencode / agent-bridge agent 客户端）、`chrome.storage.local` 封装、内容脚本。
 
 </details>
 

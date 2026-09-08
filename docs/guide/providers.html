@@ -64,6 +64,7 @@
         <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
         <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
         <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
+        <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude…）：独立守护进程把订阅登录的 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
       </ul>
 
       <h2>配一张提供商卡</h2>
@@ -118,6 +119,15 @@ agent:
       <pre class="doc-code">{
   "permission": { "bash": "ask", "edit": "ask" }
 }</pre>
+
+      <h2>Agent Bridge</h2>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程，把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当聊天后端，无需 API key：</p>
+      <ol>
+        <li>克隆仓库，在仓库目录启动：<code>node cli.mjs serve --config agents.example.json</code> 可同时起多个 agent（一桥一地址一端口），或 <code>node cli.mjs codex --port 3948</code> 只起单个；</li>
+        <li>在 browsa 设置里选中 <strong>Agent Bridge</strong> 卡，Base URL 填桥的地址，<strong>多个 agent 用逗号分隔</strong>——Ping 后自动识别各 agent 的名字，侧边栏下拉按「Agent Bridge · codex」逐个选择；</li>
+        <li>每个 agent 有自己独立的会话线程，互不串线。</li>
+      </ol>
+      <p>危险操作的审批卡直接出现在面板里（需 agent 侧开启询问权限，如 codex 的 <code>--approval on-request</code>）；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。</p>
 
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>

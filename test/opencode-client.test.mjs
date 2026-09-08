@@ -306,3 +306,56 @@ test('respond helpers hit the reply endpoints with the right bodies', async () =
     assert.match(ff.calls[1].url, /\/api\/session\/ses_test123\/question\/que_9\/reply/);
   } finally { ff.restore(); }
 });
+
+// ─── opencodeStream image forwarding (prompt.files data: attachments) ────────
+
+test('opencodeStream — images ride as prompt.files; junk entries filtered; omitted when empty', async () => {
+  const ff = installFetch({
+    '/prompt': () => jsonResponse({ data: { id: 'msg_u' } }),
+    '/api/event': () => sseResponse([
+      ev('session.next.text.delta', { delta: 'ok' }),
+      ev('session.next.step.ended', { finish: 'stop' }),
+    ], { holdOpen: false }),
+    '/api/session/active': () => jsonResponse({ data: {} }),
+    '/message': () => jsonResponse({ data: [
+      { type: 'user', content: [{ type: 'text', text: 'q' }] },
+      { type: 'assistant', content: [{ type: 'text', text: 'ok' }], tokens: { input: 1, output: 1 }, finish: 'stop' },
+    ] }),
+  });
+  try {
+    await opencodeStream({
+      baseUrl: 'http://127.0.0.1:4096', sessionId: SES, text: 'q',
+      images: ['data:image/png;base64,AAAA', 'not-a-url', '', 'data:image/jpeg;base64,BBBB'],
+      onDelta: () => {},
+      signal: new AbortController().signal,
+      _pollIntervalMs: 5,
+    });
+    const promptCall = ff.calls.find((c) => c.url.includes('/prompt'));
+    const body = JSON.parse(promptCall.body);
+    assert.deepEqual(body.prompt.files, [
+      { uri: 'data:image/png;base64,AAAA', name: 'image-1.png' },
+      { uri: 'data:image/jpeg;base64,BBBB', name: 'image-2.jpg' },
+    ]);
+  } finally { ff.restore(); }
+
+  // No images → no files key (byte-identical to the pre-images body shape).
+  const ff2 = installFetch({
+    '/prompt': () => jsonResponse({ data: { id: 'msg_u' } }),
+    '/api/event': () => sseResponse([], { holdOpen: false }),
+    '/api/session/active': () => jsonResponse({ data: {} }),
+    '/message': () => jsonResponse({ data: [
+      { type: 'assistant', content: [{ type: 'text', text: 'ok' }], finish: 'stop' },
+    ] }),
+  });
+  try {
+    await opencodeStream({
+      baseUrl: 'http://127.0.0.1:4096', sessionId: SES, text: 'q',
+      onDelta: () => {},
+      signal: new AbortController().signal,
+      _pollIntervalMs: 5,
+    });
+    const body = JSON.parse(ff2.calls.find((c) => c.url.includes('/prompt')).body);
+    assert.deepEqual(body, { prompt: { text: 'q' } });
+    assert.ok(!('files' in body.prompt));
+  } finally { ff2.restore(); }
+});
