@@ -57,8 +57,11 @@
         就把当前页面带进对话——正文、字幕、PDF 都能读，回答在旁侧流式渲染。
       </p>
       <div class="cta-group">
-        <a class="btn btn-primary" href="#install">
-          安装 browsa <span class="kbd">Ctrl+Shift+H</span>
+        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
+          从 Chrome 应用商店安装 ↗
+        </a>
+        <a class="btn btn-secondary" href="#install">
+          源码安装
         </a>
         <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">
           查看源码 ↗
@@ -473,23 +476,22 @@
     <div class="container">
       <div class="section-head">
         <p class="eyebrow">install</p>
-        <!-- 商店上架后：把 Chrome Web Store 直链放进这里做主按钮，开发者模式保留为备用路径。 -->
-        <h2>安装（开发者模式）</h2>
-        <p>browsa 是未打包扩展，通过开发者模式加载。整个过程约 5 分钟，不收取任何费用。</p>
+        <h2>安装</h2>
+        <p>两种方式二选一：商店一键安装，或从 GitHub 加载最新版。整个过程约 5 分钟，不收取任何费用。</p>
       </div>
       <div class="install-steps">
         <div class="step">
           <span class="no">1</span>
           <div>
-            <h4>获取代码</h4>
-            <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压。</p>
+            <h4>Chrome 应用商店（最省事）</h4>
+            <p>到 <a class="link" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Chrome 应用商店</a>点「添加至 Chrome」。商店版会自动更新，但审核有延迟，可能比 GitHub 版晚几天。</p>
           </div>
         </div>
         <div class="step">
           <span class="no">2</span>
           <div>
-            <h4>加载扩展</h4>
-            <p>打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。需要较新的 Chrome / Edge——近年自动更新过的浏览器都满足。</p>
+            <h4>或：从 GitHub 加载（最新功能先到这里）</h4>
+            <p><code>git clone</code> 仓库，或从 <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> 下载 zip 并解压 → 打开 <code>chrome://extensions</code>（Edge 用 <code>edge://extensions</code>）→ 开启「开发者模式」→ 点击「加载已解压的扩展程序」→ 选择 <code>browsa/</code> 目录。需要较新的 Chrome / Edge——近年自动更新过的浏览器都满足。</p>
           </div>
         </div>
         <div class="step">

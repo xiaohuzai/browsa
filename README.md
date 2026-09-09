@@ -3,13 +3,14 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website (screenshots & demo)</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website (screenshots & demo)</strong></a> · <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><strong>Chrome Web Store</strong></a> · <a href="#install"><strong>Install from source</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
 </p>
 
 ---
@@ -57,11 +58,18 @@ flowchart LR
 
 ## Install
 
-1. Clone or download this repo.
+**Chrome Web Store — easiest.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). The store build updates itself; store review can lag a few days behind the GitHub build.
+
+**From source — newest features first.**
+
+1. Clone or download this repo (or grab the zip from [Releases](https://github.com/xiaohuzai/browsa/releases)).
 2. Open `chrome://extensions` (or `edge://extensions`) and enable **Developer mode**.
 3. Click **Load unpacked** → select the `browsa/` directory.
-4. Press `Ctrl+Shift+H` (or click the toolbar icon) — the panel opens next to any page.
-5. Click **⚙ Settings** and connect a provider below.
+
+**Then, either way:**
+
+1. Press `Ctrl+Shift+H` (or click the toolbar icon) — the panel opens next to any page.
+2. Click **⚙ Settings** and connect a provider below.
 
 <details>
 <summary><b>Build & package</b></summary>
