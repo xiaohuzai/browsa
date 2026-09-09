@@ -3,13 +3,14 @@
 </p>
 
 <p align="center">
+  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
-  <a href="#安装开发者模式"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
+  <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网（截图与演示）</strong></a> · <a href="#安装开发者模式"><strong>安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网（截图与演示）</strong></a> · <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><strong>Chrome 应用商店</strong></a> · <a href="#安装"><strong>源码安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
 </p>
 
 ---
@@ -55,13 +56,20 @@ flowchart LR
     Y -->|"流式回复 · 工具进度 · 审批"| B
 ```
 
-## 安装（开发者模式）
+## 安装
 
-1. 克隆或下载本仓库。
+**Chrome 应用商店 —— 最省事。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店版会自动更新；审核有延迟，可能比 GitHub 版晚几天。
+
+**源码安装 —— 最新功能先到这里。**
+
+1. 克隆或下载本仓库（或从 [Releases](https://github.com/xiaohuzai/browsa/releases) 下载 zip）。
 2. 打开 `chrome://extensions`（或 `edge://extensions`），开启**开发者模式**。
 3. 点击**加载已解压的扩展程序** → 选择 `browsa/` 目录。
-4. 按 `Ctrl+Shift+H`（或点击工具栏图标）——侧边栏在任意页面旁打开。
-5. 点击 **⚙ 设置**，连接下方任意 provider。
+
+**接下来两种方式都一样：**
+
+1. 按 `Ctrl+Shift+H`（或点击工具栏图标）——侧边栏在任意页面旁打开。
+2. 点击 **⚙ 设置**，连接下方任意 provider。
 
 <details>
 <summary><b>构建与打包</b></summary>
