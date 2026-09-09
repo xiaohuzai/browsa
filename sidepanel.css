@@ -70,14 +70,28 @@ body {
   .status-dot[data-state="streaming"] { animation: none; opacity: 0.85; }
 }
 
-/* Small tracked-out monospace wordmark — the brand's one consistent
+/* Brand wordmark face, bundled locally (no external font fetch — privacy by
+   architecture). Variable font: weights 300-700. Mono fallbacks keep the
+   wordmark legible if the file ever fails to load. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('fonts/SpaceGrotesk.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Small tracked-out wordmark — the brand's one consistent
    typographic voice, now actually visible in the primary UI instead of
-   hidden at 50% opacity behind the empty-state selector. */
+   hidden at 50% opacity behind the empty-state selector.
+   Space Grotesk (geometric sans) replaces the original monospace: same
+   lowercase + tracked-out treatment, but reads "product" rather than
+   "terminal". The mono accent voice lives on in timestamps/code chips. */
 .wordmark {
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-family: 'Space Grotesk', ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.05em;
   color: var(--accent);
   flex-shrink: 0;
   user-select: none;
@@ -2644,3 +2658,37 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .outline-rail-preview.show { opacity: 1; visibility: visible; transform: none; }
 .msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }
 
+
+/* ─── 长历史渲染性能：content-visibility（Chrome 85+，114 基线内）─────────────
+   视口外的历史气泡跳过布局与绘制。必须配 contain-intrinsic-size——否则屏外元素
+   塌成 0 高，滚动条跳动（modern-web-guidance 指南的 MANDATORY 配对要求）。
+   豁免两类：流式中的气泡（.msg.assistant 无 .done——内容持续增高，占位尺寸会
+   干扰自动跟随的 scrollHeight 计算；DONE/ERROR/取消时补 .done）和每条列表的
+   末尾气泡（首屏内容，cv 只会多一步边界评估，指南明确不要对首屏用）。 */
+.msg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 96px;
+}
+.msg:last-child,
+.msg.assistant:not(.done) {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
+
+/* ─── 覆盖层 <dialog> 化（裁剪模态 / lightbox）────────────────────────────────
+   top-layer 自带 Esc（cancel→close）、焦点陷阱、不被 overflow 裁剪。这里只做
+   全屏化与样式复位；:not([open]) 守卫防 jsdom 的 open 属性兜底路径提前显示。 */
+dialog.crop-modal,
+dialog.lightbox-overlay {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+dialog.crop-modal:not([open]),
+dialog.lightbox-overlay:not([open]) {
+  display: none;
+}
