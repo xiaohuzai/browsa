@@ -711,6 +711,18 @@
     "message": "别名（留空，Ping 后自动发现）",
     "description": "Options: bridge endpoint row alias placeholder"
   },
+  "bridgeAgentSetupBtn": {
+    "message": "复制配置提示词",
+    "description": "Options: bridge card, copy agent-setup prompt button"
+  },
+  "bridgeAgentSetupDone": {
+    "message": "已复制 ✓ 粘给你的 CLI agent",
+    "description": "Options: bridge card, brief confirmation after copying the setup prompt"
+  },
+  "bridgeAgentSetupPrompt": {
+    "message": "请在本机配置 agent-bridge 守护进程，让 browsa 浏览器扩展能通过本地 HTTP 调用你：\n\n1. 全局安装（Node ≥ 18，零依赖）：npm i -g @xiaohuzai/agent-bridge\n2. 在固定工作目录创建 agents.json（条目形态以包内 agents.example.json 与 README 为准），为你自己加一个条目。如果你是 codex，保留 \"approval\": \"on-request\"（否则操作确认无法弹到 browsa）与 \"sandbox\": \"workspace-write\"：\n   {\"bridges\":[{\"name\":\"codex\",\"port\":3948,\"apiKey\":\"\",\"sandbox\":\"workspace-write\",\"approval\":\"on-request\"}]}\n   其他 CLI agent（如 claude）条目只需 name/port/apiKey。\n3. 启动并验证：运行 agent-bridge serve（默认读 ./agents.json，前台驻留——验证要另开一条命令）：curl http://127.0.0.1:3948/health 应返回含你名字的 JSON。\n4. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。\n\n任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。",
+    "description": "Options: bridge card, full setup prompt the user pastes into their CLI agent"
+  },
   "bridgeRemoveTitle": {
     "message": "移除此地址",
     "description": "Options: bridge endpoint row remove button"

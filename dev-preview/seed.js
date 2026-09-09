@@ -4,6 +4,12 @@ window.__BROWSA_PREVIEW_SEED = {
   pingStates: { llm1: 'reachable', hermes: 'unreachable' },
   providers: {
     hermes: { type: 'agent', alias: 'Hermes Agent', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
+    bridge: {
+      type: 'agent', alias: '', baseUrl: 'http://127.0.0.1:3948', apiKey: 'sk-preview-bridge', model: '',
+      stream: true, isBridge: true, bridgeAgents: { 'http://127.0.0.1:3948': 'codex', 'http://127.0.0.1:3949': '' },
+      bridgeApiKeys: { 'http://127.0.0.1:3948': 'sk-preview-bridge' }, activeModel: 'http://127.0.0.1:3948',
+      apiStyle: 'chat', temperature: null, maxTokens: 0,
+    },
     llm1: { type: 'llm', alias: 'My OpenAI', baseUrl: 'https://api.openai.com', apiKey: 'sk-preview', model: 'gpt-4o', apiStyle: 'chat', temperature: null, maxTokens: 0 },
     llm2: { type: 'llm', alias: 'Local Ollama', baseUrl: 'http://127.0.0.1:11434', apiKey: '', model: 'qwen3:32b', apiStyle: 'chat', temperature: null, maxTokens: 0 },
   },
