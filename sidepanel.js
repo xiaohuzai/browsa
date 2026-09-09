@@ -3911,6 +3911,7 @@ let lastReplyKey = null;         // {name, model} of the provider that wrote the
 async function renderHistory() {
   if (historyUpgradeIO) { historyUpgradeIO.disconnect(); historyUpgradeIO = null; }
   messagesEl.innerHTML = '';
+  messagesEl.classList.remove('cv-settled');
   const { history } = await chrome.storage.local.get('history');
   const list = Array.isArray(history) ? history : [];
   nextHistoryIdx = list.length; // keep local mirror in sync with storage
@@ -3964,6 +3965,12 @@ async function renderHistory() {
   // even before the full upgrade resolves.
   addCodeCopyButtons();
   scrollToBottom(true);
+  scrollToBottom(true);
+  // cv 延迟到首帧稳定后生效（两次 rAF）：初始渲染与滚动定位期间绝不启用——
+  // cv 的占位高度会拖慢首开、并把 scrollToBottom 的落点算错（指南明写的反模式）。
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    messagesEl.classList.add('cv-settled');
+  }));
   // Whether this conversation carries a video transcript decides the
   // transcript-drawer button's visibility — rescan after every history load.
   refreshTranscriptSource();
