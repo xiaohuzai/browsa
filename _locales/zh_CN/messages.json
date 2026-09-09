@@ -383,6 +383,10 @@
     "message": "设置",
     "description": "Options page subtitle"
   },
+  "guideLinkText": {
+    "message": "使用指南",
+    "description": "Settings header: link to the usage-guide website"
+  },
   "providersHeading": {
     "message": "AI 服务商",
     "description": "Options: providers card heading"
@@ -684,8 +688,36 @@
     "description": "Options: opencode server setup tip"
   },
   "bridgeTip": {
-    "message": "先在本机终端启动本地桥（需已安装 codex CLI：ChatGPT 订阅登录、API key 或自定义 provider 均可）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），在仓库目录运行 <code>node cli.mjs codex --port 3948</code>，然后把桥的地址填到这里。用法见其 README。",
+    "message": "本地桥的安装与启动见 <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge 文档</a>。一行填一个桥地址。",
     "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "API Key（可选）",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "未设置",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "「$1」未配置，已切换到「$2」",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ 添加 Agent",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "别名（留空，Ping 后自动发现）",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "移除此地址",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "先添加至少一个桥地址再 Ping。",
+    "description": "Options: bridge ping with zero endpoints"
   },
   "systemPromptSaved": {
     "message": "系统提示词已保存。",

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { providerModelList, resolveChatModel } from '../lib/handlers/provider-resolver.js';
+import { providerModelList, resolveChatModel, resolveBridgeApiKey } from '../lib/handlers/provider-resolver.js';
 
 test('providerModelList: models 全量列表优先，缺失/为空回退 model 字段', () => {
   assert.deepEqual(providerModelList({ models: ['a', 'b'], model: 'a' }), ['a', 'b']);
@@ -43,4 +43,26 @@ test('resolveChatModel: activeModel 不属于该 provider → 回退（防跨网
 test('resolveChatModel: Agent 卡（Hermes，无模型字段）返回空串', () => {
   assert.equal(resolveChatModel({ model: '' }, { activeModel: '' }), '');
   assert.equal(resolveChatModel({ model: '', models: [] }, { activeModel: 'x' }), '');
+});
+
+test('resolveBridgeApiKey: bridgeApiKeys 非空时是权威——缺失端点即无 key，绝不串用别的桥的 token', () => {
+  const provider = {
+    apiKey: 'first-bridge-token', // = 首个端点的 key（saveCard 同步写入）
+    bridgeApiKeys: { 'http://a:1': 'token-a' },
+  };
+  assert.equal(resolveBridgeApiKey(provider, 'http://a:1'), 'token-a');
+  assert.equal(
+    resolveBridgeApiKey(provider, 'http://b:2'),
+    '',
+    'B 桥不在表里 = 无 key；回落到卡级 apiKey 会把 A 桥的 token 发给 B 桥',
+  );
+  assert.equal(resolveBridgeApiKey(provider, ''), '');
+});
+
+test('resolveBridgeApiKey: 老配置（无 bridgeApiKeys）回落卡级 apiKey——单 key 时代对所有端点生效', () => {
+  const legacy = { apiKey: 'shared-token' };
+  assert.equal(resolveBridgeApiKey(legacy, 'http://a:1'), 'shared-token');
+  assert.equal(resolveBridgeApiKey(legacy, 'http://b:2'), 'shared-token');
+  assert.equal(resolveBridgeApiKey({ bridgeApiKeys: {} }, 'http://a:1'), '', '空表且无卡级 key → 空串');
+  assert.equal(resolveBridgeApiKey(undefined, 'http://a:1'), '', '防御 undefined');
 });

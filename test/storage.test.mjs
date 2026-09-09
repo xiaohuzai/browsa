@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PAGE_CONTEXT_PREFIX } from '../lib/constants.js';
+import { BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
 
 function makeStorageArea() {
   let store = {};
@@ -64,6 +65,22 @@ test('getAll() returns full defaults when storage is empty', async () => {
   assert.equal(all.providers.compatible, undefined, 'no OpenAI-compatible preset — LLM providers are user-added');
   assert.equal(all.providers.anthropic, undefined, 'no Anthropic preset — LLM providers are user-added');
   assert.equal(all.providers['llm-1'], undefined, 'no default LLM card — the LLM group starts empty and is filled via Add Provider');
+});
+
+test('getAll() migrates the legacy "Agent Bridge" default alias to the shared label', async () => {
+  reset();
+  localArea.set({ providers: { bridge: { alias: 'Agent Bridge' } } });
+  const all = await storage.getAll();
+  assert.equal(all.providers.bridge.alias, BRIDGE_CARD_LABEL,
+    '旧默认名读时归一——老用户不必重配就看到 Codex / Claude Code 的卖点');
+  assert.equal(all.providers.bridge.isBridge, true, '其余默认字段不受影响');
+});
+
+test('getAll() never overwrites a user-set bridge alias', async () => {
+  reset();
+  localArea.set({ providers: { bridge: { alias: 'My Local Bridge' } } });
+  const all = await storage.getAll();
+  assert.equal(all.providers.bridge.alias, 'My Local Bridge');
 });
 
 test('getAll() normalizes an ASR config saved for an uninstalled provider back to ark defaults', async () => {

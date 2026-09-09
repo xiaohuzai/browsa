@@ -89,12 +89,12 @@ npm run package      # → browsa-v<version>.zip
 [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的小型本地守护进程：把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当模型来源，无需另购模型 API：
 
 ```bash
-# 克隆 agent-bridge 仓库后，在仓库目录：
-node cli.mjs serve --config agents.example.json   # 多 agent：一桥一地址一端口
-node cli.mjs codex --port 3948                    # 或只起单个 codex
+npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
+cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
+agent-bridge serve                                # 每个 entry 一座桥，端口写在 agents.json 里
 ```
 
-打开 ⚙ 设置，选择 **Agent Bridge** 卡，Base URL 填桥的地址——**多个 agent 用逗号分隔**（每个地址一个 agent；Ping 后自动识别各 agent 的名字，侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
+打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
 
 </details>
 

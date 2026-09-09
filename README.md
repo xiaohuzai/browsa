@@ -89,12 +89,12 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 [agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as the model source — no separate model-API purchase needed:
 
 ```bash
-# from the cloned agent-bridge repo:
-node cli.mjs serve --config agents.example.json   # multi-agent: one bridge per address per port
-node cli.mjs codex --port 3948                    # or a single codex bridge
+npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
+cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
+agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Open ⚙ Settings, select the **Agent Bridge** card, fill Base URL with the bridge address — **comma-separate multiple agents** (one address per agent; Ping discovers each agent's name automatically, and the sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
+Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread. Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
 
 </details>
 

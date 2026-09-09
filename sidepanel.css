@@ -2555,14 +2555,16 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   opacity: 0.75;
 }
 
-/* 回复来源标注：沿用下拉框对该 provider/agent 的命名，恒显但克制 */
+/* 回复来源标注：沿用下拉框对该 provider/agent 的命名，恒显但克制。
+   位置跟随气泡顶端靠左（像「发信人」标签）——底端靠右读起来像元数据，
+   与习惯不符（2026-09-09 用户反馈）。 */
 .msg-provider {
   display: block;
   font-size: 9.5px;
   color: var(--fg-dim);
   opacity: 0.6;
-  margin-top: 4px;
-  text-align: right;
+  margin-bottom: 4px;
+  text-align: left;
   user-select: none;
 }
 .asr-mode-main { font-weight: 500; color: var(--fg); }

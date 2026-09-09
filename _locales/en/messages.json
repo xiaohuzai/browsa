@@ -383,6 +383,10 @@
     "message": "Settings",
     "description": "Options page subtitle"
   },
+  "guideLinkText": {
+    "message": "User guide",
+    "description": "Settings header: link to the usage-guide website"
+  },
   "providersHeading": {
     "message": "AI Providers",
     "description": "Options: providers card heading"
@@ -684,8 +688,36 @@
     "description": "Options: opencode server setup tip"
   },
   "bridgeTip": {
-    "message": "Run the local bridge in a terminal first (requires the codex CLI — a ChatGPT subscription login, an API key, or a custom provider all work): clone the agent-bridge repo (github.com/xiaohuzai/agent-bridge) and run <code>node cli.mjs codex --port 3948</code> from it, then fill in the bridge's address here. See its README.",
+    "message": "See the <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge docs</a> for installing and running the local bridge. One bridge address per row.",
     "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "API key (optional)",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "Not set",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "\"$1\" is not configured — switched to \"$2\"",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ Add agent",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "Alias (leave empty — Ping auto-fills it)",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "Remove this address",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "Add at least one bridge address before pinging.",
+    "description": "Options: bridge ping with zero endpoints"
   },
   "systemPromptSaved": {
     "message": "System prompt saved.",

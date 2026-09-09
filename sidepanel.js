@@ -684,17 +684,21 @@ async function handleSelectionAction(action, text) {
 
 
 let cachedProviders = {};
+// 一次性自愈标记：activeProvider 未配置时的自动切换只发一次（见 populateProviderSelect）。
+let _activeProviderRepairSent = false;
 
 function populateProviderSelect(cfg) {
   cachedProviders = cfg.providers || {};
   const pingStates = cfg.pingStates || {};
+  // 只列「已配置」的 provider（2026-09-09 用户要求）：Hermes / OpenCode / Agent
+  // Bridge 出厂就带着空 baseUrl 的卡，未配置时留在下拉里只是噪音——选中它只会
+  // 以「Base URL is not set」失败。bridge 卡的 baseUrl = 首个端点，同一判据。
+  const isConfigured = (name) => !!String(cfg.providers?.[name]?.baseUrl || '').trim();
   // Reachable providers first (stable sort — ties keep their original
   // relative order), so a provider you've actually verified works doesn't
-  // get buried below ones that are merely configured-but-unverified or
-  // unconfigured. "Configured" (has a baseUrl) isn't a strong enough signal
-  // on its own — reachability (ping state) is, so that's what drives both
-  // the sort and the status label below.
+  // get buried below ones that are merely configured-but-unverified.
   const providers = Object.keys(cfg.providers || {})
+    .filter(isConfigured)
     .map((name, i) => ({ name, i }))
     .sort((a, b) => {
       const ar = pingStates[a.name] === 'reachable' ? 0 : 1;
@@ -703,6 +707,16 @@ function populateProviderSelect(cfg) {
     })
     .map(({ name }) => name);
   providerSel.innerHTML = '';
+  if (!providers.length) {
+    // 一个都没配置：留一个禁用的占位项。空 <select> 看起来像坏了，而且不告诉
+    // 用户下一步该做什么。
+    const opt = document.createElement('option');
+    opt.disabled = true;
+    opt.selected = true;
+    opt.textContent = _t('providerNoneConfigured', '未设置');
+    providerSel.appendChild(opt);
+    return;
+  }
   // LLM 卡（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按「Alias · model」
   // 展示——一张网关卡（方舟 Coding / 兼容网关动辄几十个模型）不用为每个模型建卡；
   // 单模型卡同样带 Model ID 后缀，一眼看到当前用的模型。bridge 卡同构地按端点
@@ -718,10 +732,8 @@ function populateProviderSelect(cfg) {
     // bridge 卡：models 槽存的是端点 URL（一地址一 agent），同样逐个展开；
     // 展示名用 Ping 时 /health 发现的 agent 名（alias），未 Ping 过用 host:port 兜底。
     const modelList = ((pcfg.type || 'llm') === 'llm' || isBridgeCard) && models.length ? models : [''];
-    const configured = !!(pcfg?.baseUrl?.trim());
     let status;
-    if (!configured)               status = _t('statusNotSet', 'not set');
-    else if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
+    if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
     else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
     else                           status = _t('statusNotPinged', 'not pinged');
     for (const model of modelList) {
@@ -731,6 +743,8 @@ function populateProviderSelect(cfg) {
       opt.dataset.model = model;
       opt.dataset.display = suffix ? `${display} · ${suffix}` : display;
       opt.textContent = suffix ? `${display} · ${suffix} — ${status}` : `${display} — ${status}`;
+      // 窄侧栏里原生 select 会把长标签截断，title 让悬停能看到全名。
+      opt.title = opt.textContent;
       if (name === cfg.activeProvider) {
         if ((model || '') === String(cfg.activeModel || '')) { opt.selected = true; anySelected = true; }
         else if (!activeFallback) activeFallback = opt;
@@ -739,6 +753,25 @@ function populateProviderSelect(cfg) {
     }
   }
   if (!anySelected && activeFallback) activeFallback.selected = true;
+  // 存储里的 activeProvider 未配置（出厂默认 hermes，或它的 baseUrl 刚被清空）：
+  // 它本来就用不了，落到第一个已配置项并写回存储——否则下拉显示 A 而实际请求走
+  // B，每轮都以「Base URL is not set」失败。这是修复无效状态（ping 通首项时
+  // pingCard 也会做同样的自动切换），不是替用户改偏好。
+  if (providers.includes(cfg.activeProvider)) {
+    _activeProviderRepairSent = false; // 状态恢复合法：下次再失配仍可自愈
+  } else {
+    const first = providerSel.options[0];
+    if (first) {
+      first.selected = true;
+      if (!_activeProviderRepairSent) {
+        _activeProviderRepairSent = true;
+        const oldLabel = displayProviderName(cfg.activeProvider, cfg.providers?.[cfg.activeProvider]);
+        sendMessage({ type: 'SET_ACTIVE_PROVIDER', name: first.value, model: first.dataset.model || '' })
+          .then((res) => { if (!res?.ok) _activeProviderRepairSent = false; });
+        showToast(tSub('providerSwitchedUnconfigured', '「$1」未配置，已切换到「$2」', oldLabel, first.dataset.display), 'info');
+      }
+    }
+  }
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
@@ -3726,16 +3759,16 @@ function renderChoiceRequest(bubbleEl, req) {
 // using the SAME label the sidebar dropdown shows for the selection
 // (lib/provider-display.js). Stamped by the background on the assistant
 // history entry + DONE chunk + stream state; added here on history render
-// and on DONE. Must survive the async renderSafe upgrade (it wipes
+// and on DONE. Sits at the TOP-LEFT of the bubble like a sender label (a
+// footer at the bottom-right read as metadata and surprised users) — so it
+// is PREPENDED, and must survive the async renderSafe upgrade (it wipes
 // innerHTML) — same re-add discipline as .msg-actions.
 function addProviderLabel(el, label) {
   if (!label || el.querySelector('.msg-provider')) return;
   const chip = document.createElement('span');
   chip.className = 'msg-provider';
   chip.textContent = label;
-  const actions = el.querySelector('.msg-actions');
-  if (actions) el.insertBefore(chip, actions);
-  else el.appendChild(chip);
+  el.insertBefore(chip, el.firstChild);
 }
 
 function appendMsgAction(bubbleEl, label, onClick, icon) {
