@@ -8,6 +8,17 @@
    指南页再加 <link docs.css>（三栏布局层）。
    ───────────────────────────────────────────────────────────────────────── */
 
+/* ─── 品牌字标字体 ──────────────────────────────────────────────────────────
+   Space Grotesk（几何无衬线，OFL，随站打包）：字标专用。替代原 mono 字标——
+   保留全小写 + 疏排处理，但读作「产品」而非「终端」。代码/时间戳等 accent
+   场景仍用 --mono（终端口音保留在 accent 层，不再承担品牌）。
+   相对路径以本文件为准 → docs/fonts/SpaceGrotesk.ttf，官网与 store mockup 共用。 */
+@font-face{
+  font-family:'Space Grotesk';
+  src:url('fonts/SpaceGrotesk.ttf') format('truetype');
+  font-weight:300 700;font-style:normal;font-display:swap;
+}
+
 /* ─── 主题令牌 ───────────────────────────────────────────────────────────── */
 :root{
   /* 复刻 mkdocs-material 默认色板：白 primary + deep-orange accent */
@@ -172,7 +183,7 @@ html[data-md-color-scheme="slate"] .md-header__icon .i-moon{display:none}
 .md-footer__copy .brandline{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .md-footer__copy .brandline img{width:18px;height:18px;border-radius:4px}
 .md-footer__copy .brandline .wordmark{
-  font-family:var(--mono);font-size:13px;font-weight:700;color:var(--md-fg);
+  font-family:'Space Grotesk',var(--mono);font-size:13px;font-weight:700;color:var(--md-fg);
 }
 .md-footer__copy a{color:var(--md-link);text-decoration:none}
 .md-footer__copy a:hover{color:var(--md-link-hover);text-decoration:underline;text-underline-offset:2px}
@@ -428,7 +439,7 @@ html[data-md-color-scheme="slate"] .md-header__icon .i-moon{display:none}
 .p-status{width:6px;height:6px;border-radius:50%;background:var(--mark-lit);flex-shrink:0;animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
 .p-wordmark{
-  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.09em;
+  font-family:'Space Grotesk',var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.05em;
   color:var(--mark-lit);flex-shrink:0;
 }
 .p-provider{
