@@ -54,9 +54,16 @@ const FAKE_HISTORY = [
   {
     role: 'assistant',
     content: '## Flow Matching\n\nA generative modeling technique.\n\n| Method | Score |\n|---|---|\n| FM | 0.9 |\n\n```python\nx = 1\n```',
+    providerLabel: '方舟 Coding · glm-5.3-flash',
+    providerKey: { name: 'llm-1', model: 'glm-5.3-flash' },
   },
   { role: 'user', content: 'Q2: how does it compare to diffusion?' },
-  { role: 'assistant', content: 'Flow matching is generally **faster** than diffusion models.' },
+  {
+    role: 'assistant',
+    content: 'Flow matching is generally **faster** than diffusion models.',
+    providerLabel: '方舟 Coding · glm-5.3-flash',
+    providerKey: { name: 'llm-1', model: 'glm-5.3-flash' },
+  },
 ];
 
 let lastChatPort = null;
@@ -106,6 +113,20 @@ test('renderHistory(): assistant bubbles still have their .msg-actions (copy/rep
   for (const el of assistantMsgs) {
     assert.ok(el.querySelector('.msg-actions'), 'each assistant bubble must still have its .msg-actions row after the async upgrade replaced innerHTML');
     assert.ok(el.querySelector('.msg-actions button'), 'the actions row must contain actual buttons, not just an empty wrapper');
+  }
+});
+
+test('renderHistory(): reply-source chip sits at the TOP-LEFT of the bubble and survives the async upgrade', () => {
+  // 2026-09-09 用户反馈：来源标注在气泡底端靠右像元数据、与习惯不符——按
+  // 「发信人标签」的惯例放到顶端靠左（气泡的第一个元素子节点）。异步升级
+  // 会 el.innerHTML 清空，芯片必须随之重新前置（与 .msg-actions 同一纪律）。
+  const assistantMsgs = [...messagesEl.querySelectorAll('.msg.assistant')];
+  assert.equal(assistantMsgs.length, 2);
+  for (const el of assistantMsgs) {
+    const chip = el.querySelector('.msg-provider');
+    assert.ok(chip, '每个 assistant 气泡都带来源芯片');
+    assert.equal(el.firstElementChild, chip, '芯片是气泡第一个元素子节点 = 顶端靠左');
+    assert.equal(chip.textContent, '方舟 Coding · glm-5.3-flash');
   }
 });
 

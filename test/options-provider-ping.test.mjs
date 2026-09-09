@@ -21,6 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
+import { BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
 
 // --------------- direct tests of lib/llm-client.js's ping()/getCapabilities() ---
 
@@ -337,12 +338,20 @@ test('options.js: init() renders the fixed agent cards plus a reserved empty LLM
   assert.equal(cards.length, 4, 'Hermes Agent + OpenCode Agent + Agent Bridge (three fixed agent cards) + one reserved empty LLM slot');
   assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes Agent card present');
   assert.equal(findProviderCard('OpenCode Agent') != null, true, 'OpenCode Agent card present');
-  assert.equal(findProviderCard('Agent Bridge') != null, true, 'Agent Bridge card present');
+  assert.equal(findProviderCard(BRIDGE_CARD_LABEL) != null, true, 'Agent Bridge card present');
   const reserved = document.querySelector('.provider.reserved');
   assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
   assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
   assert.equal(reserved.querySelector('[data-act="delete"]'), null, 'the reserved slot has no delete button (nothing persisted yet)');
   assert.equal(document.querySelector('.add-provider-btn') != null, true, 'Add Provider button is always present — even with the reserved slot');
+});
+
+test('options.js: settings header carries the usage-guide link (zh site by default, new tab)', () => {
+  const a = document.getElementById('guideLink');
+  assert.ok(a, 'guide link present in the settings page header');
+  assert.equal(a.href, 'https://xiaohuzai.github.io/browsa/guide/', 'default href points at the zh guide site');
+  assert.equal(a.target, '_blank', 'opens in a new tab so settings stay put');
+  assert.equal(a.rel, 'noopener noreferrer');
 });
 
 test('options.js: configuring + saving the reserved slot does NOT auto-create an extra empty card', async () => {
@@ -359,13 +368,13 @@ test('options.js: configuring + saving the reserved slot does NOT auto-create an
 
   assert.equal(document.querySelector('.provider.reserved'), null, 'the reserved slot is consumed once a provider is committed');
   const names = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(names, ['Hermes Agent', 'OpenCode Agent', 'Agent Bridge', 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
+  assert.deepEqual(names, ['Hermes Agent', 'OpenCode Agent', BRIDGE_CARD_LABEL, 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
 
   // Now an explicit Add appends a new card BELOW the configured one.
   clickAddProvider();
   await new Promise((r) => setTimeout(r, 10));
   const after = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(after, ['Hermes Agent', 'OpenCode Agent', 'Agent Bridge', 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
+  assert.deepEqual(after, ['Hermes Agent', 'OpenCode Agent', BRIDGE_CARD_LABEL, 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
   const added = providerCards()[providerCards().length - 1];
   assert.ok(added.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
 });
@@ -635,26 +644,93 @@ test('options.js: re-pinging an already-reachable provider does not steal active
   assert.equal(second.length, 0, 're-pinging an already-reachable provider must not change the active provider');
 });
 
-// ─── Agent Bridge multi-endpoint card (serve mode: one address per agent) ────
+// ─── Agent Bridge multi-endpoint card (per-row editor: URL + alias + ＋) ─────
+//
+// The bridge card models serve mode (one bridge per agent, one address per
+// agent) as ROWS — one row = one bridge address + an optional alias — added
+// one by one via ＋, mirroring the LLM card's Model ID chips editor. Storage
+// shape is unchanged: cfg.models = endpoint URL list (shared slot with
+// multi-model LLM cards), cfg.model/cfg.baseUrl = first endpoint,
+// cfg.bridgeAgents = {url: alias}. Aliases are WYSIWYG: a typed alias is
+// sticky, an empty one is filled by Ping's /health discovery.
 
-function bridgeCard() { return findProviderCard('Agent Bridge'); }
-
-test('options.js: bridge Base URL normalizes a comma-separated endpoint list into models + first-url fields', async () => {
-  const card = bridgeCard();
-  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948/, 127.0.0.1:3949, http://127.0.0.1:3948';
+function bridgeCard() { return findProviderCard(BRIDGE_CARD_LABEL); }
+function bridgeRows(card) { return [...card.querySelectorAll('.bridge-row')]; }
+function rowUrl(row) { return row.querySelector('[data-bridge-url]'); }
+function rowAlias(row) { return row.querySelector('[data-bridge-alias]'); }
+function rowKey(row) { return row.querySelector('[data-bridge-key]'); }
+function clickBridgeAdd(card) {
+  card.querySelector('[data-act="bridge-add"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+}
+function saveBridge(card) {
   card.querySelector('button[data-act="save"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
-  const providersSet = setCalls.filter((c) => c.providers).pop();
-  const bridge = providersSet.providers.bridge;
-  assert.deepEqual(bridge.models, ['http://127.0.0.1:3948', 'http://127.0.0.1:3949'], 'split + scheme-fill + dedupe, order kept');
+  return new Promise((r) => setTimeout(r, 20));
+}
+function pingBridgeCard(card) {
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  return new Promise((r) => setTimeout(r, 20));
+}
+function lastBridgeSet() {
+  return setCalls.filter((c) => c.providers).pop().providers.bridge;
+}
+function resetBridgeRows(card) {
+  // All bridge tests share ONE options.js module instance (and one DOM):
+  // rows persist across tests, so every test starts by wiping row state back
+  // to the never-configured single empty row. Clicking ✕ on the last
+  // remaining row replaces it with a fresh empty one (production semantics),
+  // so clicking the first row's ✕ in a loop always terminates.
+  for (;;) {
+    const rows = bridgeRows(card);
+    if (rows.length === 1 && !rowUrl(rows[0]).value && !rowAlias(rows[0]).value && !rowKey(rows[0]).value) return;
+    rows[0].querySelector('[data-act="bridge-remove"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  }
+}
+
+test('options.js: bridge rows normalize into models + first-url fields (＋ adds, scheme fill, dedupe, alias saved)', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  // Fresh card renders exactly one (empty) row.
+  assert.equal(bridgeRows(card).length, 1, 'a never-configured bridge card renders one empty row');
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948/';
+  // ＋ appends one row per click, each focusable for immediate typing.
+  clickBridgeAdd(card);
+  let rows = bridgeRows(card);
+  assert.equal(rows.length, 2, '＋ appends one row');
+  rowUrl(rows[1]).value = '127.0.0.1:3949';
+  rowAlias(rows[1]).value = 'claude code';
+  // A duplicate of row 1 (same normalized URL) dedupes away on save.
+  clickBridgeAdd(card);
+  rows = bridgeRows(card);
+  assert.equal(rows.length, 3, 'second ＋ appends another row');
+  rowUrl(rows[2]).value = 'http://127.0.0.1:3948';
+  await saveBridge(card);
+  const bridge = lastBridgeSet();
+  assert.deepEqual(bridge.models, ['http://127.0.0.1:3948', 'http://127.0.0.1:3949'], 'normalize + scheme fill + dedupe, row order kept');
   assert.equal(bridge.model, 'http://127.0.0.1:3948', 'model = first endpoint (legacy consumers)');
   assert.equal(bridge.baseUrl, 'http://127.0.0.1:3948', 'baseUrl = first endpoint (resolveProvider guard)');
-  // the input re-render keeps the joined form for display
+  assert.deepEqual(bridge.bridgeAgents, { 'http://127.0.0.1:3949': 'claude code' }, 'typed alias persisted per endpoint URL');
 });
 
-test('options.js: bridge Ping probes EVERY endpoint and persists discovered aliases', async () => {
+test('options.js: bridge row ✕ removes the row; removing the last row yields a fresh empty one', async () => {
   const card = bridgeCard();
-  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  clickBridgeAdd(card);
+  assert.equal(bridgeRows(card).length, 2);
+  bridgeRows(card)[0].querySelector('[data-act="bridge-remove"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(bridgeRows(card).length, 1, '✕ removes exactly its own row');
+  assert.equal(rowUrl(bridgeRows(card)[0]).value, '', 'the surviving row is the previously added one');
+  bridgeRows(card)[0].querySelector('[data-act="bridge-remove"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(bridgeRows(card).length, 1, 'card never renders rowless');
+  assert.equal(rowUrl(bridgeRows(card)[0]).value, '', 'the replacement row is empty');
+});
+
+test('options.js: bridge Ping probes EVERY endpoint, persists discovered aliases, and fills empty alias inputs', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
   const hitUrls = [];
   globalThis.fetch = async (url) => {
     const u = String(url);
@@ -665,32 +741,55 @@ test('options.js: bridge Ping probes EVERY endpoint and persists discovered alia
     }
     return { ok: false, status: 404 };
   };
-  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
+  await pingBridgeCard(card);
 
   assert.equal(hitUrls.filter((u) => u.includes(':3948')).length, 1, 'each endpoint pinged exactly once');
   assert.equal(hitUrls.filter((u) => u.includes(':3949')).length, 1);
   assert.match(card.querySelector('.card-status').textContent, /×2\/2 healthy \(codex, claude\)/);
-  const providersSet = setCalls.filter((c) => c.providers).pop();
-  const bridge = providersSet.providers.bridge;
+  const bridge = lastBridgeSet();
   assert.deepEqual(bridge.bridgeAgents, {
     'http://127.0.0.1:3948': 'codex',
     'http://127.0.0.1:3949': 'claude',
   }, 'aliases from /health.agent persisted per endpoint URL');
+  assert.equal(rowAlias(bridgeRows(card)[0]).value, 'codex', 'discovered alias written back into the empty input');
+  assert.equal(rowAlias(bridgeRows(card)[1]).value, 'claude');
   const pingSet = setCalls.filter((c) => c.pingStates).pop();
   assert.equal(pingSet.pingStates.bridge, 'reachable');
 });
 
+test('options.js: bridge Ping never overwrites a typed alias — discovery fills only EMPTY rows', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  rowAlias(bridgeRows(card)[0]).value = 'my codex';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    const agent = u.includes(':3948') ? 'codex' : 'claude';
+    return { ok: true, json: async () => ({ ok: true, agent }) };
+  };
+  await pingBridgeCard(card);
+  const bridge = lastBridgeSet();
+  assert.deepEqual(bridge.bridgeAgents, {
+    'http://127.0.0.1:3948': 'my codex',
+    'http://127.0.0.1:3949': 'claude',
+  }, 'typed alias wins over /health, empty row gets the discovered name');
+  assert.match(card.querySelector('.card-status').textContent, /healthy \(my codex, claude\)/, 'status line shows the effective aliases');
+});
+
 test('options.js: bridge Ping stays reachable when SOME endpoints are down (×N/M + down note)', async () => {
   const card = bridgeCard();
-  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
   globalThis.fetch = async (url) => {
     const u = String(url);
     if (u.includes(':3948/health')) return { ok: true, json: async () => ({ ok: true, agent: 'codex' }) };
     return { ok: false, status: 500 };
   };
-  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
+  await pingBridgeCard(card);
   assert.match(card.querySelector('.card-status').textContent, /×1\/2 healthy \(codex\) — 1 down/);
   const pingSet = setCalls.filter((c) => c.pingStates).pop();
   assert.equal(pingSet.pingStates.bridge, 'reachable', 'reachable ⇔ at least one endpoint answers');
@@ -698,11 +797,98 @@ test('options.js: bridge Ping stays reachable when SOME endpoints are down (×N/
 
 test('options.js: bridge Ping fails only when NO endpoint answers (shared error path)', async () => {
   const card = bridgeCard();
-  card.querySelector('[data-k="baseUrl"]').value = 'http://127.0.0.1:3948, http://127.0.0.1:3949';
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
   globalThis.fetch = async () => ({ ok: false, status: 500 });
-  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
+  await pingBridgeCard(card);
   assert.match(card.querySelector('.card-status').textContent, /❌/);
   const pingSet = setCalls.filter((c) => c.pingStates).pop();
   assert.equal(pingSet.pingStates.bridge, 'unreachable');
+});
+
+test('options.js: bridge Ping with zero endpoints fails fast with an instructional error (no "at undefined")', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  for (const row of bridgeRows(card)) rowUrl(row).value = '';
+  globalThis.fetch = async () => { throw new Error('must not be called'); };
+  await pingBridgeCard(card);
+  assert.match(card.querySelector('.card-status').textContent, /❌ .+/);
+  assert.doesNotMatch(card.querySelector('.card-status').textContent, /undefined/, 'no leaked "no agent-bridge at undefined"');
+  const pingSet = setCalls.filter((c) => c.pingStates).pop();
+  assert.equal(pingSet.pingStates.bridge, 'unreachable');
+});
+
+test('options.js: each bridge row saves ITS OWN api key (bridgeApiKeys map, card apiKey = first)', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  rowKey(bridgeRows(card)[0]).value = 'token-codex';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
+  rowKey(bridgeRows(card)[1]).value = 'token-claude';
+  await saveBridge(card);
+  const bridge = lastBridgeSet();
+  assert.deepEqual(bridge.bridgeApiKeys, {
+    'http://127.0.0.1:3948': 'token-codex',
+    'http://127.0.0.1:3949': 'token-claude',
+  }, '每端点各存各的 token');
+  assert.equal(bridge.apiKey, 'token-codex', '卡级 apiKey = 首个端点的 key（老消费方/老配置兜底）');
+});
+
+test('options.js: bridge Ping authenticates each endpoint with ITS OWN key (no token leaking across bridges)', async () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  rowUrl(bridgeRows(card)[0]).value = 'http://127.0.0.1:3948';
+  rowKey(bridgeRows(card)[0]).value = 'token-codex';
+  clickBridgeAdd(card);
+  rowUrl(bridgeRows(card)[1]).value = 'http://127.0.0.1:3949';
+  rowKey(bridgeRows(card)[1]).value = 'token-claude';
+  const auth = {};
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    auth[u] = opts?.headers?.Authorization || '';
+    return { ok: true, json: async () => ({ ok: true, agent: u.includes(':3948') ? 'codex' : 'claude' }) };
+  };
+  await pingBridgeCard(card);
+  assert.equal(auth['http://127.0.0.1:3948/health'], 'Bearer token-codex');
+  assert.equal(auth['http://127.0.0.1:3949/health'], 'Bearer token-claude');
+});
+
+test('options.js: bridge row eye toggles only that row\'s key field', () => {
+  const card = bridgeCard();
+  resetBridgeRows(card);
+  rowKey(bridgeRows(card)[0]).value = 'secret';
+  const eye = bridgeRows(card)[0].querySelector('[data-act="bridge-key-eye"]');
+  assert.equal(rowKey(bridgeRows(card)[0]).type, 'password');
+  eye.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(rowKey(bridgeRows(card)[0]).type, 'text', '眼睛显示明文');
+  eye.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(rowKey(bridgeRows(card)[0]).type, 'password', '再点回密码框');
+});
+
+test('options.js: legacy comma-joined bridge baseUrl (config saved before the row editor) renders one row per address', async () => {
+  // A config saved by the pre-#112 comma-separated Base URL input has the
+  // URL list ONLY in baseUrl (no models array). The row editor splits it for
+  // display so the user sees one row per address instead of the joined blob.
+  storedData.providers = {
+    bridge: { type: 'agent', alias: 'Agent Bridge', isBridge: true, baseUrl: 'http://127.0.0.1:3948, 127.0.0.1:3949', apiKey: 'shared-token', model: '' },
+  };
+  // Cache-busted re-import = fresh module state rendering from seeded storage
+  // (options.js has zero exports; every earlier test's DOM refs belong to the
+  // first module instance — this test is self-contained and last in file).
+  await import('../options.js?legacy-render=1');
+  await new Promise((r) => setTimeout(r, 50));
+  const card = bridgeCard();
+  assert.deepEqual(
+    bridgeRows(card).map((row) => rowUrl(row).value),
+    ['http://127.0.0.1:3948', '127.0.0.1:3949'],
+    'comma string split into one row per address'
+  );
+  assert.deepEqual(
+    bridgeRows(card).map((row) => rowKey(row).value),
+    ['shared-token', 'shared-token'],
+    'single-key 时代的一个 key 对所有端点生效——渲染时预填到每一行，行为不变直到用户逐行修改'
+  );
 });

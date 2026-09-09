@@ -200,3 +200,59 @@ test('bridge 卡按端点展开：alias 后缀（/health 发现），未知 alia
   storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
   await new Promise((r) => setTimeout(r, 20));
 });
+
+// ─── 未配置的 provider 不出现在下拉框（2026-09-09 用户要求） ──────────────────
+
+test('下拉框只列已配置的 provider：出厂默认的 hermes/opencode/bridge（空 baseUrl）不再出现', async () => {
+  fakeCfg.providers = {
+    hermes: { baseUrl: '' },                                        // 出厂默认，未配置
+    opencode: { type: 'agent', isOpencode: true, baseUrl: '' },
+    bridge: { type: 'agent', isBridge: true, baseUrl: '', models: [] },
+    'llm-1': { alias: '已配置网关', baseUrl: 'http://gw.example.com/v1', model: 'm1', models: ['m1'] },
+  };
+  fakeCfg.pingStates = {};
+  fakeCfg.activeProvider = 'llm-1';
+  fakeCfg.activeModel = 'm1';
+  storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.deepEqual([...providerSel.options].map((o) => o.value), ['llm-1'],
+    '未配置的卡（选中只会以「Base URL is not set」失败）不再是下拉噪音');
+});
+
+test('一个都没配置：下拉框留一个禁用的引导占位项，而不是空下拉', async () => {
+  fakeCfg.providers = {
+    hermes: { baseUrl: '' },
+    opencode: { type: 'agent', isOpencode: true, baseUrl: '' },
+  };
+  fakeCfg.activeProvider = 'hermes';
+  fakeCfg.activeModel = '';
+  storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
+  await new Promise((r) => setTimeout(r, 20));
+
+  const opts = [...providerSel.options];
+  assert.equal(opts.length, 1, '空 <select> 看起来像坏了——给一个占位项');
+  assert.equal(opts[0].disabled, true, '占位项不可选');
+  assert.equal(opts[0].selected, true);
+  assert.equal(opts[0].textContent, '未设置', '占位文案就两个字，不啰嗦');
+});
+
+test('activeProvider 未配置但存在已配置项：自动切到第一个已配置项并写回存储', async () => {
+  fakeCfg.providers = {
+    hermes: { baseUrl: '' },                                        // 出厂默认，未配置
+    'llm-1': { alias: '已配置网关', baseUrl: 'http://gw.example.com/v1', model: 'm1', models: ['m1'] },
+  };
+  fakeCfg.pingStates = {};
+  fakeCfg.activeProvider = 'hermes';
+  fakeCfg.activeModel = '';
+  sent.length = 0;
+  storageListener({ providers: { newValue: fakeCfg.providers } }, 'local');
+  await new Promise((r) => setTimeout(r, 20));
+
+  const sel = providerSel.options[providerSel.selectedIndex];
+  assert.equal(sel.value, 'llm-1', '落到第一个已配置项');
+  const msg = sent.find((m) => m.type === 'SET_ACTIVE_PROVIDER');
+  assert.ok(msg, '必须写回存储——否则下拉显示 A 而实际请求走 B，每轮都失败');
+  assert.equal(msg.name, 'llm-1');
+  assert.equal(msg.model, 'm1');
+});

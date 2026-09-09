@@ -5,13 +5,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { providerDisplayName, providerEntrySuffix, providerEntryLabel } from '../lib/provider-display.js';
+import { providerDisplayName, providerEntrySuffix, providerEntryLabel, BRIDGE_DISPLAY_NAME, BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
 
 test('providerDisplayName — alias wins, fixed agents fall back, LLM N and capitalization', () => {
   assert.equal(providerDisplayName('llm-1', { alias: '方舟 Coding' }), '方舟 Coding');
   assert.equal(providerDisplayName('hermes', {}), 'Hermes Agent');
   assert.equal(providerDisplayName('llm-3', {}), 'LLM 3');
-  assert.equal(providerDisplayName('bridge', {}), 'Bridge');
+  assert.equal(providerDisplayName('bridge', {}), BRIDGE_DISPLAY_NAME, 'bridge 用共享的固定短名');
+  assert.equal(
+    providerDisplayName('bridge', { alias: BRIDGE_CARD_LABEL }),
+    BRIDGE_DISPLAY_NAME,
+    'bridge 的存储别名是设置卡上的长标签，下拉/回复芯片仍用短名（唯一忽略别名的卡）'
+  );
   assert.equal(providerDisplayName('llm-1', { alias: '   ' }), 'LLM 1', 'whitespace-only alias falls back');
 });
 

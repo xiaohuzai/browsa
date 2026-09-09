@@ -6,7 +6,8 @@ import { pingOpencode } from './lib/opencode-client.js';
 import { pingBridge, normalizeBridgeUrl } from './lib/bridge-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
-import { providerModelList } from './lib/handlers/provider-resolver.js';
+import { providerModelList, resolveBridgeApiKey } from './lib/handlers/provider-resolver.js';
+import { BRIDGE_CARD_LABEL } from './lib/provider-display.js';
 import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -46,9 +47,11 @@ async function init() {
   watchUiLang(() => {
     document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
     applyI18n();
+    syncGuideLink();
     renderProviders();
     syncAsrProviderUI();
   });
+  syncGuideLink();
 
   cachedCfg = await storage.getAll();
   Object.assign(_pingState, cachedCfg.pingStates || {});
@@ -80,8 +83,16 @@ async function init() {
   }
 }
 
-function applyChatPrefs(cfg) {
-  const fs = $('fontSize');
+// 使用指南链接随 UI 语言走：中文站 /guide/，英文站 /en/guide/。HTML 里已带
+// 中文站地址兜底（JS 未跑/字典未载时也可点），这里只做语言同步。
+function syncGuideLink() {
+  const a = document.getElementById('guideLink');
+  if (a) a.href = currentUiLang() === 'en'
+    ? 'https://xiaohuzai.github.io/browsa/en/guide/'
+    : 'https://xiaohuzai.github.io/browsa/guide/';
+}
+
+function applyChatPrefs(cfg) {  const fs = $('fontSize');
   const fsv = $('fontSizeVal');
   const val = cfg.fontSize ?? 13.5;
   if (fs) fs.value = val;
@@ -269,6 +280,57 @@ function renderProviders() {
   }
 }
 
+// One bridge endpoint row: URL + alias + its own API key (a bridge can require
+// its own token — loopback bridges usually need none) + remove. Shared
+// verbatim by the card render and the ＋ button (addBridgeRow) so the two
+// never drift. Two lines per row because the options page is 660px wide —
+// three inputs on one line would squeeze every field below legibility.
+function bridgeRowHtml(url, alias, apiKey) {
+  return `
+    <div class="bridge-row">
+      <div class="bridge-row-main">
+        <input data-bridge-url type="text" value="${escapeAttr(url)}" placeholder="http://127.0.0.1:3948" />
+        <button type="button" class="bridge-row-x" data-act="bridge-remove" title="${_t('bridgeRemoveTitle', '移除此地址')}" aria-label="${_t('bridgeRemoveTitle', '移除此地址')}">${ICON_CLOSE}</button>
+      </div>
+      <div class="bridge-row-sub">
+        <input data-bridge-alias type="text" value="${escapeAttr(alias)}" placeholder="${_t('bridgeAliasPlaceholder', '别名（留空，Ping 后自动发现）')}" />
+        <div class="apikey-wrap">
+          <input data-bridge-key type="password" value="${escapeAttr(apiKey)}" placeholder="${_t('bridgeKeyPlaceholder', 'API Key（可选）')}" autocomplete="off" />
+          <button type="button" class="bridge-key-eye" data-act="bridge-key-eye" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Per-endpoint API key for display: a bridgeApiKeys map (once any endpoint has
+// its own key) is authoritative — an endpoint missing from it has NO key. Only
+// a config without that map (single-key era) falls back to the card-level
+// apiKey, which applied to every endpoint back then.
+function bridgeRowApiKey(cfg, url) {
+  const map = cfg.bridgeApiKeys || {};
+  if (Object.keys(map).length) return map[url] || '';
+  return cfg.apiKey || '';
+}
+
+// Bridge endpoint rows source: cfg.models (the endpoints slot the bridge card
+// shares with multi-model LLM cards) first; a legacy comma-joined baseUrl
+// (config last saved before #112) splits as fallback. One row per endpoint,
+// always at least one (empty) row so the card never renders rowless.
+function bridgeEndpointRows(cfg) {
+  let urls = Array.isArray(cfg.models) ? cfg.models.map((s) => String(s).trim()).filter(Boolean) : [];
+  if (!urls.length) urls = String(cfg.baseUrl || '').split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+  const agents = cfg.bridgeAgents || {};
+  const rows = [...new Set(urls)].map((u) => ({ url: u, alias: agents[u] || '', apiKey: bridgeRowApiKey(cfg, u) }));
+  if (!rows.length) rows.push({ url: '', alias: '', apiKey: '' });
+  return rows;
+}
+
+function addBridgeRow(wrap, { url = '', alias = '', apiKey = '' } = {}) {
+  wrap.querySelector('.bridge-add').insertAdjacentHTML('beforebegin', bridgeRowHtml(url, alias, apiKey));
+  const rows = wrap.querySelectorAll('.bridge-row');
+  return rows[rows.length - 1];
+}
+
 function buildProviderCard(name, cfg, opts = {}) {
   const reserved = !!opts.reserved; // render-only empty slot (not yet persisted)
   const card = document.createElement('div');
@@ -284,10 +346,45 @@ function buildProviderCard(name, cfg, opts = {}) {
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
   const agentBaseUrlTip = !isAgent ? '' : cfg.isBridge
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '先在本机终端启动本地桥（需已安装 CLI agent）：克隆 agent-bridge 仓库（github.com/xiaohuzai/agent-bridge），运行 <code>node cli.mjs serve --config agents.example.json</code> 可同时启动多个 agent（codex、claude…一桥一地址一端口），或 <code>node cli.mjs codex --port 3948</code> 只起单个。这里填桥的地址，<b>多个地址用逗号分隔</b>（每个地址一个 agent，主页下拉逐个选择；Ping 后自动显示各 agent 的名字）。支持发图（截图/粘贴/PDF 图表，单条 ≤8 张、总 3MB）。用法见其 README。')}</span></span>`
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。')}</span></span>`
     : cfg.isOpencode
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
+
+  // Base URL field: a plain input for LLM/Hermes/opencode, a per-row endpoint
+  // editor (URL + alias per row, ＋ to add) for the bridge card. Precomputed
+  // OUTSIDE the card template on purpose — same V8 nested-conditional rule as
+  // agentBaseUrlTip above.
+  const agentPlaceholder = cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080';
+  const baseUrlField = isAgent && cfg.isBridge
+    ? `
+      <div class="field field-full">
+        <label><span>Base URL${agentBaseUrlTip}</span>
+          <div class="bridge-endpoints" data-bridge-endpoints>
+            ${bridgeEndpointRows(cfg).map(({ url, alias, apiKey }) => bridgeRowHtml(url, alias, apiKey)).join('')}
+            <button type="button" class="bridge-add" data-act="bridge-add">${_t('bridgeAddBtn', '＋ 添加 Agent')}</button>
+          </div>
+        </label>
+      </div>`
+    : `
+      <div class="field">
+        <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
+          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? agentPlaceholder : ''}" />
+        </label>
+      </div>`;
+
+  // API key field: bridge cards skip it — each endpoint row carries its own
+  // key (bridges can require different tokens; one card-level field was the
+  // user-reported flaw of the first row-editor pass).
+  const apiKeyField = isAgent && cfg.isBridge ? '' : `
+      <div class="field">
+        <label>${_t('apiKeyLabel', 'API key')}
+          <div class="apikey-wrap">
+            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
+            <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
+          </div>
+        </label>
+      </div>`;
 
   // Restore ping state from memory
   const pinged = _pingState[name];
@@ -307,19 +404,8 @@ function buildProviderCard(name, cfg, opts = {}) {
           <input data-k="alias" type="text" value="${escapeAttr(cfg.alias || '')}" placeholder="${_t('aliasPlaceholder', 'e.g. My OpenAI')}" />
         </label>
       </div>` : ''}
-      <div class="field">
-        <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
-          <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? (cfg.isBridge ? 'http://127.0.0.1:3948, http://127.0.0.1:3949' : cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080') : ''}" />
-        </label>
-      </div>
-      <div class="field">
-        <label>${_t('apiKeyLabel', 'API key')}
-          <div class="apikey-wrap">
-            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
-            <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
-          </div>
-        </label>
-      </div>
+      ${baseUrlField}
+      ${apiKeyField}
       ${showModel ? `
       <div class="field">
         <label>${_t('modelIdLabel', 'Model ID')}
@@ -401,6 +487,40 @@ function buildProviderCard(name, cfg, opts = {}) {
     });
   }
 
+  // Bridge endpoints editor: ＋ appends an empty row and focuses its URL
+  // input; ✕ removes the row, and when the last row goes a fresh empty one
+  // takes its place so the card never renders rowless; the eye toggles that
+  // row's own key field. (Row inputs carry data-bridge-* on purpose —
+  // readCard only harvests [data-k], and the bridge branch of saveCard reads
+  // the rows itself.)
+  const bridgeWrap = card.querySelector('[data-bridge-endpoints]');
+  if (bridgeWrap) {
+    bridgeWrap.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="bridge-add"]')) {
+        e.stopPropagation();
+        addBridgeRow(bridgeWrap).querySelector('[data-bridge-url]').focus();
+        return;
+      }
+      const eye = e.target.closest('[data-act="bridge-key-eye"]');
+      if (eye) {
+        e.stopPropagation();
+        const keyInput = eye.closest('.apikey-wrap')?.querySelector('[data-bridge-key]');
+        if (keyInput) {
+          const show = keyInput.type === 'password';
+          keyInput.type = show ? 'text' : 'password';
+          eye.textContent = show ? '🙈' : '👁';
+        }
+        return;
+      }
+      const rm = e.target.closest('[data-act="bridge-remove"]');
+      if (rm) {
+        e.stopPropagation();
+        rm.closest('.bridge-row').remove();
+        if (!bridgeWrap.querySelector('.bridge-row')) addBridgeRow(bridgeWrap);
+      }
+    });
+  }
+
   card.addEventListener('click', (e) => {
     if (e.target.closest('input, button, select, textarea')) return;
     document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
@@ -456,26 +576,35 @@ async function saveCard(name, card) {
     cachedCfg.providers[name].models = modelList;
     cachedCfg.providers[name].model = modelList[0] || '';
   }
-  // bridge 卡：Base URL 一格填多个桥地址（逗号分隔，一地址一 agent）——
-  // 复用多模型卡的 models 槽存端点 URL 列表，主页下拉逐端点展开、选中项落
-  // activeModel（resolveBridgeEndpoint 消费）。每个地址过一遍 normalizeBridgeUrl
-  // （补 scheme、去尾斜杠/路径）。baseUrl/model 保持指向首个端点，老消费方语义不变。
-  // bridgeAgents（Ping 时 /health 自动发现的 agent 名，下拉里的 alias）里已删除的
-  // 端点条目一并清掉。
+  // bridge 卡：端点逐行编辑（一行 = 一个桥地址 + 别名，＋ 添加）。models 槽
+  // 仍存端点 URL 列表（与多模型 LLM 卡共用；resolveBridgeEndpoint / 主页下拉
+  // / 每端点会话键的消费方零改动），model/baseUrl 指向首个端点。别名 WYSIWYG：
+  // 框里有字 = 手动别名（Ping 不覆盖）；框留空 = 交给 Ping 的 /health 发现
+  // （发现值保存时不保留——想重新发现，清空别名再 Ping 即可）。
+  // 注意必须先滤空原始输入再 normalizeBridgeUrl：它对空串返回默认地址而非空串。
   if (cachedCfg.providers[name].isBridge) {
-    const urls = [...new Set(
-      String(data.baseUrl || '')
-        .split(/[\n,;]+/)
-        .map((s) => normalizeBridgeUrl(s))
-        .filter(Boolean)
-    )];
+    const urls = [];
+    const aliases = {};
+    const keys = {};
+    for (const row of card.querySelectorAll('.bridge-row')) {
+      const raw = (row.querySelector('[data-bridge-url]')?.value || '').trim();
+      if (!raw) continue;
+      const u = normalizeBridgeUrl(raw);
+      if (urls.includes(u)) continue;
+      urls.push(u);
+      const a = (row.querySelector('[data-bridge-alias]')?.value || '').trim();
+      if (a) aliases[u] = a;
+      const k = (row.querySelector('[data-bridge-key]')?.value || '').trim();
+      if (k) keys[u] = k;
+    }
     cachedCfg.providers[name].models = urls;
     cachedCfg.providers[name].model = urls[0] || '';
     cachedCfg.providers[name].baseUrl = urls[0] || '';
-    const agents = cachedCfg.providers[name].bridgeAgents || {};
-    cachedCfg.providers[name].bridgeAgents = Object.fromEntries(
-      Object.entries(agents).filter(([u]) => urls.includes(u))
-    );
+    cachedCfg.providers[name].bridgeAgents = aliases;
+    // 每端点 token（桥可以各要各的）：bridgeApiKeys 是权威表，未列出的端点
+    // 即「无 key」；卡级 apiKey 仍写首个端点的 key，给老消费方/老配置兜底。
+    cachedCfg.providers[name].bridgeApiKeys = keys;
+    cachedCfg.providers[name].apiKey = keys[urls[0]] || '';
   }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
@@ -526,15 +655,31 @@ async function pingCard(name, card) {
     const reply = cfg.isBridge
       ? await (async () => {
           const urls = providerModelList(cfg);
-          const results = await Promise.all(urls.map((u) => pingBridge({ baseUrl: u, apiKey: cfg.apiKey })));
+          if (!urls.length) throw new Error(_t('bridgeNeedEndpointErr', '先添加至少一个桥地址再 Ping。'));
+          const results = await Promise.all(urls.map((u) => pingBridge({ baseUrl: u, apiKey: resolveBridgeApiKey(cfg, u) })));
           const okUrls = results.filter((r) => r.ok);
           if (!okUrls.length) {
             throw new Error(results[0]?.error || `no agent-bridge at ${results[0]?.url}`);
           }
-          cfg.bridgeAgents = Object.fromEntries(okUrls.map((r) => [r.url, r.agent || '']));
+          // 别名 WYSIWYG：发现名只填进「空」端点（没存别名 = 交给发现）；
+          // 用户手填的别名永不被 /health 覆盖，改对了名字自己清空再 Ping。
+          const agents = cfg.bridgeAgents || {};
+          cfg.bridgeAgents = Object.fromEntries(okUrls.map((r) => [
+            r.url,
+            (agents[r.url] || '').trim() || r.agent || '',
+          ]));
           await chrome.storage.local.set({ providers: cachedCfg.providers });
+          // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
+          // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
+          for (const row of card.querySelectorAll('.bridge-row')) {
+            const urlInput = row.querySelector('[data-bridge-url]');
+            const aliasInput = row.querySelector('[data-bridge-alias]');
+            if (!urlInput || !aliasInput || aliasInput.value.trim()) continue;
+            const u = normalizeBridgeUrl(urlInput.value.trim());
+            if (cfg.bridgeAgents[u]) aliasInput.value = cfg.bridgeAgents[u];
+          }
           const downs = results.length - okUrls.length;
-          const names = okUrls.map((r) => r.agent || String(r.url).replace(/^https?:\/\//, '')).join(', ');
+          const names = okUrls.map((r) => cfg.bridgeAgents[r.url] || String(r.url).replace(/^https?:\/\//, '')).join(', ');
           return `agent-bridge ×${okUrls.length}/${results.length} healthy (${names})${downs ? ` — ${downs} down` : ''}`;
         })()
       : cfg.isOpencode
@@ -735,7 +880,7 @@ function prettyProviderName(name) {
   if (alias && alias.trim()) return alias.trim();
   if (name === 'hermes') return 'Hermes Agent';
   if (name === 'opencode') return 'OpenCode Agent';
-  if (name === 'bridge') return 'Agent Bridge';
+  if (name === 'bridge') return BRIDGE_CARD_LABEL;
   const m = /^llm-(\d+)$/.exec(name);
   if (m) return `LLM ${m[1]}`;
   return name.charAt(0).toUpperCase() + name.slice(1);
