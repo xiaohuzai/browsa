@@ -2,6 +2,10 @@
 
 > 用法：Phase 0 发布时，把下面各字段**原样粘贴**到 [Developer Dashboard](https://chrome.google.com/webstore/devconsole) → 你的商品 →「Store listing」。
 > 每个字段都标了字符限制并已核验。凡标 ✅ 的可直接复制。
+>
+> ⚠ 2026-09-07 起：0.35.1 曾因「产品说明关键词过多」被拒，实际提交文案以 `store-assets/cws-submit-v0.36.0.md`
+> 及 `store-assets/` 下后续更新文档为准——描述里的具体品牌名（ChatGPT/Claude/B站等）已系统性移除。
+> 本文保留作初版策略与素材分镜记录；**详细描述段不要再照抄本文**。
 
 ---
 
@@ -34,10 +38,10 @@ browsa – AI Sidebar · Chat with Pages · ChatGPT · Claude · Ollama
 browsa – AI Sidebar, Chat with Any Page, YouTube & PDFs
 ```
 
-### Short description（≤132 字符）✅ 115 字符
+### Short description（≤132 字符）✅ 111 字符
 
 ```
-Your keys, your models, your agent. Chat with pages, videos and PDFs right in the sidebar. Open source. No account.
+AI sidebar that chats with pages, videos and PDFs. Your keys, your models, your agent. Open source. No account.
 ```
 
 ### Category
@@ -113,7 +117,7 @@ browsa – AI 侧边栏 · 与任意页面对话 · 接你自己的模型与智�
 ### Short description ✅（未超限即可）
 
 ```
-用自己的 Key 或自己的智能体，在侧边栏与网页、B站视频、PDF 对话。开源、无账号、本地解析。
+AI 侧边栏：用自己的 Key 或智能体，与网页、视频、PDF 对话。开源、无账号、本地解析。
 ```
 
 ### Description
