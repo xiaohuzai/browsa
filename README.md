@@ -104,6 +104,8 @@ agent-bridge serve                                # one bridge per entry; ports 
 
 Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread. Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
 
+Don't want to run those three commands yourself? Click "**Copy setup prompt**" on the Agent Bridge card in settings and paste the whole block to your CLI agent — it performs the install, config, and launch for you (full text in the [setup guide](https://xiaohuzai.github.io/browsa/guide/providers.html#agent-bridge)).
+
 </details>
 
 <details>

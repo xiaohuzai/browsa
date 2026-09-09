@@ -83,7 +83,7 @@
       </table>
       <p>Save, then hit <strong>Ping</strong>: connectivity is verified and capabilities auto-detected. The first provider to ping successfully becomes active automatically; switch anytime from the dropdown at the top of the panel — multi-model cards expand to one "Alias · model" entry each.</p>
       <figure class="shot">
-        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, Hermes Agent, and OpenCode Agent provider cards" loading="lazy">
+        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, Hermes Agent, OpenCode Agent, and Agent Bridge provider cards" loading="lazy">
         <figcaption>Settings: each card carries its own protocol and alias; ping state at a glance.</figcaption>
       </figure>
 
@@ -146,6 +146,17 @@ agent-bridge serve --config /path/to/agents.json  # explicit config path
         <li>Hit <strong>Ping</strong> — every address is probed; rows with an empty alias are auto-filled from the agent name returned by /health, and everything shows in the status (e.g. <code>×2/2 healthy (codex, claude)</code>);</li>
         <li>Back in the sidebar, the top dropdown lists them as "Agent Bridge · codex". Each agent keeps its own independent session thread; when you switch mid-conversation, browsa asks whether to <strong>carry the conversation over</strong> or <strong>start a new session</strong>.</li>
       </ol>
+      <p>Don't feel like running steps 1–3 by hand? Paste the whole block below to <strong>your CLI agent</strong> (the Agent Bridge card in settings also has a "Copy setup prompt" button) and let it do the install, config, and launch — then just fill the bridge URL it reports into step 4:</p>
+      <pre class="doc-code">Set up the agent-bridge daemon on this machine so the browsa browser extension can reach me over local HTTP:
+
+1. Install globally (Node >= 18, zero dependencies): npm i -g @xiaohuzai/agent-bridge
+2. Create agents.json in a fixed working directory (the package's own agents.example.json and README are authoritative for the entry shape), adding an entry for yourself. If you are codex, keep "approval": "on-request" (otherwise approval prompts never reach browsa) and "sandbox": "workspace-write":
+   {"bridges":[{"name":"codex","port":3948,"apiKey":"","sandbox":"workspace-write","approval":"on-request"}]}
+   Other CLI agents (e.g. claude) only need name/port/apiKey.
+3. Start and verify: run agent-bridge serve (reads ./agents.json by default and stays in the foreground — verify from another command): curl http://127.0.0.1:3948/health should return JSON containing your name.
+4. When done, report ONLY the final bridge URL (http://127.0.0.1:PORT); I will paste it into browsa's Agent Bridge card and click Ping.
+
+If any step fails, stop and show me the exact error — do not retry the same command in a loop.</pre>
       <p>Screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Two reminders: approval cards need <code>"approval": "on-request"</code> on that bridge's entry (the default <code>never</code> silently refuses dangerous actions); ports live in <code>agents.json</code>, so after changing one update that row's address in browsa to match.</p>
 
       <h2>Ollama, locally</h2>

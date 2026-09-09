@@ -326,9 +326,51 @@ function bridgeEndpointRows(cfg) {
 }
 
 function addBridgeRow(wrap, { url = '', alias = '', apiKey = '' } = {}) {
-  wrap.querySelector('.bridge-add').insertAdjacentHTML('beforebegin', bridgeRowHtml(url, alias, apiKey));
+  const anchor = wrap.querySelector('.bridge-actions') || wrap.querySelector('.bridge-add');
+  anchor.insertAdjacentHTML('beforebegin', bridgeRowHtml(url, alias, apiKey));
   const rows = wrap.querySelectorAll('.bridge-row');
   return rows[rows.length - 1];
+}
+
+// One-click setup prompt for the bridge card: the user pastes this into their
+// CLI agent (codex / claude code — the same audience that runs the bridge),
+// and the agent performs install → agents.json → serve → health-check itself
+// instead of the user following the docs steps by hand. Pattern borrowed from
+// ego-lite's agent-executable install doc (2026-09-09 audit). Adapter facts
+// (entry shape, sandbox/approval fields) are deliberately deferred to the
+// package's own agents.example.json/README — duplicating them here would
+// drift when the bridge repo changes.
+function bridgeAgentSetupPrompt() {
+  return _t('bridgeAgentSetupPrompt', '请在本机配置 agent-bridge 守护进程，让 browsa 浏览器扩展能通过本地 HTTP 调用你：\n\n1. 全局安装（Node ≥ 18，零依赖）：npm i -g @xiaohuzai/agent-bridge\n2. 在固定工作目录创建 agents.json（条目形态以包内 agents.example.json 与 README 为准），为你自己加一个条目。如果你是 codex，保留 "approval": "on-request"（否则操作确认无法弹到 browsa）与 "sandbox": "workspace-write"：\n   {"bridges":[{"name":"codex","port":3948,"apiKey":"","sandbox":"workspace-write","approval":"on-request"}]}\n   其他 CLI agent（如 claude）条目只需 name/port/apiKey。\n3. 启动并验证：运行 agent-bridge serve（默认读 ./agents.json，前台驻留——验证要另开一条命令）：curl http://127.0.0.1:3948/health 应返回含你名字的 JSON。\n4. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。\n\n任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。');
+}
+
+// Clipboard write with an execCommand fallback (extension pages have the
+// clipboard API, but stay safe if it's absent or rejects).
+function copyTextToClipboard(text, done) {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (_) {}
+    ta.remove();
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else {
+    fallback();
+  }
+}
+
+function copyBridgeSetupPrompt(btn) {
+  copyTextToClipboard(bridgeAgentSetupPrompt(), () => {
+    const prev = btn.textContent;
+    btn.textContent = _t('bridgeAgentSetupDone', '已复制 ✓ 粘给你的 CLI agent');
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1600);
+  });
 }
 
 function buildProviderCard(name, cfg, opts = {}) {
@@ -362,7 +404,10 @@ function buildProviderCard(name, cfg, opts = {}) {
         <label><span>Base URL${agentBaseUrlTip}</span>
           <div class="bridge-endpoints" data-bridge-endpoints>
             ${bridgeEndpointRows(cfg).map(({ url, alias, apiKey }) => bridgeRowHtml(url, alias, apiKey)).join('')}
-            <button type="button" class="bridge-add" data-act="bridge-add">${_t('bridgeAddBtn', '＋ 添加 Agent')}</button>
+            <div class="bridge-actions">
+              <button type="button" class="bridge-add" data-act="bridge-add">${_t('bridgeAddBtn', '＋ 添加 Agent')}</button>
+              <button type="button" class="bridge-setup-copy" data-act="bridge-agent-setup">${_t('bridgeAgentSetupBtn', '复制配置提示词')}</button>
+            </div>
           </div>
         </label>
       </div>`
@@ -499,6 +544,12 @@ function buildProviderCard(name, cfg, opts = {}) {
       if (e.target.closest('[data-act="bridge-add"]')) {
         e.stopPropagation();
         addBridgeRow(bridgeWrap).querySelector('[data-bridge-url]').focus();
+        return;
+      }
+      const setup = e.target.closest('[data-act="bridge-agent-setup"]');
+      if (setup) {
+        e.stopPropagation();
+        copyBridgeSetupPrompt(setup);
         return;
       }
       const eye = e.target.closest('[data-act="bridge-key-eye"]');

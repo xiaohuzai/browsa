@@ -104,6 +104,8 @@ agent-bridge serve                                # 每个 entry 一座桥，端
 
 打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
 
+不想手动执行上面三步？设置页 Agent Bridge 卡上点「**复制配置提示词**」，把整段粘给你的 CLI agent，让它替你完成安装、配置和启动（完整文案见[接入指南](https://xiaohuzai.github.io/browsa/guide/providers.html#agent-bridge)）。
+
 </details>
 
 <details>
