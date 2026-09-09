@@ -93,21 +93,25 @@ chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install' || details.reason === 'update') {
     // Best-effort: re-inject the selection toolbar into already-open tabs.
     // Removes the old host element first so old detached handlers are harmless.
-    chrome.tabs.query({}).then((tabs) => {
+    (async () => {
+      const tabs = await chrome.tabs.query({});
       for (const tab of tabs) {
         if (!tab.id || !tab.url?.startsWith('https://')) continue;
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            document.getElementById('browsa-sel-host')?.remove();
-            delete window.__browsaSelectionToolbarInstalled;
-          }
-        }).then(() => chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['lib/content-scripts/selection-toolbar.js']
-        })).catch(() => {});
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              document.getElementById('browsa-sel-host')?.remove();
+              delete window.__browsaSelectionToolbarInstalled;
+            }
+          });
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['lib/content-scripts/selection-toolbar.js']
+          });
+        } catch (_) {} // tab navigating/closed — best-effort re-injection
       }
-    });
+    })();
 
     // Show a badge + side-panel notice on update so the user knows
     // something changed and can refresh any page that still feels stale.

@@ -2665,12 +2665,14 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
    豁免两类：流式中的气泡（.msg.assistant 无 .done——内容持续增高，占位尺寸会
    干扰自动跟随的 scrollHeight 计算；DONE/ERROR/取消时补 .done）和每条列表的
    末尾气泡（首屏内容，cv 只会多一步边界评估，指南明确不要对首屏用）。 */
-.msg {
+/* 门控在 .cv-settled（首帧稳定后由 renderHistory 挂上）：cv 绝不在初始
+   渲染/滚动定位期间生效——指南明确初始视口用 cv 反而拖慢首开。 */
+.cv-settled .msg {
   content-visibility: auto;
   contain-intrinsic-size: auto none auto 96px;
 }
-.msg:last-child,
-.msg.assistant:not(.done) {
+.cv-settled .msg:last-child,
+.cv-settled .msg.assistant:not(.done) {
   content-visibility: visible;
   contain-intrinsic-size: none;
 }
