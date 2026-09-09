@@ -2344,6 +2344,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       }
       const finalText = m.full || state.acc;
       el.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
+      el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
       await r(finalText, true);
       // linkifyTimestamps already ran inside renderStream's isDone path;
       // stamp the video source (carried in the DONE chunk by the chat
@@ -2387,6 +2388,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       // and handled via the !res.ok block below (no pushChunk for real errors).
       stopWaitingIndicator();
       stopKeepAlive();
+      getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
       if (m.code === 'ABORTED') {
         const r = getRenderer();
         await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
@@ -2752,7 +2754,9 @@ async function resumeInFlightStream(tabId) {
  * onConfirm(dataUrl) is called with the final (possibly cropped) JPEG data URL.
  */
 function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
-  const modal = document.createElement('div');
+  // <dialog>（top-layer）：Esc（cancel 事件）此前不关闭裁剪界面，现免费获得。
+  // jsdom 无 showModal → open 属性兜底。
+  const modal = document.createElement('dialog');
   modal.className = 'crop-modal';
 
   modal.innerHTML = `
@@ -2769,6 +2773,8 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
     </div>
   `;
   document.body.appendChild(modal);
+  if (typeof modal.showModal === 'function') modal.showModal();
+  else modal.setAttribute('open', '');
 
   const canvas   = modal.querySelector('.crop-canvas');
   const body     = modal.querySelector('.crop-body');
@@ -2844,7 +2850,11 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
       }
     });
 
-    function close() { modal.remove(); }
+    function close() {
+      try { modal.close?.(); } catch (_) {} // close 事件统一收尾；remove 兜底 jsdom
+      modal.remove();
+    }
+    modal.addEventListener('close', () => modal.remove());
 
     cancelBtn.addEventListener('click', close);
 
@@ -2903,6 +2913,8 @@ function appendUser(text, imageDataUrls) {
       img.src = url;
       img.className = 'msg-image';
       img.alt = 'attached image';
+      img.loading = 'lazy';   // 视口外不解码（MB 级 data URL 的解码成本是真实的）
+      img.decoding = 'async';
       strip.appendChild(img);
     }
     el.appendChild(strip);
@@ -3892,10 +3904,12 @@ async function showEffectivePrompt() {
 }
 
 
+let historyUpgradeIO = null;     // IntersectionObserver driving the lazy renderSafe upgrades
 let pendingAgentBackfill = false; // one-shot: carry the conversation into the next agent turn
 let lastReplyKey = null;         // {name, model} of the provider that wrote the latest reply
 
 async function renderHistory() {
+  if (historyUpgradeIO) { historyUpgradeIO.disconnect(); historyUpgradeIO = null; }
   messagesEl.innerHTML = '';
   const { history } = await chrome.storage.local.get('history');
   const list = Array.isArray(history) ? history : [];
@@ -3965,8 +3979,13 @@ async function renderHistory() {
   // upgrades independently as soon as its own renderSafe resolves — a long
   // formula in message 3 doesn't delay message 5 from upgrading.
   if (asyncUpgrades.length > 0) {
-    showHistoryUpgradeIndicator();
-    Promise.all(asyncUpgrades.map(async ({ el, rawContent, figs, providerLabel }) => {
+    // Full renderSafe() upgrade (KaTeX / mermaid / think blocks) per bubble.
+    // Eager for ALL bubbles was the v1 behavior: fine for short histories, but
+    // a 100+-bubble conversation paid the entire upgrade cost on every panel
+    // open. IntersectionObserver-driven: upgrade when the bubble nears the
+    // scrollport (rootMargin pre-renders ahead of scroll). jsdom has no
+    // IntersectionObserver → eager fallback keeps tests and old behavior.
+    const runUpgrade = async ({ el, rawContent, figs, providerLabel }) => {
       const html = await renderSafe(rawContent);
       el.innerHTML = html;
       decorateLinks(el);
@@ -3980,7 +3999,30 @@ async function renderHistory() {
       // but since innerHTML just destroyed the old one, this always re-creates it.
       addMsgActions(el, () => rawContent);
       addProviderLabel(el, providerLabel);
-    })).finally(hideHistoryUpgradeIndicator);
+    };
+    if (typeof IntersectionObserver !== 'function') {
+      showHistoryUpgradeIndicator();
+      Promise.all(asyncUpgrades.map(runUpgrade)).finally(hideHistoryUpgradeIndicator);
+    } else {
+      const byEl = new Map(asyncUpgrades.map((j) => [j.el, j]));
+      let inFlight = 0;
+      historyUpgradeIO = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          historyUpgradeIO.unobserve(entry.target);
+          const job = byEl.get(entry.target);
+          if (!job || job._started) continue;
+          job._started = true;
+          inFlight++;
+          runUpgrade(job).finally(() => {
+            inFlight--;
+            if (inFlight === 0) hideHistoryUpgradeIndicator();
+          });
+        }
+      }, { root: messagesEl, rootMargin: '1200px 0px' });
+      showHistoryUpgradeIndicator(); // covers the initially-visible bubbles' upgrade gap
+      for (const job of asyncUpgrades) historyUpgradeIO.observe(job.el);
+    }
   }
 }
 
@@ -3996,8 +4038,10 @@ function applyFontSize(px) {
 // ─── Feature: Image lightbox ──────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 function showImageLightbox(src, alt) {
-  const overlay = document.createElement('div');
-  overlay.className = 'lightbox-overlay';
+  // <dialog>（top-layer）：Esc/焦点陷阱/置顶免费获得，替代手写 keydown 监听。
+  // jsdom 无 showModal → open 属性兜底（CSS 里有 :not([open]) 守卫）。
+  const dlg = document.createElement('dialog');
+  dlg.className = 'lightbox-overlay';
   const img = document.createElement('img');
   img.className = 'lightbox-img';
   img.src = src;
@@ -4005,13 +4049,15 @@ function showImageLightbox(src, alt) {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'lightbox-close';
   closeBtn.innerHTML = ICONS.close;
-  closeBtn.addEventListener('click', () => overlay.remove());
-  overlay.appendChild(img);
-  overlay.appendChild(closeBtn);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-  // Keyboard close
-  const onKey = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
-  document.addEventListener('keydown', onKey);
+  const dismiss = () => { try { dlg.close?.(); } catch (_) {} dlg.remove(); };
+  closeBtn.addEventListener('click', dismiss);
+  dlg.appendChild(img);
+  dlg.appendChild(closeBtn);
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dismiss(); });
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); dlg.close(); });
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.appendChild(dlg);
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  else dlg.setAttribute('open', '');
 }
 
