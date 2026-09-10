@@ -261,6 +261,10 @@ test('getCapabilities(): returns null immediately when baseUrl is missing (no fe
 const html = await readFile(new URL('../options.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/options.html', runScripts: undefined });
 globalThis.window = dom.window;
+// options.js gates destructive actions (delete provider / reset / reset system
+// prompt) behind window.confirm; jsdom's confirm is unimplemented and returns
+// undefined (treated as cancel), so stub it to auto-confirm.
+dom.window.confirm = () => true;
 globalThis.document = dom.window.document;
 Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, writable: true, configurable: true });
 globalThis.HTMLElement = dom.window.HTMLElement;

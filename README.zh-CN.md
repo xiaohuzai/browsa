@@ -196,7 +196,7 @@ hermes gateway
 完整清单收在这里：
 
 <details>
-<summary><b>聊天</b>——流式回复、思考块、图表、细聊……</summary>
+<summary><b>聊天</b>——流式回复、思考块、图表、追问……</summary>
 
 | 功能 | 说明 |
 |---|---|
@@ -205,7 +205,7 @@ hermes gateway
 | **Markdown 渲染与高亮** | 完整 GFM（表格、代码块、列表）；40+ 种语言（highlight.js）；`diff` 代码块 `+` 标绿 / `-` 标红 |
 | **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿 |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` 代码块内联渲染，各带缩放/复制/导出 SVG 工具栏；直接说要一张图表或思维导图——模型懂这个格式。Mermaid 解析失败时，一键让 AI 修复重绘——修复后的图先经本地解析校验再替换 |
-| **细聊（Detail thread）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调 |
+| **追问（Follow-up）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调 |
 | **大纲导航** | 对话满 4 轮后出现刻度导航条——点击跳转、悬停预览 |
 | **编辑并重发 · 重新生成** | ✏ 编辑并重发任意用户消息；⟳ 重新运行任意回复 |
 | **排队追问** | 流式回答期间继续输入会自动排队，回答结束后依次发出 |
@@ -249,9 +249,10 @@ hermes gateway
 | **回复语言** | 无论页面语言，强制用指定语言回复 |
 | **界面语言** | English / 中文 / Auto（跟随浏览器语言）——即时生效，无需重载 |
 | **划词工具栏与 llms.txt** | 开关划选文字时的浮动工具栏；附加页面（📎）时抓取一次 `<origin>/llms.txt`，把站点 LLM 指令烘入页面上下文——放在系统提示词之外，保证提示词前缀跨轮次字节稳定（对 prompt 缓存友好） |
-| **阅读偏好** | 消息字号、发送快捷键（Enter / Ctrl+Enter）、自动滚动开关 |
+| **阅读偏好** | 消息字号、发送快捷键（Enter / Shift+Enter）、思考块自动折叠 |
 | **ASR 字幕识别** | 无字幕视频的语音转写服务商（默认火山方舟）：API Key、语言、字幕来源 |
 | **长附件自动总结** | 自动进行——超过阈值（默认 100,000 字符）的页面或字幕会分块、并行总结、后台合并；`[mm:ss]` 标记显式保留，跳转链接继续可用；任何错误都安全失败、静默保留原文 |
+| **深读（Deep extract）** | 默认开启——附加前自动展开折叠区块、翻页抓取后续内容，让更多页面内容进入模型 |
 
 </details>
 
@@ -287,14 +288,14 @@ hermes gateway
 <summary><b>代码地图</b></summary>
 
 - **`background.js`**——MV3 服务工作线程，单一消息路由器；通过每轮端口流式传输，超大附件自动总结。
-- **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、细聊各在 `lib/sidepanel/` 下。
+- **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、追问各在 `lib/sidepanel/` 下。
 - **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions`、Hermes `/v1/runs`、opencode / agent-bridge agent 客户端）、`chrome.storage.local` 封装、内容脚本。
 
 </details>
 
 ## 浏览器兼容性
 
-Chrome / Edge 114+（主要目标）；Brave 1.56+ 应可运行（相同的 Chromium 内核）。Firefox 不支持（没有 `side_panel` API）。
+Chrome / Edge 116+（主要目标）；Brave 1.56+ 应可运行（相同的 Chromium 内核）。Firefox 不支持（没有 `side_panel` API）。
 
 ## 安全
 

@@ -105,7 +105,8 @@ function applyChatPrefs(cfg) {  const fs = $('fontSize');
 }
 
 async function saveChatPrefs() {
-  const fs = parseFloat($('fontSize')?.value || '13.5');
+  let fs = parseFloat($('fontSize')?.value || '13.5');
+  if (!Number.isFinite(fs)) fs = 13.5; // empty/invalid range value → keep the default, don't store NaN
   const ss = $('sendShortcut')?.value || 'enter';
   const tac = !!$('thoughtAutoCollapse')?.checked;
   await chrome.storage.local.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
@@ -572,10 +573,18 @@ function buildProviderCard(name, cfg, opts = {}) {
     });
   }
 
-  card.addEventListener('click', (e) => {
+  card.addEventListener('click', async (e) => {
     if (e.target.closest('input, button, select, textarea')) return;
+    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
+    // can't be the active provider, so don't highlight/persist a click on it.
+    if (!cachedCfg.providers[name]) return;
     document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
+    // Persist! This handler used to only toggle the CSS class, so the highlight
+    // silently reverted to the stored provider on reload / language switch.
+    cachedCfg.activeProvider = name;
+    cachedCfg.activeModel = '';
+    await storage.setActiveProvider(name, '');
   });
   card.querySelector('button[data-act="save"]').addEventListener('click', () => saveCard(name, card));
   card.querySelector('button[data-act="ping"]').addEventListener('click', () => pingCard(name, card));
@@ -656,6 +665,18 @@ async function saveCard(name, card) {
     // 即「无 key」；卡级 apiKey 仍写首个端点的 key，给老消费方/老配置兜底。
     cachedCfg.providers[name].bridgeApiKeys = keys;
     cachedCfg.providers[name].apiKey = keys[urls[0]] || '';
+  }
+  // Guard: saving the reserved empty "LLM 1" slot with nothing filled in would
+  // persist an unconfigured provider — exactly the state the reserved-slot
+  // comment promises the sidebar dropdown will never list.
+  if (wasReserved) {
+    const p = cachedCfg.providers[name];
+    const blank = !String(p.alias || '').trim() && !String(p.baseUrl || '').trim() && !String(p.model || '').trim();
+    if (blank) {
+      delete cachedCfg.providers[name];
+      flashCard(card, 'err', _t('providerNeedsConfig', '请至少填写 Base URL 或别名后再保存。'));
+      return;
+    }
   }
   await chrome.storage.local.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
@@ -803,6 +824,7 @@ function setBadge(card, state, name) {
 async function resetCard(name, card) {
   const cfg = cachedCfg.providers[name];
   if (!cfg) return;
+  if (!window.confirm(tSub('confirmResetProvider', '重置 provider「$1」的配置？此操作不可撤销。', cfg.alias || name))) return;
   const fresh = await storage.getAll();
   const isAgent = (cfg.type || 'llm') === 'agent';
   // Hermes resets to its shipped blank default; every LLM card resets to a
@@ -810,6 +832,14 @@ async function resetCard(name, card) {
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
   await chrome.storage.local.set({ providers: cachedCfg.providers });
+  // Invalidate ping state too — otherwise the blanked card keeps its green
+  // reachable badge from the config that no longer exists.
+  delete _pingState[name];
+  chrome.storage.local.get('pingStates', ({ pingStates }) => {
+    const updated = { ...(pingStates || {}) };
+    delete updated[name];
+    chrome.storage.local.set({ pingStates: updated });
+  });
   renderProviders();
 }
 
@@ -844,6 +874,7 @@ async function addProvider() {
 async function removeProvider(name) {
   const cfg = cachedCfg.providers[name];
   if (!cfg || (cfg.type || 'llm') === 'agent') return;
+  if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
   delete _pingState[name];
   await chrome.storage.local.set({ providers: cachedCfg.providers });
@@ -870,6 +901,7 @@ function applySystemPrompt() {
     flash('ok', _t('systemPromptSaved', 'System prompt saved.'));
   });
   document.querySelector('button[data-act="reset-system-prompt"]')?.addEventListener('click', async () => {
+    if (!window.confirm(_t('confirmResetSystemPrompt', '恢复默认系统提示词？当前内容将被替换。'))) return;
     el.value = DEFAULT_SYSTEM_PROMPT;
     await chrome.storage.local.set({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
     flash('ok', _t('systemPromptReset', 'System prompt reset to default.'));
@@ -946,9 +978,14 @@ function apiStyleLabel(style) {
   return map[style] || style;
 }
 
+let _flashTimer = null;
 function flash(cls, text) {
   statusEl.className = 'status ' + cls;
   statusEl.textContent = text;
+  // Auto-dismiss: an un-timed status left "System prompt saved." / an ASR error
+  // on screen indefinitely, where it could be mistaken for the current state.
+  clearTimeout(_flashTimer);
+  _flashTimer = setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'status'; }, 4000);
 }
 
 function escapeHtml(s) {

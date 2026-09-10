@@ -91,7 +91,7 @@ browsa is an AI sidebar that chats with the page you're on — articles, YouTube
 • Open source (MIT): every line is auditable — https://github.com/xiaohuzai/browsa
 
 ✨ RICH REPLIES, RENDERED PROPERLY
-Markdown tables, code highlighting (40+ languages), KaTeX math, Mermaid diagrams, ECharts charts and Markmap mind maps — rendered inline. Select any part of a reply to open a scoped side-conversation ("detail thread").
+Markdown tables, code highlighting (40+ languages), KaTeX math, Mermaid diagrams, ECharts charts and Markmap mind maps — rendered inline. Select any part of a reply to open a scoped side-conversation ("follow-up").
 
 ⌨️ MADE FOR KEYBOARD PEOPLE
 Ctrl+Shift+H opens the sidebar · Enter/Shift+Enter configurable · Ctrl+F search inside the conversation · Ctrl+/ switch context mode · everything streamable and abortable with Esc
@@ -159,7 +159,7 @@ browsa 是一个把「你正在看的页面」交给 AI 的浏览器侧边栏—
 • MIT 开源：https://github.com/xiaohuzai/browsa
 
 ✨ 富文本回复
-Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、ECharts 图表、Markmap 思维导图全部内联渲染；选中回复片段可开"细聊"侧对话。
+Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、ECharts 图表、Markmap 思维导图全部内联渲染；选中回复片段可开"追问"侧对话。
 
 安装后打开 ⚙ 设置，贴入 Key（或指向 localhost:11434），Ping 通过即用。界面文字跟随浏览器语言（中/英），可在设置中切换。
 

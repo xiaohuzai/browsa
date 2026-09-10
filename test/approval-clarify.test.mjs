@@ -198,11 +198,14 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
 
   assert.match(doStreamSrc, /if \(isHermes\)/, 'doStream must branch on isHermes');
   assert.match(doStreamSrc, /await runsApiStream\(/, 'the isHermes branch must call runsApiStream');
-  assert.match(doStreamSrc, /await chatStream\(/, 'the fallback branch must call chatStream');
+  // The non-Hermes fallback (chat/responses/anthropic) now goes through the
+  // shared dispatcher, which owns the actual chatStream call.
+  assert.match(doStreamSrc, /await dispatchStyleStream\(/, 'the fallback branch must call the shared stream dispatcher');
+  assert.match(doStreamSrc, /chatMessages: messages/, 'the fallback must route the chat/completions path its message array');
 
-  // runsApiStream's call must come before chatStream's in the isHermes-true branch.
+  // runsApiStream's call must come before the dispatcher's.
   const runsIdx = doStreamSrc.indexOf('await runsApiStream(');
-  const chatIdx = doStreamSrc.indexOf('await chatStream(');
+  const chatIdx = doStreamSrc.indexOf('await dispatchStyleStream(');
   assert.ok(runsIdx > 0 && chatIdx > 0 && runsIdx < chatIdx,
-    'runsApiStream must be reachable from the isHermes branch, chatStream from the else branch');
+    'runsApiStream must be reachable from the isHermes branch, the dispatcher from the else branch');
 });

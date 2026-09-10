@@ -199,13 +199,14 @@ test('CHAT handler stores AbortController in chatControllers before stream', asy
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
   // The order must be: controller created → set in chatControllers →
-  // passed as signal to chatStream. If the set happens AFTER chatStream
-  // returns, a synchronous abort between them is lost.
+  // passed as signal to the stream. If the set happens AFTER the stream call
+  // returns, a synchronous abort between them is lost. The LLM legs now go
+  // through the shared dispatcher (lib/handlers/stream-dispatch.js).
   const ctrlIdx = src.indexOf('chatControllers.set(tabId, controller)');
-  const streamIdx = src.indexOf('chatStream({', ctrlIdx);
+  const streamIdx = src.indexOf('dispatchStyleStream({', ctrlIdx);
   assert.ok(ctrlIdx > 0, 'controller must be set in chatControllers');
   assert.ok(streamIdx > 0 && ctrlIdx < streamIdx,
-    'chatControllers.set must be called before chatStream()');
+    'chatControllers.set must be called before the stream dispatch');
 });
 
 test('CHAT handler clears chatControllers in finally (no leaks)', async () => {

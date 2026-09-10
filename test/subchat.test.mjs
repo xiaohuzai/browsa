@@ -114,9 +114,15 @@ test('SUBCHAT never calls storage.appendToHistory', async () => {
 
 // --------------- SUBCHAT: always chatStream, never runsApiStream ------------
 
-test('SUBCHAT always uses chatStream, never runsApiStream, regardless of isHermes', async () => {
+test('SUBCHAT dispatches through the shared LLM stream dispatcher, never runsApiStream, regardless of isHermes', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
-  assert.match(subchatSrc, /await chatStream\(/, 'SUBCHAT must call chatStream');
+  // The three-way apiStyle branch now lives in lib/handlers/stream-dispatch.js;
+  // SUBCHAT goes through it (chat/completions by default) instead of calling
+  // chatStream inline.
+  assert.match(subchatSrc, /dispatchStyleStream\(/, 'SUBCHAT must use the shared LLM stream dispatcher');
+  assert.match(subchatSrc, /chatMessages: messages/, 'SUBCHAT must route the chat/completions path its message array');
+  const dispatchSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/stream-dispatch.js', import.meta.url), 'utf8');
+  assert.match(dispatchSrc, /chatStream\(\{/, 'the dispatcher must provide the chatStream path');
   assert.doesNotMatch(subchatSrc, /runsApiStream\(/, 'SUBCHAT must never call runsApiStream — no tool/approval flow for a side question');
   assert.doesNotMatch(subchatSrc, /\bisHermes\b/, 'SUBCHAT must not branch on isHermes — always the simple chatStream path');
 });
