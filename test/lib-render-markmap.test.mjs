@@ -84,11 +84,14 @@ test('renderMarkmap appends a toolbar only on the success path, using the same m
   assert.match(src, /wrapper\.appendChild\(_markmapToolbar\(mm, source, svgEl, wrapper\)\)/);
 });
 
-test('_markmapToolbar reuses the mermaid-toolbar/mermaid-btn CSS classes (no markmap-specific class names)', () => {
+test('_markmapToolbar reuses the shared _diagramToolbar (mermaid-toolbar/mermaid-btn CSS classes)', () => {
   const fnMatch = src.match(/function _markmapToolbar\([^)]*\)\s*\{[\s\S]*?\n\}/);
   assert.ok(fnMatch, '_markmapToolbar function must exist');
-  assert.match(fnMatch[0], /bar\.className = 'mermaid-toolbar'/);
-  assert.match(fnMatch[0], /btn\.className = 'mermaid-btn'/);
+  // The three diagram toolbars now share one builder; markmap must go through it
+  // rather than hand-rolling its own bar (which is where the classes live).
+  assert.match(fnMatch[0], /_diagramToolbar\(/, '_markmapToolbar must use the shared toolbar builder');
+  assert.match(src, /function _diagramToolbar\([\s\S]*?bar\.className = 'mermaid-toolbar'/);
+  assert.match(src, /function _diagramToolbar\([\s\S]*?btn\.className = 'mermaid-btn'/);
 });
 
 test('_markmapToolbar drives zoom via _markmapZoomBy and reset via mm.fit() — never mermaid\'s viewBox-mutation helpers', () => {
@@ -119,7 +122,9 @@ test('_markmapToolbar reuses _mermaidExportSvg (no duplicate export function) fo
 });
 
 test('renderMarkmap wires a ResizeObserver to re-fit the mind map on container size changes', () => {
-  assert.match(src, /new ResizeObserver\(\(\) => mm\.fit\(\)\)\.observe\(wrapper\)/);
+  // Now routed through _observeResize, which registers the observer so
+  // renderHistory can disconnect the batch (they hold strong refs to the DOM).
+  assert.match(src, /_observeResize\(wrapper, \(\) => mm\.fit\(\)\)/);
 });
 
 test('_markmapScale reads the live d3-zoom transform from the SVG node\'s __zoom field, not a separate d3 import', () => {

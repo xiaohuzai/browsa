@@ -224,7 +224,7 @@
     "description": "Inline explain popover: retry the request"
   },
   "inlineExplainSide": {
-    "message": "Open in panel",
+    "message": "Follow up in panel",
     "description": "Inline explain popover: continue in the side panel"
   },
   "inlineExplainClose": {
@@ -396,7 +396,7 @@
     "description": "Options: providers hint"
   },
   "providersTipHtml": {
-    "message": "<b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.",
+    "message": "<b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>OpenCode Agent</b> / <b>Agent Bridge</b>: drive a local CLI agent (Codex, Claude Code, …) you are already logged into — no API key needed.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.",
     "description": "Options: providers ? tip bubble (controlled HTML)"
   },
   "systemPromptHeading": {
@@ -480,7 +480,7 @@
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
-    "message": "Attach a video page to auto-transcribe/analyze. Platform: Bilibili only.",
+    "message": "Attach a video page to auto-transcribe/analyze. Supported platforms: YouTube and Bilibili.",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1079,5 +1079,86 @@
   },
   "providerSwitchDirectHint": {
     "message": "Send without choosing = continue without context"
+  },
+  "providerNeedsConfig": {
+    "message": "Fill in at least a Base URL or Alias before saving."
+  },
+  "confirmRemoveProvider": {
+    "message": "Delete provider \"$1\" and its configuration? This cannot be undone."
+  },
+  "confirmResetProvider": {
+    "message": "Reset provider \"$1\"? This cannot be undone."
+  },
+  "confirmResetSystemPrompt": {
+    "message": "Restore the default system prompt? Your current text will be replaced."
+  },
+  "approvalAllowOnce": {
+    "message": "Allow once"
+  },
+  "approvalAllowSession": {
+    "message": "Allow for session"
+  },
+  "approvalAlwaysAllow": {
+    "message": "Always allow"
+  },
+  "approvalDeny": {
+    "message": "Deny"
+  },
+  "approvalRequired": {
+    "message": "Approval required:"
+  },
+  "clarifyDefault": {
+    "message": "Please clarify:"
+  },
+  "clarifyPlaceholder": {
+    "message": "Your response…"
+  },
+  "clarifySend": {
+    "message": "Send"
+  },
+  "closeLabel": {
+    "message": "Close"
+  },
+  "detailThreadPlaceholder": {
+    "message": "Ask a follow-up about this…"
+  },
+  "detailThreadSend": {
+    "message": "Send"
+  },
+  "detailThreadResize": {
+    "message": "Drag to resize"
+  },
+  "inspectCtx": {
+    "message": "Inspect"
+  },
+  "inspectCtxTitle": {
+    "message": "View the full context sent to the model"
+  },
+  "ctxInspectorTitle": {
+    "message": "Context preview"
+  },
+  "copy": {
+    "message": "Copy"
+  },
+  "undoAttach": {
+    "message": "Undo"
+  },
+  "undoAttachTitle": {
+    "message": "Remove this attached page from the conversation"
+  },
+  "removeImage": {
+    "message": "Remove image"
+  },
+  "screenshotFailed": {
+    "message": "Failed to load the screenshot — please retry"
+  },
+  "cropCanvasLabel": {
+    "message": "Select a region by dragging, or with the arrow keys"
+  },
+  "detailThreadLabel": {
+    "message": "Follow up"
+  },
+  "detailThreadTruncated": {
+    "message": "Follow-up reply reached the output limit — send \"continue\" to extend it."
   }
 }

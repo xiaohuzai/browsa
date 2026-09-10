@@ -169,7 +169,7 @@ Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for
 | Alias | a name you choose (e.g. "My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple providers stay distinguishable |
 | Base URL | e.g. `https://api.openai.com` |
 | API Key | your API key |
-| Model ID | e.g. `gpt-4o`, `claude-3-5-sonnet` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
+| Model ID | e.g. `gpt-4o`, `claude-sonnet-4-6` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
 Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode, Agent Bridge — are fixed and not removable).
@@ -196,7 +196,7 @@ Highlight text on a page and the **floating toolbar** appears: **Explain** and *
 The full reference lives here:
 
 <details>
-<summary><b>Chat</b> — streaming, thinking blocks, diagrams, detail thread…</summary>
+<summary><b>Chat</b> — streaming, thinking blocks, diagrams, follow-up…</summary>
 
 | Feature | What you get |
 |---|---|
@@ -205,7 +205,7 @@ The full reference lives here:
 | **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
-| **Detail thread ("细聊")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable |
+| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable |
 | **Outline rail** | from 4 turns on, a quiet tick rail tracks the conversation — click to jump, hover to preview |
 | **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
 | **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
@@ -249,9 +249,10 @@ The full reference lives here:
 | **Reply language** | force replies in a specific language regardless of page language |
 | **UI language** | English, 中文, or Auto (follows the browser) — applies immediately, no reload |
 | **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
-| **Reading preferences** | message font size, send shortcut (Enter / Ctrl+Enter), auto-scroll toggle |
+| **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
 | **ASR** | the speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source |
 | **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
+| **Deep extract** | on by default — before attaching, browsa expands collapsed sections and pages through paginated content so far more of the page reaches the model |
 
 </details>
 
@@ -287,14 +288,14 @@ Type `/` in the composer to see autocomplete. All commands accept extra instruct
 <summary><b>Code map</b></summary>
 
 - **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
-- **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, detail thread each live in `lib/sidepanel/`.
+- **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, follow-up each live in `lib/sidepanel/`.
 - **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming clients (`/v1/chat/completions`, Hermes `/v1/runs`, the opencode / agent-bridge agent clients), `chrome.storage.local` wrapper, content scripts.
 
 </details>
 
 ## Browser compatibility
 
-Chrome / Edge 114+ (primary target); Brave 1.56+ should work (same Chromium surface). Firefox is not supported (no `side_panel` API).
+Chrome / Edge 116+ (primary target); Brave 1.56+ should work (same Chromium surface). Firefox is not supported (no `side_panel` API).
 
 ## Security
 

@@ -210,15 +210,16 @@ test('CHAT handler initializes streamState BEFORE first delta (no lost window)',
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
-  // Find the chatStream call and check that initStreamState(tabId, …)
+  // Find the stream dispatch and check that initStreamState(tabId, …)
   // appears earlier in the file. (Prefix match: the call now also carries
   // the reply-source stamp {providerLabel, providerKey} — the no-lost-window
-  // invariant is about the ORDER, not the exact argument list.)
-  const chatIdx = src.indexOf('chatStream({');
+  // invariant is about the ORDER, not the exact argument list. The LLM legs
+  // dispatch through lib/handlers/stream-dispatch.js.)
+  const chatIdx = src.indexOf('dispatchStyleStream({');
   const initIdx = src.lastIndexOf('initStreamState(tabId', chatIdx);
-  assert.ok(chatIdx > 0, 'chat-handler.js should call chatStream');
+  assert.ok(chatIdx > 0, 'chat-handler.js should dispatch the chat stream');
   assert.ok(initIdx > 0 && initIdx < chatIdx,
-    'initStreamState(tabId, …) must be called before chatStream() in the CHAT handler');
+    'initStreamState(tabId, …) must be called before the stream dispatch in the CHAT handler');
 });
 
 test('CHAT handler clears streamState after appendToHistory (no leaks)', async () => {

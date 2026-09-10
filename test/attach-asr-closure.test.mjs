@@ -28,9 +28,18 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // Extract every injected `func: async () => { ... }` block that contains
 // `__browsaFetchFreshYouTubeStreams` from background.js source, balancing
 // braces. There are two: the ASR_FRESH_URLS self-heal path and the
-// buildAsrPendingCtx attach path.
+// buildAsrPendingCtx attach path — the latter now lives in
+// lib/handlers/attach-asr-pending.js (extracted from background.js), so both
+// files are searched.
+async function readInjectionSources() {
+  const [bg, pending] = await Promise.all([
+    readFile(join(ROOT, 'background.js'), 'utf8'),
+    readFile(join(ROOT, 'lib/handlers/attach-asr-pending.js'), 'utf8'),
+  ]);
+  return bg + '\n' + pending;
+}
 async function extractYouTubeInjectFuncs() {
-  const src = await readFile(join(ROOT, 'background.js'), 'utf8');
+  const src = await readInjectionSources();
   const marker = 'window.__browsaFetchFreshYouTubeStreams';
   const out = [];
   let searchFrom = 0;
@@ -168,7 +177,7 @@ test('YouTube ASR injected func falls back to the ANDROID fetch when no pot capt
 // activeFetchBilibiliVideo 同策略），__INITIAL_STATE__.videoData 兜底。
 
 async function extractBilibiliInjectFuncs() {
-  const src = await readFile(join(ROOT, 'background.js'), 'utf8');
+  const src = await readInjectionSources();
   const marker = 'window.__browsaFetchFreshBilibiliStreams';
   const out = [];
   let searchFrom = 0;

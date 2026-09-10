@@ -87,4 +87,4 @@ fi
 echo "OK  sidePanel API used"
 
 echo
-echo "=== All checks passed. browsa should run on Edge 114+ and Chrome 114+. ==="
+echo "=== All checks passed. browsa should run on Edge 116+ and Chrome 116+. ==="

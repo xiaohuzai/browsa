@@ -2365,7 +2365,13 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   border-radius: var(--radius);
   background: var(--bg-2);
   border: 1px solid var(--border);
-  font-size: 0.85em;
+  /* Follow the reader's font-size setting (same var the main chat bubbles use)
+     instead of a fixed 0.85em. The old em was relative to .messages (14px), so
+     the card's quote/input/buttons stayed ~11-12px no matter what the user set,
+     while the reply bubbles inside (font-size:var(--msg-font-size)) ended up
+     larger than the chrome around them. --msg-font-size defaults to 13.5px on
+     :root and is updated live by applyFontSize(). */
+  font-size: var(--msg-font-size);
   /* User-resizable via .detail-thread-resize-handle (custom drag, not the
      native CSS resize property — its grip gets visually clipped by
      border-radius + the overflow:hidden it requires, making it an
@@ -2447,7 +2453,9 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  font-size: 0.85em;
+  /* Match the message text size (the card base is var(--msg-font-size)) — a
+     chat input smaller than the bubbles it sits under reads as an afterthought. */
+  font-size: 1em;
   outline: none;
 }
 .detail-thread-input:focus { border-color: var(--accent); }
