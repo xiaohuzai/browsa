@@ -182,7 +182,7 @@ function loadContentScript(name) {
 // youtube-content-script.js
 // ============================================================================
 {
-  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml } =
+  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
     loadContentScript('youtube-content-script.js');
 
   test('youtube: isYouTubePlayerUrl matches both apex and www hosts, prefix-matches the path', () => {
@@ -458,6 +458,101 @@ function loadContentScript(name) {
     assert.equal(parseTimedtextJson(''), null);
     assert.equal(parseTimedtextJson('not json'), null);
     assert.equal(parseTimedtextJson(JSON.stringify({ events: [] })), null);
+  });
+
+  test('youtube: normalizeSubtitleText strips inline markup, escaped or raw', () => {
+    // Raw tags (creator-uploaded captions / caption-editor bold+italic).
+    assert.equal(normalizeSubtitleText('a <b>bold</b> and <i>italic</i> word'), 'a bold and italic word');
+    // Entity-escaped markup: decoded first, then stripped — this is the shape
+    // that used to reach the UI as a literal "<b>" (it survived the old parser
+    // because [^<]* matched it, and the entity decode then produced the tag).
+    assert.equal(normalizeSubtitleText('&lt;b&gt;strong&lt;/b&gt; text'), 'strong text');
+    // Double-escaped markup needs the second decode+strip round.
+    assert.equal(normalizeSubtitleText('&amp;lt;b&amp;gt;deep&amp;lt;/b&amp;gt;'), 'deep');
+    // <br> and newlines collapse to a single space.
+    assert.equal(normalizeSubtitleText('line one<br/>line two\nline three'), 'line one line two line three');
+    // Numeric entities (decimal + hex), and "&amp;" decoding to a literal "&".
+    assert.equal(normalizeSubtitleText('caf&#233; &#x2014; done'), 'café — done');
+    assert.equal(normalizeSubtitleText('A&amp;B'), 'A&B');
+    // A malformed entity must not throw (which would null the whole transcript)
+    // and must not smuggle a lone surrogate through.
+    assert.equal(normalizeSubtitleText('ok &#99999999999; and &#xD800; fine'), 'ok and fine');
+    // Real prose with angle brackets survives (its "<" was entity-encoded).
+    assert.equal(normalizeSubtitleText('x &lt; 5 and y &gt; 3'), 'x < 5 and y > 3');
+    // Whitespace-only runs (json3 ASR continuation events) normalize to empty.
+    assert.equal(normalizeSubtitleText('\n'), '');
+    assert.equal(normalizeSubtitleText('   '), '');
+  });
+
+  test('youtube: normalizeSubtitleText never eats prose that merely looks taggish', () => {
+    // Mistaking prose for a tag is the one way cleanup could lose subtitle
+    // text, so pin down the cases where it must not.
+    assert.equal(normalizeSubtitleText('x &lt; 5 and y &gt; 3'), 'x < 5 and y > 3');
+    assert.equal(normalizeSubtitleText('if a&lt;b then c&gt;d'), 'if a<b then c>d');
+    assert.equal(normalizeSubtitleText('I &lt;3 this'), 'I <3 this');
+    assert.equal(normalizeSubtitleText('use &lt;div&gt; here'), 'use <div> here');
+    assert.equal(normalizeSubtitleText('5 &lt; 6 &gt; 4 &lt; 7'), '5 < 6 > 4 < 7');
+    // A matched pair IS markup — that is the bug the user reported. The words
+    // survive; only the surrounding tags go.
+    assert.equal(normalizeSubtitleText('&lt;b&gt;bold&lt;/b&gt; as literal text'), 'bold as literal text');
+  });
+
+  test('youtube: parseTimedtextJson drops no caption line (CJK/emoji/entities round-trip)', () => {
+    // Guard against cleanup turning a real caption into an empty string, which
+    // the parsers skip — that would silently delete the line.
+    const texts = [
+      '这是一条中文字幕，包含标点。',
+      'Mixed 中文 and English — with dashes',
+      '50% &amp; 30% = 80%',
+      'emoji 🎧 and ♪ music note ♪',
+      'A &lt; B &gt; C',
+    ];
+    const json = JSON.stringify({ events: texts.map((utf8, i) => ({ tStartMs: i * 1000, segs: [{ utf8 }] })) });
+    const out = parseTimedtextJson(json).split('\n');
+    assert.equal(out.length, texts.length, 'no caption line may be dropped');
+    assert.deepEqual(out, [
+      '[00:00] 这是一条中文字幕，包含标点。',
+      '[00:01] Mixed 中文 and English — with dashes',
+      '[00:02] 50% & 30% = 80%',
+      '[00:03] emoji 🎧 and ♪ music note ♪',
+      '[00:04] A < B > C',
+    ]);
+  });
+
+  test('youtube: parseTimedtextJson strips tags out of json3 segments', () => {
+    const json = JSON.stringify({ events: [
+      { tStartMs: 1000, segs: [{ utf8: '<b>Never</b> gonna give' }, { utf8: ' you up' }] },
+      { tStartMs: 61500, segs: [{ utf8: '\n' }] },   // ASR continuation — empty, skipped
+      { tStartMs: 70000, segs: [{ utf8: 'plain line' }] },
+    ]});
+    const result = parseTimedtextJson(json);
+    assert.equal(result, '[00:01] Never gonna give you up\n[01:10] plain line', `got: ${result}`);
+  });
+
+  test('youtube: parseTimedtextXml keeps word-timed ASR runs inside <p>', () => {
+    // The real srv3 shape for an auto-generated track: every word is its own
+    // <s> tag. The old [^<]* capture matched nothing here, so all speech lines
+    // were dropped and only the untagged ones ([Music] etc.) survived.
+    const xml = '<?xml version="1.0" encoding="utf-8" ?><timedtext format="3"><body>'
+      + '<p t="320" d="14260" w="1">[Music]</p>'
+      + '<p t="18790" w="1" a="1">\n</p>'
+      + '<p t="18800" d="7160" w="1"><s ac="0">We&#39;re</s><s t="239" ac="0"> no</s><s t="559" ac="0"> strangers</s></p>'
+      + '</body></timedtext>';
+    const result = parseTimedtextXml(xml);
+    assert.equal(result, "[00:00] [Music]\n[00:18] We're no strangers", `got: ${result}`);
+  });
+
+  test('youtube: parseTimedtextXml strips inline markup from <p> content', () => {
+    const xml = '<timedtext><body><p t="1000" d="2000">hello <b>world</b></p><p t="61500" d="2000">and &lt;i&gt;more&lt;/i&gt;</p></body></timedtext>';
+    const result = parseTimedtextXml(xml);
+    assert.equal(result, '[00:01] hello world\n[01:01] and more', `got: ${result}`);
+  });
+
+  test('youtube: parseTimedtextXml handles srv1 <text start> and TTML <p begin>', () => {
+    const srv1 = '<?xml version="1.0"?><transcript><text start="18.64" dur="3.24">classic format</text><text start="61.5" dur="1">second</text></transcript>';
+    assert.equal(parseTimedtextXml(srv1), '[00:18] classic format\n[01:01] second');
+    const ttml = '<?xml version="1.0"?><tt><body><div><p begin="00:00:18.640" end="00:00:21.880" style="s2">ttml line &amp; more</p></div></body></tt>';
+    assert.equal(parseTimedtextXml(ttml), '[00:18] ttml line & more');
   });
 
   test('youtube: installYouTubeInterceptor clones timedtext response body and caches the parsed transcript', async () => {
