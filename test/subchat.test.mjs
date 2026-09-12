@@ -112,19 +112,28 @@ test('SUBCHAT never calls storage.appendToHistory', async () => {
   assert.doesNotMatch(subchatSrc, /appendToHistory\(/, 'SUBCHAT must never write to the main history');
 });
 
-// --------------- SUBCHAT: always chatStream, never runsApiStream ------------
+// --------------- SUBCHAT: runs for Hermes (dedicated session), dispatcher for LLM styles
 
-test('SUBCHAT dispatches through the shared LLM stream dispatcher, never runsApiStream, regardless of isHermes', async () => {
+test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs branch on a DEDICATED per-subId session', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
-  // The three-way apiStyle branch now lives in lib/handlers/stream-dispatch.js;
-  // SUBCHAT goes through it (chat/completions by default) instead of calling
-  // chatStream inline.
-  assert.match(subchatSrc, /dispatchStyleStream\(/, 'SUBCHAT must use the shared LLM stream dispatcher');
+  assert.match(subchatSrc, /dispatchStyleStream\(/, 'LLM provider styles must use the shared LLM stream dispatcher');
   assert.match(subchatSrc, /chatMessages: messages/, 'SUBCHAT must route the chat/completions path its message array');
   const dispatchSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/stream-dispatch.js', import.meta.url), 'utf8');
   assert.match(dispatchSrc, /chatStream\(\{/, 'the dispatcher must provide the chatStream path');
-  assert.doesNotMatch(subchatSrc, /runsApiStream\(/, 'SUBCHAT must never call runsApiStream — no tool/approval flow for a side question');
-  assert.doesNotMatch(subchatSrc, /\bisHermes\b/, 'SUBCHAT must not branch on isHermes — always the simple chatStream path');
+  // 2026-09-11 reversal of the old "never runsApiStream" rule: the compat
+  // chat-completions layer does not surface Hermes's reasoning at all (verified
+  // live), while runs streams reasoning.available. Runs is ONLY for the
+  // isHermes branch, on a dedicated per-subId session — never the main chat's
+  // storage-backed session id, or the side Q&A would pour into the main
+  // conversation's server-side agent context.
+  assert.match(subchatSrc, /provider\.isHermes/, 'Hermes must get its own runs branch');
+  assert.match(subchatSrc, /runsApiStream\(/, 'the Hermes branch must stream via runsApiStream (reasoning.available → <thinking>)');
+  assert.match(subchatSrc, /subchatHermesSessions\.get\(subId\)/, 'the runs session must come from the per-subId detail-thread map');
+  assert.doesNotMatch(subchatSrc, /getOrCreateHermesSessionId/,
+    'SUBCHAT must never reuse the MAIN chat Hermes session id — that would mix the side question into the main agent context');
+  assert.match(subchatSrc, /subChatRunIds/, 'run ids must be tracked for server-side cancellation');
+  assert.match(subchatSrc, /\/v1\/runs\/\$\{encodeURIComponent\(runInfo\.runId\)\}\/stop/,
+    'abort must fire the server-side /stop (there is no /cancel route) so a stopped follow-up stops executing tools');
 });
 
 // --------------- SUBCHAT: shares CAPABILITY_HINTS with CHAT -----------------
@@ -242,10 +251,49 @@ test('SUBCHAT requires subId and a non-empty messages array (no tabId dependency
 test('SUBCHAT pushes chunks via pushSubChatChunk keyed by subId, not the main pushChunk', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CHUNK', subId, delta \}\)/);
-  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_DONE', subId, \.\.\.\(st\.finishReason === 'length' \? \{ truncated: true \} : \{\}\) \}\)/);
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_DONE', subId, providerLabel, providerKey, \.\.\.\(st\.finishReason === 'length' \? \{ truncated: true \} : \{\}\) \}\)/);
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_ERROR', subId, message:/);
   // Must not fall back to the main chat's per-turn port for this traffic.
   assert.doesNotMatch(subchatSrc, /\bpushChunk\(/, 'SUBCHAT must use pushSubChatChunk, never the main pushChunk');
+});
+
+// --------------- SUBCHAT: reply-source stamp on DONE -------------------------
+
+test('SUBCHAT_DONE carries the same reply-source stamp as CHAT, via the shared resolver', async () => {
+  const subchatSrc = await readSubchatHandlerSrc();
+  assert.match(subchatSrc, /providerEntryLabel\(all\.activeProvider, provider, replyModelOrEndpoint\)/,
+    'the label must come from provider-display.js — the same naming the sidebar dropdown and main-chat chips use');
+  // The "which model/endpoint suffix goes in the stamp for this provider kind"
+  // mapping is defined ONCE in provider-resolver.js and shared with CHAT.
+  const resolverSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/provider-resolver.js', import.meta.url), 'utf8');
+  assert.match(resolverSrc, /export function resolveReplyModelOrEndpoint\(/);
+  const chatHandlerSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  assert.match(chatHandlerSrc, /resolveReplyModelOrEndpoint\(provider, all, bridgeEndpoint\)/,
+    'CHAT must consume the same shared mapping — no per-handler copies to drift');
+});
+
+// --------------- SUBCHAT: agent process surfacing (approval/clarify/progress)
+
+test('SUBCHAT pushes tool progress + approval/clarify chunks and relays replies subId-keyed, all three agent kinds covered', async () => {
+  const subchatSrc = await readSubchatHandlerSrc();
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_TOOL_PROGRESS', subId, text \}\)/);
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_APPROVAL', subId, data \}\)/);
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CLARIFY', subId, data \}\)/);
+  // Runs + opencode + bridge branches all wire onApproval: two `onApproval:`
+  // option keys (opencode/bridge) plus the runs branch's local const passed
+  // as shorthand (`onApproval,` at the runsApiStream call).
+  assert.equal((subchatSrc.match(/onApproval:/g) || []).length, 2, 'opencode + bridge branches must surface approval requests');
+  assert.match(subchatSrc, /const onApproval = \(data\) => \{/, 'the runs branch must define its own approval handler');
+  assert.match(subchatSrc, /\n          onApproval,\n/, 'the runs branch must pass its approval handler to runsApiStream');
+  assert.equal((subchatSrc.match(/onToolProgress:/g) || []).length, 3, 'all three agent branches must surface tool progress');
+  // subId-keyed pending maps, cleaned on abort AND turn end.
+  assert.match(subchatSrc, /const subchatPendingApprovals = new Map\(\)/);
+  assert.match(subchatSrc, /const subchatPendingClarifications = new Map\(\)/);
+  assert.match(subchatSrc, /export async function handleSubchatApprovalRespond\(/);
+  assert.match(subchatSrc, /export async function handleSubchatClarifyRespond\(/);
+  const bgSrc = await readBackgroundSrc();
+  assert.match(bgSrc, /case 'SUBCHAT_APPROVAL_RESPOND':/, 'background must route the subchat approval relay');
+  assert.match(bgSrc, /case 'SUBCHAT_CLARIFY_RESPOND':/, 'background must route the subchat clarification relay');
 });
 
 // --------------- SUBCHAT_ABORT: real handle() invocation --------------------

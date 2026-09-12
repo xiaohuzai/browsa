@@ -1118,7 +1118,7 @@ async function reconcileHistoryIdx() {
 }
 
 const SEND_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>`;
-const STOP_ICON  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+const STOP_ICON  = ICONS.stop;
 
 // Drives the topbar status dot's live state (idle / streaming / error) —
 // see the .status-dot rules in sidepanel.css. A short-lived 'error' state

@@ -1125,6 +1125,9 @@
   "detailThreadSend": {
     "message": "发送"
   },
+  "detailThreadStop": {
+    "message": "停止"
+  },
   "detailThreadResize": {
     "message": "拖拽调整高度"
   },

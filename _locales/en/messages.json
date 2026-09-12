@@ -1125,6 +1125,9 @@
   "detailThreadSend": {
     "message": "Send"
   },
+  "detailThreadStop": {
+    "message": "Stop"
+  },
   "detailThreadResize": {
     "message": "Drag to resize"
   },

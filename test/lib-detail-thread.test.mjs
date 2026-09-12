@@ -165,24 +165,207 @@ test('SUBCHAT_DONE arriving before the reveal-pacer has caught up still finalize
 
 test('a failed turn shows an error message and does not leave a dangling unanswered user turn on retry', async () => {
   sentMessages.length = 0;
+  // Swap in a failing sendMessage for THIS test only — restore afterwards.
+  // (An unconditional override here leaked into every later test in this
+  // file: their send() calls saw ok:false and took the fail() path too.)
+  const originalSendMessage = chrome.runtime.sendMessage;
   chrome.runtime.sendMessage = (msg, cb) => { sentMessages.push(msg); cb({ ok: false, error: 'boom' }); };
-  const bubble = makeAssistantBubble('Reply.');
-  openDetailThread(bubble, 'excerpt', bubble);
-  const card = bubble.nextElementSibling;
-  const input = card.querySelector('.detail-thread-input');
-  input.value = 'first question';
-  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 20));
+  try {
+    const bubble = makeAssistantBubble('Reply.');
+    openDetailThread(bubble, 'excerpt', bubble);
+    const card = bubble.nextElementSibling;
+    const input = card.querySelector('.detail-thread-input');
+    input.value = 'first question';
+    card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
 
-  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
-  assert.ok(liveAi.classList.contains('subchat-error'));
-  assert.match(liveAi.textContent, /boom/);
-  // Input must be re-enabled so the user can retry.
-  assert.equal(input.disabled, false);
+    const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+    assert.ok(liveAi.classList.contains('subchat-error'));
+    assert.match(liveAi.textContent, /boom/);
+    // Input must be re-enabled so the user can retry.
+    assert.equal(input.disabled, false);
+  } finally {
+    chrome.runtime.sendMessage = originalSendMessage;
+  }
 });
 
 test('hideSelectionAskBtn is a safe no-op when no button is showing', () => {
   assert.doesNotThrow(() => hideSelectionAskBtn());
+});
+
+test('the send button becomes a stop button mid-turn: click aborts but keeps the card and finalizes the partial text', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  const sendBtn = card.querySelector('.detail-thread-send');
+  input.value = 'explain slowly';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(sendBtn.classList.contains('is-stopping'), 'button must read as stop while streaming');
+  assert.equal(input.disabled, true, 'input must be locked while streaming');
+
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'partial answer text' });
+  await new Promise((r) => setTimeout(r, 20)); // rawAccum updates synchronously; wait for the send() chain to settle
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // now ■ stop
+  await new Promise((r) => setTimeout(r, 30)); // stopTurn() finalizes async (renderSafe)
+
+  assert.ok(sentMessages.some(m => m.type === 'SUBCHAT_ABORT'), 'stop must send SUBCHAT_ABORT');
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.ok(liveAi, 'the card and its reply bubble must survive the stop');
+  assert.equal(liveAi.classList.contains('done'), true, 'partial text must be finalized in place');
+  assert.match(liveAi.textContent, /partial answer text/, 'the partial text must be kept, not discarded');
+  assert.equal(input.disabled, false, 'input re-enabled so the thread can continue');
+  assert.ok(!sendBtn.classList.contains('is-stopping'), 'button swaps back to send');
+  assert.ok(!card.querySelector('.live-think'), 'no live think block left stranded after teardown');
+});
+
+test('stopping before any text arrives removes the empty reply bubble instead of leaving a blank done bubble', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'quick question';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+
+  assert.ok(sentMessages.some(m => m.type === 'SUBCHAT_ABORT'));
+  const assistants = card.querySelectorAll('.detail-thread-messages .msg.assistant');
+  assert.equal(assistants.length, 0, 'empty reply bubble must be removed, not finalized as a blank');
+  assert.equal(input.disabled, false, 'input re-enabled for a retry');
+});
+
+test('SUBCHAT_DONE stamps the finalized reply with the provider label chip at the top of the bubble', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'who are you';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'hello' });
+  lastPort.emit({ type: 'SUBCHAT_DONE', providerLabel: 'Hermes Agent · glm-4.7', providerKey: { name: 'hermes', model: 'glm-4.7' } });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  const chip = liveAi?.querySelector('.msg-provider');
+  assert.ok(chip, 'a .msg-provider chip must render on the finalized reply');
+  assert.equal(chip.textContent, 'Hermes Agent · glm-4.7');
+  assert.equal(liveAi.firstElementChild, chip, 'chip sits at the top of the bubble (sender-label position, same as main chat)');
+});
+
+test('SUBCHAT_TOOL_PROGRESS renders the main panel\'s pre-bubble progress line and it clears on DONE', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'go search';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_TOOL_PROGRESS', text: 'web_search: querying duckduckgo' });
+  await new Promise((r) => setTimeout(r, 10));
+  const line = card.querySelector('.detail-thread-messages .tool-progress');
+  assert.ok(line, 'a .tool-progress line must appear above the streaming bubble inside the card');
+  assert.match(line.textContent, /web_search: querying duckduckgo/);
+  assert.equal(line.dataset.tier, 'searching', 'tier classification must match the main panel\'s regexes');
+
+  lastPort.emit({ type: 'SUBCHAT_DONE', providerLabel: 'x' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok(!card.querySelector('.tool-progress'), 'progress line must clear once the turn finalizes');
+  // closeBtn path: stops the 20s SW_PING interval so the test process can exit
+  // (a still-open turnPort holds a live setInterval that keeps node --test alive).
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('SUBCHAT_APPROVAL renders an approval card in the card; clicking a choice relays SUBCHAT_APPROVAL_RESPOND with subId', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'run it';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'execute_code', command: 'rm -rf /tmp/x', risk_level: 'high', choices: ['once', 'deny'] } });
+  await new Promise((r) => setTimeout(r, 10));
+  const ap = card.querySelector('.approval-card');
+  assert.ok(ap, 'an approval card must render inside the detail-thread card');
+  assert.match(ap.textContent, /execute_code/);
+
+  ap.querySelector('[data-choice="once"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  const sent = sentMessages.find(m => m.type === 'SUBCHAT_APPROVAL_RESPOND');
+  assert.ok(sent, 'clicking a choice must send SUBCHAT_APPROVAL_RESPOND');
+  assert.equal(sent.choice, 'once');
+  assert.equal(sent.subId, ap.dataset.subId);
+  assert.ok(!card.querySelector('.approval-card'), 'card must be removed after answering');
+  // Turn never completes (the agent is waiting on the approval); close the
+  // card to tear down the port + its SW_PING interval so the process can exit.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('SUBCHAT_CLARIFY renders a question card; submitting relays SUBCHAT_CLARIFY_RESPOND with subId', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'ask';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_CLARIFY', data: { question: 'Which file do you mean?' } });
+  await new Promise((r) => setTimeout(r, 10));
+  const cl = card.querySelector('.clarify-card');
+  assert.ok(cl, 'a clarify card must render inside the detail-thread card');
+  assert.match(cl.textContent, /Which file do you mean\?/);
+
+  cl.querySelector('.clarify-input').value = 'the config file';
+  cl.querySelector('.clarify-submit').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  const sent = sentMessages.find(m => m.type === 'SUBCHAT_CLARIFY_RESPOND');
+  assert.ok(sent, 'submitting must send SUBCHAT_CLARIFY_RESPOND');
+  assert.equal(sent.response, 'the config file');
+  assert.ok(!card.querySelector('.clarify-card'), 'card must be removed after answering');
+  // Same teardown rationale as the approval test above.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('reasoning deltas render as the main chat\'s live Thinking block and settle into a final collapsible think-block', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'think then answer';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  // llm-client inlines reasoning as <thinking>…</thinking> inside the delta
+  // stream for every apiStyle — the card must route it to the live collapsible,
+  // not smear it into the reply body.
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: '<thinking>pondering the question</thinking>' });
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'The answer is **42**.' });
+  await new Promise((r) => setTimeout(r, 400)); // pacer startDelay 80ms + reveal ticks
+  assert.ok(card.querySelector('.think-block.live-think'), 'a live Thinking collapsible must appear above the reply bubble');
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.doesNotMatch(liveAi.innerHTML, /pondering/, 'think content must not leak into the display bubble');
+
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok(!card.querySelector('.think-block.live-think'), 'live think block removed once the final render lands');
+  assert.ok(card.querySelector('.detail-thread-messages .msg.assistant .think-block'), 'final render keeps a collapsible think-block');
+  assert.match(liveAi.innerHTML, /<strong>42<\/strong>/);
 });
 
 test('regression: .detail-thread-input-row (and everything after it, including the resize handle) must stay pinned to the card bottom via margin-top:auto', async () => {

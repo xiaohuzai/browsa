@@ -2425,6 +2425,13 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   flex: 1 1 auto;
   min-height: 40px;
   overflow-y: auto;
+  /* The card is a nested scroller INSIDE #messages (the main scrollport).
+     Without containment, wheel scrolling at either scroller's boundary
+     chains into the other: reading the card yanks the main conversation
+     (and vice versa the card "eats" wheel strokes aimed at the main area,
+     which then feels frozen — both reported as one scroll-coupling bug).
+     contain cuts the chain at this element; each scroller stays its own. */
+  overscroll-behavior: contain;
   margin-bottom: 8px;
 }
 .detail-thread-messages:empty { display: none; margin-bottom: 0; }
@@ -2471,6 +2478,13 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 }
 .detail-thread-send:hover { opacity: 0.85; }
 .detail-thread-send:disabled { opacity: 0.5; cursor: default; }
+/* Mid-turn the send button IS the stop button (same swap as the main
+   composer's .sendbtn.is-stopping): gray + pulse so the state reads at a
+   glance. Reuses the composer's stop-pulse keyframes. */
+.detail-thread-send.is-stopping {
+  background: var(--fg-dim);
+  animation: stop-pulse 1.2s ease-in-out infinite;
+}
 .detail-thread-resize-handle {
   flex: 0 0 auto;
   display: flex;
