@@ -16,7 +16,7 @@ import {
   STREAM_KEEPALIVE_ALARM
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
-import { handleSubchat, handleSubchatAbort } from './lib/handlers/subchat-handler.js';
+import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
 import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
@@ -1280,8 +1280,12 @@ async function handle(msg, sender) {
       return { aborted: !!controller };
     }
 
-    case 'APPROVAL_RESPOND': {
-      // User clicked Allow/Deny on an approval card. Relay the choice to
+    case 'SUBCHAT_APPROVAL_RESPOND':   // subchat-keyed approval relay (detail thread card)
+      return handleSubchatApprovalRespond(msg);
+    case 'SUBCHAT_CLARIFY_RESPOND':    // subchat-keyed clarification relay (detail thread card)
+      return handleSubchatClarifyRespond(msg);
+
+    case 'APPROVAL_RESPOND': {      // User clicked Allow/Deny on an approval card. Relay the choice to
       // the agent so it can resume. opencode pending entries carry the
       // server session + request id and reply via the opencode endpoint;
       // card choices (once/always/deny) map onto opencode's reply enum
