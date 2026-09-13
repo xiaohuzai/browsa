@@ -251,7 +251,7 @@ test('SUBCHAT requires subId and a non-empty messages array (no tabId dependency
 test('SUBCHAT pushes chunks via pushSubChatChunk keyed by subId, not the main pushChunk', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CHUNK', subId, delta \}\)/);
-  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_DONE', subId, providerLabel, providerKey, \.\.\.\(st\.finishReason === 'length' \? \{ truncated: true \} : \{\}\) \}\)/);
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_DONE', subId, providerLabel, providerKey, \.\.\.\(st\.finishReason === 'length' \? \{ truncated: true \} : \{\}\), \.\.\.\(st\.usage \? \{ usage: st\.usage \} : \{\}\) \}\)/);
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_ERROR', subId, message:/);
   // Must not fall back to the main chat's per-turn port for this traffic.
   assert.doesNotMatch(subchatSrc, /\bpushChunk\(/, 'SUBCHAT must use pushSubChatChunk, never the main pushChunk');
