@@ -60,8 +60,10 @@ test('renderMarkmap error UI mirrors mermaid\'s: message + copy button + collaps
   assert.match(src, /markmap-err-src/);
 });
 
-test('addCodeCopyButtons excludes markmap (alongside mermaid/diff/patch) from highlight.js syntax highlighting', () => {
-  assert.match(src, /lang !== 'mermaid' && lang !== 'markmap' && lang !== 'diff' && lang !== 'patch'/);
+test('addCodeCopyButtons excludes markmap (alongside mermaid/diff/patch and our renderer languages) from highlight.js syntax highlighting', () => {
+  // echarts/smiles/pdb joined the skip list (2026-09-13): no hljs grammar
+  // exists for them and the attempt logs a console warning per block.
+  assert.match(src, /!\['mermaid', 'markmap', 'diff', 'patch', 'echarts', 'smiles', 'pdb'\]\.includes\(lang\)/);
 });
 
 test('renderMarkmap is exported', () => {

@@ -7,7 +7,7 @@ import { getActiveSessionId } from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, preloadChartVendors,
+  renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, renderSmiles, renderPdb, preloadChartVendors,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
@@ -1594,7 +1594,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       addCodeCopyButtons();
-      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el);
       if (m.providerLabel) addProviderLabel(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
@@ -3309,7 +3309,7 @@ async function renderHistory() {
       decorateLinks(el);
       linkifyTimestamps(el);
       decorateFigureRefs(el, figs);
-      renderMermaid(el); renderEcharts(el); renderMarkmap(el);
+      renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el);
       addCodeCopyButtons(el); // re-wire copy buttons on the upgraded content
       // el.innerHTML above wipes out the .msg-actions row appended during the
       // sync pass (it's a child of el, not a sibling) — re-add it here.

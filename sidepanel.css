@@ -2718,3 +2718,43 @@ dialog.crop-modal:not([open]),
 dialog.lightbox-overlay:not([open]) {
   display: none;
 }
+
+/* ─── 化学结构 / 生物大分子渲染（render.js renderSmiles/renderPdb） ─────────── */
+/* 2D 结构式：smiles-drawer 画在 canvas 上，透明底随主题；等宽块换成交互图 */
+.smiles-block {
+  margin: 8px 0;
+  text-align: center;
+}
+.smiles-block canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+/* Reaction SVG: ReactionDrawer writes the content-fit viewBox + style width
+   itself — cap it to the bubble width and let height follow proportionally. */
+.smiles-block svg.smiles-svg {
+  max-width: 100%;
+  height: auto;
+}
+/* 3D 蛋白质查看器：3Dmol 在容器里建 WebGL canvas，占满宽度定高 */
+.pdb-block {
+  margin: 8px 0;
+}
+.pdb-viewer {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pdb-status,
+.pdb-error {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  text-align: left;
+  pointer-events: none;
+}
+.pdb-error { color: var(--error); }

@@ -21,9 +21,11 @@
   "license": "MIT",
   "dependencies": {
     "@firecrawl/pdf-inspector-wasm": "^0.1.1",
+    "3dmol": "^1.8.0",
     "echarts": "^6.1.0",
     "markmap-lib": "^0.18.12",
     "markmap-view": "^0.18.12",
-    "pdfjs-dist": "^6.1.200"
+    "pdfjs-dist": "^6.1.200",
+    "smiles-drawer": "^2.4.1"
   }
 }
