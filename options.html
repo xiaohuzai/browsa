@@ -74,6 +74,38 @@
         </div>
       </section>
 
+      <section class="card common-settings-card">
+        <div class="card-header">
+          <h2 data-i18n="chatPrefsHeading">Chat Preferences</h2>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <label><span data-i18n="fontSizeLabel">Message font size</span>
+              <div class="range-row mt-4">
+                <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" />
+                <span id="fontSizeVal" class="range-val">13.5px</span>
+              </div>
+            </label>
+          </div>
+          <div class="row mt-12">
+            <label><span data-i18n="sendShortcutLabel">Send shortcut</span>
+              <select id="sendShortcut" class="mt-4">
+                <option value="enter" data-i18n="sendShortcutEnter">Enter (Shift+Enter for newline)</option>
+                <option value="shift-enter" data-i18n="sendShortcutShiftEnter">Shift+Enter (Enter for newline)</option>
+              </select>
+            </label>
+          </div>
+          <label class="toggle-row mt-12">
+            <input type="checkbox" id="thoughtAutoCollapse" />
+            <span data-i18n="thoughtAutoCollapseLabel">Auto-collapse thinking blocks</span>
+          </label>
+          <div class="card-actions">
+            <button data-act="save-chat-prefs" class="primary" data-i18n="saveBtn">Save</button>
+            <span id="chat-prefs-status" class="card-status"></span>
+          </div>
+        </div>
+      </section>
+
       <details class="advanced-section">
         <summary class="advanced-summary" data-i18n="advancedSummary">⚙ Advanced</summary>
 
@@ -95,38 +127,6 @@
               <input type="checkbox" id="deepExtractEnabled" checked />
               <span data-i18n-html="deepExtractToggleLabelHtml">When a page looks incomplete, automatically expand and page through it before attaching (📎)</span>
             </label>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="card-header">
-            <h2 data-i18n="chatPrefsHeading">Chat Preferences</h2>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <label><span data-i18n="fontSizeLabel">Message font size</span>
-                <div class="range-row mt-4">
-                  <input type="range" id="fontSize" min="12" max="18" step="0.5" value="13.5" />
-                  <span id="fontSizeVal" class="range-val">13.5px</span>
-                </div>
-              </label>
-            </div>
-            <div class="row mt-12">
-              <label><span data-i18n="sendShortcutLabel">Send shortcut</span>
-                <select id="sendShortcut" class="mt-4">
-                  <option value="enter" data-i18n="sendShortcutEnter">Enter (Shift+Enter for newline)</option>
-                  <option value="shift-enter" data-i18n="sendShortcutShiftEnter">Shift+Enter (Enter for newline)</option>
-                </select>
-              </label>
-            </div>
-            <label class="toggle-row mt-12">
-              <input type="checkbox" id="thoughtAutoCollapse" />
-              <span data-i18n="thoughtAutoCollapseLabel">Auto-collapse thinking blocks</span>
-            </label>
-                        <div class="card-actions">
-              <button data-act="save-chat-prefs" class="primary" data-i18n="saveBtn">Save</button>
-              <span id="chat-prefs-status" class="card-status"></span>
-            </div>
           </div>
         </section>
 

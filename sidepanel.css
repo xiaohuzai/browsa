@@ -2780,3 +2780,166 @@ dialog.lightbox-overlay:not([open]) {
   pointer-events: none;
 }
 .pdb-error { color: var(--error); }
+
+/* ─── Visual refinement pass: reading desk ────────────────────────────────
+   A quiet annotation surface: stronger grouping at the edges, lighter touch
+   in the transcript, and one clear warm action for sending. */
+.topbar {
+  min-height: 48px;
+  padding: 9px 12px 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 70%, transparent), transparent),
+    var(--bg);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent);
+}
+.topbar::after {
+  content: '';
+  align-self: stretch;
+  width: 1px;
+  margin-left: 2px;
+  background: var(--border-soft);
+  order: 1;
+}
+.topbar .provider { order: 0; }
+.topbar .iconbtn { order: 2; }
+.wordmark {
+  font-size: 13px;
+  letter-spacing: 0.075em;
+}
+.provider {
+  min-width: 0;
+  max-width: 190px;
+  background-color: color-mix(in srgb, var(--bg-2) 80%, transparent);
+  border-color: var(--border);
+}
+.provider:focus-visible,
+.iconbtn:focus-visible,
+.attachbtn:focus-visible,
+.sendbtn:focus-visible,
+.qa-btn:focus-visible,
+.ctx-pill:has(input:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+  outline-offset: 2px;
+}
+.iconbtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--fg-dim);
+  transition: background var(--t), color var(--t), transform var(--t);
+}
+.iconbtn:hover { transform: translateY(-1px); }
+
+.messages {
+  padding: 18px 14px 16px;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 34%),
+    var(--bg);
+}
+.messages:not(:has(.msg)) {
+  position: relative;
+  isolation: isolate;
+}
+.messages:not(:has(.msg))::before {
+  content: 'READ / THINK / MAKE';
+  position: absolute;
+  top: 25%;
+  left: 14px;
+  color: color-mix(in srgb, var(--accent) 52%, var(--muted));
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  opacity: .8;
+}
+.messages:not(:has(.msg))::after {
+  top: calc(25% + 24px);
+  left: 14px;
+  right: 24px;
+  max-width: 280px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  line-height: 1.6;
+}
+.msg.user {
+  box-shadow: 0 2px 8px color-mix(in srgb, #000 12%, transparent);
+}
+.msg.assistant {
+  border-left-width: 3px;
+  border-left-color: color-mix(in srgb, var(--accent) 42%, var(--border-soft));
+  padding-left: 13px;
+}
+
+.quickbar {
+  margin: 0 12px 8px;
+  padding: 5px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+}
+.quickbar-toggle { width: 25px; height: 25px; }
+.qa-btn {
+  min-height: 26px;
+  padding-inline: 11px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-dim);
+}
+.qa-btn:hover {
+  border-color: var(--border);
+  background: var(--bg-3);
+  color: var(--fg);
+  transform: translateY(-1px);
+}
+
+.composer {
+  padding: 8px 12px 11px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg-2) 75%, transparent) 24%), var(--bg);
+}
+.composer-box {
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  box-shadow: 0 6px 22px color-mix(in srgb, #000 18%, transparent);
+  transition: border-color var(--t), box-shadow var(--t), background var(--t);
+}
+.composer-box:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border-strong));
+  background: var(--bg-2);
+  box-shadow: 0 0 0 3px var(--accent-dim), 0 8px 24px color-mix(in srgb, #000 22%, transparent);
+}
+.composer-box textarea { padding-top: 12px; padding-bottom: 12px; }
+.sendbtn {
+  width: 32px;
+  height: 32px;
+  margin-right: 6px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.sendbtn:hover:not(:disabled) { transform: translateY(-1px); }
+.composer-footer { padding: 7px 4px 0; }
+.composerinfo { padding-inline: 4px; }
+
+@media (max-width: 320px) {
+  .topbar { gap: 5px; padding-inline: 8px; }
+  .topbar::after { margin-left: 0; }
+  .provider { max-width: 125px; }
+  .topbar .iconbtn { width: 25px; }
+  .messages { padding-inline: 10px; }
+  .quickbar { margin-inline: 8px; overflow-x: auto; justify-content: flex-start; }
+  .qa-btn { flex-shrink: 0; }
+  .composer { padding-inline: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+  }
+}
