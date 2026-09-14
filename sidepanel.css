@@ -188,6 +188,14 @@ body {
 
 /* ─── Message bubbles ───────────────────────────────────────────────────────── */
 .msg {
+  /* Never let flexbox shrink a bubble. .messages is a fixed-height flex
+     column that scrolls; a flex item whose overflow is NOT visible loses its
+     automatic min-height floor, so with the default flex-shrink:1 a COLLAPSED
+     bubble (overflow-y:hidden below) once absorbed the container's entire
+     shrink deficit on long histories — squashed to its 8px padding, invisible
+     and impossible to hover back open (user report). Items in a scrollable
+     list are content-sized, always. */
+  flex-shrink: 0;
   max-width: 90%;
   padding: 10px 14px;
   line-height: 1.72;

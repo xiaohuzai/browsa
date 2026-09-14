@@ -29,8 +29,8 @@ function installChromeMock() {
     storage: { local: { get: async () => storageData } },
     alarms: { create: () => {}, clear: () => {} },
     scripting: {
-      executeScript: async ({ func, args }) => {
-        execScriptCalls.push({ name: func.name, args: args?.[0] });
+      executeScript: async ({ func, args, target }) => {
+        execScriptCalls.push({ name: func.name, args: args?.[0], tabId: target?.tabId });
         switch (func.name) {
           case 'interactiveSnapshot': {
             const n = execScriptCalls.filter((c) => c.name === 'interactiveSnapshot').length;
@@ -198,7 +198,25 @@ test('maybeDeepExtract: brain clicks, re-extraction wins, result carries the gai
   const names = execScriptCalls.map((c) => c.name);
   assert.deepEqual(names.filter((n) => n === 'interactiveSnapshot').length, 2);
   assert.deepEqual(names.filter((n) => n === 'clickIndexed').length, 1);
-  // progress was pushed at least once (start + step)
+  // ALL in-page work (snapshot/click/re-extract) happened on the BACKGROUND
+  // COPY (tab 77), never on the user's tab (1) — the copy is opened with the
+  // page's own URL and closed afterwards.
+  assert.deepEqual(tabsCreated, [{ url: 'https://example.com/a', active: false }]);
+  assert.deepEqual(tabsRemoved, [77]);
+  assert.ok(execScriptCalls.length >= 4);
+  assert.ok(execScriptCalls.every((c) => c.tabId === 77), `every executeScript must target the bg copy, got: ${JSON.stringify(execScriptCalls.map((c) => c.tabId))}`);
+});
+
+test('maybeDeepExtract: interactive signals but no page URL → nothing to copy, no tab touched', async () => {
+  installChromeMock();
+  const res = await maybeDeepExtract({
+    tabId: 1,
+    ctx: { text: 'BASE', deepExtractSignals: { nextPageHref: null, loadMore: true, expandersLeft: 0 } },
+    textCap: 100_000, query: '', redoMode: 'reader',
+  });
+  assert.equal(res, null);
+  assert.deepEqual(tabsCreated, [], 'without a URL to copy, no background tab may be opened');
+  assert.equal(execScriptCalls.length, 0);
 });
 
 test('maybeDeepExtract: provider failure mid-loop → fail-open null, baseline kept', async () => {
@@ -210,6 +228,7 @@ test('maybeDeepExtract: provider failure mid-loop → fail-open null, baseline k
     textCap: 1000, query: '', redoMode: 'reader',
   });
   assert.equal(res, null);
+  assert.deepEqual(tabsRemoved, [77], 'the background copy must be closed even on failure');
 });
 
 test('maybeDeepExtract: walks URL pagination in a background tab and closes it', async () => {
