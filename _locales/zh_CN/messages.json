@@ -396,7 +396,7 @@
     "description": "Options: providers hint"
   },
   "providersTipHtml": {
-    "message": "<b>Hermes Agent</b>：内置，填 Base URL + API Key 即可。<br><br><b>OpenCode Agent</b> / <b>Agent Bridge</b>：驱动你本机已登录的 CLI agent（Codex、Claude Code 等），无需 API Key。<br><br><b>LLM</b>：任何 OpenAI Chat / OpenAI Responses / Anthropic 端点。给每张卡起个别名，<b>Ping</b> 验证连通。",
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">查看使用指南：AI 服务商配置</a>",
     "description": "Options: providers ? tip bubble (controlled HTML)"
   },
   "systemPromptHeading": {
@@ -1166,5 +1166,21 @@
   },
   "chemExportPng": {
     "message": "导出PNG"
+  },
+  "localAgentTabBridge": {
+    "message": "Codex / Claude Code",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "此类型已有配置（点击查看）",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
   }
 }

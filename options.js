@@ -27,6 +27,10 @@ const BLANK_LLM = { type: 'llm', alias: '', baseUrl: '', apiKey: '', model: '', 
 
 let cachedCfg = null;
 const _pingState = {}; // name → 'reachable' | 'unreachable', persists across re-renders
+// Agent 组默认折叠（用户反馈：小白只会填 LLM）；但 tab 点击/保存卡都会触发
+// renderProviders 重建 DOM——用户手动展开过的状态要在本会话内记住，否则
+// 一点 tab 组就又折回去了。仅会话级记忆：重开设置页回到默认折叠。
+let agentGroupOpened = false;
 
 init();
 
@@ -233,19 +237,24 @@ function renderProviders() {
   const providers = cachedCfg.providers || {};
 
   const groups = [
-    { type: 'agent', label: _t('agentGroupLabel', '🤖 Agent Providers'), desc: _t('agentGroupDesc', 'Full agent backend — tool execution, file access, multi-step tasks') },
+    // LLM 组在前且始终展开（小白的必经之路：填 Base URL + Key 就能用）；
+    // Agent 组在后、默认折叠（会本地 agent 的人是少数，且折叠状态在会话
+    // 内记忆——见 agentGroupOpened）。
     { type: 'llm',   label: _t('llmGroupLabel', '💬 LLM Providers'),   desc: _t('llmGroupDesc', 'Language model endpoint — add as many as you like; each picks its own wire protocol') },
+    { type: 'agent', label: _t('agentGroupLabel', '🤖 Agent Providers'), desc: _t('agentGroupDesc', 'Full agent backend — tool execution, file access, multi-step tasks') },
   ];
 
   for (const group of groups) {
     const entries = Object.entries(providers).filter(([, cfg]) => (cfg.type || 'llm') === group.type);
-    const hasActive = entries.some(([name]) => name === cachedCfg.activeProvider);
 
     const details = document.createElement('details');
     details.className = 'provider-group';
-    // Auto-expand the group that holds the active provider, any group that
-    // has content, AND the LLM group itself — the LLM group is always open.
-    if (hasActive || entries.length > 0 || group.type === 'llm') details.open = true;
+    if (group.type === 'llm') {
+      details.open = true; // LLM 组永远展开
+    } else {
+      details.open = agentGroupOpened;
+      details.addEventListener('toggle', () => { agentGroupOpened = details.open; });
+    }
 
     const summary = document.createElement('summary');
     summary.className = 'provider-group-header';
@@ -254,8 +263,68 @@ function renderProviders() {
       <span class="provider-group-desc">${group.desc}</span>`;
     details.appendChild(summary);
 
-    for (const [name, cfg] of entries) {
-      details.appendChild(buildProviderCard(name, cfg));
+    if (group.type === 'agent') {
+      // 本地 Agent 合并卡（用户反馈：设置页 agent 卡太多、不知道选哪个；
+      // 二轮反馈：Hermes 在选中 bridge/opencode 后仍常驻）——三张 agent 卡
+      // （Agent Bridge / OpenCode / Hermes）合成一个「类型切换」呈现：三张卡
+      // 都正常构建（各自的 buildProviderCard/saveCard/pingCard 零改动），同屏
+      // 只显示当前类型的那张。切换偏好持久化在 localAgentTab（纯 UI 偏好）。
+      const tab = localAgentTab();
+      const tabsWrap = document.createElement('div');
+      tabsWrap.className = 'local-agent-tabs';
+      // 已配置指示点：切走的 tab 背后若存有配置（如 codex 桥配了三个 agent、
+      // 又配了 opencode 直连），pill 上点一个点——多 agent 用户一眼看出
+      // 「哪个 tab 背后有东西」，不用来回切。
+      const agentConfigured = (id) => {
+        const p = providers[id];
+        if (!p) return false;
+        return !!(p.baseUrl || '').trim() || (id === 'bridge' && p.models?.length > 0);
+      };
+      const tabBtn = (id) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'local-agent-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
+        b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
+        b.textContent = id === 'bridge'
+          ? _t('localAgentTabBridge', 'Codex / Claude Code')
+          : id === 'opencode'
+          ? _t('localAgentTabOpencode', 'OpenCode')
+          : _t('localAgentTabHermes', 'Hermes');
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (cachedCfg.localAgentTab === id) return;
+          cachedCfg.localAgentTab = id;
+          try { await chrome.storage.local.set({ localAgentTab: id }); } catch (_) {}
+          renderProviders();
+        });
+        return b;
+      };
+      for (const id of ['bridge', 'opencode', 'hermes']) {
+        if (!providers[id]) continue;
+        tabsWrap.append(tabBtn(id));
+      }
+      // 分段控件直接住进「可见卡」的标题行——tab 就是标题（该卡的 .name 隐藏，
+      // 消掉「Codex/Claude Code」出现两遍的重复），控件与卡读作一个整体。
+      details.appendChild(tabsWrap);
+      for (const id of ['bridge', 'opencode', 'hermes']) {
+        if (!entries.some(([n]) => n === id)) continue;
+        const cardEl = buildProviderCard(id, providers[id]);
+        if (id !== tab) cardEl.style.display = 'none';
+        details.appendChild(cardEl);
+        if (id === tab) {
+          const h3 = cardEl.querySelector('.provider-h3');
+          const nameSpan = h3.querySelector('.name');
+          if (nameSpan) nameSpan.style.display = 'none';
+          h3.insertBefore(tabsWrap, nameSpan);
+        }
+      }
+      for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'hermes')) {
+        details.appendChild(buildProviderCard(name, cfg));
+      }
+    } else {
+      for (const [name, cfg] of entries) {
+        details.appendChild(buildProviderCard(name, cfg));
+      }
     }
 
     if (group.type === 'llm') {
@@ -279,6 +348,27 @@ function renderProviders() {
 
     providersEl.appendChild(details);
   }
+}
+
+// Which agent card the merged tabs show: explicit pref wins, then "exactly
+// one of the three is configured" (show what you actually use), then the
+// active provider — but ONLY when it is itself configured (a fresh install's
+// activeProvider defaults to the UNCONFIGURED hermes, and defaulting the tab
+// there was the exact "Hermes 永远常驻" complaint this merge fixes); finally
+// the bridge default (the recommended first path).
+function localAgentTab() {
+  const AGENTS = ['bridge', 'opencode', 'hermes'];
+  const pref = cachedCfg.localAgentTab;
+  if (AGENTS.includes(pref)) return pref;
+  const p = cachedCfg.providers || {};
+  const isConfigured = (id) => {
+    const c = p[id];
+    return !!c && (!!(c.baseUrl || '').trim() || (id === 'bridge' && c.models?.length > 0));
+  };
+  const configured = AGENTS.filter(isConfigured);
+  if (configured.length === 1) return configured[0];
+  if (AGENTS.includes(cachedCfg.activeProvider) && isConfigured(cachedCfg.activeProvider)) return cachedCfg.activeProvider;
+  return 'bridge';
 }
 
 // One bridge endpoint row: URL + alias + its own API key (a bridge can require
