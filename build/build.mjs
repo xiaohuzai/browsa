@@ -126,6 +126,15 @@ const VENDORS = [
     outName:   'pdf.worker'
   },
   {
+    // 2D chemical structure diagrams: model emits ```smiles (SMILES string),
+    // render.js's renderSmiles draws it via smiles-drawer's canvas Drawer.
+    name: 'smiles-drawer',
+    srcEntry:  'smiles-drawer/dist/smiles-drawer.min.mjs',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'smiles-drawer'
+  },
+  {
     name: 'markstream-core',
     srcEntry:  'markstream-core/dist/index.js',
     srcDir:    join(DEPS, 'node_modules'),
@@ -196,6 +205,18 @@ const RAW_COPIES = [
   {
     srcDir:  join(ROOT, 'node_modules/@firecrawl/pdf-inspector-wasm'),
     files:   ['pdf_inspector_wasm_bg.wasm', 'pdf_inspector_wasm.js']
+  },
+  {
+    // Interactive 3D protein/small-molecule viewer: the model emits ```pdb
+    // (4-char RCSB PDB ID or raw PDB text) and render.js's renderPdb renders
+    // it via $3Dmol.createViewer (WebGL). The dist is a <script>-style
+    // concatenated build (jQuery included) relying on sloppy-mode globals —
+    // esbuild's CJS wrapper makes jQuery take its CommonJS branch
+    // (noGlobal=true, never sets window.$) and the 3Dmol half then throws
+    // "$ is not defined" at evaluation. RAW copy + classic <script> load in
+    // get3Dmol() keeps its exact browser semantics.
+    srcDir:  join(ROOT, 'node_modules/3dmol/build'),
+    files:   ['3Dmol-min.js']
   }
 ];
 

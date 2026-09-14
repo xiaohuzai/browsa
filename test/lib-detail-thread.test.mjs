@@ -271,8 +271,14 @@ test('SUBCHAT_TOOL_PROGRESS renders the main panel\'s pre-bubble progress line a
   card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
 
+  // Waiting indicator (思考中… Ns) fills the pre-bubble slot until the first
+  // real event — same first-token-latency treatment as the main panel (B4).
+  const wait = card.querySelector('.detail-thread-messages .wait-indicator');
+  assert.ok(wait, 'a wait indicator must appear between send and the first event');
+
   lastPort.emit({ type: 'SUBCHAT_TOOL_PROGRESS', text: 'web_search: querying duckduckgo' });
   await new Promise((r) => setTimeout(r, 10));
+  assert.ok(!card.querySelector('.wait-indicator'), 'the first real event must stop the wait indicator');
   const line = card.querySelector('.detail-thread-messages .tool-progress');
   assert.ok(line, 'a .tool-progress line must appear above the streaming bubble inside the card');
   assert.match(line.textContent, /web_search: querying duckduckgo/);
@@ -338,6 +344,48 @@ test('SUBCHAT_CLARIFY renders a question card; submitting relays SUBCHAT_CLARIFY
   assert.equal(sent.response, 'the config file');
   assert.ok(!card.querySelector('.clarify-card'), 'card must be removed after answering');
   // Same teardown rationale as the approval test above.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('DONE folds tool events into a tool-history details block and renders the token usage chip (main-panel parity)', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'go';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_TOOL_PROGRESS', text: 'web_search: hermes agent github' });
+  lastPort.emit({ type: 'SUBCHAT_TOOL_PROGRESS', text: 'web_search ✓' });
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'Answer text.' });
+  lastPort.emit({ type: 'SUBCHAT_DONE', providerLabel: 'Hermes Agent', usage: { input_tokens: 8700, output_tokens: 596, total_tokens: 9296 } });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.ok(!card.querySelector('.detail-thread-messages .tool-progress'), 'live progress line must be gone');
+  const fold = card.querySelector('.detail-thread-messages .tool-history');
+  assert.ok(fold, 'tool events must fold into a .tool-history details above the bubble');
+  assert.match(fold.querySelector('summary').textContent, /2 steps/);
+  assert.equal(fold.querySelectorAll('li').length, 2, 'each tool event becomes a list row');
+  assert.match(fold.textContent, /web_search: hermes agent github/);
+
+  const chip = card.querySelector('.detail-thread-messages .token-usage');
+  assert.ok(chip, 'a token usage chip must render below the finalized bubble');
+  assert.match(chip.textContent, /↑ 8\.7k/);
+  assert.match(chip.textContent, /↓ 596/);
+
+  // Next turn resets the accumulators — a DONE with neither usage nor tool
+  // events must not leave a stale fold/chip behind.
+  input.value = 'again';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  lastPort.emit({ type: 'SUBCHAT_DONE', providerLabel: 'Hermes Agent' });
+  await new Promise((r) => setTimeout(r, 30));
+  const folds = card.querySelectorAll('.detail-thread-messages .tool-history');
+  assert.equal(folds.length, 1, 'exactly the first turn\'s fold remains — second turn must not stack an empty one');
+  assert.equal(card.querySelectorAll('.detail-thread-messages .token-usage').length, 1, 'exactly the first turn\'s usage chip remains');
   card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
 });
 

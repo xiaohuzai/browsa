@@ -208,3 +208,59 @@ test('handleExplainPort: port disconnect aborts the upstream stream and no error
   assert.ok(!port.sent.some((m) => m.type === 'EXPLAIN_ERROR'));
   assert.ok(!port.sent.some((m) => m.type === 'EXPLAIN_DONE'));
 });
+
+// ─── agent providers (opencode/bridge)：一次性会话分流，不打 /chat/completions
+// （2026-09-13 修复：此前 agent provider 落到 chatStream → 桥/opencode 无该
+// 路由 → float bar 翻译/解释 404 {"ok":false,"error":"not found"}）。
+
+test('handleExplainPort: bridge provider routes to a one-shot bridgeStream, never chatStream', async () => {
+  const calls = [];
+  const agentStreams = {
+    bridgeStream: async (args) => { calls.push({ fn: 'bridge', args }); args.onDelta('译文'); },
+    opencodeStream: async () => { calls.push({ fn: 'opencode' }); },
+    createOpencodeSession: async () => { calls.push({ fn: 'createSession' }); return 'ses_x'; },
+  };
+  const port = makeFakePort();
+  handleExplainPort(port, {
+    getAll: async () => ({
+      activeProvider: 'b1',
+      providers: { b1: { baseUrl: 'http://127.0.0.1:3948', apiKey: '', isBridge: true, apiStyle: 'chat' } },
+    }),
+    agentStreams,
+  });
+  port.emit({ type: 'EXPLAIN_REQUEST', text: 'serendipity', lang: 'zh', mode: 'translate' });
+  await flush();
+  assert.equal(calls.length, 1, 'exactly one agent stream call');
+  assert.equal(calls[0].fn, 'bridge');
+  assert.equal(calls[0].args.baseUrl, 'http://127.0.0.1:3948');
+  assert.equal(calls[0].args.sessionId, undefined, 'one-shot: no session id → server spawns a throwaway thread');
+  assert.match(calls[0].args.text, /翻译|translat/i);
+  assert.ok(port.sent.some(m => m.type === 'EXPLAIN_DONE'), 'must finish with EXPLAIN_DONE');
+  assert.equal(port.sent.some(m => m.type === 'EXPLAIN_ERROR'), false);
+});
+
+test('handleExplainPort: opencode provider creates a throwaway session per call', async () => {
+  const calls = [];
+  const agentStreams = {
+    bridgeStream: async () => { calls.push({ fn: 'bridge' }); },
+    opencodeStream: async (args) => { calls.push({ fn: 'opencode', args }); args.onDelta('解释'); },
+    createOpencodeSession: async (args) => { calls.push({ fn: 'createSession', args }); return 'ses_abc'; },
+  };
+  const port = makeFakePort();
+  handleExplainPort(port, {
+    getAll: async () => ({
+      activeProvider: 'o1',
+      providers: { o1: { baseUrl: 'http://127.0.0.1:4096', apiKey: '', isOpencode: true, apiStyle: 'chat' } },
+    }),
+    agentStreams,
+  });
+  port.emit({ type: 'EXPLAIN_REQUEST', text: 'catalyze', lang: 'zh', mode: 'explain' });
+  await flush();
+  assert.equal(calls[0].fn, 'createSession');
+  assert.equal(calls[1].fn, 'opencode');
+  assert.equal(calls[1].args.sessionId, 'ses_abc');
+  assert.equal(port.sent.some(m => m.type === 'EXPLAIN_ERROR'), false);
+  // 关端口 → abort 不炸（signal 已接线到 agent 流）
+  port.disconnect();
+  await flush();
+});

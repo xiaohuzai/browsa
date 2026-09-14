@@ -180,3 +180,32 @@ test('agentSwitchNeedsPrompt — only agent targets with a different previous re
   // no previous reply (fresh conversation) → nothing to carry
   assert.equal(agentSwitchNeedsPrompt({ currentIsAgent: true, currentKey: { name: 'bridge', model: 'http://127.0.0.1:3948' }, lastKey: null }), false);
 });
+
+// ─── AGENT_RENDER_HINT（2026-09-13：opencode/bridge 拿不到 CAPABILITY_HINTS，
+// 渲染能力词汇表靠首轮 turn 文本自带）─────────────────────────────────────
+
+test('withAgentRenderHints: first turn appends the hint block; later turns return the text untouched', async () => {
+  const { withAgentRenderHints, AGENT_RENDER_HINT } = await import('../lib/agent-turn.js');
+  const turn = 'What is 2+2?';
+  const first = withAgentRenderHints(turn, true);
+  assert.ok(first.startsWith(turn), 'the user turn must stay verbatim at the front');
+  assert.ok(first.includes(AGENT_RENDER_HINT));
+  assert.equal(withAgentRenderHints(turn, false), turn, 'later turns must be byte-identical (the agent transcript already holds the hints)');
+  // The fence vocabulary the chat UI can render live must all be named.
+  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb']) {
+    assert.ok(AGENT_RENDER_HINT.includes('```' + fence), `hint must mention \`\`\`${fence}`);
+  }
+  assert.match(AGENT_RENDER_HINT, /never invent an ID/i, 'the pdb anti-fabrication rule must ride along');
+});
+
+test('withAgentRenderHints is wired into all four agent branches (chat + subchat, opencode + bridge)', async () => {
+  const fs = await import('node:fs/promises');
+  const chatSrc = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  const subchatSrc = await fs.readFile(new URL('../lib/handlers/subchat-handler.js', import.meta.url), 'utf8');
+  // chat-handler: both branches consume it
+  assert.equal((chatSrc.match(/withAgentRenderHints\(/g) || []).length, 2, 'chat-handler must hint both opencode and bridge turns');
+  assert.equal((subchatSrc.match(/withAgentRenderHints\(/g) || []).length, 2, 'subchat-handler must hint both opencode and bridge turns');
+  // Hermes/LLM branches must NOT double-hint — CAPABILITY_HINTS already covers them.
+  assert.doesNotMatch(chatSrc.replace(/withAgentRenderHints\([^)]*\)/g, ''), /AGENT_RENDER_HINT/,
+    'the runs/dispatch paths must not reference the agent hint');
+});

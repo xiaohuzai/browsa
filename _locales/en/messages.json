@@ -1163,5 +1163,8 @@
   },
   "detailThreadTruncated": {
     "message": "Follow-up reply reached the output limit — send \"continue\" to extend it."
+  },
+  "chemExportPng": {
+    "message": "Export PNG"
   }
 }
