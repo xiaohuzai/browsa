@@ -396,7 +396,7 @@
     "description": "Options: providers hint"
   },
   "providersTipHtml": {
-    "message": "<b>Hermes Agent</b>: built-in, just fill Base URL + API key.<br><br><b>OpenCode Agent</b> / <b>Agent Bridge</b>: drive a local CLI agent (Codex, Claude Code, …) you are already logged into — no API key needed.<br><br><b>LLM</b>: any OpenAI Chat / OpenAI Responses / Anthropic endpoint. Give each an Alias; <b>Ping</b> to verify.",
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">Open the setup guide: AI providers</a>",
     "description": "Options: providers ? tip bubble (controlled HTML)"
   },
   "systemPromptHeading": {
@@ -1166,5 +1166,21 @@
   },
   "chemExportPng": {
     "message": "Export PNG"
+  },
+  "localAgentTabBridge": {
+    "message": "Codex / Claude Code",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "This type has a saved configuration (click to view)",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
   }
 }

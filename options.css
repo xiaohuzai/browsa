@@ -167,6 +167,49 @@ main {
   overflow: hidden;
 }
 
+/* 本地 Agent 合并卡（options.js renderProviders）：三张 agent 卡共用一个
+   连体分段控件，控件住进可见卡的标题行（该卡的 .name 隐藏，tab 即标题），
+   同屏只显示当前类型的那张。 */
+.local-agent-tabs {
+  display: inline-flex;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg);
+  min-width: 0;
+}
+.local-agent-tab {
+  border: none;
+  border-right: 1px solid var(--border);
+  padding: 3px 11px;
+  font-size: 11.5px;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.local-agent-tab:last-child { border-right: none; }
+.local-agent-tab:hover { color: var(--fg); background: var(--bg-2); }
+.local-agent-tab.on {
+  background: var(--accent);
+  color: #fff;
+}
+.local-agent-tab.on:hover { color: #fff; }
+/* 已配置指示点：该 tab 背后的 provider 存有配置（可能是多个桥 agent） */
+.local-agent-tab.configured::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold, #c9971c);
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.local-agent-tab.on.configured::after { background: #fff; }
+
 .provider-group-header {
   padding: 9px 14px;
   /* An elevated surface strip distinct from both the page (--bg) and the

@@ -331,18 +331,31 @@ async function addLlmCard() {
     assert.ok(committed, 'saving the reserved slot must commit it as a real LLM 1 card');
     return committed;
   }
+  // 新卡 = provider key 差集（不能取「最后一张卡」：LLM 组在前、Agent 组在
+  // 后后，列表末位是 agent 卡；也不能按节点身份 diff——renderProviders 会重
+  // 建全部卡节点，须按稳定的 data-name 比较）。
+  const before = new Set(providerCards().map((c) => c.dataset.name));
   clickAddProvider();
   await new Promise((r) => setTimeout(r, 10));
-  const cards = providerCards();
-  return cards[cards.length - 1];
+  const added = providerCards().find((c) => !before.has(c.dataset.name));
+  assert.ok(added, 'Add Provider must append a new card');
+  return added;
 }
 
-test('options.js: init() renders the fixed agent cards plus a reserved empty LLM slot', () => {
+test('options.js: init() renders the merged agent trio (bridge + opencode + hermes) plus a reserved empty LLM slot', () => {
   const cards = providerCards();
   assert.equal(cards.length, 4, 'Hermes Agent + OpenCode Agent + Agent Bridge (three fixed agent cards) + one reserved empty LLM slot');
   assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes Agent card present');
   assert.equal(findProviderCard('OpenCode Agent') != null, true, 'OpenCode Agent card present');
   assert.equal(findProviderCard(BRIDGE_CARD_LABEL) != null, true, 'Agent Bridge card present');
+  // 合并呈现：三个类型 tab + 同屏只显示当前类型的那张卡。全新安装无任何
+  // 配置、activeProvider 默认是未配置的 hermes —— 不得因此默认落在 Hermes
+  // （「Hermes 永远常驻」正是要修的抱怨），应落在推荐首选 bridge。
+  const tabs = document.querySelectorAll('.local-agent-tab');
+  assert.equal(tabs.length, 3, 'three agent type tabs (bridge / opencode / hermes)');
+  assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, '', 'bridge card is the default visible tab on a fresh install');
+  assert.equal(findProviderCard('OpenCode Agent').style.display, 'none', 'opencode card hidden under the default tab');
+  assert.equal(findProviderCard('Hermes Agent').style.display, 'none', 'unconfigured Hermes must NOT be the default tab (user complaint: it permanently parked there)');
   const reserved = document.querySelector('.provider.reserved');
   assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
   assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
@@ -372,15 +385,16 @@ test('options.js: configuring + saving the reserved slot does NOT auto-create an
 
   assert.equal(document.querySelector('.provider.reserved'), null, 'the reserved slot is consumed once a provider is committed');
   const names = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(names, ['Hermes Agent', 'OpenCode Agent', BRIDGE_CARD_LABEL, 'My OpenAI'], 'only the configured provider renders — no auto-appearing empty card');
+  // 组序（LLM 在前）+ 合并呈现后的卡序（与 tab 顺序一致：bridge → opencode → hermes）
+  assert.deepEqual(names, ['My OpenAI', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'Hermes Agent'], 'only the configured provider renders — no auto-appearing empty card');
 
   // Now an explicit Add appends a new card BELOW the configured one.
   clickAddProvider();
   await new Promise((r) => setTimeout(r, 10));
   const after = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(after, ['Hermes Agent', 'OpenCode Agent', BRIDGE_CARD_LABEL, 'My OpenAI', 'LLM 2'], 'Add appends below the configured provider');
-  const added = providerCards()[providerCards().length - 1];
-  assert.ok(added.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
+  assert.deepEqual(after, ['My OpenAI', 'LLM 2', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'Hermes Agent'], 'Add appends below the configured provider, inside the LLM group');
+  const added = findProviderCard('LLM 2');
+  assert.ok(added?.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
 });
 
 test('options.js: the Hermes Agent card exposes ONLY Base URL + API key (its own /v1/runs protocol needs no configuration)', () => {
@@ -895,4 +909,97 @@ test('options.js: legacy comma-joined bridge baseUrl (config saved before the ro
     ['shared-token', 'shared-token'],
     'single-key 时代的一个 key 对所有端点生效——渲染时预填到每一行，行为不变直到用户逐行修改'
   );
+});
+
+// --------------- merged local-agent card: type tabs -------------------------
+
+test('options.js: the local-agent tab pref switches which card is visible and persists', async () => {
+  // Fresh module instance over a clean store: default tab = bridge.
+  await import('../options.js?local-agent-tabs-1');
+  await new Promise((r) => setTimeout(r, 50));
+  const tabs = [...document.querySelectorAll('.local-agent-tab')];
+  assert.equal(tabs.length, 3, 'three tabs on the fresh instance (bridge / opencode / hermes)');
+  const bridgeCard = findProviderCard(BRIDGE_CARD_LABEL);
+  const opencodeCard = findProviderCard('OpenCode Agent');
+  assert.equal(bridgeCard.style.display, '', 'bridge visible by default');
+  assert.equal(opencodeCard.style.display, 'none', 'opencode hidden by default');
+  assert.equal(findProviderCard('Hermes Agent').style.display, 'none', 'hermes hidden by default');
+
+  // Click the OpenCode tab: the trio swaps visibility and the pref persists.
+  tabs.find((b) => b.textContent === 'OpenCode').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  const opencodeAfter = findProviderCard('OpenCode Agent');
+  const bridgeAfter = findProviderCard(BRIDGE_CARD_LABEL);
+  assert.equal(opencodeAfter.style.display, '', 'clicked tab becomes the visible card');
+  assert.equal(bridgeAfter.style.display, 'none', 'the other card hides');
+  const tabSets = setCalls.filter((c) => 'localAgentTab' in c);
+  assert.equal(tabSets[tabSets.length - 1].localAgentTab, 'opencode', 'tab preference persisted to storage');
+});
+
+test('options.js: localAgentTab preference wins over defaults on re-render', async () => {
+  storedData.providers = {
+    bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
+    opencode: { type: 'agent', isOpencode: true, baseUrl: 'http://127.0.0.1:4096', model: '' },
+  };
+  storedData.localAgentTab = 'opencode';
+  await import('../options.js?local-agent-tabs-2');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, 'none', 'stored pref hides bridge even though both are configured');
+  assert.equal(findProviderCard('OpenCode Agent').style.display, '', 'stored pref shows opencode');
+});
+
+test('options.js: the active provider picks the default tab when no pref exists', async () => {
+  delete storedData.localAgentTab;
+  storedData.providers = {
+    bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
+    opencode: { type: 'agent', isOpencode: true, baseUrl: 'http://127.0.0.1:4096', model: '' },
+  };
+  storedData.activeProvider = 'opencode';
+  await import('../options.js?local-agent-tabs-3');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(findProviderCard('OpenCode Agent').style.display, '', 'active opencode → opencode tab');
+  assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, 'none', 'bridge hidden');
+});
+
+test('options.js: configured agent tabs show a dot indicator (multi-agent visibility)', async () => {
+  // Both agents configured → both tabs carry the configured dot; the tabs
+  // stay mutually independent of which one is VISIBLE (the tab is a view
+  // preference, not an on/off switch — both providers stay live in storage
+  // and the sidebar dropdown lists each).
+  storedData.providers = {
+    bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
+    opencode: { type: 'agent', isOpencode: true, baseUrl: 'http://127.0.0.1:4096', model: '' },
+  };
+  storedData.localAgentTab = 'bridge';
+  await import('../options.js?local-agent-tabs-4');
+  await new Promise((r) => setTimeout(r, 50));
+  const on = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
+  assert.deepEqual(on, [true, true, false], 'configured tabs show the dot (hermes unconfigured → none)');
+  // Unconfigured tab carries no dot.
+  storedData.providers = {
+    bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
+    opencode: { type: 'agent', isOpencode: true, baseUrl: '', model: '' },
+  };
+  await import('../options.js?local-agent-tabs-5');
+  await new Promise((r) => setTimeout(r, 50));
+  const flags = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
+  assert.deepEqual(flags, [true, false, false], 'only the configured side gets the dot');
+});
+
+test('options.js: a Hermes-only user sees the Hermes card under the merged tabs', async () => {
+  // Hermes configured + active, nothing else: exactly-one-configured → the
+  // Hermes tab is the visible card (Hermes users are first-class too — the
+  // fix for "Hermes 常驻" must not swing to "Hermes 无法到达").
+  storedData.providers = {
+    hermes: { type: 'agent', isHermes: true, baseUrl: 'https://hermes.example.com', apiKey: 'k', model: '' },
+  };
+  storedData.activeProvider = 'hermes';
+  delete storedData.localAgentTab; // 前面的 tab 用例会遗留偏好——本例测默认解析
+  await import('../options.js?local-agent-tabs-6');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(findProviderCard('Hermes Agent').style.display, '', 'the only configured agent is the visible tab');
+  assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, 'none', 'bridge hidden');
+  assert.equal(findProviderCard('OpenCode Agent').style.display, 'none', 'opencode hidden');
+  const onTab = [...document.querySelectorAll('.local-agent-tab')].find((b) => b.classList.contains('on'));
+  assert.equal(onTab.textContent, 'Hermes', 'the Hermes pill is the active tab');
 });
