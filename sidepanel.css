@@ -961,7 +961,10 @@ math[display="block"] {
 }
 .mermaid-diagram:hover .mermaid-toolbar,
 .echarts-diagram:hover .mermaid-toolbar,
-.markmap-diagram:hover .mermaid-toolbar { opacity: 1; }
+.markmap-diagram:hover .mermaid-toolbar,
+.smiles-block:hover .mermaid-toolbar,
+.pdb-viewer:hover .mermaid-toolbar,
+.nn-block:hover .mermaid-toolbar { opacity: 1; }
 .echarts-diagram {
   position: relative;
   margin: 8px 0;
@@ -2730,6 +2733,7 @@ dialog.lightbox-overlay:not([open]) {
 /* ─── 化学结构 / 生物大分子渲染（render.js renderSmiles/renderPdb） ─────────── */
 /* 2D 结构式：smiles-drawer 画在 canvas 上，透明底随主题；等宽块换成交互图 */
 .smiles-block {
+  position: relative;  /* hover 工具条的定位锚（此前缺省时锚到 .msg 右上角） */
   margin: 8px 0;
   text-align: center;
 }
@@ -2746,6 +2750,16 @@ dialog.lightbox-overlay:not([open]) {
 /* 3D 蛋白质查看器：3Dmol 在容器里建 WebGL canvas，占满宽度定高 */
 .pdb-block {
   margin: 8px 0;
+}
+/* 神经网络架构图（render.js renderNn，```nn fence）：纯 SVG，宽度随气泡 */
+.nn-block {
+  position: relative;
+  margin: 8px 0;
+}
+.nn-block svg.nn-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 .pdb-viewer {
   position: relative;
