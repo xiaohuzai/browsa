@@ -44,16 +44,20 @@ async function runCleanup(html, setup) {
   const dom = new JSDOM(html, { url: 'https://example.com/' });
   if (setup) setup(dom);
   const scrollToCalls = [];
+  const visibilityAtScroll = [];
   const ctx = vm.createContext({
     document: dom.window.document,
     window: {
       scrollY: 0,
-      scrollTo: (x, y) => scrollToCalls.push([x, y]),
+      scrollTo: (x, y) => {
+        scrollToCalls.push([x, y]);
+        visibilityAtScroll.push(dom.window.document.documentElement.style.visibility);
+      },
     },
     setTimeout,
   });
   const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
-  return { result, scrollToCalls };
+  return { result, scrollToCalls, visibilityAtScroll, dom };
 }
 
 test('preExtractCleanup: clicks an accept button inside a recognized cookie-banner container', async () => {
@@ -146,16 +150,43 @@ test('preExtractCleanup: zero-delta bail — sterile expanders stop the pass aft
   assert.equal(result.expandedCount, 2, 'two consecutive zero-delta clicks must stop the expansion pass');
 });
 
-test('preExtractCleanup: scroll step calls window.scrollTo and restores the original scroll position', async () => {
+test('preExtractCleanup: a static page with no lazy signals must NOT scroll at all (page stays still)', async () => {
   const html = `<!doctype html><html><body><main>Some content.</main></body></html>`;
   const { scrollToCalls } = await runCleanup(html);
-  assert.ok(scrollToCalls.length >= 1, 'scrollTo must be called at least once (scroll-to-bottom attempt)');
+  assert.equal(scrollToCalls.length, 0, 'a page with no lazy-loading/virtualization signals must not be scrolled — the visible scroll-jump on every attach was reported as unsettling');
+});
+
+test('preExtractCleanup: a lazy-loading page IS scrolled to bottom and the original position restored', async () => {
+  const html = `<!doctype html><html><body>
+    <main><img loading="lazy" src="https://example.com/pic.jpg"><p>Article.</p></main>
+  </body></html>`;
+  const { scrollToCalls } = await runCleanup(html);
+  assert.ok(scrollToCalls.length >= 1, 'a page with lazy-load signals must still be scrolled');
   const lastCall = scrollToCalls[scrollToCalls.length - 1];
   assert.deepEqual(lastCall, [0, 0], 'final scrollTo call must restore the original scrollY (0 in this test)');
 });
 
+test('preExtractCleanup: the page is visibility-hidden only DURING the scroll phase, restored afterwards', async () => {
+  const html = `<!doctype html><html><body>
+    <main><img loading="lazy" src="https://example.com/pic.jpg"><p>Article.</p></main>
+  </body></html>`;
+  const { visibilityAtScroll, dom } = await runCleanup(html);
+  assert.ok(visibilityAtScroll.length >= 1);
+  assert.equal(visibilityAtScroll[0], 'hidden', 'the scroll phase must run while the document is visibility-hidden (the user sees a blink, not the page scrolling itself)');
+  assert.equal(dom.window.document.documentElement.style.visibility, '', 'visibility must be restored once the scroll phase ends');
+});
+
+test('preExtractCleanup: a static page is never visibility-hidden at all', async () => {
+  const html = `<!doctype html><html><body><main>Plain article.</main></body></html>`;
+  const { visibilityAtScroll, dom } = await runCleanup(html);
+  assert.equal(visibilityAtScroll.length, 0);
+  assert.equal(dom.window.document.documentElement.style.visibility, '');
+});
+
 test('preExtractCleanup: resolves promptly even when scrollHeight never grows (jsdom always reports 0)', async () => {
-  const html = `<!doctype html><html><body><main>Some content.</main></body></html>`;
+  const html = `<!doctype html><html><body>
+    <main><img loading="lazy" src="https://example.com/pic.jpg">Some content.</main>
+  </body></html>`;
   const start = Date.now();
   await runCleanup(html);
   const elapsed = Date.now() - start;
@@ -163,6 +194,28 @@ test('preExtractCleanup: resolves promptly even when scrollHeight never grows (j
   // after the first round -- this must not run anywhere near the full
   // 3.5s budget (which would indicate the loop isn't exiting early).
   assert.ok(elapsed < 2000, `expected an early exit on no-growth, took ${elapsed}ms`);
+});
+
+test('preExtractCleanup: does NOT expand controls inside chrome regions (nav/header/footer)', async () => {
+  const html = `<!doctype html><html><body>
+    <nav><button aria-expanded="false" id="nav-btn">展开菜单</button></nav>
+    <header><button aria-expanded="false" id="hdr-btn">展开</button></header>
+    <main><button aria-expanded="false" id="art-btn">展开</button></main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const clicked = [];
+  for (const id of ['nav-btn', 'hdr-btn', 'art-btn']) {
+    dom.window.document.getElementById(id).addEventListener('click', () => clicked.push(id));
+  }
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.deepEqual(clicked, ['art-btn'], 'only the in-article expander may be clicked; nav/header disclosure widgets are site chrome (the reported GitHub mega-menu incident)');
+  assert.equal(result.expandedCount, 1);
 });
 
 test('preExtractCleanup: returns a well-shaped result object even on a page with no banners/expand targets', async () => {

@@ -252,7 +252,7 @@ The full reference lives here:
 | **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
 | **ASR** | the speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source |
 | **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
-| **Deep extract** | on by default — before attaching, browsa expands collapsed sections and pages through paginated content so far more of the page reaches the model |
+| **Deep extract** | on by default — before attaching, browsa expands collapsed sections and pages through paginated content so far more of the page reaches the model; it all runs quietly in background tabs, never scrolling or clicking the page you are viewing |
 
 </details>
 
