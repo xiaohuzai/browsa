@@ -5,28 +5,34 @@
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
-  <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
+  <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>Website (screenshots & demo)</strong></a> · <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><strong>Chrome Web Store</strong></a> · <a href="#install"><strong>Install from source</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/en/"><strong>Website</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/guide/quickstart.html"><strong>Quick start</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
 </p>
 
 ---
 
-**browsa** (**brow**ser **s**ide p**a**nel **A**I) is a Chrome / Edge extension that opens a chat panel next to whatever tab you're on, reads the page you're viewing — article, video, or PDF — and hands it to **your own** agent or model. Plug in the local CLI agents you already use — **Codex, Claude Code** (subscription login — no separate model-API purchase needed) — or connect opencode, Hermes, or any OpenAI / Anthropic / Ollama-compatible endpoint. Your keys stay on your machine.
+# browsa
+
+**Stay on the page. Ask beside it.**
+
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code** through Agent Bridge, use **opencode / Hermes**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+
+**Free, MIT-licensed extension.** Bring your own model or agent; provider fees and usage limits may apply. API keys are stored locally and used to authenticate with the services you configure.
 
 ## Highlights
 
 ### 1. Connect the agent you already use
 
-However you use Codex / Claude Code in your terminal, that's how you use it in browsa — same subscription sign-in, same tool abilities (run commands, read/write files, web search), now with eyes on the browser: browsa feeds web content to the agent, tool execution streams live, and approval cards for dangerous actions appear right in the panel.
+Connect your existing CLI agent through Agent Bridge, using its configured sign-in and tools. browsa feeds it web content, streams tool progress, and displays the approval requests it sends. Available tools and permissions depend on the agent's configuration.
 
 | Agent | How to connect | Sign-in |
 |---|---|---|
-| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | ChatGPT Plus / Pro **subscription login — no separate model-API purchase** |
-| **Claude Code** (Anthropic) | agent-bridge local daemon | Claude Pro **subscription login — no separate model-API purchase** |
+| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | Existing CLI authentication |
+| **Claude Code** (Anthropic) | agent-bridge local daemon | Existing CLI authentication |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 
@@ -46,8 +52,8 @@ Full list under "What browsa reads" below.
 flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
-    subgraph Y["Your backends — local or self-hosted"]
-        A1["Codex · Claude Code<br/>via agent-bridge · subscription login"]
+    subgraph Y["Your backends — cloud, local, or self-hosted"]
+        A1["Codex · Claude Code<br/>via agent-bridge · existing CLI authentication"]
         A2["opencode · Hermes<br/>official server, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -58,29 +64,36 @@ flowchart LR
 
 ## Install
 
-**Chrome Web Store — easiest.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). The store build updates itself; store review can lag a few days behind the GitHub build.
+Choose one installation method:
 
-**From source — newest features first.**
+**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). Store review may lag behind GitHub releases.
 
-1. Clone or download this repo (or grab the zip from [Releases](https://github.com/xiaohuzai/browsa/releases)).
+**GitHub — manual installation and updates.**
+
+1. Download and extract the extension ZIP from [Releases](https://github.com/xiaohuzai/browsa/releases). To work on the code, clone or download this repository instead.
 2. Open `chrome://extensions` (or `edge://extensions`) and enable **Developer mode**.
-3. Click **Load unpacked** → select the `browsa/` directory.
+3. Click **Load unpacked** → select the extracted folder containing `manifest.json`, not the ZIP or its parent folder. Its name depends on how you downloaded it.
 
 **Then, either way:**
 
-1. Press `Ctrl+Shift+H` (or click the toolbar icon) — the panel opens next to any page.
-2. Click **⚙ Settings** and connect a provider below.
+1. Open an article and click the extension toolbar icon, or press `Ctrl+Shift+H` (`Command+Shift+H` on macOS).
+2. Open **⚙ Settings**, configure an LLM or Agent provider, and click **Ping** to verify the connection.
+3. Select the model or agent in the side-panel dropdown, click **📎** to attach the page, and ask your first question.
+
+See the [quick-start guide](https://xiaohuzai.github.io/browsa/en/guide/quickstart.html) for the full walkthrough. Advanced settings can keep their defaults while you get connected.
 
 <details>
 <summary><b>Build & package</b></summary>
 
 ```bash
 npm install          # first time only
-npm test             # run 1,000+ unit tests
+npm test             # run the test suite
 npm run package      # → browsa-v<version>.zip
 ```
 
 `npm version patch|minor` bumps the version in both `package.json` and `manifest.json` automatically.
+
+On memory-constrained machines, run tests serially: `node --test --test-concurrency=1 test/*.test.mjs`.
 
 </details>
 
@@ -94,7 +107,7 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a tiny standalone local daemon that adapts CLI agents (codex, claude) to one unified local HTTP protocol — a ChatGPT Plus / Claude Pro subscription login works as the model source — no separate model-API purchase needed:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude) to one local HTTP protocol. It uses the CLI's configured authentication; account eligibility, billing, and usage limits are determined by the agent's provider:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -104,7 +117,7 @@ agent-bridge serve                                # one bridge per entry; ports 
 
 Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread. Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
 
-Don't want to run those three commands yourself? Click "**Copy setup prompt**" on the Agent Bridge card in settings and paste the whole block to your CLI agent — it performs the install, config, and launch for you (full text in the [setup guide](https://xiaohuzai.github.io/browsa/guide/providers.html#agent-bridge)).
+Don't want to run those three commands yourself? Click "**Copy setup prompt**" on the Agent Bridge card in settings and paste the whole block to your CLI agent — it performs the install, config, and launch for you (full text in the [setup guide](https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge)).
 
 </details>
 
@@ -169,7 +182,7 @@ Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for
 | Alias | a name you choose (e.g. "My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple providers stay distinguishable |
 | Base URL | e.g. `https://api.openai.com` |
 | API Key | your API key |
-| Model ID | e.g. `gpt-4o`, `claude-sonnet-4-6` (required) — comma-separate multiple models and the sidebar dropdown expands to one "Alias · model" entry each |
+| Model ID | Required. Enter a model ID and press **Enter** or **＋** to add it; **✕** removes a model. Comma-separated input adds several at once. Each appears as "Alias · model" in the sidebar dropdown |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
 Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode, Agent Bridge — are fixed and not removable).
@@ -200,7 +213,7 @@ The full reference lives here:
 
 | Feature | What you get |
 |---|---|
-| **Streaming replies** | tokens appear as they arrive; click ✕ or press `Esc` to stop |
+| **Streaming replies** | tokens appear as they arrive; click **■** in the composer or press `Esc` to stop |
 | **Think blocks** | `<think>` / `<thinking>` content in a collapsible block, auto-collapsed after streaming |
 | **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
@@ -243,6 +256,8 @@ The full reference lives here:
 
 <details>
 <summary><b>Settings</b> — system prompt, languages, llms.txt, auto-summarize…</summary>
+
+Everyday settings are shown directly: interface language, providers, system prompt / reply language, and chat preferences. **Advanced** holds options for the selection toolbar, `llms.txt`, deep extraction, and ASR; leave it collapsed if you don't need them. LLM and Agent provider groups also collapse independently — switching agents keeps a collapsed LLM group closed.
 
 | Setting | What it does |
 |---|---|
@@ -300,9 +315,10 @@ Chrome / Edge 116+ (primary target); Brave 1.56+ should work (same Chromium surf
 
 ## Security
 
-- API keys are stored in `chrome.storage.local` on your machine only — never sent anywhere except your configured `baseUrl`.
-- Before page context is sent to your provider, every URL in it is masked locally: credentials hiding in query strings, userinfo, or fragments (tokens, passwords, signatures, session IDs) never leave your machine. URLs browsa itself fetches (media, images) are untouched.
-- PDFs are parsed entirely client-side (WASM + pdf.js) — the file's bytes never leave your device; only extracted text goes to your provider.
+- API keys are stored locally in `chrome.storage.local` and used to authenticate with your configured services. Local storage does not mean the keys are never transmitted.
+- Attached page content, questions, and conversation context are sent to your selected model or agent. Optional transcription / audiovisual analysis also sends media to the configured analysis service.
+- Before page context is sent, browsa masks recognized credentials in URLs (such as token, password, signature, and session parameters). This is not a general-purpose scrubber for sensitive page text. URLs browsa itself fetches (media, images) are untouched.
+- PDFs are parsed locally (WASM + pdf.js); extracted text and figure images can be sent to your configured provider. Local parsing does not mean all extracted content stays on the device.
 - LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources; Mermaid's SVG output is stripped of `<script>` / event-handler attributes).
 - Content scripts only observe network requests; they never modify or block them.
 

@@ -5,28 +5,34 @@
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
-  <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-114%2B-c2410c?style=flat-square" alt="Chrome / Edge 114+" /></a>&nbsp;
+  <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网（截图与演示）</strong></a> · <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><strong>Chrome 应用商店</strong></a> · <a href="#安装"><strong>源码安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网</strong></a> · <a href="https://xiaohuzai.github.io/browsa/guide/quickstart.html"><strong>快速开始</strong></a> · <a href="#安装"><strong>安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
 </p>
 
 ---
 
-**browsa**（**brow**ser **s**ide p**a**nel **A**I，浏览器侧边栏 AI）是一个 Chrome / Edge 扩展：在你当前标签页旁打开聊天面板，把正在看的页面——文章、视频、PDF——读出来，交给**你自己的**智能体或模型。可以直接接 **Codex、Claude Code** 这类本地 CLI 智能体（模型侧订阅登录即可，无需另购模型 API），也能连 opencode、Hermes 或任意 OpenAI / Anthropic / Ollama 兼容端点。key 只存在你自己的机器上。
+# browsa
+
+**读到哪里，问到哪里。**
+
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code**，连接 **opencode / Hermes**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+
+**扩展免费，MIT 开源。** 自备模型或 Agent；服务商可能收费并设有用量限制。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
 ## 亮点
 
 ### 一、接你正在用的 Agent
 
-你在终端里怎么用 Codex / Claude Code，在 browsa 里就怎么用——同一份订阅登录、同一套工具能力（跑命令、读写文件、联网搜索），现在多了浏览器的眼睛：browsa 把网页内容喂给 agent，工具执行进度实时直播，危险操作的审批卡直接出现在面板里。
+通过 Agent Bridge 连接已有的 CLI 智能体，沿用它配置好的登录方式和工具。browsa 把网页内容交给 agent，实时展示工具进度，并在面板里呈现它发出的审批请求。具体工具能力与权限取决于 agent 的配置。
 
 | Agent | 接入方式 | 登录 |
 |---|---|---|
-| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | ChatGPT Plus / Pro **订阅登录即可，无需另购模型 API** |
-| **Claude Code**（Anthropic） | agent-bridge 本地桥 | Claude Pro **订阅登录即可，无需另购模型 API** |
+| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | 沿用 CLI 已配置的认证 |
+| **Claude Code**（Anthropic） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 
@@ -46,8 +52,8 @@
 flowchart LR
     P["当前标签页<br/>文章 · 视频 · PDF · 乱页面"]
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
-    subgraph Y["你的后端 —— 本机或自托管"]
-        A1["Codex · Claude Code<br/>agent-bridge 桥 · 订阅登录即可"]
+    subgraph Y["你的后端 —— 云端、本机或自托管"]
+        A1["Codex · Claude Code<br/>agent-bridge 桥 · 沿用 CLI 认证"]
         A2["opencode · Hermes<br/>官方服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -58,29 +64,36 @@ flowchart LR
 
 ## 安装
 
-**Chrome 应用商店 —— 最省事。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店版会自动更新；审核有延迟，可能比 GitHub 版晚几天。
+选择一种安装方式即可：
 
-**源码安装 —— 最新功能先到这里。**
+**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店审核可能晚于 GitHub 发布。
 
-1. 克隆或下载本仓库（或从 [Releases](https://github.com/xiaohuzai/browsa/releases) 下载 zip）。
+**GitHub —— 手动安装与更新。**
+
+1. 从 [Releases](https://github.com/xiaohuzai/browsa/releases) 下载扩展 ZIP 并解压。如果需要修改代码，也可以克隆或下载本仓库。
 2. 打开 `chrome://extensions`（或 `edge://extensions`），开启**开发者模式**。
-3. 点击**加载已解压的扩展程序** → 选择 `browsa/` 目录。
+3. 点击**加载已解压的扩展程序** → 选择解压后包含 `manifest.json` 的目录，而不是 ZIP 文件或外层目录。文件夹名称取决于下载方式。
 
 **接下来两种方式都一样：**
 
-1. 按 `Ctrl+Shift+H`（或点击工具栏图标）——侧边栏在任意页面旁打开。
-2. 点击 **⚙ 设置**，连接下方任意 provider。
+1. 打开一篇文章，点击扩展工具栏图标，或按 `Ctrl+Shift+H`（macOS 为 `Command+Shift+H`）打开侧边栏。
+2. 进入 **⚙ 设置**，配置一个 LLM 或 Agent 服务商，点 **Ping** 验证连接。
+3. 在侧边栏下拉框选择模型或 agent，点 **📎** 附加当前页面，再问第一个问题。
+
+完整步骤见[快速开始指南](https://xiaohuzai.github.io/browsa/guide/quickstart.html)。首次使用先连通服务即可，高级设置可以保留默认值。
 
 <details>
 <summary><b>构建与打包</b></summary>
 
 ```bash
 npm install          # 仅首次需要
-npm test             # 运行 1,000+ 个单元测试
+npm test             # 运行测试套件
 npm run package      # → browsa-v<version>.zip
 ```
 
 `npm version patch|minor` 会自动把版本号同步到 `package.json` 和 `manifest.json`。
+
+内存较小的机器建议串行运行测试：`node --test --test-concurrency=1 test/*.test.mjs`。
 
 </details>
 
@@ -94,7 +107,7 @@ npm run package      # → browsa-v<version>.zip
 <details>
 <summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的小型本地守护进程：把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议——ChatGPT Plus / Claude Pro 的订阅登录就能当模型来源，无需另购模型 API：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式；账号资格、计费和用量限制由智能体的服务商决定：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
@@ -169,7 +182,7 @@ hermes gateway
 | Alias | 你起的名字（例如「My OpenAI」「本地模型」）——显示在侧边栏下拉框中，方便区分多个 provider |
 | Base URL | 例如 `https://api.openai.com` |
 | API Key | 你的 API key |
-| Model ID | **必填**——例如 `gpt-4o`、`claude-sonnet-4-6`；可填多个（逗号分隔），侧边栏下拉按「Alias · 模型」逐个选择 |
+| Model ID | **必填**——输入模型 ID 后按 **Enter** 或点 **＋** 添加，点 **✕** 移除；也支持一次输入多个逗号分隔的 ID。侧边栏下拉按「Alias · 模型」逐个选择 |
 | API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
 想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenCode / Agent Bridge 智能体卡片固定不可删）。
@@ -200,7 +213,7 @@ hermes gateway
 
 | 功能 | 说明 |
 |---|---|
-| **流式回复** | token 逐字出现；点击 ✕ 或按 `Esc` 停止 |
+| **流式回复** | token 逐字出现；点击输入框中的 **■** 或按 `Esc` 停止 |
 | **思考块** | ` thinking` / `<thinking>` 内容显示为可折叠块，流式结束后自动收起 |
 | **Markdown 渲染与高亮** | 完整 GFM（表格、代码块、列表）；40+ 种语言（highlight.js）；`diff` 代码块 `+` 标绿 / `-` 标红 |
 | **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿 |
@@ -243,6 +256,8 @@ hermes gateway
 
 <details>
 <summary><b>设置</b>——系统提示词、语言、llms.txt、长附件自动总结……</summary>
+
+常用设置直接展示：界面语言、服务商、系统提示词／回复语言和聊天偏好。**高级设置**里放划词工具栏、`llms.txt`、深读和 ASR 等选项；不使用这些功能时无需展开。LLM 与 Agent 服务商也可分别折叠，切换 agent 不会展开已折叠的 LLM 分组。
 
 | 设置 | 说明 |
 |---|---|
@@ -300,9 +315,10 @@ Chrome / Edge 116+（主要目标）；Brave 1.56+ 应可运行（相同的 Chro
 
 ## 安全
 
-- API key 只存在你自己的机器上的 `chrome.storage.local` 里——除了你配置的 `baseUrl` 之外，绝不会发送到任何地方。
-- 页面内容发给 provider 前，其中所有 URL 会先在本地脱敏：藏在查询参数、userinfo、hash 里的凭据（令牌、密码、签名、会话 ID）不会离开你的机器；browsa 自己要拉取的 URL（媒体、图片）不受影响。
-- PDF 完全在客户端解析（WASM + pdf.js）——文件字节绝不离开你的设备，只有提取出的文本会发送给你配置的 provider。
+- API Key 保存在本地 `chrome.storage.local`，用于向你配置的服务进行身份验证；本地保存不代表密钥不会通过网络发送。
+- 附加的页面内容、问题和对话上下文会发送给你选择的模型或 agent。可选的语音转写／视听分析也会把媒体发送给配置的分析服务。
+- 页面上下文发送前，browsa 会在本地隐去 URL 中可识别的凭据（如令牌、密码、签名、会话参数）；这不等于对页面正文中的敏感信息进行全面脱敏。browsa 自己要拉取的 URL（媒体、图片）不受影响。
+- PDF 在本地解析（WASM + pdf.js），提取出的文字和图片可以发送给配置的 provider；本地解析不代表所有提取内容都留在设备上。
 - LLM 回复在渲染前用 DOMPurify 净化（拦截 `data:image/svg+xml` 来源；Mermaid 的 SVG 输出会移除 `<script>` / 事件处理器属性）。
 - 内容脚本只观察网络请求，从不修改或阻断它们。
 

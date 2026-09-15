@@ -11,12 +11,14 @@
 <meta property="og:title" content="browsa — Side-panel AI for your browser">
 <meta property="og:description" content="Bring the current page into the conversation — articles, videos, PDFs. Your own models or agent: open source, no subscription, no markup.">
 <meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
-<meta property="og:url" content="https://xiaohuzai.github.io/browsa/">
+<meta property="og:url" content="https://xiaohuzai.github.io/browsa/en/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<link rel="canonical" href="https://xiaohuzai.github.io/browsa/en/">
+<link rel="alternate" hreflang="zh-CN" href="https://xiaohuzai.github.io/browsa/">
+<link rel="alternate" hreflang="en" href="https://xiaohuzai.github.io/browsa/en/">
 </head>
-<body>
+<body class="landing">
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="md-header">
@@ -50,36 +52,34 @@
   <!-- Hero -->
   <section class="hero" id="top">
     <div class="container">
-      <p class="eyebrow">browser side-panel AI</p>
-      <h1>Read anywhere, <span class="mark">ask anywhere</span>.</h1>
-      <p class="lead">
-        browsa is a <strong>Chrome / Edge side-panel extension</strong>: no copy-pasting —
-        click <strong>📎</strong> to bring the current page into the conversation —
-        articles, subtitles, PDFs — and stream replies right next to it.
-      </p>
-      <div class="cta-group">
-        <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
-          Install from the Chrome Web Store ↗
-        </a>
-        <a class="btn btn-secondary" href="#install">
-          Install from source
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">
-          View source ↗
-        </a>
-      </div>
-      <div class="hero-meta">
-        <span class="chip"><b>MIT</b> open source</span>
-        <span class="chip">No subscription · no markup</span>
-        <span class="chip"><b>10+</b> sites with deep extraction</span>
+      <div class="hero-copy">
+        <p class="eyebrow">browsa / browser side-panel AI</p>
+        <h1>Stay on the page.<span class="mark">Ask beside it.</span></h1>
+        <p class="lead">
+          Long article? Dense paper? Fast-moving video? Bring the page into a conversation with <strong>your own AI</strong>. Get the explanation without the copy-paste — or leaving what you’re reading.
+        </p>
+        <div class="cta-group">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
+            Add to Chrome ↗
+          </a>
+          <a class="btn btn-secondary" href="guide/quickstart.html">
+            Get started →
+          </a>
+        </div>
+        <p class="hero-note">Chrome / Edge · <a href="#install">Source install available</a><br>Free extension. Bring your own model or agent; provider fees may apply.</p>
+        <div class="hero-meta">
+          <a class="chip" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener"><b>MIT</b> open source ↗</a>
+          <span class="chip">Your choice of model</span>
+          <span class="chip">Local settings</span>
+        </div>
       </div>
 
       <!-- Scenario switcher -->
       <div class="scenarios">
         <div class="scn-tabs" role="radiogroup" aria-label="Usage examples">
-          <label class="scn-tab"><input type="radio" name="scn" id="scn-video" checked><span class="dot"></span><span>🎬 Watch video</span></label>
-          <label class="scn-tab"><input type="radio" name="scn" id="scn-article"><span class="dot"></span><span>📄 Read article</span></label>
-          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>📕 Open PDF</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-article" checked><span class="dot"></span><span>Articles</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-video"><span class="dot"></span><span>Videos</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>Papers</span></label>
         </div>
 
         <!-- Scenario 1: Watch video (YouTube) -->
@@ -265,6 +265,7 @@
           </div>
           <p class="win-caption">PDFs: local WASM rebuilds tables / headings / layout; figure regions are cropped and captioned automatically.</p>
         </figure>
+        <p class="scenario-note">Illustrative interface · Switch scenes to see how browsa works with the page.</p>
       </div>
     </div>
   </section>
@@ -331,12 +332,12 @@
         <div class="feature">
           <span class="f-tag">render</span>
           <h3>Rich rendering</h3>
-          <p>Replies are more than plain text — all rendered locally, no external services:</p>
+          <p>Replies are more than plain text — formulas and diagrams render in your browser:</p>
           <ul>
             <li>Markdown GFM + 40+ language syntax highlighting</li>
             <li>LaTeX math (KaTeX, Web Worker accelerated)</li>
             <li>Mermaid diagrams, ECharts, Markmap mind maps</li>
-            <li>A Mermaid block that won't parse? One click asks the AI to fix and re-render it</li>
+            <li>A Mermaid block that won't parse? Ask your configured AI to fix and re-render it</li>
           </ul>
         </div>
         <div class="feature">
@@ -358,18 +359,18 @@
             <li>OpenCode Agent: direct line to the opencode CLI agent — same full tool &amp; approval flow</li>
             <li>Agent Bridge: bridges your subscription-logged-in Codex / Claude Code — the model side runs on your subscription; one card connects several agents at once</li>
             <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
-            <li>Multiple models per card (comma-separated) — switch via “Alias · model” in the sidebar</li>
+            <li>Add multiple models per card — switch via “Alias · model” in the sidebar</li>
             <li>Ping to verify connectivity and capabilities</li>
           </ul>
         </div>
         <div class="feature">
           <span class="f-tag">privacy</span>
           <h3>Privacy first</h3>
-          <p>No account, no cloud, no data relay:</p>
+          <p>No browsa account. Your choice of model service:</p>
           <ul>
-            <li>API keys live only in local <code>chrome.storage</code></li>
+            <li>API keys are stored locally and used to authenticate with your configured provider</li>
             <li>URLs in page context are masked locally before sending — tokens, passwords and signatures stripped</li>
-            <li>PDFs parsed entirely on-device — bytes never leave</li>
+            <li>PDFs are parsed on-device; extracted text and images can be attached to model requests</li>
             <li>Content goes only to the backend you configure</li>
           </ul>
         </div>
@@ -441,7 +442,7 @@
           <li><span class="tick">›</span><span><b>Ollama / LM Studio local models</b> — fully offline works too.</span></li>
           <li><span class="tick">›</span><span><b>Real agents</b>: tool execution, live progress, approval before risky actions.</span></li>
         </ul>
-        <div class="prov-board" role="img" aria-label="Provider settings illustration: OpenAI, Claude, Ollama and a Hermes agent">
+        <div class="prov-board" data-label="Connection examples" role="img" aria-label="Connection examples: model APIs, local models, Hermes, OpenCode and Agent Bridge">
           <div class="prov-card">
             <span class="prov-ava pa-openai">O</span>
             <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
@@ -467,9 +468,14 @@
             <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
             <span class="prov-badge pb-idle">not pinged</span>
           </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-bridge">↔</span>
+            <span class="prov-info"><span class="prov-name">Codex / Claude Code</span><span class="prov-model">Agent Bridge · connect local CLI agents</span></span>
+            <span class="prov-badge pb-idle">bridge</span>
+          </div>
         </div>
       </div>
-      <p class="keys-footnote"><span class="dot-ok"></span>hermes agent · reachable — risky actions require approval first</p>
+      <p class="site-note">Not sure which to choose? <a href="guide/providers.html">Read the model and agent setup guide →</a></p>
     </div>
   </section>
 
@@ -477,31 +483,26 @@
     <div class="container">
       <div class="section-head">
         <p class="eyebrow">install</p>
-        <h2>Install</h2>
-        <p>Two ways to pick from: one click from the Chrome Web Store, or load the newest build from GitHub. About 5 minutes, free forever.</p>
+        <h2>Start with your next read.</h2>
+        <p>Choose one installation method, then connect your model or agent. The browsa extension is free; model service costs depend on your provider.</p>
       </div>
-      <div class="install-steps">
-        <div class="step">
-          <span class="no">1</span>
-          <div>
-            <h4>Chrome Web Store — easiest</h4>
-            <p>Open the <a class="link" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Chrome Web Store listing</a> and click <strong>Add to Chrome</strong>. The store build updates itself, but store review can lag a few days behind the GitHub build.</p>
-          </div>
-        </div>
-        <div class="step">
-          <span class="no">2</span>
-          <div>
-            <h4>Or: load from GitHub — newest features first</h4>
-            <p><code>git clone</code> the repo, or download and unzip from <a class="link" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Releases</a> → open <code>chrome://extensions</code> (or <code>edge://extensions</code>) → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → select the <code>browsa/</code> folder. A recent Chrome / Edge works — any auto-updated browser from the last few years.</p>
-          </div>
-        </div>
-        <div class="step">
-          <span class="no">3</span>
-          <div>
-            <h4>Configure and go</h4>
-            <p>Press <code>Ctrl+Shift+H</code> to open the panel → in ⚙ Settings add a Base URL and API key → Ping to verify → start chatting.</p>
-          </div>
-        </div>
+      <div class="install-options">
+        <article class="install-option recommended">
+          <p class="install-label">Recommended · Automatic updates</p>
+          <h3>Install from the store</h3>
+          <p>The simplest way to start. Add the extension, then connect your model in Settings. Store review may lag behind GitHub releases.</p>
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Add to Chrome ↗</a>
+        </article>
+        <article class="install-option">
+          <p class="install-label">Alternative · Manual updates</p>
+          <h3>Load from GitHub</h3>
+          <p>Download and unzip a release. Enable Developer mode in your browser’s extension manager, choose Load unpacked, and select the folder containing <code>manifest.json</code>.</p>
+          <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Download a release ↗</a>
+        </article>
+      </div>
+      <div class="install-next">
+        <div><h3>Installed? Make the connection.</h3><p>Configure a model API or local agent in Settings and Ping to verify. Open an article, attach it with 📎, and ask your first question.</p></div>
+        <a class="btn btn-secondary" href="guide/quickstart.html">Follow the setup guide →</a>
       </div>
     </div>
   </section>
