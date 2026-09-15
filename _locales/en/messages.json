@@ -843,6 +843,14 @@
     "message": "Image too large: $1",
     "description": "Sidepanel: image too large ($1 = name)"
   },
+  "imageBudgetExceeded": {
+    "message": "Image not attached ($1) — too large to send; about $2 MB of images fit in one message.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "Image not attached ($1) — up to $2 images per message.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
   "outputTruncatedToast": {
     "message": "Reply still hit the model's output limit — click “Continue” or reply 继续.",
     "description": "Sidepanel: output truncated toast"

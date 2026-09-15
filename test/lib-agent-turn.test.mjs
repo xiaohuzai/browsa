@@ -192,10 +192,17 @@ test('withAgentRenderHints: first turn appends the hint block; later turns retur
   assert.ok(first.includes(AGENT_RENDER_HINT));
   assert.equal(withAgentRenderHints(turn, false), turn, 'later turns must be byte-identical (the agent transcript already holds the hints)');
   // The fence vocabulary the chat UI can render live must all be named.
-  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb']) {
+  // This list is the anti-drift guard for AGENT_RENDER_HINT: ```nn shipped
+  // 2026-09-14 and was missing here for a day (agent providers answered
+  // "there is no NN format"), so a new renderer must fail this assertion.
+  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn']) {
     assert.ok(AGENT_RENDER_HINT.includes('```' + fence), `hint must mention \`\`\`${fence}`);
   }
   assert.match(AGENT_RENDER_HINT, /never invent an ID/i, 'the pdb anti-fabrication rule must ride along');
+  // Plain layer stacks must go to ```nn, not a Mermaid flowchart — the exact
+  // failure the missing nn entry produced in the field.
+  assert.match(AGENT_RENDER_HINT, /ALWAYS ```nn, never a Mermaid flowchart/, 'nn must carry the not-Mermaid rule');
+  assert.match(AGENT_RENDER_HINT, /"style":"fcnn"/, 'the fcnn (neuron-circle) form must be taught too');
 });
 
 test('withAgentRenderHints is wired into all four agent branches (chat + subchat, opencode + bridge)', async () => {

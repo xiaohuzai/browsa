@@ -50,9 +50,13 @@ import { ensureReadabilityInjected } from './lib/readability-injector.js';
 // Editing rules: this array rides EVERY turn as a byte-stable prefix (KV
 // prompt-cache friendly — never make it dynamic per-turn, see the llms.txt
 // lesson in chat-handler.js). It was compressed 2026-09-15 (6669→4873 chars,
-// -27%) by tightening wording only; every constraint that remains is
-// load-bearing (each paid for with a real rendering bug) — when adding a
-// hint, keep it terse and never drop an existing constraint to save space.
+// -27%) by tightening wording only, and sits at ~4.9K chars since; every
+// constraint that remains is load-bearing (each paid for with a real rendering
+// bug) — when adding a hint, keep it terse and never drop an existing
+// constraint to save space. The fence list in the second entry is mirrored by
+// lib/agent-turn.js's AGENT_RENDER_HINT (agent providers never see this array)
+// — add a new renderer to both, and to the assertion in
+// test/lib-agent-turn.test.mjs that guards the pair.
 const CAPABILITY_HINTS = [
   'When writing mathematical expressions or formulas, always use LaTeX notation: $...$ for inline math, $$...$$ for display/block math — everywhere including inside Markdown table cells; never leave formulas as plain text.',
   'The chat UI renders these fenced code blocks natively, inline in the reply: ```mermaid (diagrams), ```echarts (charts), ```markmap (mind maps), ```smiles (chemistry), ```pdb (proteins), ```nn (neural nets). Output them directly — never create HTML files or write files to disk.',
@@ -69,7 +73,7 @@ const CAPABILITY_HINTS = [
   'For chemical structures, output a ```smiles block whose content is the SMILES string — rendered as a 2D structure diagram natively. Molecule example: ```smiles\nCC(=O)OC1=CC=CC=C1C(=O)O\n``` (aspirin). For REACTIONS use reaction SMILES reactants>agents>products in the same block, species dot-separated (empty agent section when none), e.g. CC(=O)O.CCO>>CCOC(=O)CC.O. Never draw molecules or reactions as ASCII art or Mermaid graphs.',
   'For protein 3D structures, output a ```pdb block whose content is ONLY the 4-character PDB ID of a structure you are confident exists in the RCSB Protein Data Bank (e.g. 1UBQ) — the UI fetches real coordinates and renders a 3D viewer. NEVER write raw ATOM coordinate lines and NEVER invent an ID; if you don\'t know a real one, say so.',
   'For neural-network / model-architecture figures (MLP, CNN, Transformer — any stack of layers), output a ```nn block containing JSON (publication-style figure, rendered natively); a plain layer stack is ALWAYS ```nn, never a Mermaid flowchart. Layer stack form: {"layers":["Input 224×224×3","Conv2D 64 @3×3",{"name":"Residual block","parallel":[{"name":"Conv 3×3"},{"name":"Conv 1×1"}]},"Dense 128","Softmax 10"],"skips":[{"from":1,"to":3,"label":"residual"}]} — each layer is a plain string or {"name":...,"out":"output shape","kind":"input|output"}; "parallel" (2-6 objects) renders a side-by-side branch group; "skips" draws curved skip/residual connections between layer indices (from<to). Classic neuron circles, small MLPs only: {"style":"fcnn","layers":[3,5,5,2],"labels":["input","hidden","hidden","output"]} — each number is a neuron count (values above 10 are abbreviated automatically). Keep layer names short; put tensor shapes in "out".',
-  'Never fabricate or invent image URLs — an unverifiable URL renders as a broken placeholder (the chat UI has no Markdown-image source of truth). To show a diagram, chart, or mind map, output a ```mermaid, ```echarts, or ```markmap block, or a plain ASCII/text diagram.',
+  'Never fabricate or invent image URLs — an unverifiable URL renders as a broken placeholder (the chat UI has no Markdown-image source of truth). To show a diagram, chart, mind map, molecule, protein or network figure, output one of the fenced blocks listed above, or a plain ASCII/text diagram.',
 ].join(' ');
 
 // CHOICE_REQUEST is CHAT-only, deliberately NOT part of CAPABILITY_HINTS:
