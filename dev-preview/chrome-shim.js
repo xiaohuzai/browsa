@@ -173,7 +173,7 @@
     // real browser would. Default zh-CN; add ?lang=en to preview the English UI.
     i18n: {
       getUILanguage() { return new URLSearchParams(location.search).get('lang') === 'en' ? 'en-US' : 'zh-CN'; },
-      getMessage(key) {
+      getMessage(key, subs) {
         if (!i18nCache) {
           try {
             const lang = this.getUILanguage().startsWith('zh') ? 'zh_CN' : 'en';
@@ -183,7 +183,13 @@
             i18nCache = JSON.parse(x.responseText);
           } catch (_) { i18nCache = {}; }
         }
-        return (i18nCache[key] || {}).message || '';
+        let msg = (i18nCache[key] || {}).message || '';
+        // Chrome substitutes $1/$2/… from the substitutions argument; without
+        // this every tSub() string would render its raw placeholders in the
+        // preview (see lib/i18n.js's tSub for the same convention).
+        const list = Array.isArray(subs) ? subs : (subs == null ? [] : [subs]);
+        list.forEach((v, i) => { msg = msg.replaceAll(`$${i + 1}`, String(v)); });
+        return msg;
       },
     },
     storage: {

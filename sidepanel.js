@@ -40,6 +40,7 @@ import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orc
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
+import { AGENT_TURN_MAX_IMAGES, AGENT_TURN_IMAGE_BUDGET_CHARS, imageRejectReason } from './lib/image-budget.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -1394,12 +1395,30 @@ function fileToDataUrl(file) {
   });
 }
 
+// Per-message image limits — the SAME ones the turn applies (lib/image-budget.js).
+// Enforced at attach time so every thumbnail the user sees is an image that
+// actually ships: a drop at send time has no UI surface at all (the strip is
+// cleared the moment the turn starts), so it reads as "my paste did nothing".
+// The MB figure is derived from the char budget (base64 ≈ 4/3 of the bytes),
+// rounded DOWN so the message never promises more than the gate will accept.
+const IMAGE_BUDGET_MB = (Math.floor(AGENT_TURN_IMAGE_BUDGET_CHARS / 4 * 3 / 1048576 * 10) / 10).toFixed(1);
+
+// 'size'/'budget' share the size wording; 'shape' is unreachable here (every
+// candidate is a data: image URL we just built), so it falls into the same arm.
+function imageNotAttachedText(reason, name) {
+  return reason === 'count'
+    ? tSub('imageCountExceeded', 'Image not attached ($1) — up to $2 images per message.', name, AGENT_TURN_MAX_IMAGES)
+    : tSub('imageBudgetExceeded', 'Image not attached ($1) — too large to send; about $2 MB of images fit in one message.', name, IMAGE_BUDGET_MB);
+}
+
 async function handleDroppedFiles(fileList) {
-  const maxSize = 20 * 1024 * 1024; // 20 MB
+  const maxSize = 20 * 1024 * 1024; // 20 MB — refuse before reading the bytes into a data URL
   for (const f of fileList) {
     if (!f.type.startsWith('image/')) continue;
-    if (f.size > maxSize) { appendError(tSub('imageTooLarge', 'Image too large: $1', f.name)); continue; }
+    if (f.size > maxSize) { appendError(tSub('imageTooLarge', 'Image too large: $1', f.name), { compact: true }); continue; }
     const dataUrl = await fileToDataUrl(f);
+    const reject = imageRejectReason(images.map((i) => i.dataUrl), dataUrl);
+    if (reject) { appendError(imageNotAttachedText(reject, f.name), { compact: true }); continue; }
     images.push({ dataUrl, name: f.name });
   }
   refreshImageStrip();
@@ -3068,14 +3087,19 @@ function appendMsgAction(bubbleEl, label, onClick, icon) {
  * and stays collapsible for the full copyable text. Short unmatched notices
  * ('No active tab.', selection hints) keep the old compact single-line form
  * — a card around "please select text again" would be noise.
+ * `compact` marks a LOCAL refusal (a rejected attachment, a client-side check)
+ * as opposed to a provider failure: it gets that one-line ⚠ chip whatever its
+ * length, instead of falling past the 80-char threshold into the card
+ * ("Something went wrong" + "Raw error" + Copy), whose chrome is about
+ * diagnosing a remote failure.
  */
-function appendError(text) {
+function appendError(text, { compact = false } = {}) {
   const el = document.createElement('div');
   el.className = 'msg error';
   const raw = String(text ?? '');
 
-  const cls = classifyErrorText(raw);
-  if (!cls && raw.length <= 80) {
+  const cls = compact ? null : classifyErrorText(raw);
+  if (compact || (!cls && raw.length <= 80)) {
     el.textContent = '⚠ ' + raw;
     messagesEl.appendChild(el);
     scrollToBottom(true);

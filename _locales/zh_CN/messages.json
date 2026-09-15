@@ -843,6 +843,14 @@
     "message": "图片过大：$1",
     "description": "Sidepanel: image too large ($1 = name)"
   },
+  "imageBudgetExceeded": {
+    "message": "未附加图片（$1）——超出单条消息的图片体积上限（约 $2 MB）。",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "未附加图片（$1）——单条消息最多 $2 张。",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
   "outputTruncatedToast": {
     "message": "回复仍被模型输出上限截断，可点「继续生成」或回复「继续」",
     "description": "Sidepanel: output truncated toast"

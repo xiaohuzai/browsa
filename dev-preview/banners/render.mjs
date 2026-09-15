@@ -40,6 +40,10 @@ const jobs = [
   { html: 'og-en.html',   w: 1200, h: 630, out: 'docs/assets/readme/hero-en.png', scale: 2 },
   { html: 'keys-en.html', w: 1280, h: 800, out: 'docs/assets/readme/providers-en.png', scale: 2 },
   { html: 'keys-zh.html', w: 1280, h: 800, out: 'docs/assets/readme/providers-zh.png', scale: 1 },
+  // Chrome Web Store screenshots — same two sources, but 1280×800 at scale 1: the store
+  // accepts only 1280×800 / 640×400, so the 2x retina banner above cannot be reused there.
+  { html: 'keys-en.html', w: 1280, h: 800, out: 'store-assets/cws-en-4.png', scale: 1 },
+  { html: 'keys-zh.html', w: 1280, h: 800, out: 'store-assets/cws-4.png', scale: 1 },
 ];
 const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
 for (const j of jobs) {
