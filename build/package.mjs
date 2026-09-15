@@ -38,7 +38,7 @@ root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "bu
     # incident (2026-08-28, v0.32.0): ~6MB of accumulated dev screenshots in
     # dev-preview/shots were silently swept in, bloating the zip from ~5.5MB
     # to 11.8MB -- same failure mode as the loose-PDF exclusion below.
-    "dev-preview", "store-assets", "docs"}
+    "dev-preview", "preview-shots", "store-assets", "docs"}
 exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "AGENTS.md", "skills-lock.json",
     # Repo housekeeping / dev docs that must not ship in the CWS zip.
     ".gitignore", "README.md", "README.zh-CN.md", "SITES.md"}

@@ -936,6 +936,31 @@ test('options.js: the local-agent tab pref switches which card is visible and pe
   assert.equal(tabSets[tabSets.length - 1].localAgentTab, 'opencode', 'tab preference persisted to storage');
 });
 
+test('options.js: agent tab switches preserve both provider groups open states', async () => {
+  const groups = () => [...document.querySelectorAll('.provider-group')];
+  groups()[0].open = false;
+  groups()[1].open = true;
+
+  for (const label of ['Hermes', 'Codex / Claude Code', 'OpenCode']) {
+    const previousGroup = groups()[0];
+    const tab = [...document.querySelectorAll('.local-agent-tab')]
+      .find((button) => button.textContent === label);
+    assert.ok(tab);
+    tab.click();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.notEqual(groups()[0], previousGroup, 'the provider groups were re-rendered');
+    assert.equal(groups()[0].open, false, `${label}: LLM group stays collapsed`);
+    assert.equal(groups()[1].open, true, `${label}: Agent group stays open`);
+  }
+
+  groups()[0].open = true;
+  groups()[1].open = false;
+  clickAddProvider();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(groups()[0].open, true, 'adding a provider keeps LLM open');
+  assert.equal(groups()[1].open, false, 'adding a provider keeps Agent collapsed');
+});
+
 test('options.js: localAgentTab preference wins over defaults on re-render', async () => {
   storedData.providers = {
     bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
