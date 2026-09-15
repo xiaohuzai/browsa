@@ -27,10 +27,6 @@ const BLANK_LLM = { type: 'llm', alias: '', baseUrl: '', apiKey: '', model: '', 
 
 let cachedCfg = null;
 const _pingState = {}; // name → 'reachable' | 'unreachable', persists across re-renders
-// Agent 组默认折叠（用户反馈：小白只会填 LLM）；但 tab 点击/保存卡都会触发
-// renderProviders 重建 DOM——用户手动展开过的状态要在本会话内记住，否则
-// 一点 tab 组就又折回去了。仅会话级记忆：重开设置页回到默认折叠。
-let agentGroupOpened = false;
 
 init();
 
@@ -233,13 +229,14 @@ async function saveAsr() {
 }
 
 function renderProviders() {
+  const groupOpenStates = new Map(
+    [...providersEl.querySelectorAll('.provider-group')]
+      .map((details) => [details.dataset.groupType, details.open])
+  );
   providersEl.innerHTML = '';
   const providers = cachedCfg.providers || {};
 
   const groups = [
-    // LLM 组在前且始终展开（小白的必经之路：填 Base URL + Key 就能用）；
-    // Agent 组在后、默认折叠（会本地 agent 的人是少数，且折叠状态在会话
-    // 内记忆——见 agentGroupOpened）。
     { type: 'llm',   label: _t('llmGroupLabel', '💬 LLM Providers'),   desc: _t('llmGroupDesc', 'Language model endpoint — add as many as you like; each picks its own wire protocol') },
     { type: 'agent', label: _t('agentGroupLabel', '🤖 Agent Providers'), desc: _t('agentGroupDesc', 'Full agent backend — tool execution, file access, multi-step tasks') },
   ];
@@ -249,12 +246,8 @@ function renderProviders() {
 
     const details = document.createElement('details');
     details.className = 'provider-group';
-    if (group.type === 'llm') {
-      details.open = true; // LLM 组永远展开
-    } else {
-      details.open = agentGroupOpened;
-      details.addEventListener('toggle', () => { agentGroupOpened = details.open; });
-    }
+    details.dataset.groupType = group.type;
+    details.open = groupOpenStates.get(group.type) ?? (group.type === 'llm');
 
     const summary = document.createElement('summary');
     summary.className = 'provider-group-header';

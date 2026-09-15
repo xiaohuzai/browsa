@@ -70,17 +70,6 @@ body {
   .status-dot[data-state="streaming"] { animation: none; opacity: 0.85; }
 }
 
-/* Brand wordmark face, bundled locally (no external font fetch — privacy by
-   architecture). Variable font: weights 300-700. Mono fallbacks keep the
-   wordmark legible if the file ever fails to load. */
-@font-face {
-  font-family: 'Space Grotesk';
-  src: url('fonts/SpaceGrotesk.ttf') format('truetype');
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* Small tracked-out wordmark — the brand's one consistent
    typographic voice, now actually visible in the primary UI instead of
    hidden at 50% opacity behind the empty-state selector.
@@ -157,21 +146,24 @@ body {
 .messages:not(:has(.msg)) {
   align-items: center;
   justify-content: center;
+  isolation: isolate;
 }
 .messages:not(:has(.msg))::before {
   content: 'browsa';
   display: block;
-  color: var(--accent);
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 27px;
+  color: color-mix(in srgb, var(--accent) 62%, var(--fg-dim));
+  font-family: 'Space Grotesk', ui-monospace, monospace;
+  font-size: 28px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: .02em;
+  line-height: 1.2;
+  opacity: .82;
   text-align: center;
   /* Highlighter-gold underline — the wordmark sitting on a quiet gold rule,
      like a proofreader's mark on the margin. */
   border-bottom: 2px solid color-mix(in srgb, var(--gold) 32%, transparent);
-  padding: 0 6px 7px;
-  margin-bottom: 12px;
+  padding: 0 8px 8px;
+  margin: 0 0 12px;
 }
 .messages:not(:has(.msg))::after {
   /* 文案由 sidepanel.js 按当前 UI 语言注入 --empty-hint（CSS content 无法走
@@ -184,6 +176,8 @@ body {
   opacity: 0.75;
   letter-spacing: 0.01em;
   font-weight: 400;
+  max-width: 280px;
+  line-height: 1.6;
 }
 
 /* ─── Message bubbles ───────────────────────────────────────────────────────── */
@@ -2796,7 +2790,7 @@ dialog.lightbox-overlay:not([open]) {
   content: '';
   align-self: stretch;
   width: 1px;
-  margin-left: 2px;
+  margin-left: auto;
   background: var(--border-soft);
   order: 1;
 }
@@ -2808,7 +2802,6 @@ dialog.lightbox-overlay:not([open]) {
 }
 .provider {
   min-width: 0;
-  max-width: 190px;
   background-color: color-mix(in srgb, var(--bg-2) 80%, transparent);
   border-color: var(--border);
 }
@@ -2836,32 +2829,6 @@ dialog.lightbox-overlay:not([open]) {
   background:
     radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 34%),
     var(--bg);
-}
-.messages:not(:has(.msg)) {
-  position: relative;
-  isolation: isolate;
-}
-.messages:not(:has(.msg))::before {
-  content: 'READ / THINK / MAKE';
-  position: absolute;
-  top: 25%;
-  left: 14px;
-  color: color-mix(in srgb, var(--accent) 52%, var(--muted));
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .16em;
-  opacity: .8;
-}
-.messages:not(:has(.msg))::after {
-  top: calc(25% + 24px);
-  left: 14px;
-  right: 24px;
-  max-width: 280px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-  text-align: left;
-  line-height: 1.6;
 }
 .msg.user {
   box-shadow: 0 2px 8px color-mix(in srgb, #000 12%, transparent);
@@ -2926,8 +2893,6 @@ dialog.lightbox-overlay:not([open]) {
 
 @media (max-width: 320px) {
   .topbar { gap: 5px; padding-inline: 8px; }
-  .topbar::after { margin-left: 0; }
-  .provider { max-width: 125px; }
   .topbar .iconbtn { width: 25px; }
   .messages { padding-inline: 10px; }
   .quickbar { margin-inline: 8px; overflow-x: auto; justify-content: flex-start; }
