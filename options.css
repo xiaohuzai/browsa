@@ -1023,3 +1023,76 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .advanced-summary:hover { color: var(--fg-2); }
 .advanced-section[open] .advanced-summary { color: var(--fg-2); }
+
+/* ─── Visual refinement pass: settings as a calm control room ──────────── */
+body {
+  background:
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%),
+    var(--bg);
+}
+main { max-width: 720px; gap: 14px; }
+.page-header {
+  padding: 4px 2px 22px;
+  margin-bottom: 6px;
+}
+.page-header .logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.page-header h1 {
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-size: 21px;
+  letter-spacing: .01em;
+}
+.card {
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  border-top-width: 2px;
+  box-shadow: 0 5px 18px color-mix(in srgb, #000 10%, transparent);
+}
+.card-header { padding: 15px 21px 14px; }
+.card-body { padding: 18px 21px 20px; }
+.card h2 { font-size: 11px; letter-spacing: .09em; }
+.card:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.provider-group { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); }
+.provider-group-header { padding: 10px 14px; }
+.row input[type="text"],
+.row input[type="password"],
+.row input[type="number"],
+.row select,
+.field input[type="text"],
+.field input[type="password"],
+.field select,
+textarea {
+  min-height: 36px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
+}
+button.primary {
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.advanced-summary {
+  padding: 12px 6px;
+  border-radius: var(--radius-sm);
+}
+.advanced-summary:hover { background: var(--hover-bg); }
+@media (max-width: 560px) {
+  body { padding: 24px 14px 56px; }
+  .card-header, .card-body { padding-inline: 16px; }
+  .fields { grid-template-columns: 1fr; }
+  .field.field-full { grid-column: auto; }
+}
+
+.common-settings-card {
+  border-top-color: var(--gold);
+}
+.common-settings-card .card-actions {
+  align-items: center;
+  padding-top: 2px;
+}
+.common-settings-card .card-status {
+  min-width: 0;
+}
+.advanced-section > .card + .card { margin-top: 2px; }
+.advanced-summary::first-letter { color: var(--accent); }
