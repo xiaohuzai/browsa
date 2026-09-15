@@ -17,6 +17,14 @@
    signal. The same three-state idea now lives in a small status dot next to
    the wordmark — see sidepanel.css's .status-dot.) */
 
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../fonts/SpaceGrotesk.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Ground */
   --bg:           #0d0f14;
