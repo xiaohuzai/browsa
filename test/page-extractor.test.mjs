@@ -2111,3 +2111,33 @@ test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) re
   assert.ok(!result.base64, 'must not base64-encode HTML as if it were a PDF');
   assert.equal(blobCalled, false, 'should not consume the blob body once content-type says HTML');
 });
+
+// --- full-mode dump hygiene --------------------------------------------------
+// Regression: attaching labuladong.online degraded all the way to full mode and
+// returned 124K chars that were half inline <script> (a Next.js RSC flight
+// payload) — the site inlines its scripts at the top of <body>, and
+// extractFullInPageWorld reads body.textContent precisely so CSS-hidden prose
+// (小红书-style) is not lost. The dump must keep that property while dropping
+// markup text that is never prose.
+test('extractFullInPageWorld: script/style/noscript text is dropped, CSS-hidden prose is still captured', async () => {
+  const fnBody = await loadSiblingFn('extractFullInPageWorld');
+  const html = `<!doctype html><html><body>
+    <script>var flightPayload = {"markdown":"huge serialized payload"};</script>
+    <style>.banner { color: red }</style>
+    <noscript>Enable JavaScript please</noscript>
+    <div style="display:none">隐藏的正文内容 hidden prose worth capturing</div>
+    <p>Visible article text.</p>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: dom.window,
+    NodeFilter: dom.window.NodeFilter
+  });
+  const out = vm.runInContext(`${fnBody}\nextractFullInPageWorld({ htmlCap: 100000 });`, ctx);
+  assert.ok(!out.text.includes('flightPayload'), 'inline <script> text (framework flight payloads) must not reach the model');
+  assert.ok(!out.text.includes('color: red'), 'inline <style> text must not reach the model');
+  assert.ok(!out.text.includes('Enable JavaScript'), '<noscript> text must not reach the model');
+  assert.ok(out.text.includes('隐藏的正文内容'), 'CSS-hidden prose must still be captured — that is why full mode reads textContent');
+  assert.ok(out.text.includes('Visible article text.'));
+});

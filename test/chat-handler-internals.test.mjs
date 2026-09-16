@@ -712,3 +712,36 @@ test('chat-handler: rewrite + continuation branches rebuild every apiStyle input
   assert.match(rewrite, /apiStyle === 'anthropic'/, 'rewrite must rebuild anthropicMessages');
   assert.match(rewrite, /buildTimestampRewriteHistory\(history, videoSrc/, 'rewrite history built from the RAW history (aged copy may have stubbed the transcript)');
 });
+
+// --------------- isContextOverflowError (overflow self-rescue) ---------------
+// The matcher that arms handleChat's one-shot overflow rescue (stub oversized
+// attachments, rebuild the request, retry once). Must recognize the real
+// wordings of every provider class; must NOT match unrelated failures — a
+// false positive costs a pointless extra request, a miss leaves the user in
+// the dead-end retry loop (every turn re-sends the huge history).
+
+test('isContextOverflowError: recognizes the real overflow wordings', async () => {
+  const { isContextOverflowError } = await import('../lib/handlers/chat-handler.js');
+  const yes = [
+    // Hermes, 2026-09-16 real report
+    "This conversation has grown too long for deepseek-flash to read, and Hermes couldn't shrink it enough automatically.",
+    // OpenAI
+    "This model's maximum context length is 16385 tokens. However, your messages resulted in 24500 tokens.",
+    // Anthropic
+    'prompt is too long: 357005 tokens > 200000 maximum',
+    // generic gateway / HTTP-layer
+    'context_length_exceeded', 'Request too large: 413',
+    // Chinese gateway
+    '输入过长，请缩短输入或更换模型', '对话上下文超过限制',
+  ];
+  for (const msg of yes) assert.equal(isContextOverflowError(msg), true, JSON.stringify(msg));
+  const no = [
+    'HTTP 500 Internal Server Error',
+    '429 Too Many Requests — rate limit exceeded, retry later',
+    'Model not found: deepseek-flash',
+    'Connection reset by peer',
+    '',
+    undefined,
+  ];
+  for (const msg of no) assert.equal(isContextOverflowError(msg), false, JSON.stringify(msg));
+});

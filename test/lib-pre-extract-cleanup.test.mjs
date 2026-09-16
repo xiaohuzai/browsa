@@ -44,20 +44,20 @@ async function runCleanup(html, setup) {
   const dom = new JSDOM(html, { url: 'https://example.com/' });
   if (setup) setup(dom);
   const scrollToCalls = [];
-  const visibilityAtScroll = [];
+  const paintSuppressedAtScroll = [];
   const ctx = vm.createContext({
     document: dom.window.document,
     window: {
       scrollY: 0,
       scrollTo: (x, y) => {
         scrollToCalls.push([x, y]);
-        visibilityAtScroll.push(dom.window.document.documentElement.style.visibility);
+        paintSuppressedAtScroll.push(dom.window.document.documentElement.style.opacity);
       },
     },
     setTimeout,
   });
   const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
-  return { result, scrollToCalls, visibilityAtScroll, dom };
+  return { result, scrollToCalls, paintSuppressedAtScroll, dom };
 }
 
 test('preExtractCleanup: clicks an accept button inside a recognized cookie-banner container', async () => {
@@ -166,20 +166,20 @@ test('preExtractCleanup: a lazy-loading page IS scrolled to bottom and the origi
   assert.deepEqual(lastCall, [0, 0], 'final scrollTo call must restore the original scrollY (0 in this test)');
 });
 
-test('preExtractCleanup: the page is visibility-hidden only DURING the scroll phase, restored afterwards', async () => {
+test('preExtractCleanup: the page is paint-suppressed only DURING the scroll phase, restored afterwards', async () => {
   const html = `<!doctype html><html><body>
     <main><img loading="lazy" src="https://example.com/pic.jpg"><p>Article.</p></main>
   </body></html>`;
-  const { visibilityAtScroll, dom } = await runCleanup(html);
-  assert.ok(visibilityAtScroll.length >= 1);
-  assert.equal(visibilityAtScroll[0], 'hidden', 'the scroll phase must run while the document is visibility-hidden (the user sees a blink, not the page scrolling itself)');
+  const { paintSuppressedAtScroll, dom } = await runCleanup(html);
+  assert.ok(paintSuppressedAtScroll.length >= 1);
+  assert.equal(paintSuppressedAtScroll[0], '0', 'the scroll phase must run while the document is paint-suppressed via opacity (the user sees a blink, not the page scrolling itself). opacity, not visibility: visibility is inherited and scroll-reveal sites choreograph against it');
   assert.equal(dom.window.document.documentElement.style.visibility, '', 'visibility must be restored once the scroll phase ends');
 });
 
-test('preExtractCleanup: a static page is never visibility-hidden at all', async () => {
+test('preExtractCleanup: a static page is never paint-suppressed at all', async () => {
   const html = `<!doctype html><html><body><main>Plain article.</main></body></html>`;
-  const { visibilityAtScroll, dom } = await runCleanup(html);
-  assert.equal(visibilityAtScroll.length, 0);
+  const { paintSuppressedAtScroll, dom } = await runCleanup(html);
+  assert.equal(paintSuppressedAtScroll.length, 0);
   assert.equal(dom.window.document.documentElement.style.visibility, '');
 });
 
@@ -342,4 +342,139 @@ test('preExtractCleanup: does nothing feed-related on a page with no repeated-gr
   const html = `<!doctype html><html><body><main>Just one plain article, no list.</main></body></html>`;
   const { result } = await runCleanup(html);
   assert.equal(result.feedItemsRestored, undefined, 'feedItemsRestored must not be set when no feed candidate was found');
+});
+
+// Regression: real user report — attaching
+// https://hfviewer.com/blog/architecture-trends-over-5-years failed with
+// "⚠ Failed to read page DOM: Frame with ID 0 was removed." The site's brand
+// link is `<a id="brand" aria-expanded="false" href="/">`: it sits outside any
+// nav/header (so the chrome exclusion misses it) and carries no danger word,
+// so Step 2 clicked it, the tab navigated to the home page, and the frame the
+// extraction was about to read was destroyed. Anchors are only safe when they
+// cannot navigate — same rule interactiveSnapshot already applies.
+test('preExtractCleanup: does NOT click an anchor with a real href (regression: navigating click destroyed the frame mid-attach)', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <a id="brand" href="/" aria-expanded="false">hfviewer by embedl</a>
+      <button aria-expanded="false" id="expand-btn">展开</button>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  let navClicked = false;
+  dom.window.document.getElementById('brand').addEventListener('click', () => { navClicked = true; });
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(navClicked, false, 'an <a href="/"> must never be clicked: it navigates the tab and the extraction dies on a destroyed frame');
+  assert.equal(result.expandedCount, 1, 'the genuine href-less expander next to it must still be clicked');
+});
+
+test('preExtractCleanup: still clicks href-less / hash / javascript: anchors (they are pure JS toggles)', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <a id="a1" aria-expanded="false">展开一</a>
+      <a id="a2" href="#" aria-expanded="false">展开二</a>
+      <a id="a3" href="javascript:void(0)" aria-expanded="false">展开三</a>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  for (const id of ['a1', 'a2', 'a3']) {
+    // Each click appends text so the zero-delta bail-out does not cut the pass.
+    dom.window.document.getElementById(id).addEventListener('click', () => {
+      const p = dom.window.document.createElement('p');
+      p.textContent = `revealed by ${id} `.repeat(6);
+      dom.window.document.querySelector('main').appendChild(p);
+    });
+  }
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(result.expandedCount, 3, 'href-less/#/javascript: anchors cannot navigate and must stay eligible');
+});
+
+// Regression: real user report — attaching
+// https://labuladong.online/zh/ai-coding/llm/lora-fine-tuning/ degraded to the
+// 124K-char full-text wall (autoMode=full) because Step 2 clicked the site's
+// 「清除阅读历史」 button, which popped a destructive-confirmation dialog that
+// Readability then scored as the article. Three guards pin the fix.
+
+test('preExtractCleanup: expand candidates inside <aside> are site chrome and must not be clicked (aligned with isChromeNoise)', async () => {
+  const html = `<!doctype html><html><body>
+    <aside><button aria-expanded="false" id="sidebar-btn">清除阅读历史</button></aside>
+    <main><button aria-expanded="false" id="content-btn">展开正文</button></main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  let sidebarClicked = false;
+  dom.window.document.getElementById('sidebar-btn').addEventListener('click', () => { sidebarClicked = true; });
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(sidebarClicked, false, 'a sidebar utility button is chrome, not a content gate — clicking it armed a destructive action on the reported site');
+  assert.equal(result.expandedCount, 1, 'the genuine expander in <main> must still be clicked');
+});
+
+test('preExtractCleanup: destructive labels (清除/clear/reset family) are vetoed even outside chrome regions', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <button aria-expanded="false" id="clear-history">清除阅读历史</button>
+      <button aria-expanded="false" id="clear-en">Clear reading history</button>
+      <button aria-expanded="false" id="reset-en">Reset all</button>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  let clicked = 0;
+  for (const id of ['clear-history', 'clear-en', 'reset-en']) {
+    dom.window.document.getElementById(id).addEventListener('click', () => { clicked++; });
+  }
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(clicked, 0, 'none of the destructive-label buttons may be clicked');
+  assert.equal(result.expandedCount, 0);
+});
+
+test('preExtractCleanup: a click that pops a dialog is rolled back, the dialog dismissed, and the pass stops', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <button aria-expanded="false" id="arm">Show more</button>
+      <button aria-expanded="false" id="second">Show even more</button>
+      <dialog id="dlg"><p>Confirm destructive action?</p><button id="cancel">取消</button></dialog>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  const doc = dom.window.document;
+  let secondClicked = false;
+  doc.getElementById('second').addEventListener('click', () => { secondClicked = true; });
+  // The site's own handler: arming click opens the dialog, 取消 closes it.
+  // (jsdom has no HTMLDialogElement.close(), so the handler mirrors what a
+  // real browser's close() does via the reflected `open` attribute.)
+  doc.getElementById('arm').addEventListener('click', () => { doc.getElementById('dlg').open = true; });
+  doc.getElementById('cancel').addEventListener('click', () => { doc.getElementById('dlg').open = false; });
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: doc,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(doc.getElementById('dlg').open, false, 'a dialog the pass opened must be dismissed, not left for Readability to score as the article');
+  assert.equal(result.expandedCount, 0, 'a dialog-opening click expanded no content — must not count as an expansion');
+  assert.equal(result.dialogsDismissed, 1);
+  assert.equal(secondClicked, false, 'the pass must stop once a click has popped a dialog');
 });

@@ -121,3 +121,56 @@ test('ageStaleAttachments: opts honored (minUserTurnsAfter / minChars)', () => {
   const kept = ageStaleAttachments(history, { minUserTurnsAfter: 5, minChars: 100 });
   assert.equal(kept[0].content, history[0].content);
 });
+
+// ─── stubOversizedAttachments (context-overflow self-rescue) ─────────────────
+// 2026-09-16 real report: an 18-page arXiv PDF (67.8K chars ≈ 35K tokens) plus
+// 9 figure images overflowed a 64K-class window via Hermes on the FIRST turn
+// after attach, and neither Hermes's auto-shrink nor context aging could
+// recover (aging never touches the NEWEST attach). The rescue stubs every
+// oversized attach — newest included, figures dropped — so the retried turn
+// fits. Deliberately different from aging: latency vs. making the request fit.
+
+import { stubOversizedAttachments } from '../lib/message-builder.js';
+
+test('stubOversizedAttachments: stubs the NEWEST oversized attach too (aging never does)', () => {
+  const history = [{ role: 'user', attachId: 'a-1', content: attach('https://arxiv.org/pdf/2307.03172', 'Lost in the Middle', 'p'.repeat(67_801)) }];
+  const { history: out, changed } = stubOversizedAttachments(history);
+  assert.equal(changed.length, 1);
+  assert.equal(changed[0].attachId, 'a-1');
+  assert.match(String(out[0].content), /too large for the model's context window/);
+  assert.match(String(out[0].content), /Title: Lost in the Middle/);
+  assert.match(String(out[0].content), /URL: https:\/\/arxiv\.org\/pdf\/2307\.03172/);
+  assert.match(String(out[0].content), /Original size: ~6\d{4} chars/, 'the stub carries the true original size (body + header, not just the body)');
+  // the stub must still open with PAGE_CONTEXT_PREFIX — the sidepanel skips
+  // attach entries from bubble rendering by that prefix, and the persisted
+  // stub would otherwise start rendering as a user bubble.
+  assert.ok(String(out[0].content).startsWith(PREFIX));
+  // input array untouched
+  assert.ok(history[0].content.includes('p'.repeat(100)));
+});
+
+test('stubOversizedAttachments: multimodal (figure) entries lose their image parts', () => {
+  const history = [{
+    role: 'user', attachId: 'pdf-1',
+    content: [
+      { type: 'text', text: attach('https://arxiv.org/pdf/x', 'Figured Doc', 'f'.repeat(9000)) },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,FIG1' } },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,FIG2' } },
+    ],
+  }];
+  const { history: out, changed } = stubOversizedAttachments(history);
+  assert.equal(changed.length, 1);
+  assert.equal(Array.isArray(out[0].content), false, 'figure blocks must not survive — they can be ~15K tokens and the retried turn cannot fit with them');
+  assert.equal(String(out[0].content).includes('FIG1'), false);
+});
+
+test('stubOversizedAttachments: small attaches and plain messages are untouched', () => {
+  const history = [
+    { role: 'user', attachId: 'small', content: attach('https://s.com', 'Small', 'tiny body') },
+    { role: 'assistant', content: 'hi' },
+    { role: 'user', content: 'a plain question mentioning ' + PREFIX + ' in passing' },
+  ];
+  const { history: out, changed } = stubOversizedAttachments(history);
+  assert.equal(changed.length, 0);
+  assert.deepEqual(out, history, 'nothing eligible → identical content, input array never mutated');
+});
