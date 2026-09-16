@@ -811,6 +811,10 @@
     "message": "Failed to read page",
     "description": "Sidepanel: read page failed"
   },
+  "pageNavigatedDuringRead": {
+    "message": "The page navigated while it was being read — attach it again",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
   "progressParsingPdf": {
     "message": "Parsing PDF…",
     "description": "Sidepanel: attach progress"

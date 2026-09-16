@@ -811,6 +811,10 @@
     "message": "读取网页失败",
     "description": "Sidepanel: read page failed"
   },
+  "pageNavigatedDuringRead": {
+    "message": "页面在读取过程中跳转了，请重新附加",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
   "progressParsingPdf": {
     "message": "解析 PDF 中…",
     "description": "Sidepanel: attach progress"

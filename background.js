@@ -1222,7 +1222,10 @@ async function handle(msg, sender) {
         return { ok: true, ctx, attachId: historyEntry.attachId };
       } catch (e) {
         console.warn('browsa: ATTACH_PAGE failed', e);
-        return { ok: false, error: e?.message || String(e) };
+        // `code` (when present) lets the side panel say the failure in the
+        // user's own language instead of echoing a raw browser string; the
+        // message stays English for logs and any other consumer.
+        return { ok: false, error: e?.message || String(e), code: e?.code };
       }
     }
 
