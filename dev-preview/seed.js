@@ -6,7 +6,7 @@ window.__BROWSA_PREVIEW_SEED = {
     hermes: { type: 'agent', alias: 'Hermes Agent', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
     bridge: {
       type: 'agent', alias: '', baseUrl: 'http://127.0.0.1:3948', apiKey: 'sk-preview-bridge', model: '',
-      stream: true, isBridge: true, bridgeAgents: { 'http://127.0.0.1:3948': 'codex', 'http://127.0.0.1:3949': '' },
+      stream: true, isBridge: true, bridgeAgents: { 'http://127.0.0.1:3948': 'codex', 'http://127.0.0.1:3949': '', 'http://127.0.0.1:3950': 'pi' },
       bridgeApiKeys: { 'http://127.0.0.1:3948': 'sk-preview-bridge' }, activeModel: 'http://127.0.0.1:3948',
       apiStyle: 'chat', temperature: null, maxTokens: 0,
     },

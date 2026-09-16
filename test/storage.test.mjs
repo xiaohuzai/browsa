@@ -72,8 +72,16 @@ test('getAll() migrates the legacy "Agent Bridge" default alias to the shared la
   localArea.set({ providers: { bridge: { alias: 'Agent Bridge' } } });
   const all = await storage.getAll();
   assert.equal(all.providers.bridge.alias, BRIDGE_CARD_LABEL,
-    '旧默认名读时归一——老用户不必重配就看到 Codex / Claude Code 的卖点');
+    '旧默认名读时归一——老用户不必重配就看到当前卖点标签');
   assert.equal(all.providers.bridge.isBridge, true, '其余默认字段不受影响');
+});
+
+test('getAll() migrates the previous-generation bridge label (pre-pi) to the shared label', async () => {
+  reset();
+  localArea.set({ providers: { bridge: { alias: 'Agent Bridge (Codex / Claude Code …)' } } });
+  const all = await storage.getAll();
+  assert.equal(all.providers.bridge.alias, BRIDGE_CARD_LABEL,
+    '2026-09-09 那一代默认名同样读时归一，pi 上新后老用户同步看到新标签');
 });
 
 test('getAll() never overwrites a user-set bridge alias', async () => {

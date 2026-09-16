@@ -19,7 +19,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code** through Agent Bridge, use **opencode / Hermes**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi** through Agent Bridge, use **opencode / Hermes**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent; provider fees and usage limits may apply. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -33,6 +33,7 @@ Connect your existing CLI agent through Agent Bridge, using its configured sign-
 |---|---|---|
 | **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | Existing CLI authentication |
 | **Claude Code** (Anthropic) | agent-bridge local daemon | Existing CLI authentication |
+| **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 
@@ -53,7 +54,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi<br/>via agent-bridge · existing CLI authentication"]
         A2["opencode · Hermes<br/>official server, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -105,9 +106,9 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude) to one local HTTP protocol. It uses the CLI's configured authentication; account eligibility, billing, and usage limits are determined by the agent's provider:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi) to one local HTTP protocol. It uses the CLI's configured authentication; account eligibility, billing, and usage limits are determined by the agent's provider:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
