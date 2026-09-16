@@ -720,7 +720,7 @@
     "description": "Options: bridge card, brief confirmation after copying the setup prompt"
   },
   "bridgeAgentSetupPrompt": {
-    "message": "Set up the agent-bridge daemon on this machine so the browsa browser extension can reach me over local HTTP:\n\n1. Install globally (Node >= 18, zero dependencies): npm i -g @xiaohuzai/agent-bridge\n2. Create agents.json in a fixed working directory (the package's own agents.example.json and README are authoritative for the entry shape), adding an entry for yourself. If you are codex, keep \"approval\": \"on-request\" (otherwise approval prompts never reach browsa) and \"sandbox\": \"workspace-write\":\n   {\"bridges\":[{\"name\":\"codex\",\"port\":3948,\"apiKey\":\"\",\"sandbox\":\"workspace-write\",\"approval\":\"on-request\"}]}\n   Other CLI agents (e.g. claude) only need name/port/apiKey.\n3. Start and verify: run agent-bridge serve (reads ./agents.json by default and stays in the foreground — verify from another command): curl http://127.0.0.1:3948/health should return JSON containing your name.\n4. When done, report ONLY the final bridge URL (http://127.0.0.1:PORT); I will paste it into browsa's Agent Bridge card and click Ping.\n\nIf any step fails, stop and show me the exact error — do not retry the same command in a loop.",
+    "message": "Set up the agent-bridge daemon on this machine so the browsa browser extension can reach me over local HTTP:\n\n1. Install globally (Node >= 18, zero dependencies): npm i -g @xiaohuzai/agent-bridge\n2. Create agents.json in a fixed working directory (the package's own agents.example.json and README are authoritative for the entry shape), adding an entry for yourself. If you are codex, keep \"approval\": \"on-request\" (otherwise approval prompts never reach browsa) and \"sandbox\": \"workspace-write\":\n   {\"bridges\":[{\"name\":\"codex\",\"port\":3948,\"apiKey\":\"\",\"sandbox\":\"workspace-write\",\"approval\":\"on-request\"}]}\n   Other CLI agents (e.g. claude, pi) only need name/port/apiKey.\n3. Start and verify: run agent-bridge serve (reads ./agents.json by default and stays in the foreground — verify from another command): curl http://127.0.0.1:3948/health should return JSON containing your name.\n4. When done, report ONLY the final bridge URL (http://127.0.0.1:PORT); I will paste it into browsa's Agent Bridge card and click Ping.\n\nIf any step fails, stop and show me the exact error — do not retry the same command in a loop.",
     "description": "Options: bridge card, full setup prompt the user pastes into their CLI agent"
   },
   "bridgeRemoveTitle": {
@@ -1180,7 +1180,7 @@
     "message": "Export PNG"
   },
   "localAgentTabBridge": {
-    "message": "Codex / Claude Code",
+    "message": "Codex / Claude Code / pi",
     "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
   },
   "localAgentTabOpencode": {

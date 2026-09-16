@@ -64,7 +64,7 @@
         <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
         <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
         <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
-        <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude…）：独立守护进程把订阅登录的 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
+        <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
       </ul>
       <p>切换到任一智能体时，browsa 会询问当前对话的去留——把对话记录作为第一条消息带给新 agent 接续上下文，或新建会话从零开始；每条回复都标注来自哪个 provider / agent。</p>
 
@@ -122,8 +122,8 @@ agent:
 }</pre>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude</strong> 等 CLI 智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API。</p>
-      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>）。</p>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi</strong> 等 CLI 智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；pi 则用你在它内部配置好的模型供应商。</p>
+      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>；pi：<code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>，首次运行 <code>pi</code> 配好模型供应商，要求 Node ≥ 22）。</p>
       <ol>
         <li>安装桥（已发布到 npm）：
 <pre class="doc-code">npm i -g @xiaohuzai/agent-bridge      # 或免安装试用：npx @xiaohuzai/agent-bridge serve</pre></li>
@@ -133,7 +133,8 @@ chmod 600 agents.json</pre>
 <pre class="doc-code">{
   "bridges": [
     { "name": "codex",  "port": 3948, "apiKey": "", "sandbox": "workspace-write", "approval": "on-request" },
-    { "name": "claude", "port": 3949, "apiKey": "" }
+    { "name": "claude", "port": 3949, "apiKey": "" },
+    { "name": "pi",     "port": 3950, "apiKey": "" }
   ]
 }</pre></li>
         <li>启动（在 <code>agents.json</code> 所在目录）：
@@ -141,7 +142,7 @@ chmod 600 agents.json</pre>
 agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 #  加 --bind 0.0.0.0 可暴露到本机之外（此时每个 entry 必须设 apiKey）</pre></li>
         <li>在 browsa ⚙ 设置里选中 <strong>Agent Bridge</strong> 卡，点 <strong>＋ 添加 Agent</strong> 逐行填桥地址（一行一个 agent，如 <code>http://127.0.0.1:3948</code>）。每行还可以填<strong>别名</strong>和该桥自己的 <strong>API Key</strong>——这里的 key 是<em>桥自身的访问令牌</em>（<code>agents.json</code> 里的 <code>apiKey</code>），不是模型服务的 key；仅本机使用时两边都留空；</li>
-        <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×2/2 healthy (codex, claude)</code>）；</li>
+        <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×3/3 healthy (codex, claude, pi)</code>）；</li>
         <li>回到侧边栏，顶部下拉按「Agent Bridge · codex」逐个选择。每个 agent 有自己独立的会话线程，互不串线；中途切换时 browsa 会询问当前对话是<strong>带过去</strong>继续，还是<strong>新建会话</strong>从零开始。</li>
       </ol>
       <p>不想手动执行 1–3 步？把下面这段整段<strong>复制给你的 CLI agent</strong>（设置页 Agent Bridge 卡上也有「复制配置提示词」按钮），让它替你完成安装、配置与启动，最后把它报告的桥地址填进第 4 步即可：</p>
@@ -150,12 +151,12 @@ agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 1. 全局安装（Node ≥ 18，零依赖）：npm i -g @xiaohuzai/agent-bridge
 2. 在固定工作目录创建 agents.json（条目形态以包内 agents.example.json 与 README 为准），为你自己加一个条目。如果你是 codex，保留 "approval": "on-request"（否则操作确认无法弹到 browsa）与 "sandbox": "workspace-write"：
    {"bridges":[{"name":"codex","port":3948,"apiKey":"","sandbox":"workspace-write","approval":"on-request"}]}
-   其他 CLI agent（如 claude）条目只需 name/port/apiKey。
+   其他 CLI agent（如 claude、pi）条目只需 name/port/apiKey。
 3. 启动并验证：运行 agent-bridge serve（默认读 ./agents.json，前台驻留——验证要另开一条命令）：curl http://127.0.0.1:3948/health 应返回含你名字的 JSON。
 4. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。
 
 任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。</pre>
-      <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤8 张）。两点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址。</p>
+      <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤8 张）。三点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址；pi 的内置工具自动执行、通常不弹审批卡，也不上报 token 用量。</p>
 
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>
