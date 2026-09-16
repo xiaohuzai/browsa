@@ -76,6 +76,16 @@ test('shouldSummarize: 0/undefined threshold falls back to the 100,000-char defa
   assert.equal(shouldSummarize('a'.repeat(100_001), undefined), true);
 });
 
+test('shouldSummarize: the real overflow report (18-page arXiv PDF, 67.8K chars) stays BELOW the default on purpose', () => {
+  // 2026-09-16: this exact attachment overflowed a 64K-class window via Hermes.
+  // The fix chosen is NOT a lower summarize threshold (that would silently
+  // condense big-window users' verbatim attachments) but chat-handler's
+  // context-overflow self-rescue: the send fails once, the oversized attach is
+  // stubbed, and the turn is retried. This test pins that the threshold keeps
+  // staying out of the way.
+  assert.equal(shouldSummarize('a'.repeat(67_801), 0), false);
+});
+
 test('shouldSummarize: empty/falsy text is always false', () => {
   assert.equal(shouldSummarize('', 10), false);
   assert.equal(shouldSummarize(null, 10), false);
