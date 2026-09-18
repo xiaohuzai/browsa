@@ -999,6 +999,10 @@
     "message": "Copy code",
     "description": "Sidepanel: mermaid/chart copy code button"
   },
+  "pdbPlddtLegend": {
+    "message": "pLDDT confidence",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
   "mathCopyLatex": {
     "message": "Copy LaTeX",
     "description": "Sidepanel: formula hover copy-LaTeX button"

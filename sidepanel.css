@@ -2781,6 +2781,27 @@ dialog.lightbox-overlay:not([open]) {
   pointer-events: none;
 }
 .pdb-error { color: var(--error); }
+/* AlphaFold pLDDT 置信度图例（render.js _plddtLegend）：色块 + 数值区间 */
+.pdb-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.pdb-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.pdb-legend-chip i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
 
 /* ─── Visual refinement pass: reading desk ────────────────────────────────
    A quiet annotation surface: stronger grouping at the edges, lighter touch

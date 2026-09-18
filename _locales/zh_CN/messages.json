@@ -999,6 +999,10 @@
     "message": "复制代码",
     "description": "Sidepanel: mermaid/chart copy code button"
   },
+  "pdbPlddtLegend": {
+    "message": "pLDDT 置信度",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
   "mathCopyLatex": {
     "message": "复制 LaTeX",
     "description": "Sidepanel: formula hover copy-LaTeX button"
