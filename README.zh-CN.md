@@ -24,7 +24,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
 <p align="center">
-  <img src="docs/assets/readme/demo.gif" alt="browsa 演示：附页提问、选中一句就地追问、划词即答、视频可点击时间线，图表与蛋白质 3D 结构直接长在回复里" width="720" />
+  <img src="docs/assets/readme/demo-v2.gif" alt="browsa 演示：附页提问、选中一句就地追问、划词即答、视频可点击时间线，图表与蛋白质 3D 结构直接长在回复里" width="720" />
 </p>
 <p align="center">
   <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 观看 60 秒完整演示</strong></a> — 附页问答 · 追问线程 · 划词工具条 · 视频时间线 · 图表与 3D · Agent 审批
