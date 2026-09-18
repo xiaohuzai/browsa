@@ -23,6 +23,13 @@ browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF 
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
+<p align="center">
+  <img src="docs/assets/readme/demo.gif" alt="browsa demo: attach the current page and ask, follow up on a selected phrase, explain a selection in place, read a video with a clickable timeline, and watch diagrams and a 3D protein structure render inside the reply" width="720" />
+</p>
+<p align="center">
+  <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Watch the full 60-second tour</strong></a> — attach &amp; ask · follow-up threads · selection toolbar · video timeline · live diagrams &amp; 3D · agent approvals
+</p>
+
 ## Highlights
 
 ### 1. Connect the agent you already use
