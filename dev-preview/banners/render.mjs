@@ -44,7 +44,18 @@ const jobs = [
   // accepts only 1280×800 / 640×400, so the 2x retina banner above cannot be reused there.
   { html: 'keys-en.html', w: 1280, h: 800, out: 'store-assets/cws-en-4.png', scale: 1 },
   { html: 'keys-zh.html', w: 1280, h: 800, out: 'store-assets/cws-4.png', scale: 1 },
-];
+  // Chrome Web Store promo tiles — the store requires EXACT pixel sizes (small promo tile
+  // 440×280, marquee promo image 1400×560), so scale must stay 1 (2x files get rejected).
+  // These never appear on the item's own listing page; they are the assets Google's featuring
+  // slots (homepage carousel, category cards) draw from. Per-locale: EN pair → EN locale, zh pair → zh locale.
+  { html: 'tile-en.html',    w: 440,  h: 280, out: 'store-assets/cws-tile-440-en.png',    scale: 1 },
+  { html: 'tile-zh.html',    w: 440,  h: 280, out: 'store-assets/cws-tile-440-zh.png',    scale: 1 },
+  { html: 'marquee-en.html', w: 1400, h: 560, out: 'store-assets/cws-marquee-1400-en.png', scale: 1 },
+  { html: 'marquee-zh.html', w: 1400, h: 560, out: 'store-assets/cws-marquee-1400-zh.png', scale: 1 },
+].filter((j) => {
+  const args = process.argv.slice(2);
+  return !args.length || args.some((a) => j.html.includes(a) || j.out.includes(a));
+});
 const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
 for (const j of jobs) {
   const p = await browser.newPage({ viewport: { width: j.w, height: j.h } });

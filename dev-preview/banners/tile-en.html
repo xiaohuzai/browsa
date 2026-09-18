@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+@font-face{font-family:'Inter';src:url('InterVar.ttf');font-weight:100 900}
+@font-face{font-family:'Space Grotesk';src:url('/fonts/SpaceGrotesk.ttf');font-weight:300 700}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:440px;height:280px;overflow:hidden;position:relative;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:#f5f6f3;color:#14171f}
+.glow{position:absolute;inset:0;background:
+  radial-gradient(ellipse 320px 130px at 50% 122%,rgba(194,65,12,.11),transparent 62%),
+  radial-gradient(ellipse 170px 100px at -4% 124%,rgba(146,108,13,.09),transparent 58%),
+  radial-gradient(ellipse 170px 100px at 104% 124%,rgba(146,108,13,.09),transparent 58%)}
+.mark-br{position:absolute;right:14px;bottom:14px;width:14px;height:14px}
+.mark-br::before{content:"";position:absolute;bottom:0;left:0;width:100%;height:1.5px;background:#5b6270;opacity:.5}
+.mark-br::after{content:"";position:absolute;top:0;right:0;width:1.5px;height:100%;background:#5b6270;opacity:.5}
+.wrap{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 38px 30px}
+.eyebrow{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:11px;font-weight:600;letter-spacing:.12em;color:#6f5206;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.eyebrow::before{content:"";width:22px;height:2px;background:#926c0d}
+h1{font-size:33px;font-weight:800;letter-spacing:-.02em;line-height:1.18;margin-bottom:14px}
+em{font-style:normal;color:#c2410c;background:linear-gradient(transparent 60%,rgba(194,65,12,.18) 60%);padding:0 .05em}
+.footrow{position:absolute;left:38px;right:38px;bottom:22px;display:flex;align-items:center;justify-content:space-between}
+.wordmark{font-family:'Space Grotesk',ui-monospace,Consolas,monospace;font-size:20px;font-weight:700;letter-spacing:.05em;color:#c2410c}
+.ts{display:inline-block;padding:.06em .4em;border-radius:7px;font-family:ui-monospace,Consolas,monospace;font-size:13px;font-weight:600;color:#d4a72c;background:rgba(212,167,44,.16);font-variant-numeric:tabular-nums}
+</style></head><body>
+<div class="glow"></div>
+<div class="wrap">
+  <p class="eyebrow">browser side-panel AI</p>
+  <h1>Read anywhere,<br><em>ask anywhere</em>.</h1>
+</div>
+<div class="footrow">
+  <span class="wordmark">browsa</span>
+  <span class="ts">[07:42]</span>
+</div>
+<div class="mark-br"></div>
+</body></html>

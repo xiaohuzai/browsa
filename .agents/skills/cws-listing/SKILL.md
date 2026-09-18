@@ -14,7 +14,7 @@ description: 生成 Chrome Web Store 商店填写项（CWS listing 更新包）�
 3. **描述必须与实物一致**：新用户可见行为不写进描述，审核员会当「文档不符」打回；反过来，描述里不能出现产品没有的行为。
 4. **不加收费/限额类免责表述**（2026-09 已从全站清理，勿回流）；面向用户文案无行话、无歧义宣称。
 5. **版本号不擅自 bump**——manifest/package.json 的 bump 是用户动作；本技能产出文案包，版本沿用用户给定的目标版本（没给就问或用 manifest 当前值提醒确认）。
-6. 字符限制核验后标注：名称 ≤75、简短说明 ≤132、What's new 单语 ≤500。
+6. 字符限制核验后标注：名称 ≤75、简短说明 ≤132、What's new 单语 ≤500、**测试说明（访问权限页）≤500**（2026-09-19 Dashboard 实测；0.38.2 基线文档的 ~2300 字符长版粘不进去，v0.38.5 起改精简版——无 Key 测试路径 + 提取/隐藏副本/cookies/本地数据四要素全保留，逐权限细节留给权限理由框）。其他字段也别假设上限，产出前逐一核验。
 7. **同一 item 上传新包替换，绝不删件**（删件丢评分与安装量）。
 8. 不确定的事实（线上当前文案与文档有出入、minimum_chrome_version 变化、权限增减）**标 ⚠ 请用户拍板**，不擅自定。
 
@@ -54,7 +54,7 @@ git log v<CODE_BASE>..HEAD --oneline --merges | grep -v 回灌
 - What's new（EN+zh）：本版用户可见变更的 bullet 列表，每条一句话、说行为不说实现。
 - 权限理由：仅当权限/注入行为变化时改（如后台 tab 行为要写进 `tabs` 理由）。
 - 隐私问卷：仅当数据流变化时改（无新数据流则 ✅）。
-- 截图：仅当被拍界面变了才重渲染（源在 `dev-preview/banners/*.html`，`node dev-preview/banners/render.mjs`；旧图备份 `_backup-*`）。宣传视频字段现成素材：`store-assets/promo/browsa-promo-62s.mp4`（需用户传 YouTube 后填链接）。
+- 截图：仅当被拍界面变了才重渲染（源在 `dev-preview/banners/*.html`，`node dev-preview/banners/render.mjs`；旧图备份 `_backup-*`）。宣传视频字段（可选，**只收 YouTube 链接**）：上传用 `store-assets/promo/browsa-promo-62s-1440p-master.mp4`——**别传 3.3MB 展示版**（~431kbps 源经 YouTube 重转码后小字发糊；1440p 上传还吃到 VP9/AV1 高码率档，2026-09-19 实证）；可见性 ≥ 不公开（私密连嵌入都拉不到，oEmbed 200 = 可访问）、**别勾「设为首映」**；换视频流程 = 新传 → 确认 1440p 就绪 → Dashboard 换链接（搭版本审核，不单独多审）→ 再删旧片（顺序反了商店挂死链）。官网 zh 区保持自托管 mp4（大陆访客打不开 YouTube），仓库不放 masters。
 - 分类 / 分发 / 单一用途 / 隐私政策 URL：通常 — 不动。
 
 ### 第三步：产出填写包
