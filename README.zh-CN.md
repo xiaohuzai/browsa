@@ -21,7 +21,7 @@
 
 browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi**，连接 **opencode / Hermes**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
-**扩展免费，MIT 开源。** 自备模型或 Agent；服务商可能收费并设有用量限制。API Key 保存在本地，用于向你配置的服务进行身份验证。
+**扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
 ## 亮点
 
@@ -108,7 +108,7 @@ npm run package      # → browsa-v<version>.zip
 <details>
 <summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式；账号资格、计费和用量限制由智能体的服务商决定：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）

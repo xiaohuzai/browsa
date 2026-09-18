@@ -20,6 +20,7 @@ import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handle
 import { handleSession } from './lib/handlers/session-handler.js';
 import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
+import { boundUnseenImageBytes } from './lib/handlers/history-compactor.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { handleExplainPort } from './lib/handlers/selection-explain.js';
 import { respondOpencodePermission, respondOpencodeQuestion } from './lib/opencode-client.js';
@@ -104,6 +105,10 @@ chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({ id: 'browsa-summarize', title: menuTitle('toolbarSummarize', 'Summarize'), parentId: 'browsa', contexts: ['selection'] });
 
   if (details.reason === 'install' || details.reason === 'update') {
+    // One-shot self-heal: history blobs bloated by parked images from
+    // attach-without-ask sessions (pre-fix) get bounded on first load.
+    boundUnseenImageBytes().catch(() => {});
+
     // Best-effort: re-inject the selection toolbar into already-open tabs.
     // Removes the old host element first so old detached handlers are harmless.
     (async () => {
@@ -661,6 +666,10 @@ async function handle(msg, sender) {
           { type: 'image_url', image_url: { url: imageDataUrl } }
         ]
       });
+      // Pixels park in history until the first successful chat turn compacts
+      // them; cap total parked bytes so attach-without-ask usage can't bloat
+      // every panel open. Fire-and-forget. (lib/handlers/history-compactor.js)
+      boundUnseenImageBytes().catch(() => {});
       return { ok: true, attachId };
     }
 
@@ -747,6 +756,7 @@ async function handle(msg, sender) {
       // it's also the undo identity the panel's 撤销 button deletes by.
       historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
+      boundUnseenImageBytes().catch(() => {});
       console.log(`browsa[bg]: pdf attached — ${finalText.length} chars, ${numPages || '?'} pages`);
       if (willSummarize) {
         maybeSummarizeAttachment({
@@ -821,6 +831,7 @@ async function handle(msg, sender) {
       // it's also the undo identity the panel's 撤销 button deletes by.
       historyEntry.attachId = crypto.randomUUID();
       await storage.appendToHistory(historyEntry);
+      boundUnseenImageBytes().catch(() => {});
       console.log(`browsa[bg]: ${asrPlatform} asr attached — ${finalText.length} chars${figures.length ? `, ${figures.length} keyframes` : ''}`);
       if (willSummarize) {
         maybeSummarizeAttachment({

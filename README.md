@@ -21,7 +21,7 @@
 
 browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi** through Agent Bridge, use **opencode / Hermes**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
-**Free, MIT-licensed extension.** Bring your own model or agent; provider fees and usage limits may apply. API keys are stored locally and used to authenticate with the services you configure.
+**Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
 ## Highlights
 
@@ -108,7 +108,7 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi) to one local HTTP protocol. It uses the CLI's configured authentication; account eligibility, billing, and usage limits are determined by the agent's provider:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi) to one local HTTP protocol. It uses the CLI's configured authentication:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
