@@ -37,7 +37,7 @@ ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
 
 ## 改分镜的常规路径
 
-1. **改字幕文案**：`driver.mjs` 顶部 `Q1/A1/Q2/A2/EXPLAIN/Q3/A3` 常量 + 各幕 `__caption(html, opacity)` 调用。字幕支持 `<span class="hl">` 高亮。
+1. **改字幕文案**：`driver.mjs` 顶部 `Q1/A1/Q2/A2/EXPLAIN/Q3/A3` 常量 + 各幕 `__caption(zh, opacity, en)` 调用。字幕为中英双行（`wrapper.html` 里 `#capzh`/`#capen`，英文次行省略参数即隐藏）；两行都支持 `<span class="hl">` 高亮。**英文文案用 ASCII 直引号**——弯引号 ' 会被中文字体 Noto Sans SC 渲染成全角、出现空隙。
 2. **改节奏**：每幕由 `frames(count, step)` 段组成，count 即帧数（24 帧 = 1 秒）；步进函数里做逐帧插值。
 3. **加一幕**：仿照现有 `if (only('sN'))` 块写，注意承接上一幕的布局与光标位置；`swapWithFade(setup)` 做"切 tab"观感的幕间转场（窗口框不动）。
 4. **重拍范围**：单幕改动仍建议全量连拍（帧号全局连续）；只想预览就 `node driver.mjs sN` 后单独看帧。

@@ -28,13 +28,17 @@
   #pageframe { height: 100%; border: 0; background: #fff; flex: 0 0 auto; }
   #panelframe { height: 100%; border: 0; border-left: 1px solid #2a313b; background: #0f141a; flex: 0 0 auto; width: 448px; }
 
-  /* 字幕（底部大字） */
+  /* 字幕（底部大字，中英双行） */
   .caption { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(14px);
     background: rgba(13,17,23,.86); border: 1px solid #303945; color: #eef3f8;
-    font-size: 33px; font-weight: 700; padding: 13px 32px; border-radius: 14px;
-    opacity: 0; letter-spacing: 1px; white-space: nowrap; z-index: 40;
-    box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+    font-size: 33px; font-weight: 700; padding: 12px 32px 14px; border-radius: 14px;
+    opacity: 0; letter-spacing: 1px; z-index: 40;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .caption .zh, .caption .en { white-space: nowrap; line-height: 1.3; }
+  .caption .en { font-size: 21px; font-weight: 400; color: #a7b6c6; letter-spacing: .4px; margin-top: 5px; }
   .caption .hl { color: #6ea8ff; }
+  .caption .en .hl { color: #8fb8ff; font-weight: 600; }
 
   /* 假光标 + 点击涟漪 */
   #cursor { position: absolute; left: 0; top: 0; width: 30px; z-index: 55; pointer-events: none;
@@ -49,7 +53,9 @@
   .outro .mark { font-size: 104px; font-weight: 700; letter-spacing: -1px; line-height: 1;
     background: linear-gradient(100deg, #eaf1fa 30%, #6ea8ff 75%, #4c8dff); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .outro .tag { margin-top: 30px; font-size: 33px; font-weight: 500; color: #d7e0ea; letter-spacing: 2px; }
-  .outro .sub { margin-top: 16px; font-size: 19px; color: #8b97a5; letter-spacing: 1px; }
+  .outro .tag-en { margin-top: 10px; font-size: 20px; font-weight: 400; color: #a7b6c6; letter-spacing: .4px; }
+  .outro .sub { margin-top: 22px; font-size: 19px; color: #8b97a5; letter-spacing: 1px; }
+  .outro .sub-en { margin-top: 7px; font-size: 16px; color: #718091; letter-spacing: .4px; }
   .outro .store { margin-top: 44px; font-size: 20px; color: #cfe0ff; background: rgba(76,141,255,.14); border: 1px solid rgba(108,160,255,.42);
     padding: 12px 26px; border-radius: 999px; letter-spacing: .6px; }
 
@@ -70,15 +76,17 @@
     </div>
   </div>
 
-  <div class="caption" id="caption"></div>
+  <div class="caption" id="caption"><div class="zh" id="capzh"></div><div class="en" id="capen" style="display:none"></div></div>
   <div id="ripple"></div>
   <svg id="cursor" viewBox="0 0 24 24"><path d="M5.2 2.6 19 13.2l-6.1.9 3.4 7.6-2.9 1.3-3.4-7.7-4.8 3.9z" fill="#fff" stroke="#1a1f27" stroke-width="1.1"/></svg>
 
   <div class="outro" id="outro">
     <div class="mark" id="mark">browsa</div>
     <div class="tag">把正在看的网页、视频、PDF，带进对话</div>
+    <div class="tag-en">Bring the pages, videos &amp; PDFs you're reading into the conversation</div>
     <div class="sub">Chrome / Edge 侧边栏 · 接你自己的模型与 Agent</div>
-    <div class="store">Chrome Web Store → 搜索 browsa</div>
+    <div class="sub-en">Chrome / Edge side panel · your own models &amp; agents</div>
+    <div class="store">Chrome Web Store → 搜索 / search browsa</div>
   </div>
   <div class="fade" id="fade"></div>
 
@@ -95,9 +103,14 @@
     if (o.url != null) $('urltext').textContent = o.url;
   };
 
-  window.__caption = (html, op, dy) => {
+  window.__caption = (html, op, en, dy) => {
     const c = $('caption');
-    if (html != null) c.innerHTML = html;
+    if (html != null) $('capzh').innerHTML = html;
+    if (en != null) {
+      const e = $('capen');
+      if (en) { e.innerHTML = en; e.style.display = 'block'; }
+      else e.style.display = 'none';
+    }
     c.style.opacity = op;
     c.style.transform = 'translateX(-50%) translateY(' + (dy || 0) + 'px)';
   };

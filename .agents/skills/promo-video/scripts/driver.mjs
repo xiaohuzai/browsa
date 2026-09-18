@@ -179,7 +179,7 @@ if (only('s1')) {
   await frames(12, async (i) => {
     const t = easeOut(i / 11);
     await W((op) => window.__fade(1 - op), t);
-    await W(([h, op]) => window.__caption(h, op), ['网页看不懂？<span class="hl">别再复制粘贴</span>', Math.min(1, t * 1.5)]);
+    await W(([h, op, en]) => window.__caption(h, op, en), ['网页看不懂？<span class="hl">别再复制粘贴</span>', Math.min(1, t * 1.5), 'Can\'t make sense of the page? <span class="hl">Stop copy-pasting</span>']);
   });
   await frames(24, async (i) => {
     const t = easeInOut(i / 23);
@@ -207,7 +207,7 @@ if (only('s2')) {
   const [ax, ay] = await panelPoint('#attach');
   await frames(24, async (i) => {
     const t = easeInOut(i / 23);
-    await W(([h, op]) => window.__caption(h, op), ['📎 一键附带<span class="hl">当前页面</span>', Math.min(1, i / 10)]);
+    await W(([h, op, en]) => window.__caption(h, op, en), ['📎 一键附带<span class="hl">当前页面</span>', Math.min(1, i / 10), '📎 Attach the <span class="hl">current page</span> in one click']);
     await W(([x, y]) => window.__cursor(x, y), [800 + t * (ax - 800), 500 + t * (ay - 500)]);
   });
   const attachP = PF().click('#attach');
@@ -239,7 +239,7 @@ if (only('s2')) {
   await frames(12, async (i) => {
     const t = easeInOut(i / 11);
     await W(([x, y]) => window.__cursor(x, y), [ax + t * (sx - ax), ay + t * (sy - ay)]);
-    if (i > 5) await W(([h, op]) => window.__caption(h, op), ['用你自己的<span class="hl">模型</span>回答', 1]);
+    if (i > 5) await W(([h, op, en]) => window.__caption(h, op, en), ['用你自己的<span class="hl">模型</span>回答', 1, 'Answered by <span class="hl">your own model</span>']);
   });
   await PF().click('#send');
   await page.waitForTimeout(260);
@@ -300,7 +300,7 @@ if (only('s3')) {
   const [cx0, cy0] = await W(() => { const c = document.getElementById('cursor'); return [+c.style.left.replace('px', ''), +c.style.top.replace('px', '')]; });
   await frames(24, async (i) => {
     const t = easeInOut(i / 23);
-    await W(([h, op]) => window.__caption(h, op), ['选中一句，<span class="hl">就地追问</span>', Math.min(1, i / 10)]);
+    await W(([h, op, en]) => window.__caption(h, op, en), ['选中一句，<span class="hl">就地追问</span>', Math.min(1, i / 10), 'Select a phrase, <span class="hl">follow up in place</span>']);
     await W(([x, y]) => window.__cursor(x, y), [cx0 + t * (qx - cx0), cy0 + t * (qy - cy0)]);
   });
   // 真点击 pill（mousedown 触发 openDetailThread）
@@ -351,7 +351,7 @@ if (only('s4')) {
   const [cx1, cy1] = await W(() => { const c = document.getElementById('cursor'); return [+c.style.left.replace('px', ''), +c.style.top.replace('px', '')]; });
   await frames(24, async (i) => {
     const t = easeInOut(i / 23);
-    await W(([h, op]) => window.__caption(h, op), ['划词即答：<span class="hl">解释 · 翻译 · 总结</span>', Math.min(1, i / 10)]);
+    await W(([h, op, en]) => window.__caption(h, op, en), ['划词即答：<span class="hl">解释 · 翻译 · 总结</span>', Math.min(1, i / 10), 'Select any text: <span class="hl">Explain · Translate · Summarize</span>']);
     await W(([x, y]) => window.__cursor(x, y), [cx1 + t * (wx - cx1), cy1 + t * (wy - cy1)]);
   });
   // 20f：真拖选（原生选区高亮）
@@ -403,7 +403,7 @@ if (only('s5')) {
   const [tx, ty] = await panelPoint('#transcript-btn');
   await frames(20, async (i) => {
     const t = easeInOut(i / 19);
-    await W(([h, op]) => window.__caption(h, op), ['视频也读得懂：<span class="hl">笔记 · 字幕 · 时间线</span>', Math.min(1, i / 10)]);
+    await W(([h, op, en]) => window.__caption(h, op, en), ['视频也读得懂：<span class="hl">笔记 · 字幕 · 时间线</span>', Math.min(1, i / 10), 'Videos too: <span class="hl">notes · subtitles · timeline</span>']);
     await W(([x, y]) => window.__cursor(x, y), [760 + t * (tx - 760), 320 + t * (ty - 320)]);
   });
   const openP = PF().click('#transcript-btn');
@@ -428,7 +428,7 @@ if (only('s5')) {
   await frames(16, async (i) => {
     await W(([x, y]) => window.__cursor(x, y), [nx - i * 2, ny]);
     if (i === 2) await W(([x, y, ph]) => window.__ripple(x, y, ph), [nx, ny, 0.5]);
-    if (i > 3) await W(([h, op]) => window.__caption(h, op), ['随手<span class="hl">记一笔</span>，带回去继续问', 1]);
+    if (i > 3) await W(([h, op, en]) => window.__caption(h, op, en), ['随手<span class="hl">记一笔</span>，带回去继续问', 1, '<span class="hl">Jot a note</span>, then keep asking in chat']);
   });
   await noteP;
   await W(([x, y]) => window.__ripple(x, y, 1), [nx, ny]);
@@ -456,7 +456,7 @@ if (only('s6') || only('s7')) {
   }
 
   if (only('s6')) {
-    await W(() => window.__caption('图表、公式、结构——<span class="hl">直接长在回复里</span>', 1));
+    await W(() => window.__caption('图表、公式、结构——<span class="hl">直接长在回复里</span>', 1, 'Charts, formulas, structures — <span class="hl">rendered right in the reply</span>'));
     // 三个问答组按镜头顺序入列：mermaid → echarts → 蛋白质（蛋白质预渲染，慢，不占采帧）
     await PF().evaluate(async () => {
       const mod = window.__promoRender;
@@ -563,7 +563,7 @@ if (only('s6') || only('s7')) {
         ta.value = text;
         ta.dispatchEvent(new Event('input', { bubbles: true }));
       }, [Q3.slice(0, c)]);
-      if (i > 8) await W(([h, op]) => window.__caption(h, op), ['接上你的 Agent：<span class="hl">过程可见，先审后动</span>', Math.min(1, (i - 8) / 12)]);
+      if (i > 8) await W(([h, op, en]) => window.__caption(h, op, en), ['接上你的 Agent：<span class="hl">过程可见，先审后动</span>', Math.min(1, (i - 8) / 12), 'Connect your Agent: <span class="hl">visible steps, approve before it acts</span>']);
     });
     const [sx2, sy2] = await panelPoint('#send');
     const [pcx, pcy] = await W(() => { const c = document.getElementById('cursor'); const x = parseFloat(c.style.left) || 0; const y = parseFloat(c.style.top) || 0; return [x < 0 ? 1500 : x, y < 0 ? 940 : y]; });
