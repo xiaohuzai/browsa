@@ -1,0 +1,9 @@
+{
+  "name": "browsa-promo-video",
+  "private": true,
+  "description": "browsa 宣传片生成器依赖（playwright-core + Noto Sans SC webfont）",
+  "dependencies": {
+    "playwright-core": "^1.49.0",
+    "@fontsource/noto-sans-sc": "^5.0.0"
+  }
+}

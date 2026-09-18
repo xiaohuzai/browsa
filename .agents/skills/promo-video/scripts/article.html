@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="/fonts/400.css" />
+<link rel="stylesheet" href="/fonts/500.css" />
+<link rel="stylesheet" href="/fonts/700.css" />
+<style>
+  html, body { margin: 0; }
+  body { font-family: 'Noto Sans SC', sans-serif; }
+
+  /* ── v=doc：浅色技术文档页 ─────────────────────────────────────────── */
+  .doc { background: #ffffff; color: #1f2430; min-height: 100vh; }
+  .doc .wrap { max-width: 820px; margin: 0 auto; padding: 44px 48px 80px; }
+  .doc .crumb { font-size: 13px; color: #7a828e; letter-spacing: .4px; margin-bottom: 14px; }
+  .doc h1 { font-size: 34px; line-height: 1.25; margin: 0 0 10px; font-weight: 700; }
+  .doc .meta { font-size: 13.5px; color: #8a929e; margin-bottom: 30px; }
+  .doc h2 { font-size: 21px; margin: 34px 0 10px; font-weight: 700; }
+  .doc p { font-size: 15.5px; line-height: 1.75; margin: 10px 0; color: #333a46; }
+  .doc code { background: #f1f3f7; border: 1px solid #e3e7ee; border-radius: 5px; padding: 1px 6px; font-size: 13.5px; }
+  .doc pre { background: #f6f8fa; border: 1px solid #e3e7ee; border-radius: 10px; padding: 16px 18px; overflow: auto; }
+  .doc pre code { background: none; border: 0; font-size: 13.5px; line-height: 1.6; color: #24292f; }
+  .doc ul { padding-left: 22px; } .doc li { font-size: 15px; line-height: 1.7; margin: 6px 0; }
+  .doc .note { border-left: 3px solid #4c8dff; background: #f0f6ff; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 14.5px; color: #2b3a52; }
+
+  /* ── v=video：深色视频页 ──────────────────────────────────────────── */
+  .vid { background: #101418; color: #e8edf3; min-height: 100vh; }
+  .vid .nav { height: 52px; display: flex; align-items: center; padding: 0 24px; background: #171c22; border-bottom: 1px solid #232a33; color: #8b97a5; font-size: 14px; gap: 22px; }
+  .vid .logo { color: #fb7299; font-weight: 700; font-size: 19px; margin-right: 8px; }
+  .vid .wrap { max-width: 1000px; margin: 0 auto; padding: 26px 24px 60px; }
+  .vid .player { position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden;
+    background: radial-gradient(120% 130% at 20% 10%, #2b3d5e 0%, #1b2740 45%, #131a2a 100%); }
+  .vid .player .play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 86px; height: 86px; border-radius: 50%;
+    background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center; }
+  .vid .player .play::after { content: ''; border-style: solid; border-width: 15px 0 15px 26px; border-color: transparent transparent transparent #fff; margin-left: 6px; }
+  .vid .track { position: absolute; left: 0; right: 0; bottom: 0; height: 34px; background: linear-gradient(transparent, rgba(0,0,0,.55)); display: flex; align-items: flex-end; }
+  .vid .track .rail { margin: 0 14px 10px; flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
+  .vid .track .fill { display: block; height: 100%; width: 0%; background: #fb7299; border-radius: 3px; }
+  .vid .track .clock { margin: 0 14px 6px 0; font-size: 12.5px; color: #dfe6ee; }
+  .vid h1 { font-size: 21px; margin: 20px 0 8px; font-weight: 700; }
+  .vid .sub { font-size: 13.5px; color: #8b97a5; }
+  .vid .sub b { color: #46a6ff; font-weight: 500; }
+</style>
+</head>
+<body id="body"></body>
+<script>
+  const v = new URLSearchParams(location.search).get('v') || 'doc';
+
+  if (v === 'doc') {
+    document.title = 'Understanding WebAssembly Memory';
+    document.getElementById('body').innerHTML = `
+    <div class="doc"><div class="wrap">
+      <div class="crumb">Guides / WebAssembly / Memory model</div>
+      <h1>Understanding WebAssembly Memory</h1>
+      <div class="meta">Updated Sep 2026 · 12 min read</div>
+
+      <p>Every WebAssembly instance works with a <b>linear memory</b>: one contiguous,
+      <span class="psel" data-sel="byte">byte-addressable</span> space that both the module and the host can read and write.
+      Understanding how this space is sized, grown, and shared is the key to making
+      modules fast — and to avoiding the classic invalid-view bug.</p>
+
+      <h2>Pages, not bytes</h2>
+      <p>Memory is allocated in units of <b>64&nbsp;KiB pages</b>. A fresh module starts
+      with the minimum declared at compile time, and can grow up to a declared maximum —
+      or without one, up to the engine's limit. Addresses are offsets from zero; there is
+      no memory protection between a module's own data.</p>
+
+      <h2>Growing at runtime</h2>
+      <p>Calls to <code>memory.grow(n)</code> append <i>n</i> pages and return the previous
+      size in pages. Growth may force the engine to relocate the backing buffer, which is
+      why any <code>ArrayBuffer</code> view you cached becomes <b>detached</b> after a grow:</p>
+      <pre><code>const mem = new WebAssembly.Memory({ initial: 1, maximum: 8 });
+let view = new Uint8Array(mem.buffer);
+
+mem.grow(2);                    // +2 pages (128 KiB)
+// view.byteLength === 0        // detached!
+view = new Uint8Array(mem.buffer); // re-create after every grow</code></pre>
+
+      <div class="note">Rule of thumb: re-create every TypedArray view immediately after
+      a <code>grow()</code> call, and prefer sizing memory up front in hot paths.</div>
+
+      <h2>Sharing with JavaScript</h2>
+      <p>Because the host and the module reference the same bytes, passing large data
+      across the boundary needs <b>no copy at all</b>: write into the shared buffer from
+      JS, hand the module a pointer and a length. This is where most of WebAssembly's
+      real-world performance comes from.</p>
+
+      <h2>Takeaways</h2>
+      <ul>
+        <li>Linear memory is one flat, byte-addressable space, sized in 64 KiB pages.</li>
+        <li><code>grow()</code> can detach old views — always re-create them.</li>
+        <li>Zero-copy data sharing beats structured cloning for large payloads.</li>
+        <li>Declare a sane maximum so engines can reserve address space cheaply.</li>
+      </ul>
+    </div></div>`;
+  } else {
+    document.title = '【4K】2026 前端趋势分享会';
+    document.getElementById('body').innerHTML = `
+    <div class="vid">
+      <div class="nav"><span class="logo">哔哩哔哩</span><span>首页</span><span>番剧</span><span>直播</span><span>游戏中心</span><span>会员购</span></div>
+      <div class="wrap">
+        <div class="player" id="player">
+          <div class="play"></div>
+          <div class="track"><span class="clock" id="clock">00:00 / 40:00</span><span class="rail"><span class="fill" id="fill"></span></span></div>
+        </div>
+        <h1>【4K】2026 前端趋势分享会</h1>
+        <div class="sub"><b>前端晚自习</b> · 128,442 播放 · 2026-03-12 &nbsp;|&nbsp; 本地优先 / React Compiler / Rust 工具链 / 圆桌</div>
+      </div>
+    </div>`;
+    // 播放进度由驱动脚本逐帧设置（分数 0-1），同步进度条与时间码
+    window.__setProgress = (frac) => {
+      frac = Math.max(0, Math.min(1, frac));
+      document.getElementById('fill').style.width = (frac * 100).toFixed(2) + '%';
+      const total = 2400, s = Math.round(frac * total);
+      const fmt = (x) => String(Math.floor(x / 60)).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0');
+      document.getElementById('clock').textContent = fmt(s) + ' / 40:00';
+    };
+    window.__setProgress(0.02);
+  }
+</script>
+<!-- 真实浮条内容脚本：内容注入完成后再装（内容脚本会整体替换 body.innerHTML） -->
+<script src="page-shim.js"></script>
+<script src="/repo/lib/content-scripts/selection-toolbar.js"></script>
+</html>
