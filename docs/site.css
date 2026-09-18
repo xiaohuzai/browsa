@@ -781,3 +781,14 @@ html[data-md-color-scheme="slate"] .pb-idle{color:#d4a72c;background:rgba(212,16
   .p-status{animation:none;opacity:.85}
   .p-tool .spin{animation:none}
 }
+
+/* ── 演示视频（#demo）────────────────────────────────────────────── */
+.demo-video{margin:0 auto;max-width:960px}
+.demo-video video{
+  display:block;width:100%;height:auto;border-radius:14px;
+  border:1px solid var(--md-fg-lightest);background:#0f141a;
+  box-shadow:0 24px 60px rgba(0,0,0,.18);
+}
+.demo-video figcaption{
+  margin-top:12px;text-align:center;font-size:12px;color:var(--md-fg-light);line-height:1.7;
+}
