@@ -12,6 +12,7 @@ import {
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
+import { initMathCopy, addMathCopyButtons } from './lib/sidepanel/math-copy.js';
 import { classifyErrorText } from './lib/sidepanel/error-classifier.js';
 import {
   initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups
@@ -601,6 +602,8 @@ async function init() {
 
   // Wire search bar
   initMsgSearch();
+  // 复制含公式的选区 → LaTeX 源码（否则 MathML 被序列化成逐符号换行的碎片）
+  initMathCopy({ messagesEl });
   $('search-btn')?.addEventListener('click', openMsgSearch);
 
   // Wire multi-select toggle
@@ -1614,6 +1617,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       addCodeCopyButtons();
       renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el); renderNn(el);
+      addMathCopyButtons(el);
       if (m.providerLabel) addProviderLabel(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
@@ -3335,6 +3339,7 @@ async function renderHistory() {
       decorateFigureRefs(el, figs);
       renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el); renderNn(el);
       addCodeCopyButtons(el); // re-wire copy buttons on the upgraded content
+      addMathCopyButtons(el);
       // el.innerHTML above wipes out the .msg-actions row appended during the
       // sync pass (it's a child of el, not a sibling) — re-add it here.
       // addMsgActions is idempotent (no-ops if .msg-actions already present),

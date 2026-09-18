@@ -958,7 +958,14 @@ math[display="block"] {
 .markmap-diagram:hover .mermaid-toolbar,
 .smiles-block:hover .mermaid-toolbar,
 .pdb-viewer:hover .mermaid-toolbar,
-.nn-block:hover .mermaid-toolbar { opacity: 1; }
+.nn-block:hover .mermaid-toolbar,
+.katex:hover > .mermaid-toolbar { opacity: 1; }
+
+/* 公式悬浮「复制 LaTeX」按钮：.katex 是行内 span，作定位参照；
+   行内公式按钮浮在公式上方（base 的 top:6px 会盖住符号），块级公式同 mermaid 落角落 */
+.katex { position: relative; }
+.katex > .mermaid-toolbar { top: -30px; right: -4px; }
+.katex:has(> math[display="block"]) > .mermaid-toolbar { top: 6px; right: 6px; }
 .echarts-diagram {
   position: relative;
   margin: 8px 0;

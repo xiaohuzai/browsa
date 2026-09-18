@@ -999,6 +999,10 @@
     "message": "Copy code",
     "description": "Sidepanel: mermaid/chart copy code button"
   },
+  "mathCopyLatex": {
+    "message": "Copy LaTeX",
+    "description": "Sidepanel: formula hover copy-LaTeX button"
+  },
   "mermaidViewSource": {
     "message": "View source",
     "description": "Sidepanel: mermaid error view source"
