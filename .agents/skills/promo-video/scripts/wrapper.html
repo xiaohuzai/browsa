@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>promo</title>
+<link rel="stylesheet" href="/fonts/400.css" />
+<link rel="stylesheet" href="/fonts/500.css" />
+<link rel="stylesheet" href="/fonts/700.css" />
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0b0e13; font-family: 'Noto Sans SC', sans-serif; }
+  .backdrop { position: absolute; inset: 0;
+    background:
+      radial-gradient(900px 520px at 24% 0%, rgba(76,141,255,.10), transparent 60%),
+      radial-gradient(820px 560px at 82% 100%, rgba(251,114,153,.07), transparent 60%),
+      linear-gradient(160deg, #10151c 0%, #0b0e13 55%, #0d1117 100%); }
+
+  /* 浏览器窗口：共享标题栏 + 页面区 + 侧栏区（Chrome 真实布局） */
+  .win { position: absolute; left: 64px; top: 48px; width: 1792px; height: 896px;
+    background: #1b2027; border: 1px solid #2a313b; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 34px 90px rgba(0,0,0,.55), 0 6px 22px rgba(0,0,0,.35); }
+  .winbar { height: 44px; display: flex; align-items: center; padding: 0 16px; background: #20262e; border-bottom: 1px solid #2a313b; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+  .urlbar { margin-left: 14px; height: 28px; flex: 0 0 620px; border-radius: 8px; background: #141920; border: 1px solid #2a313b;
+    color: #9aa6b4; font-size: 14.5px; display: flex; align-items: center; padding: 0 14px; letter-spacing: .2px; white-space: nowrap; }
+  .urlbar .lock { margin-right: 8px; font-size: 12px; }
+  .winbody { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; display: flex; overflow: hidden; }
+  #bodyfade { position: absolute; inset: 0; background: #0f141a; opacity: 0; pointer-events: none; z-index: 5; }
+  #pageframe { height: 100%; border: 0; background: #fff; flex: 0 0 auto; }
+  #panelframe { height: 100%; border: 0; border-left: 1px solid #2a313b; background: #0f141a; flex: 0 0 auto; width: 448px; }
+
+  /* 字幕（底部大字） */
+  .caption { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(14px);
+    background: rgba(13,17,23,.86); border: 1px solid #303945; color: #eef3f8;
+    font-size: 33px; font-weight: 700; padding: 13px 32px; border-radius: 14px;
+    opacity: 0; letter-spacing: 1px; white-space: nowrap; z-index: 40;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .caption .hl { color: #6ea8ff; }
+
+  /* 假光标 + 点击涟漪 */
+  #cursor { position: absolute; left: 0; top: 0; width: 30px; z-index: 55; pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.65)); }
+  #ripple { position: absolute; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.9); border-radius: 50%;
+    opacity: 0; pointer-events: none; z-index: 54; }
+
+  /* 片尾卡 */
+  .outro { position: absolute; inset: 0; opacity: 0; z-index: 60; pointer-events: none;
+    background: radial-gradient(1100px 640px at 50% 38%, rgba(23,30,40,.97), rgba(8,10,14,.985));
+    display: flex; flex-direction: column; align-items: center; justify-content: center; color: #eef3f8; }
+  .outro .mark { font-size: 104px; font-weight: 700; letter-spacing: -1px; line-height: 1;
+    background: linear-gradient(100deg, #eaf1fa 30%, #6ea8ff 75%, #4c8dff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .outro .tag { margin-top: 30px; font-size: 33px; font-weight: 500; color: #d7e0ea; letter-spacing: 2px; }
+  .outro .sub { margin-top: 16px; font-size: 19px; color: #8b97a5; letter-spacing: 1px; }
+  .outro .store { margin-top: 44px; font-size: 20px; color: #cfe0ff; background: rgba(76,141,255,.14); border: 1px solid rgba(108,160,255,.42);
+    padding: 12px 26px; border-radius: 999px; letter-spacing: .6px; }
+
+  .fade { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 70; pointer-events: none; }
+</style>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="win" id="win">
+    <div class="winbar">
+      <span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>
+      <div class="urlbar"><span class="lock">🔒</span><span id="urltext">docs.example.dev/wasm/memory</span></div>
+    </div>
+    <div class="winbody">
+      <iframe id="pageframe"></iframe>
+      <iframe id="panelframe"></iframe>
+      <div id="bodyfade"></div>
+    </div>
+  </div>
+
+  <div class="caption" id="caption"></div>
+  <div id="ripple"></div>
+  <svg id="cursor" viewBox="0 0 24 24"><path d="M5.2 2.6 19 13.2l-6.1.9 3.4 7.6-2.9 1.3-3.4-7.7-4.8 3.9z" fill="#fff" stroke="#1a1f27" stroke-width="1.1"/></svg>
+
+  <div class="outro" id="outro">
+    <div class="mark" id="mark">browsa</div>
+    <div class="tag">把正在看的网页、视频、PDF，带进对话</div>
+    <div class="sub">Chrome / Edge 侧边栏 · 接你自己的模型与 Agent</div>
+    <div class="store">Chrome Web Store → 搜索 browsa</div>
+  </div>
+  <div class="fade" id="fade"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const win = $('win'), pageframe = $('pageframe'), panelframe = $('panelframe');
+
+  // 几何：窗口位置尺寸 + 页面/侧栏宽度
+  window.__layout = (o) => {
+    if (o.win) { const [x, y, w, h] = o.win; win.style.left = x + 'px'; win.style.top = y + 'px'; win.style.width = w + 'px'; win.style.height = h + 'px'; }
+    if (o.page != null) pageframe.style.width = o.page + 'px';
+    if (o.panel != null) panelframe.style.width = o.panel + 'px';
+    if (o.panelX != null) panelframe.style.transform = 'translateX(' + o.panelX + 'px)';
+    if (o.url != null) $('urltext').textContent = o.url;
+  };
+
+  window.__caption = (html, op, dy) => {
+    const c = $('caption');
+    if (html != null) c.innerHTML = html;
+    c.style.opacity = op;
+    c.style.transform = 'translateX(-50%) translateY(' + (dy || 0) + 'px)';
+  };
+
+  window.__cursor = (x, y) => { $('cursor').style.left = x + 'px'; $('cursor').style.top = y + 'px'; };
+  window.__ripple = (x, y, phase) => {  // phase: 0..1（0=隐藏）
+    const r = $('ripple');
+    if (phase == null || phase <= 0 || phase >= 1) { r.style.opacity = 0; return; }
+    const s = 1 + phase * 2.6;
+    r.style.left = (x - 9) + 'px'; r.style.top = (y - 9) + 'px';
+    r.style.transform = 'scale(' + s + ')';
+    r.style.opacity = String(0.9 * (1 - phase));
+  };
+
+  window.__outro = (op, scale) => {
+    $('outro').style.opacity = op;
+    if (scale != null) $('mark').style.transform = 'scale(' + scale + ')';
+  };
+  window.__fade = (op) => { $('fade').style.opacity = op; };
+  window.__bodyFade = (op) => { $('bodyfade').style.opacity = op; };
+</script>
+</body>
+</html>
