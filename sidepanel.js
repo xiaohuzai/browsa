@@ -2476,8 +2476,17 @@ function addMsgActions(el, getRaw) {
       // 会带出 think 正文）。
       let text = stripThinkSegments(getRaw() || '');
       if (!text) {
+        // getRaw() 为空的兜底路径（克隆后取 innerText）：剥掉全部面板自带的
+        // UI chrome，只留正文——主路径的原始 markdown 里本来就没有这些东西，
+        // 兜底必须逼近同一产物。否则 code 块复制按钮的「复制」、时间戳、
+        // token 芯片、工具折叠条、provider 铭牌、图表面板按钮（复制代码/
+        // 导出SVG…）都会混进剪贴板（同 code-copy-btn 标签泄漏，用户报告）。
+        // 注意只剥面板自己的类；模型自产的 <details><summary> 原样保留
+        // （与 math-copy.js 选区复制的剥离清单同一口径）。
         const clone = el.cloneNode(true);
-        clone.querySelectorAll('.think-block').forEach((n) => n.remove());
+        clone.querySelectorAll(
+          '.think-block, .msg-actions, .code-copy-btn, .msg-time, .token-usage, .tool-history, .msg-provider, .mermaid-toolbar'
+        ).forEach((n) => n.remove());
         text = (clone.innerText || '').trim();
       }
       try {
