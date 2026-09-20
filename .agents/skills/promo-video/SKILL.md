@@ -58,5 +58,8 @@ ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
 
 - 产物落 `store-assets/promo/`（gitignore 内，本地留存），`README.md` 在该目录记录规格与分镜。
 - 分发：GIF → `docs/assets/readme/`（**嵌双语 README**）；mp4+海报 → `docs/assets/promo/`（官网双语 `#demo` 区）。README 侧图片**换内容必须换文件名**（demo.gif → demo-v2 → demo-v3…），否则 camo/浏览器缓存让用户永远看到旧版。
-- 发布走仓库惯例：dev 提交 → PR → CI 绿 → squash 合 main（不带 --delete-branch）→ 回灌 dev；Pages 自动部署。
+- 发布走仓库惯例：dev 提交 → PR → CI 绿 → squash 合 main（不带 --delete-branch）→ 回灌 dev
+  改用 **`git reset --hard origin/main` + `git push --force-with-lease`**（2026-09-19 起，替代
+  merge 回灌——merge 回灌会让历史开发提交永远留在 `main..dev` 区间，GitHub squash body 把
+  它们全部拼进去越滚越长，12KB/条实证）；Pages 自动部署。
 - 中英文案逐节对齐（README 双语、docs/en）；官网截图目检用临时 http.server + 截图，不起常驻预览服务。

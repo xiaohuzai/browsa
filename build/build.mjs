@@ -217,6 +217,18 @@ const RAW_COPIES = [
     // get3Dmol() keeps its exact browser semantics.
     srcDir:  join(ROOT, 'node_modules/3dmol/build'),
     files:   ['3Dmol-min.js']
+  },
+  {
+    // Office-document → Markdown conversion (docx/pptx/xlsx/odt/rtf/epub/…):
+    // docling.rs compiled to WASM — the /web target is dependency-free ESM
+    // glue (wasm-bindgen, references only globalThis — verified: zero
+    // document/window touches) plus the raw .wasm binary. Loaded by
+    // lib/sidepanel/office-inspector.worker.js (type:'module' worker),
+    // exactly like the pdf-inspector pair above; esbuild must NOT bundle
+    // either file. convert() is sync/CPU-bound — Worker offload mirrors
+    // katex/pdf precedents.
+    srcDir:  join(ROOT, 'node_modules/docling.rs-wasm/web'),
+    files:   ['docling_wasm_bg.wasm', 'docling_wasm.js']
   }
 ];
 
