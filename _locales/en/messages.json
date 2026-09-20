@@ -819,9 +819,17 @@
     "message": "Parsing PDF…",
     "description": "Sidepanel: attach progress"
   },
+  "progressParsingDoc": {
+    "message": "Parsing document…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
   "pdfAttachFailed": {
     "message": "PDF attach failed",
     "description": "Sidepanel: PDF attach failed"
+  },
+  "officeAttachFailed": {
+    "message": "Document attach failed",
+    "description": "Sidepanel: Office document attach failed"
   },
   "asrAttachFailed": {
     "message": "ASR attach failed",

@@ -819,9 +819,17 @@
     "message": "解析 PDF 中…",
     "description": "Sidepanel: attach progress"
   },
+  "progressParsingDoc": {
+    "message": "解析文档中…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
   "pdfAttachFailed": {
     "message": "PDF 附加失败",
     "description": "Sidepanel: PDF attach failed"
+  },
+  "officeAttachFailed": {
+    "message": "文档附加失败",
+    "description": "Sidepanel: Office document attach failed"
   },
   "asrAttachFailed": {
     "message": "ASR 附加失败",

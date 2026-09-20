@@ -50,6 +50,7 @@ One browsa card connects to several agents at once; the sidebar dropdown switche
 
 - **Videos**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too
 - **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
+- **Office documents**: direct links to `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… are converted to Markdown fully on-device (docling compiled to WASM) — tables, headings and lists survive
 - **Articles & messy pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
 
 Full list under "What browsa reads" below.
@@ -205,6 +206,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 |---|---|
 | Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
 | PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
+| Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
 | Videos | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — Volcengine Ark key in Settings) or visually analyzed together with the speech |
 | GitHub file pages | raw source from `raw.githubusercontent.com` — markdown and code keep their structure |
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |

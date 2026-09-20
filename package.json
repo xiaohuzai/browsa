@@ -22,6 +22,7 @@
   "dependencies": {
     "@firecrawl/pdf-inspector-wasm": "^0.1.1",
     "3dmol": "^1.8.0",
+    "docling.rs-wasm": "^1.58.0",
     "echarts": "^6.1.0",
     "markmap-lib": "^0.18.12",
     "markmap-view": "^0.18.12",

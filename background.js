@@ -772,6 +772,42 @@ async function handle(msg, sender) {
       return { ok: true, contextText, attachId: historyEntry.attachId };
     }
 
+    case 'ATTACH_OFFICE_CONFIRM': {
+      // Side panel finished docling.rs-wasm conversion (or fell back to the
+      // placeholder on any conversion failure/timeout) and hands us the final
+      // text to store — a slimmed ATTACH_PDF_CONFIRM: no figures (v1 keeps
+      // docling's `<!-- image -->` placeholders), no arXiv enrichment. Same
+      // two-step handoff, summarize pass-through, and attachId undo identity.
+      const { text, metaUrl, metaTitle, ext } = msg;
+      if (!text) return { ok: false, error: 'no text' };
+      const all = await storage.getAll();
+      const officeCtx = {
+        meta: { url: metaUrl || '', title: metaTitle || '' },
+        mode: 'office',
+        text,
+        format: ext ? `${ext}-text` : 'office-text'
+      };
+      const contextText =
+        `${PAGE_CONTEXT_PREFIX}\n` +
+        `URL: ${redactUrlCredentials(metaUrl || '')}\n` +
+        `Title: ${metaTitle || ''}\n` +
+        `Mode: ${officeCtx.mode}${ext ? ` | ${officeCtx.format}` : ''}\n` +
+        `---\n\n${redactTextUrls(text)}`;
+      const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(text, all.summarizeThresholdChars);
+      const attachId = crypto.randomUUID();
+      await storage.appendToHistory({ role: 'user', attachId, content: contextText });
+      console.log(`browsa[bg]: office document attached — ${text.length} chars (${officeCtx.format})`);
+      if (willSummarize) {
+        maybeSummarizeAttachment({
+          attachId,
+          ctx: officeCtx,
+          provider: all.providers?.[all.activeProvider],
+          all
+        });
+      }
+      return { ok: true, contextText, attachId };
+    }
+
     case 'ATTACH_ASR_CONFIRM': {
       // Side panel finished the ASR pipeline (download audio -> upload to
       // 火山方舟 Files API -> poll -> Responses API ASR transcript) and hands
@@ -1102,6 +1138,12 @@ async function handle(msg, sender) {
         if (ctx.mode === 'pdf-pending' && ctx.pdfBase64) {
           return { ok: true, ctx };
         }
+        // Office-document bytes fetched (docx/pptx/xlsx/…, page-extractor.js's
+        // tryOfficeExtraction): same deferred-storage handoff, sidepanel runs
+        // docling.rs-wasm locally, then confirms via ATTACH_OFFICE_CONFIRM.
+        if (ctx.mode === 'office-pending' && ctx.officeBase64) {
+          return { ok: true, ctx };
+        }
         // Bilibili video WITHOUT subtitles + ASR enabled: hand off to sidepanel
         // for the ASR pipeline (download audio in page-world -> upload to 火山方舟
         // Files API -> poll -> Responses API transcript). Deferred storage until
@@ -1147,7 +1189,7 @@ async function handle(msg, sender) {
         // url -- comparing across different extraction modes for the same
         // page would produce false "changed" signals, since reader/dom/full
         // naturally yield different text for the same page.
-        if (ctx.meta?.url && !['selected', 'pdf-url', 'screenshot'].includes(ctx.mode) && (ctx.text || '').length > 50) {
+        if (ctx.meta?.url && !['selected', 'pdf-url', 'office-url', 'screenshot'].includes(ctx.mode) && (ctx.text || '').length > 50) {
           const changeInfo = await checkAndRecordAttachChange(`${ctx.mode}::${ctx.meta.url}`, ctx.text);
           if (changeInfo.changed) ctx.changedSinceLastAttach = changeInfo;
         }
