@@ -200,7 +200,7 @@ Add as many LLM providers as you like; each picks its own protocol and carries i
 
 ## What browsa reads
 
-Click 📎 to attach the current tab — **Auto** mode (clean article text, falling back to DOM tree, then full page text) or **📷 Screenshot** mode (the visible tab, for multimodal models). Attaching a PDF — or a page that turns out to be one — is automatic; no mode to pick.
+Click 📎 to attach the current tab — **Auto** mode (clean article text, falling back to DOM tree, then full page text) or **📷 Screenshot** mode (the visible tab, for multimodal models). Attaching a PDF or Office document — or a page that turns out to be one — is automatic; no mode to pick.
 
 | You're reading | What browsa sends |
 |---|---|

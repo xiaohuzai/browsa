@@ -16,6 +16,15 @@ bash check-compat.sh            # static compatibility check
 
 When bumping a version, update both `manifest.json` and `package.json`.
 
+## Docs sync convention (user-visible changes, 2026-09-20)
+
+**Any user-visible change — feature, behavior, capability — syncs the public docs in the SAME PR**, without waiting to be asked. The rule was made explicit after the Office-document attach landed with its README/docs edits already bundled (2026-09-20, the intended shape) and a follow-up scan caught one missed sentence — that scan-then-fix pass is the routine to repeat:
+
+1. **README.md + README.zh-CN.md** — always both, sections aligned one-to-one (EN and zh are semantic mirrors, not literal translations; zh carries no English jargon). The recurring touchpoints for attach/extraction features: the Highlights bullets (~line 50), the 「你在读 / What browsa sends」attach table (~line 205), and the mode-less auto-attach sentence in the attach walkthrough (~line 203).
+2. **docs/index.html + docs/en/index.html** (the GitHub Pages site, bilingual) — feature/privacy lists mirror README claims. **Exempt**: the demo hero mocks (the 📎 已附加… / Attached: … lines inside the fake panel scenes) are illustrative screenshots of specific scenarios, NOT a feature inventory — a new feature does not require re-staging them.
+3. **Screenshots/banners** (`dev-preview/banners/*.html` → `node dev-preview/banners/render.mjs`) — re-render ONLY when the captured UI itself changed (new buttons, new panels). Text-only features don't touch them. Store-side screenshots live in `store-assets/` (gitignored) and are governed by the cws-listing skill, not this repo flow.
+4. **AGENTS.md** — architecture-level records for anything a future agent must not misinterpret (new pipeline, new vendor, new message type). If a decision closes a door (e.g. "deliberately NOT pre-warmed", "techniques portable, signature features not"), write the why down — un-recorded whys get re-litigated.
+
 ## Architecture
 
 **Chrome MV3 extension** — side panel chat UI. No build step is required for the JS source; all extension files are loaded directly by Chrome.
