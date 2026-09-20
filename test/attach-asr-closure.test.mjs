@@ -30,13 +30,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // braces. There are two: the ASR_FRESH_URLS self-heal path and the
 // buildAsrPendingCtx attach path — the latter now lives in
 // lib/handlers/attach-asr-pending.js (extracted from background.js), so both
-// files are searched.
+// files are searched. Same for the ASR_FRESH_URLS refresh funcs: they moved to
+// lib/handlers/attach-confirm-handler.js (2026-09-20 refactor pass).
 async function readInjectionSources() {
-  const [bg, pending] = await Promise.all([
+  const [bg, pending, confirm] = await Promise.all([
     readFile(join(ROOT, 'background.js'), 'utf8'),
     readFile(join(ROOT, 'lib/handlers/attach-asr-pending.js'), 'utf8'),
+    readFile(join(ROOT, 'lib/handlers/attach-confirm-handler.js'), 'utf8'),
   ]);
-  return bg + '\n' + pending;
+  return bg + '\n' + pending + '\n' + confirm;
 }
 async function extractYouTubeInjectFuncs() {
   const src = await readInjectionSources();
