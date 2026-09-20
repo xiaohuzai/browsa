@@ -28,7 +28,7 @@ globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
 const {
   fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
-  decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks,
+  decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry
 } = await import('../lib/sidepanel/render.js');
@@ -269,6 +269,30 @@ test('addCodeCopyButtons highlights code, adds a Copy button per <pre>, and runs
   for (const pre of pres) assert.ok(pre.querySelector('.code-copy-btn'), 'every <pre> gets a copy button');
   assert.equal(pres[0].querySelector('code').dataset.highlighted, '1', 'JS block goes through highlight.js');
   assert.ok(pres[1].querySelector('.diff-add'), 'diff block still gets diff-colored spans');
+});
+
+test('extractCodeText: the copy fallback must NOT carry the button\'s own Copy label', () => {
+  // 无语言标注的围栏块：marked 渲染出 <pre><code>（code 无 language-* 类），
+  // 旧实现走 pre.textContent 兜底，把 pre 里的按钮文本「复制」一起带进剪贴板。
+  const root = document.createElement('div');
+  root.innerHTML = '<pre><code>plain fenced block, no language tag</code></pre>';
+  const pre = root.querySelector('pre');
+  addCodeCopyButtons(root); // 按钮已 appendChild 进 pre（真实时序）
+  const code = pre.querySelector('code[class*="language-"]'); // null —— 旧 bug 触发条件
+  assert.equal(code, null);
+  const text = extractCodeText(pre, code);
+  assert.ok(text.startsWith('plain fenced block'), 'code text is preserved');
+  assert.ok(!text.includes('复制') && !text.includes('Copy'), 'button label must not leak into the clipboard text');
+  assert.ok(text.endsWith('no language tag'), 'trailing button label not appended');
+});
+
+test('extractCodeText: language-tagged blocks read the code element directly', () => {
+  const root = document.createElement('div');
+  root.innerHTML = '<pre><code class="language-python">print(1)</code></pre>';
+  const pre = root.querySelector('pre');
+  addCodeCopyButtons(root);
+  const code = pre.querySelector('code[class*="language-"]');
+  assert.equal(extractCodeText(pre, code), 'print(1)');
 });
 
 // ─── makeStreamRenderer ──────────────────────────────────────────────────────

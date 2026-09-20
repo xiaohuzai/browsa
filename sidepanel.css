@@ -952,6 +952,7 @@ math[display="block"] {
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 10;
+  user-select: none;
 }
 .mermaid-diagram:hover .mermaid-toolbar,
 .echarts-diagram:hover .mermaid-toolbar,
@@ -1007,6 +1008,7 @@ math[display="block"] {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  user-select: none;
 }
 .mermaid-error .mermaid-err-fix:hover,
 .mermaid-error .mermaid-err-copy:hover { background: color-mix(in srgb, var(--error) 12%, transparent); }
@@ -1057,6 +1059,7 @@ math[display="block"] {
   opacity: 0;
   transition: opacity var(--t), color var(--t);
   z-index: 1;
+  user-select: none;
 }
 .msg.assistant pre:hover .code-copy-btn { opacity: 1; }
 .code-copy-btn:hover { color: var(--fg); border-color: var(--accent); }
@@ -1625,6 +1628,7 @@ math[display="block"] {
   margin-left: 6px;
   vertical-align: middle;
   transition: color var(--t);
+  user-select: none;
 }
 .think-copy-btn:hover { color: var(--fg); }
 

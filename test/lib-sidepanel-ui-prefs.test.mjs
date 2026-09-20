@@ -92,3 +92,44 @@ test('assistant reply\'s copy action is a plain msg-action-icon (no always-visib
     .filter((b) => !allowed.has(b.className));
   assert.equal(special.length, 0, `no action icon may opt out of the uniform hover gate, got: ${special.map((b) => b.className).join(', ')}`);
 });
+
+test('message copy fallback (no dataset.raw) must not carry panel chrome like the code-copy button label', async () => {
+  inputEl.value = 'give me code';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(lastChatPort, 'onSend() must open a browsa-chat port');
+
+  // 无语言标注的围栏块 → code[class*=language-] 为 null → code-copy-btn 走
+  // pre.textContent 兜底路径的历史温床；DONE 渲染后 addCodeCopyButtons 已把
+  // 带标签的按钮塞进 pre。
+  lastChatPort.emit({ type: 'DONE', full: 'before\n\n```\nconst x = 1;\n```\n\nafter' });
+  await new Promise((r) => setTimeout(r, 350));
+
+  const assistantEl = messagesEl.querySelector('.msg.assistant:last-of-type');
+  assert.ok(assistantEl.querySelector('pre .code-copy-btn'), 'code copy button exists inside the pre');
+  // 抹掉 raw 强制走克隆 innerText 兜底
+  delete assistantEl.dataset.raw;
+
+  // stub 剪贴板，捕获 writeText 的实参。jsdom 的 isSecureContext=false 会走
+  // execCommand 兜底（jsdom 没有 execCommand → reject），强制 secure 让
+  // _copyText 走 Clipboard API 路径打到 stub 上。
+  let clipboardText = null;
+  Object.defineProperty(dom.window, 'isSecureContext', { value: true, configurable: true });
+  Object.defineProperty(dom.window.navigator, 'clipboard', {
+    value: { writeText: async (t) => { clipboardText = t; } },
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, writable: true, configurable: true });
+
+  const copyBtn = assistantEl.querySelector('.msg-actions .msg-action-icon[title="Copy response"]')
+    || [...assistantEl.querySelectorAll('.msg-actions .msg-action-icon')].find((b) => b.title === 'Copy response');
+  assert.ok(copyBtn, 'copy action exists');
+  copyBtn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 80));
+
+  assert.ok(clipboardText != null, 'clipboard was written');
+  assert.match(clipboardText, /const x = 1;/, 'code body is present');
+  assert.ok(!clipboardText.includes('Copy') && !clipboardText.includes('复制'), 'code-copy button label must not leak');
+  assert.ok(!/\d{1,2}:\d{2}/.test(clipboardText.replace(/const x = 1;/, '')), 'no timestamp chip text');
+  assert.ok(!clipboardText.includes('t/s'), 'no token-usage chip text');
+});
