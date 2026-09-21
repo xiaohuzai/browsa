@@ -153,3 +153,79 @@ test('clearPersistedDraft empties the draft but keeps the recall history', async
   assert.equal(stored.composerState.draft, '');
   assert.deepEqual(stored.composerState.history, ['remembered q']);
 });
+
+test('recall state is per-input: walks never leak between two inputs of one scope', async () => {
+  // Within one scope the recall list is shared by every input wired to it,
+  // but an in-progress walk must stay bound to the input that started it —
+  // otherwise ↑ in one input resumes the other's position and ↓-past-the-end
+  // writes the other's saved draft here.
+  const cs = await freshModule();
+  cs.pushInputHistory('q1');
+  cs.pushInputHistory('q2');
+  const a = makeInput('draft-a');
+  setCaret(a, 'draft-a'.length);
+  const b = makeInput('');
+
+  assert.equal(cs.handleHistoryNav(keydown(a, 'ArrowUp')), true);
+  assert.equal(a.value, 'q2', 'a starts its walk at the newest');
+  assert.equal(cs.handleHistoryNav(keydown(a, 'ArrowUp')), true);
+  assert.equal(a.value, 'q1', 'a walks back');
+
+  // b's first ↑ starts a FRESH walk at the newest instead of continuing a's
+  assert.equal(cs.handleHistoryNav(keydown(b, 'ArrowUp')), true);
+  assert.equal(b.value, 'q2');
+  assert.equal(cs.handleHistoryNav(keydown(b, 'ArrowUp')), true);
+  assert.equal(b.value, 'q1', 'b walks back on its own');
+
+  // a, still mid-walk at q1 while b is armed at q1 too, walks forward
+  // independently — each input owns its own position
+  setCaret(a, a.value.length);
+  assert.equal(cs.handleHistoryNav(keydown(a, 'ArrowDown')), true);
+  assert.equal(a.value, 'q2');
+  setCaret(a, a.value.length);
+  assert.equal(cs.handleHistoryNav(keydown(a, 'ArrowDown')), true);
+  assert.equal(a.value, 'draft-a', "past-the-end restores a's own draft, not b's");
+
+  // resetHistoryNav from the WRONG input is a no-op: b (armed at q1) keeps
+  // its walk — ↑ stays put at the oldest entry instead of restarting at q2.
+  cs.resetHistoryNav(a);
+  assert.equal(cs.handleHistoryNav(keydown(b, 'ArrowUp')), true);
+  assert.equal(b.value, 'q1', 'b is still armed — walk survives a foreign reset');
+  // …and b's own reset ends it, restoring b's pre-nav draft (empty).
+  cs.resetHistoryNav(b);
+  assert.equal(b.value, '');
+});
+
+test('createInputHistory scopes are independent: separate lists and separate storage rows', async () => {
+  const cs = await freshModule();
+  cs.pushInputHistory('main q');
+  const sub = cs.createInputHistory({ storageKey: 'subInputHistory' });
+  sub.pushInputHistory('sub q');
+
+  const mainInput = makeInput('');
+  assert.equal(cs.handleHistoryNav(keydown(mainInput, 'ArrowUp')), true);
+  assert.equal(mainInput.value, 'main q', 'the main scope recalls only its own sends');
+
+  const subInput = makeInput('');
+  assert.equal(sub.handleHistoryNav(keydown(subInput, 'ArrowUp')), true);
+  assert.equal(subInput.value, 'sub q', 'the card scope recalls only its own sends');
+
+  await new Promise(r => setTimeout(r, 500)); // debounce 400ms
+  assert.deepEqual(stored.composerState.history, ['main q'], 'main pushes stay in the composerState row');
+  assert.deepEqual(stored.subInputHistory, { history: ['sub q'] },
+    'the card scope persists under its own key, history only — no draft field');
+});
+
+test('a card-scope list persists and restores across a panel reopen', async () => {
+  const cs = await freshModule();
+  const a = cs.createInputHistory({ storageKey: 'cardHist' });
+  a.pushInputHistory('earlier follow-up');
+  await new Promise(r => setTimeout(r, 500)); // debounce 400ms
+
+  // "Reopened panel": a brand-new scope instance over the same key.
+  const b = cs.createInputHistory({ storageKey: 'cardHist' });
+  await b.loadInputHistory();
+  const input = makeInput('');
+  assert.equal(b.handleHistoryNav(keydown(input, 'ArrowUp')), true);
+  assert.equal(input.value, 'earlier follow-up');
+});

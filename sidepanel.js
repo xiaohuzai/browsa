@@ -7,7 +7,7 @@ import { getActiveSessionId } from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { classifyToolTier } from './lib/sidepanel/tool-tier.js';
 import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
-import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard, isImeComposing } from './lib/sidepanel/ui-utils.js';
 import {
   renderSafe, renderStreamingSafe, preloadChartVendors, addRichRenderFeatures,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
@@ -255,7 +255,7 @@ async function init() {
         _syncSlashAria(items);
         return;
       }
-      if (e.key === 'Tab' || (e.key === 'Enter' && slashSuggestIdx >= 0)) {
+      if (e.key === 'Tab' || (e.key === 'Enter' && slashSuggestIdx >= 0 && !isImeComposing(e))) {
         e.preventDefault();
         const active = slashSuggestIdx >= 0 ? items[slashSuggestIdx] : items[0];
         if (active) inputEl.value = active.dataset.cmd;
@@ -274,13 +274,15 @@ async function init() {
     }
     // Send shortcut: Enter (default) or Shift+Enter. `!e.repeat` guards
     // against held-key double-fire — repeats would now stack queued
-    // follow-ups instead of just re-sending.
+    // follow-ups instead of just re-sending. isImeComposing: the Enter that
+    // confirms an IME candidate is NOT a send (229 covers drivers that
+    // report the process-key code instead of isComposing).
     if (sendShortcut === 'shift-enter') {
-      if (e.key === 'Enter' && e.shiftKey && !e.isComposing && !e.repeat) {
+      if (e.key === 'Enter' && e.shiftKey && !isImeComposing(e) && !e.repeat) {
         e.preventDefault(); onSend();
       }
     } else {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.repeat) {
+      if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e) && !e.repeat) {
         e.preventDefault(); onSend();
       }
     }
@@ -2647,7 +2649,7 @@ function startMsgEdit(el) {
 
   textarea.addEventListener('keydown', (e) => {
     // 同主输入框：中文 IME 确认候选词的 Enter 不能触发保存重发。
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.repeat) { e.preventDefault(); saveBtn.click(); }
+    if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e) && !e.repeat) { e.preventDefault(); saveBtn.click(); }
     if (e.key === 'Escape') cancelBtn.click();
   });
 }
@@ -2802,7 +2804,7 @@ function showClarifyCard(bubbleEl, data) {
     card.remove();
   };
   submit.addEventListener('click', respond);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) respond(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !isImeComposing(e)) respond(); });
   _insertCard(bubbleEl, card);
   setTimeout(() => input.focus(), 50);
 }

@@ -229,7 +229,7 @@ The full reference lives here:
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
 | **Molecules · Proteins · Neural nets** | ```smiles / ```pdb / ```nn code blocks render live too — 2D structure and reaction diagrams, interactive protein 3D from a PDB ID, and publication-style network architecture figures; each with copy / export controls |
-| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable |
+| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable; the input's ↑/↓ recalls follow-up questions only |
 | **Outline rail** | from 4 turns on, a quiet tick rail tracks the conversation — click to jump, hover to preview |
 | **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
 | **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
