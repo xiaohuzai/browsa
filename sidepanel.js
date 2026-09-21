@@ -5,9 +5,11 @@
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import { getActiveSessionId } from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
+import { classifyToolTier } from './lib/sidepanel/tool-tier.js';
+import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderStreamingSafe, renderMermaid, renderEcharts, renderMarkmap, renderSmiles, renderPdb, renderNn, preloadChartVendors,
+  renderSafe, renderStreamingSafe, preloadChartVendors, addRichRenderFeatures,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
@@ -94,7 +96,8 @@ let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 let lastSentRaw = '';   // raw input text of last user send, used by Retry
-let nextHistoryIdx = 0; // mirrors history.length; used to assign data-hidx to new bubbles
+// The hidx mirror lives in lib/sidepanel/history-index.js (single owner of the
+// counter + the shift-after-delete protocol); mutate it only through those fns.
 let deleteLock = false; // serialises message-delete operations to prevent index races
 let isUserScrolledUp = false; // true when user has manually scrolled up during streaming
 let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
@@ -150,7 +153,6 @@ async function init() {
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); }
   });
   initMultiselect({
-    decrementNextHistoryIdx: () => { nextHistoryIdx = Math.max(0, nextHistoryIdx - 1); },
     // 批量删除与单条删除共用同一把锁，避免两边的 hidx 平移互相踩。
     tryLock: () => { if (deleteLock) return false; deleteLock = true; return true; },
     releaseLock: () => { deleteLock = false; },
@@ -217,7 +219,7 @@ async function init() {
   initAttachOrchestrator({
     getTabId: () => currentTabId,
     getCtxRadios: () => ctxRadios,
-    bumpHistoryIdx: (n = 1) => { nextHistoryIdx += n; },
+    bumpHistoryIdx: (n = 1) => hidxBump(n),
     inputEl, messagesEl, attachBtn,
     appendAttachSystem, appendError, appendScreenshot,
     clearAttachProgress, compactArkErrorText, refreshAsrStreams,
@@ -672,7 +674,7 @@ async function handleSelectionAction(action, text) {
     // background may be empty if the SW was sleeping when the user selected.
     const res = await sendMessage({ type: 'ATTACH_PAGE', tabId: currentTabId, mode: 'selected', text }).catch(() => null);
     if (res?.data?.ok) {
-      nextHistoryIdx++; // selected-text context stored to history
+      hidxBump(); // selected-text context stored to history
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
@@ -1052,7 +1054,7 @@ async function newSession() {
   }
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
-  nextHistoryIdx = 0;
+  hidxResetTo(0);
   deleteLock = false;
   isUserScrolledUp = false;
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
@@ -1073,7 +1075,7 @@ async function clearChatHistory() {
   cancelStream(); // 确认后再停流：取消确认不应误杀进行中的回复
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
-  nextHistoryIdx = 0;
+  hidxResetTo(0);
   deleteLock = false;
   isUserScrolledUp = false;
   if (scrollToBottomBtn) scrollToBottomBtn.hidden = true;
@@ -1103,7 +1105,7 @@ async function reconcileHistoryIdx() {
     });
     const plan = planHistoryReconcile({
       entries: Array.isArray(h) ? h : [],
-      nextHistoryIdx,
+      nextHistoryIdx: hidxCurrent(),
       anchorH: anchor ? anchorH : -1,
       anchorRaw: anchor?.dataset?.raw || '',
     });
@@ -1117,7 +1119,7 @@ async function reconcileHistoryIdx() {
         if (!isNaN(bidx)) b.dataset.hidx = bidx - plan.drift;
       });
     }
-    nextHistoryIdx = plan.actualLen;
+    hidxResetTo(plan.actualLen);
   } catch (_) { /* storage unavailable — leave as-is */ }
 }
 
@@ -1608,16 +1610,14 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
         state.toolEvents = [];
       }
       const finalText = m.full || state.acc;
-      el.dataset.hidx = nextHistoryIdx++; // assistant turn stored in background
+      hidxAssign(el); // assistant turn stored in background
       el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
       await r(finalText, true);
       // linkifyTimestamps already ran inside renderStream's isDone path;
       // stamp the video source (carried in the DONE chunk by the chat
       // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
-      addCodeCopyButtons();
-      renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el); renderNn(el);
-      addMathCopyButtons(el);
+      addRichRenderFeatures(el);
       if (m.providerLabel) addProviderLabel(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
@@ -1737,7 +1737,7 @@ async function onSend() {
   pushInputHistory(rawText); // ↑ recall list
   const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
   const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
-  userBubble.dataset.hidx = nextHistoryIdx++;  // user turn stored in background CHAT handler
+  hidxAssign(userBubble); // user turn stored in background CHAT handler
   // 复位 ↑ 召回态——不复位的话 _navIdx 保持武装，发送后敲的第一个字会被旧
   // 草稿顶掉。resetHistoryNav 会把召回前的草稿写回 value，所以必须先复位、
   // 再清空。
@@ -2417,11 +2417,7 @@ function addMsgActions(el, getRaw) {
         // 索引超界时 storage 静默返回 ok:false，误当成功会平移错所有 hidx。
         if (res?.data?.ok) {
           // Confirmed: shift indices of all remaining bubbles after the deleted slot.
-          messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
-            const bidx = parseInt(b.dataset.hidx, 10);
-            if (bidx > idx) b.dataset.hidx = bidx - 1;
-          });
-          nextHistoryIdx--;
+          hidxShiftAfter(idx);
         } else {
           // Removal failed (index out of range or storage error) — resync.
           reconcileHistoryIdx();
@@ -2560,7 +2556,7 @@ async function regenerateReply(userBubble) {
     sib.remove();
     sib = next;
   }
-  nextHistoryIdx = idx;
+  hidxResetTo(idx);
 
   // onSend() reads the composer as its input source; preserve whatever is
   // parked there and restore after the regenerated turn has been handed off.
@@ -2641,7 +2637,7 @@ function startMsgEdit(el) {
         sib.remove();
         sib = next;
       }
-      nextHistoryIdx = idx; // will be re-assigned when CHAT handler stores new turns
+      hidxResetTo(idx); // will be re-assigned when CHAT handler stores new turns
     }
     // Re-send as new turn
     lastSentRaw = newText;
@@ -2661,16 +2657,6 @@ function startMsgEdit(el) {
 // or waiting — mirrors personal_ai_assistant's event-type display. Shared by
 // showToolProgress (live) and renderToolHistory (folded, post-hoc) so the
 // classification regexes only live in one place.
-function classifyToolTier(text) {
-  const t = text.toLowerCase();
-  if (/think|reason|analyz|consid/.test(t))           return { tier: 'thinking',  icon: ICONS.think };
-  if (/search|fetch|web|http|url/.test(t))            return { tier: 'searching', icon: ICONS.search };
-  if (/read|open|load|file|path/.test(t))             return { tier: 'reading',   icon: ICONS.book };
-  if (/write|edit|creat|sav|updat/.test(t))           return { tier: 'writing',   icon: ICONS.edit };
-  if (/run|exec|bash|shell|cmd|command/.test(t))      return { tier: 'running',   icon: ICONS.terminal };
-  return { tier: '', icon: ICONS.gear };
-}
-
 /** Show a faint "tool progress" line above a streaming bubble, alongside thinking. */
 // ---- Waiting indicator (first-token latency) ----
 // Between send and the first CHUNK / TOOL_PROGRESS / reasoning event the
@@ -2983,12 +2969,10 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
       const removedIdx = d.removedIdx ?? -1;
       if (removedIdx >= 0) {
         // Shift data-hidx on every DOM bubble that came after the removed entry.
-        messagesEl.querySelectorAll('[data-hidx]').forEach(b => {
-          const bidx = parseInt(b.dataset.hidx, 10);
-          if (bidx > removedIdx) b.dataset.hidx = bidx - 1;
-        });
+        hidxShiftAfter(removedIdx);
+      } else {
+        hidxDecrement();
       }
-      nextHistoryIdx--;
       span.textContent = text + '（已撤销）';
       span.style.opacity = '0.45';
       btn.remove();
@@ -3262,7 +3246,7 @@ async function renderHistory() {
   messagesEl.classList.remove('cv-settled');
   const { history } = await chrome.storage.local.get('history');
   const list = Array.isArray(history) ? history : [];
-  nextHistoryIdx = list.length; // keep local mirror in sync with storage
+  hidxResetTo(list.length); // keep local mirror in sync with storage
 
   // Two-pass rendering: paint bubbles synchronously first (renderStreamingSafe,
   // no async KaTeX) so the panel is visible immediately, then upgrade each
@@ -3346,9 +3330,7 @@ async function renderHistory() {
       decorateLinks(el);
       linkifyTimestamps(el);
       decorateFigureRefs(el, figs);
-      renderMermaid(el); renderEcharts(el); renderMarkmap(el); renderSmiles(el); renderPdb(el); renderNn(el);
-      addCodeCopyButtons(el); // re-wire copy buttons on the upgraded content
-      addMathCopyButtons(el);
+      addRichRenderFeatures(el); // re-wires copy buttons on the upgraded content
       // el.innerHTML above wipes out the .msg-actions row appended during the
       // sync pass (it's a child of el, not a sibling) — re-add it here.
       // addMsgActions is idempotent (no-ops if .msg-actions already present),

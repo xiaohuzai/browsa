@@ -18,17 +18,17 @@ import {
 import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
 import { handleSession } from './lib/handlers/session-handler.js';
-import { shouldSummarize, maybeSummarizeAttachment } from './lib/handlers/attach-summarizer.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
 import { boundUnseenImageBytes } from './lib/handlers/history-compactor.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { handleExplainPort } from './lib/handlers/selection-explain.js';
-import { respondOpencodePermission, respondOpencodeQuestion } from './lib/opencode-client.js';
-import { respondBridgeApproval } from './lib/bridge-client.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
 import { ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
 import { buildAsrPendingCtx } from './lib/handlers/attach-asr-pending.js';
 import { handleAttachConfirm, ATTACH_CONFIRM_TYPES } from './lib/handlers/attach-confirm-handler.js';
+import { storeAttachment } from './lib/handlers/attach-store.js';
+import { relayApproval, relayClarify } from './lib/handlers/approval-relay.js';
+import { modeCaps, DEFERRED_HANDOFFS } from './lib/attach-modes.js';
 import { videoUrlMatches } from './lib/video-url.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
 export {
@@ -40,7 +40,7 @@ export {
 import { extractActiveTab } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
 import { inlinePageImages } from './lib/page-images.js';
-import { buildPageContextText, interleaveImageParts } from './lib/message-builder.js';
+import { interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
 // Capability hints: browsa rendering rules injected automatically so users
@@ -664,23 +664,11 @@ async function handle(msg, sender) {
 
     case 'CLEAR_HISTORY': {
       await storage.clearHistory();
-      // Reset the Hermes session identity for every Hermes provider so the
-      // next conversation starts fresh (new X-Hermes-Session-Id / session_id).
+      // Fresh server-side agent sessions for the next conversation (new
+      // X-Hermes-Session-Id / opencode ses_ / bridge thread id) — the
+      // provider-kind ladder lives in storage.clearAllAgentSessions.
       const allCfg = await storage.getAll();
-      for (const name of Object.keys(allCfg.providers || {})) {
-        if (allCfg.providers[name]?.isHermes) {
-          await storage.resetHermesSessionId(name);
-        }
-        if (allCfg.providers[name]?.isOpencode) {
-          // New conversation → fresh opencode server session (the agent's
-          // transcript would otherwise carry over across "clear history").
-          await storage.clearOpencodeSessionId(name);
-        }
-        if (allCfg.providers[name]?.isBridge) {
-          // Same for the bridge provider's agent thread (codex thread id).
-          await storage.clearBridgeSessionId(name);
-        }
-      }
+      await storage.clearAllAgentSessions(allCfg.providers);
       console.log('browsa[bg]: global history cleared');
       return { cleared: true };
     }
@@ -779,7 +767,7 @@ async function handle(msg, sender) {
           // what the heuristics missed. Provider-agnostic, hard-capped, and
           // fail-open: any null/throw keeps the baseline result above.
           // Generic modes only — site fast paths own their extraction.
-          if (['reader', 'dom', 'full', 'auto'].includes(ctx.mode) && all.deepExtractEnabled !== false) {
+          if (modeCaps(ctx.mode).deepExtract && all.deepExtractEnabled !== false) {
             try {
               const deep = await maybeDeepExtract({
                 tabId,
@@ -797,21 +785,16 @@ async function handle(msg, sender) {
             } catch (_) { /* fail-open: baseline result wins */ }
           }
         }
-        // Screenshot mode: don't store to history yet. The side panel shows
-        // a crop UI first; once the user confirms (with or without a crop),
-        // it calls ATTACH_SCREENSHOT_CONFIRM with the final image data URL.
-        if (mode === 'screenshot' && ctx.imageDataUrl) {
-          return { ok: true, ctx };
-        }
-        // PDF bytes fetched: hand off to sidepanel.js for pdf.js text extraction.
-        // Like screenshot, history storage is deferred until ATTACH_PDF_CONFIRM.
-        if (ctx.mode === 'pdf-pending' && ctx.pdfBase64) {
-          return { ok: true, ctx };
-        }
-        // Office-document bytes fetched (docx/pptx/xlsx/…, page-extractor.js's
-        // tryOfficeExtraction): same deferred-storage handoff, sidepanel runs
-        // docling.rs-wasm locally, then confirms via ATTACH_OFFICE_CONFIRM.
-        if (ctx.mode === 'office-pending' && ctx.officeBase64) {
+        // Deferred-storage handoffs (screenshot crop / pdf.js text / docling
+        // office conversion): history storage is deferred until the sidepanel
+        // confirms via the matching ATTACH_*_CONFIRM message. One table
+        // (lib/attach-modes.js) drives both this check and the sidepanel's
+        // dispatch, so a new deferred mode is one row, not two if-chains.
+        // Screenshot keys off the REQUEST mode (the mocked/extraction ctx may not
+        // carry mode); pdf/office pendings key off ctx.mode — the request mode is
+        // never 'pdf-pending'/'office-pending', so the OR is exact, not loose.
+        const handoff = DEFERRED_HANDOFFS.find((h) => (ctx.mode === h.mode || mode === h.mode) && ctx[h.field]);
+        if (handoff) {
           return { ok: true, ctx };
         }
         // Bilibili video WITHOUT subtitles + ASR enabled: hand off to sidepanel
@@ -859,7 +842,7 @@ async function handle(msg, sender) {
         // url -- comparing across different extraction modes for the same
         // page would produce false "changed" signals, since reader/dom/full
         // naturally yield different text for the same page.
-        if (ctx.meta?.url && !['selected', 'pdf-url', 'office-url', 'screenshot'].includes(ctx.mode) && (ctx.text || '').length > 50) {
+        if (ctx.meta?.url && !modeCaps(ctx.mode).skipChangeTracking && (ctx.text || '').length > 50) {
           const changeInfo = await checkAndRecordAttachChange(`${ctx.mode}::${ctx.meta.url}`, ctx.text);
           if (changeInfo.changed) ctx.changedSinceLastAttach = changeInfo;
         }
@@ -872,14 +855,14 @@ async function handle(msg, sender) {
         // actions shouldn't pull in full site instructions), `jina` is a
         // third-party proxy, and the deferred paths (screenshot/pdf/asr) store
         // derived content — none should carry site instructions.
-        if (['reader', 'dom', 'full', 'auto'].includes(ctx.mode)) {
+        if (modeCaps(ctx.mode).siteInstructions) {
           ctx = await withSiteInstructions(ctx, all);
         }
         // Video page-contexts (youtube/bilibili): append the video-note
         // formatting instruction to the stored text (same KV-cache rationale
         // as llms.txt — dynamic formatting hints ride in the trajectory, not
         // the static system prompt).
-        if (ctx.mode === 'youtube' || ctx.mode === 'bilibili') {
+        if (modeCaps(ctx.mode).video) {
           ctx = withVideoNote(ctx);
         }
 
@@ -888,7 +871,7 @@ async function handle(msg, sender) {
         // 截图 / PDF figure 同一套 [图N] 引用协议（回答引用 [图N]，渲染端还原缩略图）。
         // 全程 fail-open：无图/下载失败/无解码环境保持原文，绝不阻塞附加。
         // dom/full 是树状文本（无 Markdown 图片语法）、selected 是局部摘录，不参与。
-        if (['reader', 'auto', 'jina'].includes(ctx.mode) && ctx.text) {
+        if (modeCaps(ctx.mode).inlineImages && ctx.text) {
           try {
             const inlined = await inlinePageImages(ctx.text, { baseUrl: ctx.meta?.url || '' });
             if (inlined.figures.length) {
@@ -901,48 +884,33 @@ async function handle(msg, sender) {
           }
         }
 
-        // All other modes: save to global history immediately.
-        const contextText = buildPageContextText(ctx);
+        // All other modes: save to global history immediately, via the single
+        // owner of the storage recipe (attachId = the panel 撤销 undo identity,
+        // stamped on every entry; summarize kick; image-byte bounding).
+        // lib/handlers/attach-store.js — candidate #2 of the architecture review.
         const pageFigures = Array.isArray(ctx.pageFigures) ? ctx.pageFigures : [];
-        // 有配图时存成按 [图N] 锚点真交错的多模态 content（与 ATTACH_ASR_CONFIRM 的
-        // 视频截图同构）；无配图保持纯字符串 content 形状不变。
-        const historyEntry = pageFigures.length
-          ? { role: 'user', content: interleaveImageParts(contextText, pageFigures) }
-          : { role: 'user', content: contextText };
-        // Stamp the video source on video page-contexts (youtube/bilibili)
-        // so video-note replies can turn their [mm:ss] markers into clickable
-        // seek links. Other pages have no seekable <video> target.
-        if (ctx.mode === 'youtube' || ctx.mode === 'bilibili') {
-          historyEntry.videoSrc = {
-            platform: ctx.mode,
-            url: ctx.meta?.url || '',
-            tabId,
-          };
-        }
         // Very long attachments (e.g. a 4-5 hour video's transcript) get
-        // resent in FULL on every subsequent turn (buildMessages pushes the
-        // whole history every time) — so it's worth a one-time chunk/
-        // summarize/merge pass now rather than paying that cost (and risking
-        // exceeding a smaller-context provider's window) on every message.
-        // Stamp attachId BEFORE appending so maybeSummarizeAttachment can
-        // find this exact entry later, then kick it off fire-and-forget
-        // AFTER the response below is prepared — the raw text is never
-        // rendered in the chat bubble, so there's no UI to block on.
-        // Stamped on EVERY attach entry (not only summarized ones): it is
-        // also the undo identity the panel's 撤销 button deletes by.
-        const willSummarize = all.autoSummarizeAttachments !== false && shouldSummarize(ctx.text, all.summarizeThresholdChars);
-        historyEntry.attachId = crypto.randomUUID();
-        await storage.appendToHistory(historyEntry);
-        console.log(`browsa[bg]: page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`);
-        if (willSummarize) {
-          maybeSummarizeAttachment({
-            attachId: historyEntry.attachId,
-            ctx,
-            provider: all.providers?.[all.activeProvider],
-          all
-          });
-        }
-        return { ok: true, ctx, attachId: historyEntry.attachId };
+        // resent in FULL on every subsequent turn — the one-time chunk/
+        // summarize/merge pass here is cheaper than paying that cost on every
+        // message. maybeSummarizeAttachment runs fire-and-forget AFTER the
+        // response is prepared; the raw text is never rendered in the chat
+        // bubble, so there's no UI to block on.
+        const { attachId: pageAttachId } = await storeAttachment({
+          pageContext: ctx,
+          contentFrom: (contextText) => pageFigures.length
+            // 有配图时存成按 [图N] 锚点真交错的多模态 content（与 ATTACH_ASR_CONFIRM 的
+            // 视频截图同构）；无配图保持纯字符串 content 形状不变。
+            ? interleaveImageParts(contextText, pageFigures)
+            : null,
+          // Stamp the video source on video page-contexts (youtube/bilibili)
+          // so video-note replies can turn their [mm:ss] markers into clickable
+          // seek links. Other pages have no seekable <video> target.
+          videoSrc: modeCaps(ctx.mode).video
+            ? { platform: ctx.mode, url: ctx.meta?.url || '', tabId }
+            : null,
+          log: (contextText) => `page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`,
+        });
+        return { ok: true, ctx, attachId: pageAttachId };
       } catch (e) {
         console.warn('browsa: ATTACH_PAGE failed', e);
         // `code` (when present) lets the side panel say the failure in the
@@ -1030,48 +998,8 @@ async function handle(msg, sender) {
       // (deny → reject) — see showApprovalCard's btnLabels.
       const pending = pendingApprovals.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending approval' };
-      if (pending.kind === 'bridge') {
-        // agent-bridge daemon: relay the card choice to POST /approvals/:id
-        // (the bridge maps it onto the codex decision vocabulary).
-        try {
-          await respondBridgeApproval({
-            baseUrl: pending.baseUrl,
-            apiKey: pending.apiKey,
-            requestId: pending.requestId,
-            choice: msg.choice,
-          });
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e?.message };
-        }
-      }
-      if (pending.kind === 'opencode') {
-        try {
-          await respondOpencodePermission({
-            baseUrl: pending.baseUrl,
-            apiKey: pending.apiKey,
-            sessionId: pending.sessionId,
-            requestId: pending.requestId,
-            reply: msg.choice === 'deny' ? 'reject' : (msg.choice === 'always' ? 'always' : 'once'),
-          });
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e?.message };
-        }
-      }
       try {
-        const res = await fetch(
-          `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/approval`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(pending.apiKey ? { Authorization: `Bearer ${pending.apiKey}` } : {}),
-            },
-            body: JSON.stringify({ approval_id: pending.approvalId, choice: msg.choice }),
-          },
-        );
-        return { ok: res.ok };
+        return await relayApproval(pending, msg.choice);
       } catch (e) {
         return { ok: false, error: e?.message };
       }
@@ -1084,33 +1012,8 @@ async function handle(msg, sender) {
       // selected label (opencode's QuestionInfo has a `custom` answer path).
       const pending = pendingClarifications.get(msg.tabId);
       if (!pending) return { ok: false, error: 'no pending clarification' };
-      if (pending.kind === 'opencode') {
-        try {
-          await respondOpencodeQuestion({
-            baseUrl: pending.baseUrl,
-            apiKey: pending.apiKey,
-            sessionId: pending.sessionId,
-            requestId: pending.requestId,
-            answers: [[String(msg.response ?? '')]],
-          });
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e?.message };
-        }
-      }
       try {
-        const res = await fetch(
-          `${pending.baseUrl}/v1/runs/${encodeURIComponent(pending.runId)}/clarifications/${encodeURIComponent(pending.clarifyId)}/respond`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(pending.apiKey ? { Authorization: `Bearer ${pending.apiKey}` } : {}),
-            },
-            body: JSON.stringify({ response: msg.response }),
-          },
-        );
-        return { ok: res.ok };
+        return await relayClarify(pending, msg.response);
       } catch (e) {
         return { ok: false, error: e?.message };
       }

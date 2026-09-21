@@ -30,13 +30,17 @@ const {
   initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
   deleteSelectedMessages
 } = await import('../lib/sidepanel/multiselect.js');
-
+// 2026-09-20 deepening pass: the counter + shift protocol moved into
+// lib/sidepanel/history-index.js — the test drives it through the facade.
+const hidx = await import('../lib/sidepanel/history-index.js');
 let decrements = 0;
-initMultiselect({ decrementNextHistoryIdx: () => { decrements++; } });
 
 function setupDom() {
   sentMessages.length = 0;
   decrements = 0;
+  // renderHistory would have left the mirror at the list length (3 bubbles:
+  // data-hidx 0/1/2) — seed the facade with the same value.
+  hidx.hidxResetTo(3);
   document.body.innerHTML = `
     <div id="messages">
       <div class="msg user" data-hidx="0">hi</div>
@@ -109,7 +113,7 @@ test('deleteSelectedMessages: deletes checked messages highest-index-first, shif
     { type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: 2 },
     { type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: 0 },
   ]);
-  assert.equal(decrements, 2);
+  assert.equal(hidx.hidxCurrent(), 1, 'counter decremented once per confirmed deletion (3 − 2)');
 
   // Only the untouched middle message (originally hidx=1) survives.
   const remaining = [...document.querySelectorAll('.msg')];
@@ -128,10 +132,10 @@ test('deleteSelectedMessages: a failed removal is not shifted/counted and its bu
     enterMultiSelect();
     document.querySelector('.msg[data-hidx="0"] .msg-select-cb').checked = true;
     document.querySelector('.msg[data-hidx="2"] .msg-select-cb').checked = true;
-    const decrementsBefore = decrements;
+    const counterBefore = hidx.hidxCurrent();
     await deleteSelectedMessages();
 
-    assert.equal(decrements, decrementsBefore + 1, 'only the successful removal (index 0) decrements; the failed one must not');
+    assert.equal(hidx.hidxCurrent(), counterBefore - 1, 'only the successful removal (index 0) decrements; the failed one must not');
     // The failed bubble (hidx=2) must still be in the DOM — its storage
     // entry survived; only hidx=0 was actually deleted.
     const remaining = [...document.querySelectorAll('.msg')].map(m => m.textContent);
