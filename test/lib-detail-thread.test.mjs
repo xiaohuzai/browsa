@@ -448,3 +448,122 @@ test('regression: .detail-thread-input-row (and everything after it, including t
   assert.match(css, /\.detail-thread-messages:empty\s*\{\s*display:\s*none/,
     'the display:none-when-empty rule this fix accounts for must still be in place');
 });
+
+test('the card input recalls its own sent questions with ↑, never main-composer sends', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'recall me later';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(input.value, '', 'send clears the input');
+
+  // A MAIN-composer send must never surface in the card: push straight into
+  // the main scope (same composer-state module instance detail-thread uses —
+  // a shared-list bug would make this the newest entry and win the first ↑).
+  const { pushInputHistory } = await import('../lib/sidepanel/composer-state.js');
+  pushInputHistory('MAIN-only question');
+
+  // ↑ recalls the just-sent card question from the card's OWN scope.
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+  assert.equal(input.value, 'recall me later', '↑ recalls the just-sent card question, not the main-composer send');
+
+  // Typing disarms the walk and restores the pre-nav draft (nav started
+  // from an empty input) — same job attachDraftPersistence does for the
+  // main composer, minus draft persistence (the card is ephemeral).
+  input.value = 'typed during recall';
+  input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  assert.equal(input.value, '');
+
+  // ↓ with no active walk is left alone (normal caret movement).
+  input.value = 'fresh text';
+  const down = new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+  input.dispatchEvent(down);
+  assert.equal(down.defaultPrevented, false, '↓ without an active walk must not be intercepted');
+  assert.equal(input.value, 'fresh text');
+
+  // Turn never completes — close the card to tear down the port + its
+  // SW_PING interval so the test process can exit.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('the card recall list spans cards but stays separate from the main composer', async () => {
+  sentMessages.length = 0;
+  const bubbleA = makeAssistantBubble('Reply A.');
+  openDetailThread(bubbleA, 'excerpt', bubbleA);
+  const cardA = bubbleA.nextElementSibling;
+  const inputA = cardA.querySelector('.detail-thread-input');
+  inputA.value = 'question in card A';
+  cardA.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  // A second card on a different anchor — both live at once and share the
+  // card scope (cards are ephemeral; a per-card empty list would make ↑
+  // useless in a freshly opened card).
+  const bubbleB = makeAssistantBubble('Reply B.');
+  openDetailThread(bubbleB, 'other excerpt', bubbleB);
+  const cardB = bubbleB.nextElementSibling;
+  const inputB = cardB.querySelector('.detail-thread-input');
+
+  // ↑ in card B recalls card A's just-sent question — the card scope spans
+  // cards, and a main-composer send (pushed here) must not displace it.
+  const { pushInputHistory } = await import('../lib/sidepanel/composer-state.js');
+  pushInputHistory('MAIN-only question');
+  inputB.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+  assert.equal(inputB.value, 'question in card A', 'first ↑ lands on the newest CARD send, skipping main-composer pushes');
+  // Second ↑ walks back through earlier card-scope entries (this file's own
+  // previous card sends).
+  inputB.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+  assert.notEqual(inputB.value, 'question in card A', 'the second ↑ walks back through the card scope');
+  assert.notEqual(inputB.value, 'MAIN-only question', 'main-composer sends never appear in the card walk');
+
+  // Card A's ↑ starts its OWN fresh walk at the newest entry — the leaked
+  // variant would resume card B's in-progress walk at the older entry.
+  inputA.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+  assert.equal(inputA.value, 'question in card A', 'a new input starts fresh at the newest, not at the other walk\'s position');
+
+  // Card A's ↓ walks forward on its own (past the newest → restores card A's
+  // pre-nav draft, empty after its send) while card B stays armed.
+  inputA.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  assert.equal(inputA.value, '', "past-the-end restores card A's own pre-nav draft");
+
+  // Both turns never complete — close both cards to tear down ports and
+  // their SW_PING intervals so the test process can exit.
+  cardA.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  cardB.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('Enter confirming an IME candidate must NOT send the half-typed card question', async () => {
+  // User report 2026-09-21: the card input was the one Enter-submits surface
+  // with no IME guard — pressing Enter to confirm a Chinese-IME candidate
+  // fired send() with the unfinished sentence.
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+
+  input.value = 'half-typed 中文';
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sentMessages.filter(m => m.type === 'SUBCHAT').length, 0, 'isComposing Enter must not send');
+  assert.equal(input.value, 'half-typed 中文', 'the draft stays in the input');
+
+  // keyCode 229 belt-and-braces: same verdict when an IME driver reports
+  // the process-key code instead of isComposing.
+  input.value = 'half-typed again';
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sentMessages.filter(m => m.type === 'SUBCHAT').length, 0, 'keyCode-229 Enter must not send either');
+
+  // A plain Enter (no IME flags) still sends.
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(sentMessages.some(m => m.type === 'SUBCHAT'), 'a plain Enter still sends');
+
+  // Turn never completes — close the card to tear down the port + its
+  // SW_PING interval so the test process can exit.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
