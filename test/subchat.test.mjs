@@ -268,8 +268,8 @@ test('SUBCHAT_DONE carries the same reply-source stamp as CHAT, via the shared r
   const resolverSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/provider-resolver.js', import.meta.url), 'utf8');
   assert.match(resolverSrc, /export function resolveReplyModelOrEndpoint\(/);
   const chatHandlerSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
-  assert.match(chatHandlerSrc, /resolveReplyModelOrEndpoint\(provider, all, bridgeEndpoint\)/,
-    'CHAT must consume the same shared mapping — no per-handler copies to drift');
+  assert.match(chatHandlerSrc, /resolveReplyModelOrEndpoint\(provider, all, turn\.bridgeEndpoint\)/,
+    'CHAT must consume the same shared mapping — no per-handler copies to drift (bridgeEndpoint lives on the turn request since the 2026-09-20 turn-request pass)');
 });
 
 // --------------- SUBCHAT: agent process surfacing (approval/clarify/progress)

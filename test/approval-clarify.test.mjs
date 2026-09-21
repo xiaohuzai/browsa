@@ -184,11 +184,15 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
   // /v1/runs API over plain /v1/chat/completions — no separate per-provider
   // toggle exists (a provider that doesn't support /v1/runs is simply not
   // flagged isHermes).
-  assert.match(src, /const isHermes = !!\(provider\.isHermes\)/,
+  // 2026-09-20 deepening pass: the kind derivation moved into
+  // lib/handlers/turn-request.js (kind = provider.isHermes ? 'hermes' : …),
+  // still read DIRECTLY from the provider config every call.
+  const trSrc = await fs.readFile(new URL('../lib/handlers/turn-request.js', import.meta.url), 'utf8');
+  assert.match(trSrc, /provider\.isHermes \? 'hermes'/,
     'isHermes must be read directly from the provider config');
   assert.doesNotMatch(src, /useRunsApi/, 'the retired useRunsApi toggle must not reappear');
 
-  // The doStream() closure must branch on isHermes to pick the API client.
+  // The doStream() closure must branch on the turn kind to pick the API client.
   // (doStream takes an opts arg so the auto timestamp-rewrite can run it
   // silently - opts.silent swallows deltas instead of pushing CHUNKs.)
   const doStreamIdx = src.indexOf('const doStream = async (opts = {}) => {');
@@ -196,12 +200,12 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
   const doStreamEnd = src.indexOf('\n  };', doStreamIdx);
   const doStreamSrc = src.slice(doStreamIdx, doStreamEnd);
 
-  assert.match(doStreamSrc, /if \(isHermes\)/, 'doStream must branch on isHermes');
+  assert.match(doStreamSrc, /kind === 'hermes'/, 'doStream must branch on the hermes kind');
   assert.match(doStreamSrc, /await runsApiStream\(/, 'the isHermes branch must call runsApiStream');
   // The non-Hermes fallback (chat/responses/anthropic) now goes through the
   // shared dispatcher, which owns the actual chatStream call.
   assert.match(doStreamSrc, /await dispatchStyleStream\(/, 'the fallback branch must call the shared stream dispatcher');
-  assert.match(doStreamSrc, /chatMessages: messages/, 'the fallback must route the chat/completions path its message array');
+  assert.match(doStreamSrc, /chatMessages: turn\.messages/, 'the fallback must route the chat/completions path its message array (payloads live on the turn request)');
 
   // runsApiStream's call must come before the dispatcher's.
   const runsIdx = doStreamSrc.indexOf('await runsApiStream(');

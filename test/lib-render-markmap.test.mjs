@@ -60,11 +60,14 @@ test('renderMarkmap error UI mirrors mermaid\'s: message + copy button + collaps
   assert.match(src, /markmap-err-src/);
 });
 
-test('addCodeCopyButtons excludes markmap (alongside mermaid/diff/patch and our renderer languages) from highlight.js syntax highlighting', () => {
+test('addCodeCopyButtons excludes markmap (alongside our renderer languages) from highlight.js syntax highlighting', () => {
   // echarts/smiles/pdb joined the skip list (2026-09-13), nn (2026-09-14):
   // no hljs grammar exists for them and the attempt logs a console warning
-  // per block.
-  assert.match(src, /!\['mermaid', 'markmap', 'diff', 'patch', 'echarts', 'smiles', 'pdb', 'nn'\]\.includes\(lang\)/);
+  // per block. 2026-09-20 deepening pass: the list became FENCED_RENDERERS
+  // (single home for the renderer fan-out) + diff/patch; the skip set derives
+  // from it, so pin the derivation and the list contents.
+  assert.match(src, /HLJS_SKIP_LANGS = new Set\(\[\.\.\.FENCED_RENDERERS, 'diff', 'patch'\]\)/);
+  assert.match(src, /FENCED_RENDERERS = \['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn'\]/);
 });
 
 test('renderMarkmap is exported', () => {

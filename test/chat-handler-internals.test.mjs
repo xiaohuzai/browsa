@@ -654,7 +654,7 @@ test('chat-handler: auto-continuation block sits between the retry loop and the 
   assert.match(block, /doStream\(\{ silent: true \}\)/, 'second pass is silent (deltas swallowed, DONE.full replaces the bubble)');
   assert.match(block, /fullReply = fullReply \+ rc\.full/, 'merged, not replaced (continuation resumes mid-sentence)');
   assert.match(block, /replyTruncated = rc\.finishReason === 'length'/, 'still-truncated flag re-derived from the continuation leg');
-  assert.match(block, /isHermes/, 'Hermes runs-path mirrors the rewrite conversation rebuild');
+  assert.match(block, /turn\.continueWith\(/, 'the per-kind rebuild lives in the turn request (Hermes runs-path mirrors the rewrite conversation rebuild there — see turn-request.js continueWith)');
   assert.match(block, /Do NOT repeat any content already written/, 'anti-repetition instruction present');
 });
 
@@ -703,14 +703,31 @@ test('buildTimestampRewriteHistory: falls back to full history when no videoSrc 
 });
 
 test('chat-handler: rewrite + continuation branches rebuild every apiStyle input', async () => {
+  // 2026-09-20 deepening pass: the per-apiStyle rebuild ladders moved from
+  // chat-handler.js into lib/handlers/turn-request.js (continueWith /
+  // rewriteWith) — chat-handler now CALLS them. The regression this guards
+  // (continuation used to rebuild ONLY the chat-style messages, so
+  // responses/anthropic providers silently resent the original request)
+  // is pinned at the new seam: the turn-request module must branch on every
+  // kind in both methods, and chat-handler must route both passes through it.
   const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
   const cont = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(cont, /apiStyle === 'responses'/, 'continuation must rebuild responsesInput (was chat-only — responses providers resent the original request)');
-  assert.match(cont, /apiStyle === 'anthropic'/, 'continuation must rebuild anthropicMessages');
+  assert.match(cont, /turn\.continueWith\(contInstruction, fullReply\)/, 'continuation must go through the turn request (was chat-only — responses providers resent the original request)');
   const rewrite = src.slice(src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(rewrite, /apiStyle === 'responses'/, 'rewrite must rebuild responsesInput');
-  assert.match(rewrite, /apiStyle === 'anthropic'/, 'rewrite must rebuild anthropicMessages');
+  assert.match(rewrite, /turn\.rewriteWith\(rewriteInstruction, rewriteHistory\)/, 'rewrite must go through the turn request');
   assert.match(rewrite, /buildTimestampRewriteHistory\(history, videoSrc/, 'rewrite history built from the RAW history (aged copy may have stubbed the transcript)');
+
+  const trSrc = await readFile(new URL('../lib/handlers/turn-request.js', import.meta.url), 'utf8');
+  const contFn = trSrc.slice(trSrc.indexOf('t.continueWith ='), trSrc.indexOf('t.rewriteWith ='));
+  assert.match(contFn, /kind === 'responses'/, 'continueWith must rebuild responsesInput');
+  assert.match(contFn, /kind === 'anthropic'/, 'continueWith must rebuild anthropicMessages');
+  assert.match(contFn, /buildMessages\(/, 'continueWith must rebuild chat messages (the final else branch)');
+  assert.match(contFn, /kind === 'hermes'/, 'continueWith must rebuild the runs conversation');
+  const rwFn = trSrc.slice(trSrc.indexOf('t.rewriteWith ='));
+  assert.match(rwFn, /kind === 'responses'/, 'rewriteWith must rebuild responsesInput');
+  assert.match(rwFn, /kind === 'anthropic'/, 'rewriteWith must rebuild anthropicMessages');
+  assert.match(rwFn, /buildMessages\(/, 'rewriteWith must rebuild chat messages (the final else branch)');
+  assert.match(rwFn, /kind === 'hermes'/, 'rewriteWith must rebuild the runs conversation');
 });
 
 // --------------- isContextOverflowError (overflow self-rescue) ---------------
