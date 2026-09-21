@@ -387,6 +387,10 @@
     "message": "使用指南",
     "description": "Settings header: link to the usage-guide website"
   },
+  "rateLinkText": {
+    "message": "⭐ 去商店评分",
+    "description": "Settings header: neutral link to the Chrome Web Store reviews tab (no incentive wording)"
+  },
   "providersHeading": {
     "message": "AI 服务商",
     "description": "Options: providers card heading"
