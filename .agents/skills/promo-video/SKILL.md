@@ -28,9 +28,11 @@ node driver.mjs s2         # 单拍某幕（s1|s2|s3|s4|s5|s6|s7|s8；全片必�
 # 合成（24fps）：
 ffmpeg -framerate 24 -i $(PROMO_FRAMES 或 $TMPDIR/browsa-promo/frames)/f%05d.png \
   -c:v libx264 -preset faster -crf 20 -pix_fmt yuv420p -movflags +faststart out.mp4
-# GIF（从第 72 帧起 329 帧 = 33s 循环版）：
+# GIF（从第 72 帧起 329 帧 = 33s 循环版）。720px = README 实际显示宽度
+# （width=720），1:1 像素不再放大；sierra2_4a 比 bayer 网格纹更干净
+# （2026-09-22 用户反馈 640px+bayer 版「看着模糊」后实测定型）：
 ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
-  -vf "fps=10,scale=640:-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" out.gif
+  -vf "fps=10,scale=720:-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a" out.gif
 ```
 
 环境变量：`BROWSA_ROOT`（仓库根，默认从脚本位置向上推三级）、`PROMO_PORT`、`PROMO_FRAMES`、`PROMO_CHROME`。浏览器默认从 `~/.cache/ms-playwright` 自动找最新 chromium；没有就先 `npx playwright-core install chromium`（或设 `PROMO_CHROME` 指向系统 Chrome）。改了 `sidepanel.html` 结构先 `node dev-preview/gen.mjs`。
