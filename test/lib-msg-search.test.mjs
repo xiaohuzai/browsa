@@ -34,10 +34,13 @@ function setupDom() {
 
 beforeEach(() => setupDom());
 
-function fireInput(value) {
+// doMsgSearch is debounced 120ms in production (it is two full-tree DOM
+// passes per keystroke) — tests flush past the debounce.
+async function fireInput(value) {
   const input = document.getElementById('msg-search-input');
   input.value = value;
   input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 130));
 }
 
 test('openMsgSearch un-hides the bar and focuses the input', () => {
@@ -45,25 +48,25 @@ test('openMsgSearch un-hides the bar and focuses the input', () => {
   assert.equal(document.getElementById('msg-search-bar').hidden, false);
 });
 
-test('typing a query wraps every match in <mark class="search-highlight"> and updates the count', () => {
+test('typing a query wraps every match in <mark class="search-highlight"> and updates the count', async () => {
   openMsgSearch();
-  fireInput('fox');
+  await fireInput('fox');
   const marks = document.querySelectorAll('mark.search-highlight');
   assert.equal(marks.length, 2, 'both occurrences of "fox" must be wrapped');
   assert.equal(document.getElementById('msg-search-count').textContent, '1 / 2');
   assert.ok(marks[0].classList.contains('search-highlight-active'), 'first match starts active');
 });
 
-test('typing a query with no matches shows "No results" and wraps nothing', () => {
+test('typing a query with no matches shows "No results" and wraps nothing', async () => {
   openMsgSearch();
-  fireInput('giraffe');
+  await fireInput('giraffe');
   assert.equal(document.querySelectorAll('mark.search-highlight').length, 0);
   assert.equal(document.getElementById('msg-search-count').textContent, 'No results');
 });
 
-test('Enter cycles to the next match, Shift+Enter cycles to the previous', () => {
+test('Enter cycles to the next match, Shift+Enter cycles to the previous', async () => {
   openMsgSearch();
-  fireInput('fox');
+  await fireInput('fox');
   const input = document.getElementById('msg-search-input');
   input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   assert.equal(document.getElementById('msg-search-count').textContent, '2 / 2');
@@ -71,9 +74,9 @@ test('Enter cycles to the next match, Shift+Enter cycles to the previous', () =>
   assert.equal(document.getElementById('msg-search-count').textContent, '1 / 2');
 });
 
-test('closeMsgSearch hides the bar, clears the input, and unwraps all highlight marks', () => {
+test('closeMsgSearch hides the bar, clears the input, and unwraps all highlight marks', async () => {
   openMsgSearch();
-  fireInput('fox');
+  await fireInput('fox');
   closeMsgSearch();
   assert.equal(document.getElementById('msg-search-bar').hidden, true);
   assert.equal(document.getElementById('msg-search-input').value, '');
@@ -89,13 +92,13 @@ test('Escape key inside the input closes the search bar', () => {
   assert.equal(document.getElementById('msg-search-bar').hidden, true);
 });
 
-test('search skips text inside .msg-actions / .token-usage / think-block summary', () => {
+test('search skips text inside .msg-actions / .token-usage / think-block summary', async () => {
   document.getElementById('messages').innerHTML +=
     '<div class="msg-actions">fox actions</div>' +
     '<div class="token-usage">fox tokens</div>' +
     '<details class="think-block"><summary>fox summary</summary></details>';
   openMsgSearch();
-  fireInput('fox');
+  await fireInput('fox');
   // Only the original 2 matches in the assistant bubble should be found.
   assert.equal(document.querySelectorAll('mark.search-highlight').length, 2);
 });
