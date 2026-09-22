@@ -169,7 +169,7 @@ test('analyzeVideo sends input_video(+input_audio+input_text) with the video mod
     const res = await analyzeVideo({
       baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
       apiKey: 'k', videoFileId: 'file-v', audioFileId: 'file-a',
-      model: 'doubao-seed-2-0-lite-260428', language: 'zh', durationSec: 600,
+      model: 'doubao-seed-2-1-lite-260915', language: 'zh', durationSec: 600,
     });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, 'https://ark.cn-beijing.volces.com/api/v3/responses');
@@ -177,7 +177,7 @@ test('analyzeVideo sends input_video(+input_audio+input_text) with the video mod
     assert.deepEqual(content.map((c) => c.type), ['input_video', 'input_audio', 'input_text']);
     assert.equal(content[0].file_id, 'file-v');
     assert.equal(content[1].file_id, 'file-a');
-    assert.equal(calls[0].body.model, 'doubao-seed-2-0-lite-260428');
+    assert.equal(calls[0].body.model, 'doubao-seed-2-1-lite-260915');
     assert.equal(calls[0].body.max_output_tokens, 65536);
     assert.equal(calls[0].body.stream, true);
     assert.match(res.text, /\[00:04\] 画面：示例代码/);

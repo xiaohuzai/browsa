@@ -150,7 +150,7 @@ test('ATTACH_PAGE on a subtitle-less bilibili page + ASR enabled: returns asr-pe
     activeProvider: 'compatible',
     providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
     autoSummarizeAttachments: false,
-    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', language: 'zh', format: 'audio/x-m4a' },
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', language: 'zh', format: 'audio/x-m4a' },
   });
   Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, { transcript: null }), writable: true, configurable: true });
   const { handle } = await import('../background.js');
@@ -456,7 +456,7 @@ test('ATTACH_PAGE on a subtitle-less YouTube page + ASR enabled: returns asr-pen
     activeProvider: 'compatible',
     providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
     autoSummarizeAttachments: false,
-    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', language: 'zh', format: 'audio/x-m4a' },
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', language: 'zh', format: 'audio/x-m4a' },
   });
   Object.defineProperty(globalThis, 'chrome', {
     value: makeChrome(localArea, { pageUrl: YT_URL, ytTranscript: null }),

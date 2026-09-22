@@ -102,7 +102,7 @@ test('getAll() normalizes an ASR config saved for an uninstalled provider back t
   const all = await storage.getAll();
   assert.equal(all.asr.provider, 'ark', '已卸载供应商回落 ark');
   assert.equal(all.asr.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3', '连接字段归一到方舟默认');
-  assert.equal(all.asr.model, 'doubao-seed-2-0-lite-260428');
+  assert.equal(all.asr.model, 'doubao-seed-2-1-lite-260915');
   assert.equal(all.asr.videoModel, '');
   assert.equal(all.asr.apiKey, '', '别家 key 不保留');
   assert.equal(all.asr.enabled, true, '开关与偏好保留');
@@ -110,7 +110,7 @@ test('getAll() normalizes an ASR config saved for an uninstalled provider back t
   assert.equal(all.asr.subtitleSource, 'asr');
 
   reset();
-  localArea.set({ asr: { enabled: true, provider: 'ark', apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', videoModel: '', language: 'zh', timeoutMs: 150000, subtitleSource: 'original' } });
+  localArea.set({ asr: { enabled: true, provider: 'ark', apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', videoModel: '', language: 'zh', timeoutMs: 150000, subtitleSource: 'original' } });
   const untouched = await storage.getAll();
   assert.equal(untouched.asr.apiKey, 'ark-key', '合法配置原样透传');
 });

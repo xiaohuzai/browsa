@@ -211,7 +211,7 @@ test('transcribeAudio: POSTs stream:true with input_audio.file_id and accumulate
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     apiKey: 'k',
     fileId: 'file-abc',
-    model: 'doubao-seed-2-0-lite-260428',
+    model: 'doubao-seed-2-1-lite-260915',
     language: 'zh',
     idleTimeoutMs: 1000,
   });
@@ -231,7 +231,7 @@ test('transcribeAudio: language "auto" omits the concrete hint and asks the mode
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     apiKey: 'k',
     fileId: 'file-abc',
-    model: 'doubao-seed-2-0-lite-260428',
+    model: 'doubao-seed-2-1-lite-260915',
     language: 'auto',
     idleTimeoutMs: 1000,
   });
@@ -536,7 +536,7 @@ test('formatAsrTranscript: keeps speaker-labelled + punctuated sentence lines', 
 
 test('ASR_DEFAULTS: baseUrl is the Ark /api/v3 endpoint (NOT openspeech)', () => {
   assert.equal(ASR_DEFAULTS.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3');
-  assert.equal(ASR_DEFAULTS.model, 'doubao-seed-2-0-lite-260428');
+  assert.equal(ASR_DEFAULTS.model, 'doubao-seed-2-1-lite-260915');
   assert.equal(ASR_DEFAULTS.language, 'zh');
   assert.equal(ASR_DEFAULTS.subtitleSource, 'original', 'subtitle source must default to prefer the video\'s own subtitles');
   assert.equal(ASR_SUBTITLE_SOURCE.ORIGINAL, 'original');

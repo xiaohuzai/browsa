@@ -24,7 +24,7 @@ const MIME = {
 };
 
 // ── 分镜种子 ────────────────────────────────────────────────────────────────
-const asr = { enabled: false, apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', videoModel: '', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original' };
+const asr = { enabled: false, apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', videoModel: '', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original' };
 const providers = {
   llm1: { type: 'llm', alias: 'My OpenAI', baseUrl: 'https://api.openai.com', apiKey: 'sk-preview', model: 'gpt-4o', apiStyle: 'chat', temperature: null, maxTokens: 0 },
   llm2: { type: 'llm', alias: 'Local Ollama', baseUrl: 'http://127.0.0.1:11434', apiKey: '', model: 'qwen3:32b', apiStyle: 'chat', temperature: null, maxTokens: 0 },

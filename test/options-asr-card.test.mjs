@@ -52,7 +52,7 @@ test('服务商下拉由注册表填充，ark 元数据驱动占位符/?提示/�
 
   assert.equal(document.getElementById('asrBaseUrl').placeholder, 'https://ark.cn-beijing.volces.com/api/v3');
   assert.match(document.getElementById('asrApiKey').placeholder, /方舟/);
-  assert.equal(document.getElementById('asrModel').placeholder, 'doubao-seed-2-0-lite-260428');
+  assert.equal(document.getElementById('asrModel').placeholder, 'doubao-seed-2-1-lite-260915');
   const tip = document.getElementById('asrBaseUrlTip');
   assert.match(tip.innerHTML, /api\/v3/, 'Base URL 的 ? 提示来自注册表');
   const doc = document.getElementById('asrDocLink');
@@ -65,7 +65,7 @@ test('存过已卸载供应商（qwen）的 ASR 配置：storage 读时归一，
   // storage.getAll 归一化把连接字段换回方舟默认值（key 清空待重填），UI 原样呈现
   assert.equal(document.getElementById('asrProvider').value, 'ark', '服务商回落 ark');
   assert.equal(document.getElementById('asrBaseUrl').value, 'https://ark.cn-beijing.volces.com/api/v3', 'baseUrl 归一为方舟默认');
-  assert.equal(document.getElementById('asrModel').value, 'doubao-seed-2-0-lite-260428', '模型归一为方舟默认');
+  assert.equal(document.getElementById('asrModel').value, 'doubao-seed-2-1-lite-260915', '模型归一为方舟默认');
   assert.equal(document.getElementById('asrApiKey').value, '', '千问 key 不残留（待重填）');
 });
 
@@ -86,5 +86,5 @@ test('save-asr 把 provider 写入 asr 配置块', async () => {
   assert.equal(saved.enabled, true);
   assert.equal(saved.apiKey, 'ark-test-key');
   assert.equal(saved.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3', 'Base URL 留空 → 注册表默认值');
-  assert.equal(saved.model, 'doubao-seed-2-0-lite-260428', '模型留空 → 注册表默认值');
+  assert.equal(saved.model, 'doubao-seed-2-1-lite-260915', '模型留空 → 注册表默认值');
 });
