@@ -1301,6 +1301,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     }
     navPorts.delete(tabId);
   }
+  // Re-sync even when no set existed for THIS tab: if this was the last open
+  // panel's tab and its port already disconnected, the map can be empty here
+  // without syncNavListeners having run — leaving the webNavigation listeners
+  // registered to no-op on every navigation (the exact cost they gate).
+  syncNavListeners();
 });
 
 // Exported for testing. handle() is the switch-based message dispatcher.
