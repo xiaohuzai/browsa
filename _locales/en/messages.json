@@ -1214,5 +1214,9 @@
   "localAgentTabHermes": {
     "message": "Hermes",
     "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "slashPromptDesc": {
+    "message": "Show the current active system prompt",
+    "description": "Slash autocomplete: description for the /prompt command"
   }
 }

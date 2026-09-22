@@ -258,7 +258,7 @@ details.provider-group[open] > .provider-group-header::before {
   cursor: pointer;
   transition: background 0.1s;
 }
-.provider:not(.active):hover { background: var(--hover, rgba(128,128,128,0.05)); }
+.provider:not(.active):hover { background: var(--hover-bg); }
 .provider::before {
   content: '';
   position: absolute;

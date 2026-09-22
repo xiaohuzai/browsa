@@ -16,7 +16,7 @@ window.__BROWSA_PREVIEW_SEED = {
   replyLanguage: '',
   systemPrompt: 'You are a helpful assistant.',
   contextMode: 'auto',
-  asr: { enabled: false, apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-lite-260428', videoModel: '', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original', videoModel: '' },
+  asr: { enabled: false, apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', videoModel: '', language: 'zh', format: 'audio/x-m4a', timeoutMs: 150000, subtitleSource: 'original', videoModel: '' },
   __pageMeta: {
     id: 7,
     title: '【4K】2026 前端趋势分享会 - 哔哩哔哩',
