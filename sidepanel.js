@@ -7,9 +7,9 @@ import { getActiveSessionId } from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { classifyToolTier } from './lib/sidepanel/tool-tier.js';
 import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
-import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard, isImeComposing } from './lib/sidepanel/ui-utils.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard, isImeComposing, scheduleIdle } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderStreamingSafe, preloadChartVendors, addRichRenderFeatures,
+  renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, addRichRenderFeatures,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
@@ -41,6 +41,7 @@ import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll liste
 import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orchestrator.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
+import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
 import { AGENT_TURN_MAX_IMAGES, AGENT_TURN_IMAGE_BUDGET_CHARS, imageRejectReason } from './lib/image-budget.js';
@@ -176,7 +177,7 @@ async function init() {
   if (cfg.fontSize) applyFontSize(cfg.fontSize);
 
   // Load history
-  await renderHistory();
+  const renderStats = await renderHistory();
 
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
@@ -528,11 +529,18 @@ async function init() {
       console.warn('browsa: init resumeInFlightStream failed', e)
     );
   }
-  // Pre-warm the pdf-inspector WASM Worker so the first real PDF attach
-  // doesn't pay the cold-compile cost (~10-30s in Chrome) at click time.
-  // Fire-and-forget: never awaited, silently no-ops if worker construction
-  // fails — same pattern as preloadChartVendors().
-  warmupPdfInspector();
+  // Gated vendor warm-ups (2026-09-23 efficiency pass): instead of paying
+  // ~7MB of diagram-vendor parse + the 4.84MB pdf-inspector WASM compile on
+  // EVERY panel open, warm each one on idle ONLY when this history shows the
+  // user actually uses them (diagram fences / PDF attach traces — sniffed
+  // during renderHistory above). A fresh or plain-text session warms nothing:
+  // chart vendors get warm the moment a fence streams by (see the CHUNK
+  // handler), and a first-ever PDF attach compiles on demand at click time
+  // (the attach flow already runs behind a progress spinner).
+  scheduleIdle(() => {
+    if (renderStats?.historyHasCharts) preloadChartVendors();
+    if (renderStats?.historyHasPdf) warmupPdfInspector();
+  });
   // Snap to the bottom of the rendered history. renderHistory() does
   // call scrollToBottom, but Chrome may not have finished the first
   // layout pass by the time we read scrollHeight (the side panel
@@ -1263,8 +1271,20 @@ function cancelStream() {
 }
 
 let outputTokens = 0;
+// CJK count without allocation: `.match(re).length` builds one array entry
+// per CJK char, and estimateTokens runs over the WHOLE composer text on
+// every keystroke (a 50K-char pasted draft = a 50K-element array per key).
+function countCjk(text) {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) || (c >= 0xf900 && c <= 0xfaff)) n++;
+  }
+  return n;
+}
+
 function updateOutputTokenCount(delta) {
-  const cjk = (delta.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+  const cjk = countCjk(delta);
   const rest = delta.length - cjk;
   outputTokens += Math.round(cjk + rest / 4);
   tokCountEl.textContent = `~${outputTokens}`;
@@ -1281,7 +1301,7 @@ function updateOutputTokenCount(delta) {
 //        non-cjk    : ceil(length / 4)  (rough word+punctuation count)
 function estimateTokens(text) {
   if (!text) return 0;
-  const cjk = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g) || []).length;
+  const cjk = countCjk(text);
   const rest = text.length - cjk;
   return Math.round(cjk + rest / 4);
 }
@@ -1593,6 +1613,12 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       state.acc += m.delta;
       getRenderer()(m.delta, false); // pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
+      // Fence sniff: the instant a diagram fence appears in the stream, warm
+      // the multi-MB chart vendors so the render at DONE finds them cached.
+      // preloadChartVendors() is idempotent; the backtick gate keeps this at
+      // one cheap string scan per fence-bearing delta. A fence opener can
+      // split across deltas, so match against the accumulated text.
+      if (m.delta.includes('`') && wantsChartVendors(state.acc)) preloadChartVendors();
 
     } else if (m.type === 'TOOL_PROGRESS') {
       stopWaitingIndicator();
@@ -1631,6 +1657,9 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
         state.toolEvents = [];
       }
       const finalText = m.full || state.acc;
+      // Belt-and-suspenders sniff: a silent rewrite/continuation can produce
+      // a final text whose fences differ from what the deltas streamed.
+      if (wantsChartVendors(finalText)) preloadChartVendors();
       hidxAssign(el); // assistant turn stored in background
       el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
       await r(finalText, true);
@@ -1702,11 +1731,11 @@ async function onSend() {
 
   if (!rawText) return;
 
-  // Fire-and-forget: warm up the mermaid/echarts/markmap vendor bundles now,
-  // during the request/inference latency, so if this reply contains a
-  // diagram it's already cached by the time DONE arrives instead of paying
-  // a multi-MB cold import right when the user is waiting to see it render.
-  preloadChartVendors();
+  // Chart vendors are no longer pre-warmed on every send (2026-09-23): the
+  // CHUNK handler below warms them the moment a diagram fence actually
+  // streams by, so users whose replies never contain diagrams never pay the
+  // ~7MB parse at all, and users whose replies do still get the vendor
+  // loaded well before DONE (the stream has the rest of the turn to run).
 
   // Slash commands: expand `/summarize` etc. into full prompts. The original
   // slash text is shown in the user bubble; the expanded prompt is what the
@@ -3269,6 +3298,22 @@ async function renderHistory() {
   const list = Array.isArray(history) ? history : [];
   hidxResetTo(list.length); // keep local mirror in sync with storage
 
+  // Warm-up sniff (2026-09-23): while we already have every entry's text in
+  // hand, record whether this history ever contained a diagram fence or a
+  // PDF attach trace — init's gated idle warm-up reads exactly this (see the
+  // scheduleIdle call there). Costs two regexes over the entry text; a fresh
+  // or plain-text session leaves both false and warms nothing.
+  let historyHasCharts = false, historyHasPdf = false;
+  const sniffText = (content) => {
+    const text = typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.filter((p) => p?.type === 'text').map((p) => p.text || '').join('\n')
+        : '';
+    if (wantsChartVendors(text)) historyHasCharts = true;
+    if (hasPdfTrace(text)) historyHasPdf = true;
+  };
+
   // Two-pass rendering: paint bubbles synchronously first (renderStreamingSafe,
   // no async KaTeX) so the panel is visible immediately, then upgrade each
   // assistant bubble to the full renderSafe() output in parallel. Previously
@@ -3279,6 +3324,7 @@ async function renderHistory() {
 
   for (let i = 0; i < list.length; i++) {
     const m = list[i];
+    sniffText(m.content); // runs before any `continue` — attached (skipped) entries carry the PDF traces
     if (m.role === 'user') {
       if (Array.isArray(m.content)) {
         const textPart = m.content.find(p => p.type === 'text')?.text || '';
@@ -3317,7 +3363,6 @@ async function renderHistory() {
   // (copy buttons, timestamps) on the fast-rendered content now so they work
   // even before the full upgrade resolves.
   addCodeCopyButtons();
-  scrollToBottom(true);
   scrollToBottom(true);
   // cv 延迟到首帧稳定后生效（两次 rAF）：初始渲染与滚动定位期间绝不启用——
   // cv 的占位高度会拖慢首开、并把 scrollToBottom 的落点算错（指南明写的反模式）。
@@ -3383,6 +3428,7 @@ async function renderHistory() {
       for (const job of asyncUpgrades) historyUpgradeIO.observe(job.el);
     }
   }
+  return { historyHasCharts, historyHasPdf };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

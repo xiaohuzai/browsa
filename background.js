@@ -13,7 +13,7 @@ import {
   activeRunIds, pendingApprovals, pendingClarifications,
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState,
-  STREAM_KEEPALIVE_ALARM
+  STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
@@ -330,6 +330,7 @@ chrome.runtime.onConnect.addListener((port) => {
         claimedTabId = msg.tabId;
         if (!navPorts.has(claimedTabId)) navPorts.set(claimedTabId, new Set());
         navPorts.get(claimedTabId).add(port);
+        syncNavListeners();
         console.log('browsa[bg]: nav port registered for tab', claimedTabId);
         try { port.postMessage({ type: 'NAV_HELLO_ACK' }); } catch (_) {}
       } else if (msg && msg.type === 'NAV_GOODBYE' && claimedTabId != null) {
@@ -338,6 +339,7 @@ chrome.runtime.onConnect.addListener((port) => {
           set.delete(port);
           if (set.size === 0) navPorts.delete(claimedTabId);
         }
+        syncNavListeners();
       } else if (msg && msg.type === 'NAV_FOLLOW' && typeof msg.tabId === 'number') {
         // Side panel can switch which tab it's watching (e.g. user clicked
         // a different tab in the browser). Re-register.
@@ -348,6 +350,7 @@ chrome.runtime.onConnect.addListener((port) => {
         claimedTabId = msg.tabId;
         if (!navPorts.has(claimedTabId)) navPorts.set(claimedTabId, new Set());
         navPorts.get(claimedTabId).add(port);
+        syncNavListeners();
       }
     });
     port.onDisconnect.addListener(() => {
@@ -357,6 +360,7 @@ chrome.runtime.onConnect.addListener((port) => {
           set.delete(port);
           if (set.size === 0) navPorts.delete(claimedTabId);
         }
+        syncNavListeners();
         console.log('browsa[bg]: nav port disconnected for tab', claimedTabId);
       }
     });
@@ -373,8 +377,6 @@ chrome.runtime.onConnect.addListener((port) => {
 // would be cleared on sleep. We use chrome.alarms (which survives sleep) to
 // guarantee GC runs even when the extension is idle for long periods.
 const STREAM_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const GC_ALARM_NAME = 'browsa-stream-gc';
-const GC_ALARM_PERIOD_MINUTES = 5;
 
 function gcStreamState() {
   const now = Date.now();
@@ -384,12 +386,12 @@ function gcStreamState() {
       console.log('browsa[bg]: GC stale streamState for tab', tabId);
     }
   }
+  // The alarm's lifecycle is owned by lib/state.js's syncGcAlarm: created on
+  // first streamState entry, cleared here once the sweep empties the map —
+  // a permanently-registered alarm cold-started the worker every 5 minutes
+  // to sweep a Map that is empty except after an interrupted stream.
+  syncGcAlarm();
 }
-
-// Register a periodic alarm on service-worker startup. chrome.alarms.create
-// is idempotent when given the same name — repeated calls just update the
-// schedule, so registering on every startup is safe.
-chrome.alarms.create(GC_ALARM_NAME, { periodInMinutes: GC_ALARM_PERIOD_MINUTES });
 
 // Restore site caches from session storage on every SW startup so that
 // content-script data captured before the SW went to sleep is not lost.
@@ -1149,25 +1151,47 @@ function broadcastNav(tabId, url) {
   }
 }
 
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+// The three webNavigation listeners exist ONLY to feed broadcastNav, whose
+// only audience is a connected side panel (navPorts). With <all_urls> host
+// permissions, registering them unconditionally made every top-frame
+// navigation and every SPA pushState in every tab cold-start the service
+// worker (644KB of module parse) just to no-op on an empty navPorts. They
+// are now registered only while at least one nav port is connected and
+// removed when the last one goes away; NAVIGATED delivery is unchanged for
+// any panel that is actually open.
+function onNavHistoryStateUpdated(details) {
   if (details.frameId !== 0) return; // only top frame
   broadcastNav(details.tabId, details.url);
-});
+}
 
-chrome.webNavigation.onCommitted.addListener((details) => {
+function onNavCommitted(details) {
   if (details.frameId !== 0) return;
   // Only fires for non-history-API commits. onHistoryStateUpdated handles
   // the SPA case. This is a safety net for any other navigation path.
   broadcastNav(details.tabId, details.url);
-});
+}
 
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+function onNavBeforeNavigate(details) {
   if (details.frameId !== 0) return;
   // Reset the dedup so a same-URL back/forward (which history treats as
   // a new navigation) still fires. We can't know the new URL yet, so we
   // just clear.
   lastNavBroadcast.delete(details.tabId);
-});
+}
+
+let navListenersActive = false;
+function syncNavListeners() {
+  // Count actual ports, not keys: NAV_FOLLOW can leave an empty Set behind
+  // under the tab a panel moved away from.
+  let want = false;
+  for (const set of navPorts.values()) { if (set.size > 0) { want = true; break; } }
+  if (want === navListenersActive) return;
+  navListenersActive = want;
+  const method = want ? 'addListener' : 'removeListener';
+  chrome.webNavigation.onHistoryStateUpdated[method](onNavHistoryStateUpdated);
+  chrome.webNavigation.onCommitted[method](onNavCommitted);
+  chrome.webNavigation.onBeforeNavigate[method](onNavBeforeNavigate);
+}
 
 // Per-site XHR intercept caches.
 //

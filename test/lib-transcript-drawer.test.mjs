@@ -243,6 +243,9 @@ test('search marks matches, counts them, and cycles with wraparound', async () =
   // 「一」命中两行共三处（「第一个要点」一处、「一小时后的一行」两处）
   input.value = '一';
   input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  // 生产路径 _applySearch 有 120ms 防抖（每次按键全行重渲染 + 图行重挂
+  // 多 MB data: img.src），测试等过防抖再断言。
+  await new Promise((r) => setTimeout(r, 140));
   const st = T.__TRANSCRIPT_TESTING__.state();
   assert.equal(st.matchCount, 2);
   assert.equal(document.querySelectorAll('.ts-row-text mark').length, 3);
@@ -262,6 +265,7 @@ test('search marks matches, counts them, and cycles with wraparound', async () =
 
   input.value = '';
   input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 140)); // 搜索清除同样走防抖
   assert.equal(document.querySelectorAll('.ts-row-text mark').length, 0);
   assert.equal(T.__TRANSCRIPT_TESTING__.state().matchCount, 0);
 });

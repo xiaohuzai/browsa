@@ -180,3 +180,10 @@ test('_insertCard always inserts directly after the bubble — tool-progress liv
   _insertCard(bubble2, card2);
   assert.equal(bubble2.nextElementSibling, card2, 'with no following sibling, card lands right after the bubble');
 });
+
+
+test('scheduleIdle invokes fn via the setTimeout fallback when requestIdleCallback is absent', async () => {
+  const { scheduleIdle } = await import('../lib/sidepanel/ui-utils.js');
+  // jsdom has no requestIdleCallback — the call must still land (setTimeout fallback).
+  await new Promise((resolve) => scheduleIdle(resolve, 50));
+});

@@ -60,3 +60,13 @@ test('base64ToUint8Array correctly decodes a known base64 string', async () => {
   assert.deepEqual(Array.from(bytes), Array.from(Buffer.from('Hello', 'utf8')));
   delete global.atob;
 });
+
+
+test('hasPdfTrace matches the placeholder and Mode: pdf header, nothing else', async () => {
+  const { hasPdfTrace } = await import('../lib/sidepanel/pdf-extractor.js');
+  assert.equal(hasPdfTrace('[PDF file — agent should fetch and read directly]\nURL: https://x/book.pdf'), true, 'placeholder form');
+  assert.equal(hasPdfTrace('BROWSA_PAGE_CONTEXT\nURL: x\nTitle: t\nMode: pdf | pdf-text\n---\n\nbody'), true, 'context header form');
+  assert.equal(hasPdfTrace('Mode: office | docx-text'), false, 'office attach must not warm the PDF wasm');
+  assert.equal(hasPdfTrace('a pdf of an idea'), false);
+  assert.equal(hasPdfTrace(undefined), false);
+});

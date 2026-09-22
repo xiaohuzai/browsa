@@ -82,13 +82,19 @@ test('selection toolbar: bails out when chrome.runtime is absent (non-extension 
   dom.window.close();
 });
 
-test('selection toolbar: selectionchange caches the selected text to the background', () => {
+// The production selectionchange handler is debounced 220ms (per-caret-move
+// messages cold-started the service worker on every keystroke in Docs) — wait
+// out the debounce before asserting.
+const SELECTION_DEBOUNCE_MS = 260;
+
+test('selection toolbar: selectionchange caches the selected text to the background', async () => {
   const { dom, w, sent } = setup();
   w.eval(SRC);
   sent.length = 0; // drop any load-time messages
 
   selectAll(w, 'Hello brave new world of toolbars');
   w.document.dispatchEvent(new w.Event('selectionchange'));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS));
 
   const cache = sent.find((m) => m.type === 'SELECTION_CACHE');
   assert.ok(cache, 'a SELECTION_CACHE message must be sent on selectionchange');
@@ -96,15 +102,19 @@ test('selection toolbar: selectionchange caches the selected text to the backgro
   dom.window.close();
 });
 
-test('selection toolbar: selectionchange with an empty selection still sends an empty cache (clears the side panel)', () => {
+// Empty selections are skipped AT THE SOURCE: background's SELECTION_CACHE
+// case has always ignored empty text (`if (tabId && msg.text)` — the cache
+// deliberately survives deselection so 📎 keeps working), so sending the
+// empty message was a no-op that only cost a service-worker wake.
+test('selection toolbar: selectionchange with an empty selection sends nothing', async () => {
   const { dom, w, sent } = setup();
   w.eval(SRC);
   w.getSelection().removeAllRanges();
   sent.length = 0;
   w.document.dispatchEvent(new w.Event('selectionchange'));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS));
   const cache = sent.find((m) => m.type === 'SELECTION_CACHE');
-  assert.ok(cache, 'must send a SELECTION_CACHE even when nothing is selected');
-  assert.equal(cache.text, '');
+  assert.equal(cache, undefined, 'empty selection must not wake the service worker');
   dom.window.close();
 });
 

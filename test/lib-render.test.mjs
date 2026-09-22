@@ -30,8 +30,21 @@ const {
   fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
-  stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry
+  stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
+  wantsChartVendors, FENCED_RENDERERS
 } = await import('../lib/sidepanel/render.js');
+
+test('wantsChartVendors detects every FENCED_RENDERERS language fence, nothing else', () => {
+  const fence = '```';
+  for (const lang of FENCED_RENDERERS) {
+    assert.equal(wantsChartVendors(`intro\n\n${fence}${lang}\nx\n${fence}\n`), true, lang);
+  }
+  assert.equal(wantsChartVendors('```js\nconst a = 1;\n```'), false, 'plain code fence must not trigger the ~7MB warm-up');
+  assert.equal(wantsChartVendors('```javascript\nx\n```'), false);
+  assert.equal(wantsChartVendors('```mermaidxyz\nx\n```'), false, 'word boundary must not match language prefixes');
+  assert.equal(wantsChartVendors('no fences at all'), false);
+  assert.equal(wantsChartVendors(undefined), false);
+});
 
 // ─── CJK/bold regression suite ──────────────────────────────────────────────
 // These are the exact bug patterns this fix went through multiple rounds
@@ -429,7 +442,11 @@ test('render.js pipes Mermaid\'s SVG output through sanitizeMermaidSvg before as
   // than assigning it to innerHTML unsanitized.
   const fs = await import('node:fs/promises');
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
-  assert.match(src, /import\s*\{\s*sanitizeMermaidSvg\s*\}\s*from\s*['"]\.\.\/vendor\/stream-markdown-parser\.bundle\.js['"]/);
+  // The 388KB stream-markdown-parser bundle is lazy-imported on the first
+  // mermaid render (getSanitizeMermaidSvg) instead of at module top level —
+  // sanitizeMermaidSvg is its ONLY use and mermaid itself is already lazy.
+  assert.match(src, /sanitizeModule\s*=\s*import\(\s*['"]\.\.\/vendor\/stream-markdown-parser\.bundle\.js['"]\s*\)/);
+  assert.match(src, /const\s+sanitizeMermaidSvg\s*=\s*await\s+getSanitizeMermaidSvg\(\)/);
   assert.match(src, /svgWrap\.innerHTML\s*=\s*sanitizeMermaidSvg\(svg\)/);
 });
 
