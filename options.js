@@ -509,7 +509,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       <div class="field">
         <label>${_t('apiKeyLabel', 'API key')}
           <div class="apikey-wrap">
-            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." />
+            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." autocomplete="off" spellcheck="false" />
             <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
           </div>
         </label>

@@ -26,6 +26,12 @@
 }
 
 :root {
+  /* Tell the UA which scheme these pages render in, so native widgets we
+     don't fully restyle (select dropdown popups, UA scrollbars, form
+     validation bubbles) pick the matching dark/light chrome instead of the
+     OS default. */
+  color-scheme: dark;
+
   /* Ground */
   --bg:           #0d0f14;
   --bg-2:         #14171f;
@@ -60,8 +66,8 @@
   --warn:         #e0b23a;
   --success:      #4ade80;
 
-  /* Radius — three tiers only: controls / cards+composer / (reserved, unused
-     today, kept for a future larger surface). Previously five+ competing
+  /* Radius — three tiers only: controls / cards+composer / large surfaces
+     (user bubble's outer corners, composer box). Previously five+ competing
      radii (20px pills, 8px icon buttons, 16px composer, 10px cards, 999px
      qa-btns) with no shared rule. */
   --radius-sm:    6px;
@@ -88,6 +94,8 @@
 
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
+
     /* Cool paper-white, not warm cream/parchment — the light mode is its own
        considered surface, not a tinted inversion of the dark one. */
     --bg:           #f5f6f3;

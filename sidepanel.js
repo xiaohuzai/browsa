@@ -576,6 +576,23 @@ async function init() {
   });
   document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
 
+  // Anchor the fixed-position button to the composer stack's REAL height —
+  // the CSS bottom:134px is only the no-JS fallback, calibrated for a one-line
+  // composer. A grown textarea (multi-line draft, image previews) pushes the
+  // quickbar up past a static offset and the button lands on top of it.
+  const repositionScrollBtn = () => {
+    const stackH = (document.querySelector('.quickbar')?.offsetHeight || 0)
+      + (document.querySelector('.composer')?.offsetHeight || 0);
+    scrollToBottomBtn.style.bottom = `${stackH + 10}px`;
+  };
+  repositionScrollBtn();
+  if (typeof ResizeObserver !== 'undefined') {
+    const stbObserver = new ResizeObserver(repositionScrollBtn);
+    for (const el of [document.querySelector('.quickbar'), document.querySelector('.composer')]) {
+      if (el) stbObserver.observe(el);
+    }
+  }
+
   messagesEl.addEventListener('scroll', () => {
     const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
     isUserScrolledUp = dist > 80;
@@ -842,7 +859,9 @@ function updateSlashSuggest() {
     item.id = `slash-opt-${i}`;
     item.setAttribute('role', 'option');
     item.setAttribute('aria-selected', 'false');
-    const desc = SLASH_COMMANDS[cmd];
+    const desc = cmd === '/prompt'
+      ? t('slashPromptDesc', 'Show the effective system prompt')
+      : SLASH_COMMANDS[cmd];
     const shortDesc = desc.length > 55 ? desc.slice(0, 55) + '…' : desc;
     item.innerHTML = `<span class="slash-cmd">${cmd}</span><span class="slash-desc">${shortDesc}</span>`;
     item.addEventListener('mousedown', (e) => {
