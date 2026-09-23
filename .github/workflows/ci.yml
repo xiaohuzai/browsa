@@ -50,10 +50,43 @@ jobs:
             echo "source_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # ── 全量测试结果复用（2026-09-24）─────────────────────────────────
+      # 同一内容树 + 同一环境 = 测试结果可转移（npm ci + lockfile 钉死依赖、
+      # Node 20 钉死环境）。缓存键用**树哈希**而非 commit SHA——squash 合并换
+      # SHA 不换树，「PR 测过、main push 再测」的纯重复由此消除；revert 回旧
+      # 内容也能命中最初的记录。键带 OS/Node 前缀，环境一变自然失效。
+      # 只缓存最贵的 npm test；npm ci / check-compat 永远现场跑（秒级且吃环境）。
+      - name: Compute tree hash
+        id: tree
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Lookup previous full-test result
+        id: testcache
+        uses: actions/cache/restore@v4
+        with:
+          path: .fulltest-pass
+          key: fulltest-${{ runner.os }}-node20-${{ steps.tree.outputs.hash }}
+          lookup-only: true
+
+      - name: Reuse full-test result
+        if: steps.changes.outputs.source_changed == 'true' && steps.testcache.outputs.cache-hit == 'true'
+        run: echo "::notice::全量测试结果复用自同树同环境的既有记录（tree ${{ steps.tree.outputs.hash }}）——语义=这份内容在本环境全量测过一次"
+
       - name: Run tests
-        if: steps.changes.outputs.source_changed == 'true'
+        if: steps.changes.outputs.source_changed == 'true' && steps.testcache.outputs.cache-hit != 'true'
         run: npm test
 
       - name: Run MV3 compat check
         if: steps.changes.outputs.source_changed == 'true'
         run: bash check-compat.sh
+
+      - name: Record full-test result
+        if: steps.changes.outputs.source_changed == 'true' && steps.testcache.outputs.cache-hit != 'true' && success()
+        run: echo "passed by ${{ github.sha }} at $(date -u +%FT%TZ)" > .fulltest-pass
+
+      - name: Save full-test result
+        if: steps.changes.outputs.source_changed == 'true' && steps.testcache.outputs.cache-hit != 'true' && success()
+        uses: actions/cache/save@v4
+        with:
+          path: .fulltest-pass
+          key: fulltest-${{ runner.os }}-node20-${{ steps.tree.outputs.hash }}

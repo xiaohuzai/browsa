@@ -28,6 +28,22 @@ jobs:
 
       - run: npm ci
 
+      # ── 全量测试结果复用（2026-09-24，与 ci.yml 同一缓存空间）──────────
+      # 测试步虽在 Bump 之后，但 bump 当时尚未提交——HEAD^{tree} 读的是已提交
+      # 树 = 这次要发的内容树（CI 刚全量测过的那份）。命中即复用，发版不再
+      # 重跑全量；未命中（首发新树/缓存过期）照常全量并回填记录。
+      - name: Compute tree hash
+        id: tree
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Lookup previous full-test result
+        id: testcache
+        uses: actions/cache/restore@v4
+        with:
+          path: .fulltest-pass
+          key: fulltest-${{ runner.os }}-node20-${{ steps.tree.outputs.hash }}
+          lookup-only: true
+
       # Bump version (package.json + manifest.json via postversion hook).
       # 输入版本 == 当前版本时跳过 npm version（会报 "Version not changed"），
       # 直接走当前版本 —— 覆盖"发当前已 bump 但未发布的版本"的场景。
@@ -53,11 +69,27 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
+      - name: Reuse full-test result
+        if: steps.testcache.outputs.cache-hit == 'true'
+        run: echo "::notice::全量测试结果复用自同树同环境的既有记录（tree ${{ steps.tree.outputs.hash }}）"
+
       - name: Run tests
+        if: steps.testcache.outputs.cache-hit != 'true'
         run: npm test
 
       - name: Run MV3 compat check
         run: bash check-compat.sh
+
+      - name: Record full-test result
+        if: steps.testcache.outputs.cache-hit != 'true' && success()
+        run: echo "passed by ${{ github.sha }} at $(date -u +%FT%TZ)" > .fulltest-pass
+
+      - name: Save full-test result
+        if: steps.testcache.outputs.cache-hit != 'true' && success()
+        uses: actions/cache/save@v4
+        with:
+          path: .fulltest-pass
+          key: fulltest-${{ runner.os }}-node20-${{ steps.tree.outputs.hash }}
 
       - name: Build zip
         run: npm run package
