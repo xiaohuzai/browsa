@@ -248,9 +248,12 @@ test('ATTACH_ASR_CONFIRM: bilibili transcript gets the video-note instruction ba
 
 test('CHAT system prompt no longer references llms.txt / video-note (KV-cache stable prefix)', async () => {
   const src = await readFile(fileURLToPath(new URL('../lib/handlers/chat-handler.js', import.meta.url)), 'utf8');
-  const effLine = src.split('\n').find((l) => l.includes('effectiveSystemPrompt = ['));
+  // C5 后组装本体住 lib/prompt-assembly.js，本文件只剩调用行——两处源都断言。
+  const effLine = src.split('\n').find((l) => l.includes('effectiveSystemPrompt = '));
   assert.ok(effLine, 'effectiveSystemPrompt assembly must exist');
   assert.doesNotMatch(effLine, /llmsTxt|llms\.txt|Site instructions|videoNoteHint|video transcript with/, 'system prompt must not include llms.txt or the video-note hint — both move to the attach-time page context');
+  const paSrc = await readFile(fileURLToPath(new URL('../lib/prompt-assembly.js', import.meta.url)), 'utf8');
+  assert.doesNotMatch(paSrc, /llmsTxt|llms\.txt|Site instructions|videoNoteHint|video transcript with/, 'the shared assembly must not reference them either');
   // fetchLlmsTxt must still exist (consumed by withSiteInstructions at attach time).
   assert.match(src, /export async function fetchLlmsTxt/, 'fetchLlmsTxt must remain exported for the attach flow');
   // videoSrc detection must survive (drives DONE stamping + timestamp rewrite).

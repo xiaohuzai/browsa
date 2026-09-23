@@ -5,6 +5,7 @@
 //   - GET_CONFIG: read storage (SET_CONFIG does not exist)
 //   - CLEAR_HISTORY: clear per-tab history
 
+import { stopHermesRun } from './lib/handlers/agent-stream-session.js';
 import * as storage from './lib/storage.js';
 import { ProviderConfigError } from './lib/llm-client.js';
 import { PAGE_CONTEXT_PREFIX, VIDEO_NOTE_HINT } from './lib/constants.js';
@@ -58,32 +59,10 @@ import { ensureReadabilityInjected } from './lib/readability-injector.js';
 // lib/agent-turn.js's AGENT_RENDER_HINT (agent providers never see this array)
 // — add a new renderer to both, and to the assertion in
 // test/lib-agent-turn.test.mjs that guards the pair.
-const CAPABILITY_HINTS = [
-  'When writing mathematical expressions or formulas, always use LaTeX notation: $...$ for inline math, $$...$$ for display/block math — everywhere including inside Markdown table cells; never leave formulas as plain text.',
-  'The chat UI renders these fenced code blocks natively, inline in the reply: ```mermaid (diagrams), ```echarts (charts), ```markmap (mind maps), ```smiles (chemistry), ```pdb (proteins), ```nn (neural nets). Output them directly — never create HTML files or write files to disk.',
-  'In Mermaid, always quote node labels that contain special characters (<, >, /, \\, (, ), {, }, ;, #, ~, %) using double-quoted syntax: ["label text"].',
-  'In Markdown, always place punctuation outside bold/italic delimiters: **text**, not **text,**.',
-  'In Markdown, put a space between Chinese/CJK text and ** or * emphasis delimiters when directly adjacent — e.g. 一个 **"GPU 利用率"** 因子, never 一个**"GPU 利用率"**因子. Without that space, emphasis that starts/ends with punctuation cannot parse as a delimiter and renders as literal asterisks.',
-  'When an answer covers multiple sub-questions or sections, give each one an actual Markdown heading (## or ###) — never a bare unformatted title line like "BF16 比 FP16 强在哪?", which renders with no visual distinction from body text.',
-  'When listing parallel points, reasons, or comparisons (even just 2-3 short ones), format them as a Markdown list (- or 1. per line), not separate plain lines — those render as one undifferentiated block.',
-  'In Mermaid node labels, NEVER use Markdown bold/italic (**text**/*text*) — they display as literal asterisks. Use HTML instead: <b>text</b>, <i>text</i>, e.g. A["<b>Title</b><br/>subtitle"].',
-  'In Mermaid node labels, write math as $$...$$ (KaTeX) with SINGLE backslashes: A["$$T = \\frac{D_{vol}}{B_{bw}}$$"]. Write the formula EXACTLY ONCE per label — never a compact plain-text copy alongside the LaTeX version; put explanations in a separate node or as plain text outside the $$...$$ span. Never double backslashes (\\\\frac).',
-  'For data visualizations (bar/line/pie/scatter charts), output an ECharts option object as JSON in a ```echarts block: ```echarts\n{"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2,3]}]}\n```',
-  'In ECharts option JSON, NEVER put HTML tags (<b>, <br/>, <span>) inside title/legend/axis/label text fields — unlike Mermaid labels, ECharts renders them as literal characters. Use \\n for line breaks; for mixed styling in one field use ECharts\' rich-text syntax (a "rich" object in textStyle, referenced as {styleName|text}), never raw HTML.',
-  'For mind maps / outlines / hierarchical breakdowns (a topic and its sub-points, a video TOC), output a ```markmap block containing a plain Markdown outline (headings # ## ### and/or nested - lists) — not Mermaid syntax, not JSON. Never use it for flowcharts, sequence diagrams, or timelines — those are Mermaid.',
-  'For chemical structures, output a ```smiles block whose content is the SMILES string — rendered as a 2D structure diagram natively. Molecule example: ```smiles\nCC(=O)OC1=CC=CC=C1C(=O)O\n``` (aspirin). For REACTIONS use reaction SMILES reactants>agents>products in the same block, species dot-separated (empty agent section when none), e.g. CC(=O)O.CCO>>CCOC(=O)CC.O. Never draw molecules or reactions as ASCII art or Mermaid graphs.',
-  'For protein 3D structures, output a ```pdb block whose content is ONLY a structure ID you are confident exists: the 4-character RCSB Protein Data Bank ID (e.g. 1UBQ), or an AlphaFold predicted model ID like AF-P00533-F1 (a real UniProt accession; rendered with pLDDT confidence coloring) — the UI fetches real coordinates and renders a 3D viewer. NEVER write raw ATOM coordinate lines and NEVER invent an ID; if you don\'t know a real one, say so.',
-  'For neural-network / model-architecture figures (MLP, CNN, Transformer — any stack of layers), output a ```nn block containing JSON (publication-style figure, rendered natively); a plain layer stack is ALWAYS ```nn, never a Mermaid flowchart. Layer stack form: {"layers":["Input 224×224×3","Conv2D 64 @3×3",{"name":"Residual block","parallel":[{"name":"Conv 3×3"},{"name":"Conv 1×1"}]},"Dense 128","Softmax 10"],"skips":[{"from":1,"to":3,"label":"residual"}]} — each layer is a plain string or {"name":...,"out":"output shape","kind":"input|output"}; "parallel" (2-6 objects) renders a side-by-side branch group; "skips" draws curved skip/residual connections between layer indices (from<to). Classic neuron circles, small MLPs only: {"style":"fcnn","layers":[3,5,5,2],"labels":["input","hidden","hidden","output"]} — each number is a neuron count (values above 10 are abbreviated automatically). Keep layer names short; put tensor shapes in "out".',
-  'Never fabricate or invent image URLs — an unverifiable URL renders as a broken placeholder (the chat UI has no Markdown-image source of truth). To show a diagram, chart, mind map, molecule, protein or network figure, output one of the fenced blocks listed above, or a plain ASCII/text diagram.',
-].join(' ');
+// 系统提示常量与组装已收拢到 lib/prompt-assembly.js（C5：/prompt 检视器此前
+// 显示 ≠ 发送）。CHAT 用两块、SUBCHAT 只用 capabilityHints——原样传参，通道差异不变。
+import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT } from './lib/prompt-assembly.js';
 
-// CHOICE_REQUEST is CHAT-only, deliberately NOT part of CAPABILITY_HINTS:
-// rendering it as clickable buttons requires background.js's CHAT case to
-// parse+strip the tail and sidepanel.js to call renderChoiceRequest() —
-// SUBCHAT's detail-thread card does neither, so including this hint there
-// would just leak the raw "CHOICE_REQUEST:{...}" JSON into the reply text.
-const CHOICE_REQUEST_HINT =
-  'When you need the user to pick one of several distinct options (not free-form text), end your reply with a line in this exact format so the chat UI renders clickable buttons: CHOICE_REQUEST:{"question":"short question text","choices":["full text of option 1","full text of option 2"]}. This must be the very last thing in your reply, valid single-line JSON, with no text after it. Each choice string should be the complete message that gets sent back to you when clicked (not just a letter like "A") — write full option text, not a lettered index. Only use this when you are truly asking the user to choose between distinct paths forward, not for yes/no confirmations or open-ended questions.';
 
 // Allow side panel to open on action click (Chrome MV3)
 chrome.sidePanel
@@ -165,18 +144,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!action) return;
 
   selectionCache.set(tab.id, text);
-
-  const set = navPorts.get(tab.id);
-  let relayed = false;
-  if (set && set.size > 0) {
-    for (const p of set) {
-      try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); relayed = true; } catch (_) {}
-    }
-  }
-  if (!relayed) {
-    chrome.storage.session.set({ pendingSelectionAction: { tabId: tab.id, action, text } }).catch(() => {});
-    try { await chrome.sidePanel.open({ tabId: tab.id }); } catch (_) {}
-  }
+  await relaySelectionAction(tab.id, action, text);
 });
 
 // Streaming port/stream-state/controller Maps (streamPorts, streamState,
@@ -222,6 +190,45 @@ function pushDeepProgress(tabId, text) {
 // deltas can start arriving and get silently dropped before the port has
 // finished reconnecting. Opening fresh + waiting for the HELLO_ACK (like
 // onSend() does for browsa-chat) avoids that race entirely.
+// 划词动作中继（右键菜单与浮动工具条两个入口此前逐字两份）：优先走既有
+// navPort 直推；没有（SW 刚醒、navPorts 是空 Map）则落 chrome.storage.session
+// 兜底并拉起面板——setTimeout 重试不可行，handler 一返回 SW 就睡回去。
+async function relaySelectionAction(tabId, action, text) {
+  const set = navPorts.get(tabId);
+  let relayed = false;
+  if (set && set.size > 0) {
+    for (const p of set) {
+      try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); relayed = true; } catch (_) {}
+    }
+  }
+  if (!relayed) {
+    chrome.storage.session.set({ pendingSelectionAction: { tabId, action, text } }).catch(() => {});
+    try { await chrome.sidePanel.open({ tabId }); } catch (_) {}
+  }
+}
+
+// 视频 tab 注入的统一门（SEEK_VIDEO / GET_VIDEO_TIME 此前各带一份装配）：
+// videoSrc.tabId 随存档跨浏览器重启、id 会被回收——盲注入会操作无关 tab 的
+// 视频，先复验 URL 再注入。注入函数内部的 <video> selector 两份是平台约束
+//（MAIN-world 只序列化单个函数），保留双份。
+async function runInVideoTab(tabId, url, func, args) {
+  if (tabId == null) return { ok: false, error: 'no tabId' };
+  if (!(await tabMatchesVideo(tabId, url))) return { ok: false, error: 'tab no longer shows the source video' };
+  try {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', func, args });
+    return res?.result || { ok: false };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+// 抽取参数里的站点缓存二件套（ATTACH_PAGE 与 GET_PAGE_CONTEXT 各写一份）。
+async function siteCacheCtx(t) {
+  await siteCacheReady; // ensure session-storage restore finished
+  if (typeof t !== 'number') return { xhsXhrNote: null, siteCache: null };
+  return { xhsXhrNote: xhsXhrCache.get(t) || null, siteCache: getSiteCache(t) };
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'browsa-chat') {
     // The side panel sends a "hello" with its tabId so we know which tab this
@@ -489,24 +496,7 @@ async function handle(msg, sender) {
       const tabId = sender?.tab?.id;
       if (!tabId) return { ok: false };
       const { action, text } = msg;
-      // Try relaying to the side panel through the existing nav port.
-      const set = navPorts.get(tabId);
-      let relayed = false;
-      if (set && set.size > 0) {
-        for (const p of set) {
-          try { p.postMessage({ type: 'SELECTION_ACTION', action, text }); relayed = true; } catch (_) {}
-        }
-      }
-      if (!relayed) {
-        // navPort not registered yet — the SW just woke up and navPorts is
-        // empty (module-level Map resets on every SW restart). A setTimeout
-        // retry won't work because the SW goes back to sleep as soon as this
-        // message handler returns. Instead, persist to chrome.storage.session
-        // which survives SW restarts. The side panel picks it up via
-        // storage.onChanged or on navPort reconnect.
-        chrome.storage.session.set({ pendingSelectionAction: { tabId, action, text } }).catch(() => {});
-        try { await chrome.sidePanel.open({ tabId }); } catch (_) {}
-      }
+      await relaySelectionAction(tabId, action, text);
       return { ok: true };
     }
 
@@ -519,13 +509,7 @@ async function handle(msg, sender) {
     case 'XUEQIU_DATA':
     case 'TWITTER_TWEET':
     case 'XIAOYUZHOU_EPISODE': {
-      const { site, field } = SITE_MESSAGE_MAP[msg.type];
-      const tabId = sender?.tab?.id;
-      if (tabId) {
-        const data = msg[field];
-        SITE_CACHES[site].set(tabId, data);
-        persistSiteCache(tabId, site, data);
-      }
+      recordSiteMessage(msg, sender?.tab?.id);
       return { ok: true };
     }
 
@@ -534,21 +518,11 @@ async function handle(msg, sender) {
       // clickable [mm:ss] markers in video-note replies. The side panel
       // falls back to opening the source URL with ?t= when this returns
       // ok:false (tab closed, navigated away, or no <video> on the page).
-      const tabId = msg.tabId;
-      if (tabId == null) return { ok: false, error: 'no tabId' };
-      // videoSrc.tabId is persisted in saved sessions — after a browser
-      // restart those ids are recycled, and blind injection could seek an
-      // UNRELATED tab's video. Revalidate the tab still shows the source
-      // video; mismatch degrades to the side panel's ?t= URL fallback.
-      if (!(await tabMatchesVideo(tabId, msg.url))) return { ok: false, error: 'tab no longer shows the source video' };
-      try {
-        const [res] = await chrome.scripting.executeScript({
-          target: { tabId },
-          // MAIN world so YouTube's #movie_player.seekTo (a method the page
-          // attaches to the element) is reachable - page-set custom props
-          // aren't visible from the ISOLATED world's DOM wrappers.
-          world: 'MAIN',
-          func: (seconds) => {
+      // 复验 + 注入走 runInVideoTab（C7）。MAIN world so YouTube's
+      // #movie_player.seekTo (a method the page attaches to the element) is
+      // reachable - page-set custom props aren't visible from the ISOLATED
+      // world's DOM wrappers. 失败时侧栏回落 ?t= URL 打开。
+      return runInVideoTab(msg.tabId, msg.url, (seconds) => {
             const v = document.querySelector('#movie_player video, #bilibili-player video, video');
             if (!v) return { ok: false };
             // YouTube exposes seekTo on #movie_player - its custom progress
@@ -563,39 +537,21 @@ async function handle(msg, sender) {
               v.dispatchEvent(new Event('seeking'));
               v.dispatchEvent(new Event('timeupdate'));
             }
-            return { ok: true };
-          },
-          args: [Number(msg.seconds) || 0],
-        });
-        return res?.result || { ok: false };
-      } catch (e) {
-        return { ok: false, error: e?.message || String(e) };
-      }
+          return { ok: true };
+        },
+        [Number(msg.seconds) || 0]);
     }
 
     case 'GET_VIDEO_TIME': {
       // Read the video tab's current playback position (for the transcript
       // drawer's playback-follow highlight). Mirrors SEEK_VIDEO's element
       // lookup so both agree on which <video> is the target.
-      const tabId = msg.tabId;
-      if (tabId == null) return { ok: false, error: 'no tabId' };
-      // Same stale-tabId revalidation as SEEK_VIDEO — otherwise a recycled
-      // id makes the drawer follow some OTHER tab's playback.
-      if (!(await tabMatchesVideo(tabId, msg.url))) return { ok: false, error: 'tab no longer shows the source video' };
-      try {
-        const [res] = await chrome.scripting.executeScript({
-          target: { tabId },
-          world: 'MAIN',
-          func: () => {
-            const v = document.querySelector('#movie_player video, #bilibili-player video, video');
-            if (!v) return { ok: false };
-            return { ok: true, time: v.currentTime || 0, paused: !!v.paused };
-          },
-        });
-        return res?.result || { ok: false };
-      } catch (e) {
-        return { ok: false, error: e?.message || String(e) };
-      }
+      // 同 SEEK_VIDEO 的门与注入装配（C7）——selector 双份是 MAIN-world 约束。
+      return runInVideoTab(msg.tabId, msg.url, () => {
+        const v = document.querySelector('#movie_player video, #bilibili-player video, video');
+        if (!v) return { ok: false };
+        return { ok: true, time: v.currentTime || 0, paused: !!v.paused };
+      });
     }
 
     case 'SET_ACTIVE_PROVIDER': {
@@ -724,13 +680,11 @@ async function handle(msg, sender) {
         } else {
           // auto and reader modes may need Readability; dom/full don't
           if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
-          await siteCacheReady; // ensure session-storage restore finished
           ctx = await extractActiveTab({
             mode,
             tabId,
             maxTextChars: all.maxTextChars,
-            xhsXhrNote: xhsXhrCache.get(tabId) || null,
-            siteCache: getSiteCache(tabId),
+            ...(await siteCacheCtx(tabId)),
             query: msg.query || '',
             preClean: true
           });
@@ -978,10 +932,8 @@ async function handle(msg, sender) {
       // map and gateway/platforms/api_server.py's route table).
       const runInfo = activeRunIds.get(t);
       if (runInfo) {
-        const stopUrl = `${runInfo.baseUrl}/v1/runs/${encodeURIComponent(runInfo.runId)}/stop`;
-        const stopHeaders = { 'Content-Type': 'application/json' };
-        if (runInfo.apiKey) stopHeaders['Authorization'] = `Bearer ${runInfo.apiKey}`;
-        fetch(stopUrl, { method: 'POST', headers: stopHeaders }).catch(() => {});
+        // /stop 的 fetch 唯一实现在 agent-stream-session.js（C4：此前手写三份）。
+        stopHermesRun(runInfo);
         activeRunIds.delete(t);
       }
       clearStreamState(t);
@@ -1034,13 +986,11 @@ async function handle(msg, sender) {
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
       const t = tabIdOf(msg, sender);
-      await siteCacheReady; // ensure session-storage restore finished
       const ctx = await extractActiveTab({
         mode,
         tabId: typeof t === 'number' ? t : null,
         maxTextChars: all.maxTextChars,
-        xhsXhrNote: (typeof t === 'number') ? (xhsXhrCache.get(t) || null) : null,
-        siteCache: (typeof t === 'number') ? getSiteCache(t) : null
+        ...(await siteCacheCtx(t)),
       });
       return ctx;
     }
@@ -1212,70 +1162,10 @@ const xhsXhrCache    = new Map(); // tabId -> XHS note summary (has special push
 // Site-specific XHR intercept caches, keyed by tabId. Each entry is a Map.
 // Adding a new site requires only adding an entry here — restore, getSiteCache,
 // and onRemoved all iterate this registry automatically.
-const SITE_CACHES = {
-  youtube:    new Map(), // YouTube video data
-  juejin:     new Map(), // 掘金 article
-  zhihu:      new Map(), // 知乎 article or Q&A
-  dedao:      new Map(), // 得到 article
-  geektime:   new Map(), // 极客时间 article
-  bilibili:   new Map(), // Bilibili video data
-  xueqiu:     new Map(), // 雪球 stock/post data
-  twitter:    new Map(), // Twitter/X tweet data
-  xiaoyuzhou: new Map(), // 小宇宙 podcast episode
-};
+// 站点缓存 registry 外迁 lib/handlers/site-cache-store.js（C7）——handle() 的
+// 站点 case 从此只剩路由。
+import { recordSiteMessage, getSiteCache, purgeTab, restoreSiteCachesFromSession } from './lib/handlers/site-cache-store.js';
 
-// Maps each site content script's push-message type to which SITE_CACHES
-// entry it writes and which field of the message carries the payload.
-// Every entry here follows the exact same shape (SITE_CACHES[site].set(tabId,
-// msg[field]); persistSiteCache(tabId, site, msg[field])) — the single
-// generic case below in handle() replaces what used to be 9 near-identical
-// copy-pasted case blocks. Adding a new site's push message only needs a
-// new SITE_CACHES entry (above) plus one line here.
-const SITE_MESSAGE_MAP = {
-  YOUTUBE_DATA:       { site: 'youtube',    field: 'video' },
-  JUEJIN_ARTICLE:     { site: 'juejin',     field: 'article' },
-  ZHIHU_CONTENT:      { site: 'zhihu',      field: 'content' },
-  DEDAO_ARTICLE:      { site: 'dedao',      field: 'article' },
-  GEEKTIME_ARTICLE:   { site: 'geektime',   field: 'article' },
-  BILIBILI_VIDEO:     { site: 'bilibili',   field: 'video' },
-  XUEQIU_DATA:        { site: 'xueqiu',     field: 'data' },
-  TWITTER_TWEET:      { site: 'twitter',    field: 'tweet' },
-  XIAOYUZHOU_EPISODE: { site: 'xiaoyuzhou', field: 'episode' },
-};
-
-
-// Site caches above are module-level Maps that are wiped on every SW restart
-// (~30s idle). Persist them to chrome.storage.session so they survive SW
-// sleep/wake cycles within a browser session.
-const SC_PREFIX = 'sc_';
-
-function persistSiteCache(tabId, source, data) {
-  chrome.storage.session.set({ [`${SC_PREFIX}${tabId}`]: { source, data } }).catch(() => {});
-}
-
-function clearSessionSiteCache(tabId) {
-  chrome.storage.session.remove(`${SC_PREFIX}${tabId}`).catch(() => {});
-}
-
-async function restoreSiteCachesFromSession() {
-  try {
-    const all = await chrome.storage.session.get(null);
-    for (const [key, val] of Object.entries(all)) {
-      if (!key.startsWith(SC_PREFIX)) continue;
-      const tabId = parseInt(key.slice(SC_PREFIX.length), 10);
-      if (isNaN(tabId) || !val?.source || !val?.data) continue;
-      SITE_CACHES[val.source]?.set(tabId, val.data);
-    }
-  } catch (_) {}
-}
-
-/** Return cached site data for a tab, regardless of which site it came from. */
-function getSiteCache(tabId) {
-  for (const [source, cache] of Object.entries(SITE_CACHES)) {
-    if (cache.has(tabId)) return { source, data: cache.get(tabId) };
-  }
-  return null;
-}
 
 function pushXhsNote(tabId, note) {
   if (typeof tabId !== 'number' || !note) return;
@@ -1292,8 +1182,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   lastNavBroadcast.delete(tabId);
   selectionCache.delete(tabId);
   xhsXhrCache.delete(tabId);
-  for (const cache of Object.values(SITE_CACHES)) cache.delete(tabId);
-  clearSessionSiteCache(tabId);
+  purgeTab(tabId);
   const set = navPorts.get(tabId);
   if (set) {
     for (const p of set) {

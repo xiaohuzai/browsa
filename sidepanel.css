@@ -26,23 +26,44 @@ body {
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
 
 /* ─── Top bar ───────────────────────────────────────────────────────────────── */
+/* "Reading desk" surface (visual refinement pass, 2026-09-23): stronger
+   grouping at the edges, lighter touch in the transcript, one clear warm
+   action for sending. Consolidated into these base rules — the old override
+   block at the file's tail re-declared .topbar/.wordmark/.provider/.iconbtn/
+   .messages/.msg.user/.msg.assistant/.quickbar/.qa-btn/.composer/
+   .composer-box/.sendbtn/.composer-footer/.composerinfo and is gone. */
 .topbar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px 9px;
+  padding: 9px 12px 8px;
+  min-height: 48px;
   /* Same ground as the messages area — the topbar reads as content floating
      on the panel with only a hairline beneath it, not as another stacked
      gray band (the old --bg-2 fill made three competing surface tones
      visible above the first message). */
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 70%, transparent), transparent),
+    var(--bg);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent);
   flex-shrink: 0;
 }
+/* Divider before the tool cluster: wordmark/provider left, hairline, icons. */
+.topbar::after {
+  content: '';
+  align-self: stretch;
+  width: 1px;
+  margin-left: auto;
+  background: var(--border-soft);
+  order: 1;
+}
+.topbar .provider { order: 0; }
+.topbar .iconbtn { order: 2; }
 
 /* Live state indicator (idle / streaming / error) — a quiet dot next to the
    wordmark, driven by setStatusDotState() in sidepanel.js. Replaces an
@@ -78,9 +99,9 @@ body {
    "terminal". The mono accent voice lives on in timestamps/code chips. */
 .wordmark {
   font-family: 'Space Grotesk', ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.075em;
   color: var(--accent);
   flex-shrink: 0;
   user-select: none;
@@ -88,10 +109,13 @@ body {
 
 .provider {
   flex: 1;
+  min-width: 0;
   padding: 5px 10px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-2);
+  /* background-color longhand (was a background shorthand here): the
+     background-image dropdown arrow below must survive the merge. */
+  background-color: color-mix(in srgb, var(--bg-2) 80%, transparent);
   color: var(--fg);
   font: inherit;
   font-size: 12px;
@@ -121,7 +145,9 @@ body {
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
-  transition: background var(--t), border-color var(--t), color var(--t);
+  /* transform replaces the border-color entry — this is the merged effective
+     transition set (the hover lift below animates transform). */
+  transition: background var(--t), color var(--t), transform var(--t);
   flex-shrink: 0;
   padding: 0;
 }
@@ -129,6 +155,7 @@ body {
   background: var(--bg-3);
   border-color: var(--border);
   color: var(--fg);
+  transform: translateY(-1px);
 }
 
 /* ─── Messages ──────────────────────────────────────────────────────────────── */
@@ -136,10 +163,18 @@ body {
   flex: 1;
   position: relative;   /* outline-rail 的 offsetTop 以内容空间为参照 */
   overflow-y: auto;
-  padding: 16px 14px 8px;
+  /* U12: the main scrollport must not chain its overscroll (wheel/touch
+     boundary gestures) into the page around the panel. y-axis only — the
+     container never scrolls horizontally. */
+  overscroll-behavior-y: contain;
+  padding: 18px 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Faint accent wash from the top-right corner — the "margin" side. */
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 34%),
+    var(--bg);
 }
 
 /* Empty state */
@@ -211,13 +246,14 @@ body {
      radius breaks the symmetry, pointing the note back at the margin. */
   background: color-mix(in srgb, var(--accent) 5%, var(--bg-2));
   border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
   padding: 7px 12px;
   color: var(--fg-2);
   white-space: pre-wrap;
   font-size: var(--msg-font-size);
   text-align: left;
   max-width: 88%;
+  box-shadow: 0 2px 8px color-mix(in srgb, #000 12%, transparent);
 }
 
 /* Assistant bubble — transparent background, clean text flow */
@@ -229,8 +265,8 @@ body {
      without this the only "who said this" signal is text color + alignment.
      Kept deliberately faint — a hint of the proofreader's red in the rail
      ties it to the brand without turning this back into a bubble. */
-  border-left: 2px solid color-mix(in srgb, var(--accent) 26%, var(--border-soft));
-  padding: 4px 2px 4px 12px;
+  border-left: 3px solid color-mix(in srgb, var(--accent) 42%, var(--border-soft));
+  padding: 4px 2px 4px 13px;
   max-width: 96%;
 }
 .msg.assistant::after {
@@ -282,6 +318,10 @@ body {
   justify-content: center;
   width: 22px;
   height: 22px;
+  /* U13: 24px minimum hit target (glyph stays 22px-box styled; the box
+     itself just can't compute below 24). */
+  min-width: 24px;
+  min-height: 24px;
   font-size: 11px;
   line-height: 1;
   padding: 0;
@@ -295,6 +335,15 @@ body {
 }
 .msg-action-icon:hover { background: var(--bg-4); border-color: var(--fg-dim); color: var(--fg); }
 .msg-action-icon.delete-icon:hover { background: color-mix(in srgb, var(--error) 12%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+/* B4: two-step armed delete — sidepanel.js adds .armed on the first click and
+   removes it after 2s (Ctrl/Cmd+click commits directly). Same "sure?" signal
+   as the sessions drawer's .session-del-btn.armed: the icon flips to a solid
+   error chip; the second click is the destructive one. */
+.msg-action-icon.delete-icon.armed {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
+}
 
 /* ─── Collapse/expand a long assistant reply (manual, ephemeral) ────────── */
 .fold-btn svg { transition: transform var(--t); }
@@ -344,12 +393,16 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  opacity: 0.55;
-  transition: opacity 0.15s;
+  /* U14: was opacity:0.55 — contrast now baked into --fg-faint instead of an
+     alpha dim. The [open]/hover rule brightens the COLOR (it used to raise
+     opacity), so the reveal affordance survives without alpha. */
+  opacity: 1;
+  color: var(--fg-faint);
+  transition: color 0.15s;
 }
 .tool-history summary::-webkit-details-marker { display: none; }
 .tool-history[open] summary,
-.tool-history summary:hover { opacity: 0.9; }
+.tool-history summary:hover { color: var(--fg-dim); }
 .tool-history ul {
   margin: 4px 0 0 8px;
   padding: 6px 10px;
@@ -388,7 +441,7 @@ body {
   font-size: 12.5px;
   padding: 6px 16px;
   border: 1px solid var(--accent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--accent);
   cursor: pointer;
@@ -414,7 +467,7 @@ body {
   color: var(--accent);
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
@@ -485,7 +538,7 @@ body {
   font-size: 11px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   cursor: pointer;
   color: var(--fg-2);
@@ -500,6 +553,7 @@ body {
   word-break: break-word;
   color: var(--fg-2);
   overflow-y: auto;
+  overscroll-behavior: contain;   /* U12 — same scroller containment as .detail-thread-messages */
   flex: 1;
   line-height: 1.55;
 }
@@ -527,7 +581,7 @@ body {
 .ctx-fig img {
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: var(--bg-3);
 }
@@ -606,7 +660,7 @@ body {
   background: none;
   border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   color: var(--error);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;
@@ -641,9 +695,9 @@ body {
 .tp-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Tier-specific accent colours + left stripe */
 .tool-progress[data-tier="thinking"]  { color: var(--warn); border-left-color: var(--warn); }
-.tool-progress[data-tier="searching"] { color: #60a5fa; border-left-color: #60a5fa; }
-.tool-progress[data-tier="running"]   { color: #a78bfa; border-left-color: #a78bfa; }
-.tool-progress[data-tier="reading"]   { color: #34d399; border-left-color: #34d399; }
+.tool-progress[data-tier="searching"] { color: var(--tier-search); border-left-color: var(--tier-search); }
+.tool-progress[data-tier="running"]   { color: var(--tier-run); border-left-color: var(--tier-run); }
+.tool-progress[data-tier="reading"]   { color: var(--tier-read); border-left-color: var(--tier-read); }
 .tool-progress[data-tier="writing"]   { color: var(--accent); border-left-color: var(--accent); }
 .tool-progress[data-tier="warn"]      { color: var(--warn); border-left-color: var(--warn); }
 @keyframes tool-pulse {
@@ -676,7 +730,7 @@ body {
   font: inherit;
   font-size: 11.5px;
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--fg-2);
@@ -753,7 +807,7 @@ body {
   margin: 0 0.1em;
   color: var(--gold);
   background: var(--gold-dim);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
@@ -762,7 +816,13 @@ body {
   vertical-align: baseline;
 }
 .msg.assistant .browsa-ts:hover { opacity: 0.8; }
-.msg.assistant .browsa-ts:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.msg.assistant .browsa-ts:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  /* U3: single ring — this rule's own outline. The global *:focus-visible
+     halo (a box-shadow) would otherwise paint a second ring around it. */
+  box-shadow: none;
+}
 .msg.assistant blockquote {
   margin: 0.5em 0;
   padding: 0.5em 1em;
@@ -774,13 +834,17 @@ body {
      obliques that render Chinese glyphs as ugly slanted strokes. The red
      bar + tint already carry the "quoted" signal. */
 }
+/* U6: markdown *强调* lands as <em>/<i>, which the UA defaults to italic —
+   same synthesized-oblique problem for Chinese. Weight, not slant, carries
+   emphasis here (consistent with the blockquote note above). */
+.msg.assistant em, .msg.assistant i { font-style: normal; font-weight: 500; }
 .msg.assistant code {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 0.855em;
   background: color-mix(in srgb, var(--accent) 8%, var(--bg-3));
   color: color-mix(in srgb, var(--accent) 70%, var(--fg));
   padding: 0.15em 0.42em;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .msg.assistant pre {
@@ -865,14 +929,16 @@ math[display="block"] {
 .msg-time {
   display: block;
   font-size: 9.5px;
-  color: var(--fg-dim);
+  /* U14: micro-text contrast lives in --fg-faint (baked), not alpha. The
+     opacity below is purely the hover-reveal switch (0 → 1), not a dimmer. */
+  color: var(--fg-faint);
   opacity: 0;
   margin-top: 4px;
   text-align: right;
   transition: opacity 0.15s;
   user-select: none;
 }
-.msg:hover .msg-time { opacity: 0.6; }
+.msg:hover .msg-time { opacity: 1; }
 
 /* ─── <think> block ─────────────────────────────────────────────────────────── */
 .think-block {
@@ -994,7 +1060,7 @@ math[display="block"] {
   background: var(--bg-3);
   color: var(--fg-2);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   width: 26px;
   height: 26px;
   font-size: 14px;
@@ -1011,7 +1077,7 @@ math[display="block"] {
   font-size: 12px;
   padding: 4px 8px;
   border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 4px 0;
 }
 .mermaid-error .mermaid-err-fix,
@@ -1020,7 +1086,7 @@ math[display="block"] {
   padding: 2px 8px;
   font-size: 11px;
   border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -1056,7 +1122,7 @@ math[display="block"] {
   font-size: 12px;
   padding: 4px 8px;
   border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 4px 0;
 }
 
@@ -1068,7 +1134,7 @@ math[display="block"] {
   font-size: 10.5px;
   font-weight: 500;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
   color: var(--fg-dim);
   cursor: pointer;
@@ -1102,7 +1168,7 @@ math[display="block"] {
   font-size: 11px;
   background: var(--code-bg);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
 }
 .diagnostics a { color: var(--accent); text-decoration: underline; cursor: pointer; }
@@ -1112,19 +1178,27 @@ math[display="block"] {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  margin: 0 12px 8px;
+  padding: 5px 6px;
   overflow-x: auto;
   scrollbar-width: none;
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
+  /* border shorthand (was border-top) — the merged effective state draws the
+     hairline on all four sides of the capsule dock. */
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
 }
 .quickbar::-webkit-scrollbar { display: none; }
 .qa-btn {
   flex-shrink: 0;
-  padding: 4px 12px;
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: var(--bg-2);
+  min-height: 26px;
+  padding: 4px 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
   color: var(--fg-dim);
   font: inherit;
   font-size: 11.5px;
@@ -1135,9 +1209,10 @@ math[display="block"] {
   letter-spacing: 0.01em;
 }
 .qa-btn:hover {
-  background: var(--accent-hover);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  color: var(--accent);
+  background: var(--bg-3);
+  border-color: var(--border);
+  color: var(--fg);
+  transform: translateY(-1px);
 }
 /* Collapse toggle: purely a user preference (persisted, no auto-hide
    heuristic) — the toggle itself always stays visible so it can bring the
@@ -1147,8 +1222,8 @@ math[display="block"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 25px;
+  height: 25px;
   padding: 0;
   border: none;
   background: transparent;
@@ -1184,7 +1259,7 @@ math[display="block"] {
   max-width: calc(100% - 70px);
   background: var(--hover-bg);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 4px 2px 9px;
 }
 .followup-text {
@@ -1209,6 +1284,9 @@ math[display="block"] {
   line-height: 1;
   padding: 3px 4px;
   border-radius: 50%;
+  /* U13: 24px minimum hit target. */
+  min-width: 24px;
+  min-height: 24px;
 }
 .followup-remove:hover { color: var(--error); background: var(--hover-bg); }
 
@@ -1218,12 +1296,12 @@ math[display="block"] {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 9px 12px 11px;
+  padding: 8px 12px 11px;
   /* Material inversion: the footer sits on the panel ground and the input
      box is the raised element (raised box on quiet ground reads as "this is
      the one thing you interact with" — the old bg-2 footer under a bg box
      was a gray band with a hole in it). */
-  background: var(--bg);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg-2) 75%, transparent) 24%), var(--bg);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -1233,17 +1311,17 @@ math[display="block"] {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: 7px 7px 7px 12px;
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--t), box-shadow var(--t);
+  box-shadow: 0 6px 22px color-mix(in srgb, #000 18%, transparent);
+  transition: border-color var(--t), box-shadow var(--t), background var(--t);
 }
 .composer-box:focus-within {
-  border-color: var(--accent);
-  background: var(--bg-3);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border-strong));
+  background: var(--bg-2);
+  box-shadow: 0 0 0 3px var(--accent-dim), 0 8px 24px color-mix(in srgb, #000 22%, transparent);
 }
 
 #input {
@@ -1262,7 +1340,8 @@ math[display="block"] {
   overflow-y: auto;
   field-sizing: content;
 }
-#input::placeholder { color: var(--fg-dim); opacity: 0.45; }
+/* U14: placeholder contrast in the token (--fg-faint), not a 0.45 alpha dim. */
+#input::placeholder { color: var(--fg-faint); opacity: 1; }
 
 /* Attach / clear buttons */
 .attachbtn {
@@ -1273,7 +1352,7 @@ math[display="block"] {
   height: 28px;
   flex-shrink: 0;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
@@ -1290,11 +1369,11 @@ math[display="block"] {
 
 /* Send button */
 .sendbtn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: var(--accent);
   color: #fff;
   display: flex;
@@ -1305,10 +1384,11 @@ math[display="block"] {
   padding: 0;
   align-self: flex-end;
   margin-bottom: 1px;
-  box-shadow: 0 2px 8px var(--accent-glow);
+  margin-right: 6px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 .sendbtn:hover:not(:disabled) {
-  transform: scale(1.08);
+  transform: translateY(-1px);
   box-shadow: 0 4px 16px var(--accent-glow);
 }
 .sendbtn:active:not(:disabled) { transform: scale(0.94); box-shadow: none; }
@@ -1326,6 +1406,7 @@ math[display="block"] {
   align-items: center;
   gap: 6px;
   min-height: 20px;
+  padding: 7px 4px 0;
 }
 
 .ctx-group {
@@ -1337,7 +1418,7 @@ math[display="block"] {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 11px;
   cursor: pointer;
   color: var(--fg-dim);
@@ -1351,7 +1432,19 @@ math[display="block"] {
   color: var(--accent);
   font-weight: 500;
 }
-.ctx-pill input { display: none; }
+/* U2: visually hidden but STILL FOCUSABLE — a display:none radio is dropped
+   from the tab order, which made the mode pills mouse-only and turned the
+   .ctx-pill:has(input:focus-visible) ring below into a permanently dead rule.
+   Same clip recipe as .visually-hidden (see the a11y section). */
+.ctx-pill input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .pagemeta {
   flex: 1;
@@ -1370,10 +1463,11 @@ math[display="block"] {
 /* Composer info */
 .composerinfo {
   font-size: 10.5px;
-  color: var(--fg-dim);
+  /* U14: contrast in --fg-faint, not a 0.7 alpha dim. */
+  color: var(--fg-faint);
   font-variant-numeric: tabular-nums;
-  padding: 0 2px;
-  opacity: 0.7;
+  padding: 0 4px;
+  opacity: 1;
 }
 .composerinfo .warn   { color: var(--warn); opacity: 1; }
 .composerinfo .danger { color: var(--error); font-weight: 600; opacity: 1; }
@@ -1404,12 +1498,16 @@ math[display="block"] {
   position: absolute;
   top: 2px; right: 2px;
   width: 18px; height: 18px;
+  /* U13: 24px minimum hit target (✕ glyph unchanged; line-height follows the
+     grown box so it stays optically centered). */
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 50%;
   background: rgba(0,0,0,0.65);
   color: #fff;
   border: none;
   font-size: 13px;
-  line-height: 18px;
+  line-height: 24px;
   text-align: center;
   cursor: pointer;
   padding: 0;
@@ -1434,7 +1532,7 @@ math[display="block"] {
   opacity: 1;
   pointer-events: auto;
 }
-.msg:focus-within .msg-time { opacity: 0.6; }
+.msg:focus-within .msg-time { opacity: 1; }
 .session-item:focus-within .session-item-actions { opacity: 1; }
 .code-copy-btn:focus-visible { opacity: 1; }
 .mermaid-toolbar:focus-within { opacity: 1; }
@@ -1456,6 +1554,29 @@ math[display="block"] {
 }
 /* Textarea is inside composer-box which already shows focus via border+shadow */
 #input:focus-visible { box-shadow: none; }
+/* "Single outline system" list — these controls take an offset outline for
+   focus and suppress the halo above. */
+.provider:focus-visible,
+.iconbtn:focus-visible,
+.attachbtn:focus-visible,
+.sendbtn:focus-visible,
+.qa-btn:focus-visible,
+.ctx-pill:has(input:focus-visible),
+/* U3: these three carry their own resting box-shadow, which (same
+   specificity, later in the file) beat the global halo's box-shadow and left
+   focus with ZERO feedback. Same single-outline treatment as the controls
+   above — while focused, the drop shadow yields to the outline ring. */
+.scroll-to-bottom-btn:focus-visible,
+.transcript-follow-pill:focus-visible,
+.selection-ask-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+  outline-offset: 2px;
+  /* The global *:focus-visible rule above paints a 2px-bg+4px-accent box-shadow
+     halo on EVERYTHING; without resetting it here these controls rendered both
+     systems at once — a halo plus an offset outline (double ring). One system
+     per control: this outline. */
+  box-shadow: none;
+}
 .skip-link {
   position: absolute;
   top: -40px; left: 8px;
@@ -1543,6 +1664,9 @@ math[display="block"] {
   line-height: 1;
   padding: 0 2px;
   flex-shrink: 0;
+  /* U13: 24px minimum hit target (✕ glyph unchanged). */
+  min-width: 24px;
+  min-height: 24px;
 }
 .toast-x:hover { opacity: 1; }
 .toast-success { background: color-mix(in srgb, var(--success) 12%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
@@ -1633,7 +1757,7 @@ math[display="block"] {
 .toast-copy {
   background: none;
   border: 1px solid currentColor;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: inherit;
   opacity: 0.75;
   cursor: pointer;
@@ -1658,6 +1782,9 @@ math[display="block"] {
   vertical-align: middle;
   transition: color var(--t);
   user-select: none;
+  /* U13: 24px minimum hit target (glyph unchanged). */
+  min-width: 24px;
+  min-height: 24px;
 }
 .think-copy-btn:hover { color: var(--fg); }
 
@@ -1678,8 +1805,11 @@ math[display="block"] {
 .msg-image {
   max-width: 180px;
   max-height: 140px;
-  border-radius: 6px;
-  object-fit: cover;
+  border-radius: var(--radius-sm);
+  /* U15 防 CLS：预留 4:3 占位，图未解码时气泡高度已定（contain 不裁图）。 */
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: var(--bg-3);
   display: block;
 }
 
@@ -1737,7 +1867,7 @@ code.language-patch {
   width: 100%;
   padding: 7px 10px;
   border: 1px dashed var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-2);
   font-size: 12px;
@@ -1750,7 +1880,7 @@ code.language-patch {
   width: 100%;
   padding: 5px 8px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: var(--input-bg, var(--surface));
   color: var(--fg);
   font-size: 12px;
@@ -1761,6 +1891,7 @@ code.language-patch {
 .sessions-list {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;   /* U12 */
   padding: 6px 0;
 }
 .session-item {
@@ -1769,7 +1900,7 @@ code.language-patch {
   gap: 6px;
   padding: 7px 12px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin: 1px 6px;
   transition: background 0.1s;
 }
@@ -1810,8 +1941,11 @@ code.language-patch {
   cursor: pointer;
   font-size: 13px;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: color 0.1s;
+  /* U13: 24px minimum hit target (glyph unchanged). */
+  min-width: 24px;
+  min-height: 24px;
 }
 .session-export-btn:hover { color: var(--accent); }
 .session-del-btn:hover { color: var(--err); }
@@ -1852,7 +1986,7 @@ code.language-patch {
   color: var(--fg);
   background: var(--input-bg, var(--surface));
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 1px 4px;
   width: 100%;
   outline: none;
@@ -1868,14 +2002,16 @@ code.language-patch {
 /* ── Token usage chip ────────────────────────────────────────────────────── */
 .token-usage {
   font-size: 10px;
-  color: var(--muted);
+  /* U14: was color:--muted + opacity:0.75 — contrast now baked into
+     --fg-faint; hover brightens the color instead of the alpha. */
+  color: var(--fg-faint);
   padding: 2px 6px;
   margin: 2px 0 4px;
-  opacity: 0.75;
+  opacity: 1;
   user-select: none;
   cursor: default;
 }
-.token-usage:hover { opacity: 1; }
+.token-usage:hover { color: var(--fg-dim); }
 
 /* ── Prompt inspector modal ──────────────────────────────────────────────── */
 .prompt-inspector-modal {
@@ -1886,6 +2022,7 @@ code.language-patch {
   width: calc(100% - 40px);
   max-height: 80vh;
   overflow-y: auto;
+  overscroll-behavior: contain;   /* U12 */
   box-shadow: var(--shadow-lg);
 }
 .prompt-inspector-url {
@@ -1906,7 +2043,7 @@ code.language-patch {
 }
 .prompt-section-body {
   background: var(--code-bg, rgba(128,128,128,0.08));
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-size: 12px;
   white-space: pre-wrap;
@@ -1919,7 +2056,7 @@ code.language-patch {
 .pi-copy {
   background: none;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
   font-size: 12px;
   color: var(--fg-2);
@@ -1983,7 +2120,7 @@ code.language-patch {
   font-size: 12px;
   padding: 5px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
 }
@@ -1991,6 +2128,7 @@ code.language-patch {
 .transcript-list {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;   /* U12 */
   padding: 4px 0 12px;
 }
 .ts-row {
@@ -1999,7 +2137,7 @@ code.language-patch {
   padding: 6px 10px;
   margin: 0 6px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
 }
 .ts-row:hover { background: var(--hover-bg, rgba(128,128,128,0.08)); }
@@ -2031,7 +2169,11 @@ code.language-patch {
 .ts-fig-img {
   display: block;
   width: 100%;
-  border-radius: 6px;
+  /* U15 防 CLS：视频关键帧天然是 16:9，预留比例后列表滚动高度稳定。 */
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   margin: 2px 0 5px;
 }
@@ -2039,13 +2181,13 @@ code.language-patch {
 .ts-row-text mark {
   background: var(--gold-dim);
   color: inherit;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   padding: 0 1px;
 }
 .ts-row.search-current {
   outline: 1px solid var(--gold);
   outline-offset: -1px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .transcript-empty {
   padding: 24px 14px;
@@ -2063,7 +2205,7 @@ code.language-patch {
   color: var(--fg-2);
   font-size: 11px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   box-shadow: var(--shadow-md);
   transition: background var(--t, 0.15s), color var(--t, 0.15s);
@@ -2072,7 +2214,10 @@ code.language-patch {
 
 /* ── Syntax highlighting (highlight.js dark theme) ───────────────────────── */
 .msg.assistant pre code.hljs { background: transparent; padding: 0; }
-.hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+/* U6: no font-style:italic on any CJK-possible text — browsers synthesize
+   obliques that render Chinese glyphs as slanted strokes (same reasoning as
+   the .msg.assistant blockquote rule). Color carries the "comment" signal. */
+.hljs-comment, .hljs-quote { color: #8b949e; }
 .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #ff7b72; }
 .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
 .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #a5d6ff; }
@@ -2086,11 +2231,11 @@ code.language-patch {
 .hljs-attr { color: #7ee787; }
 .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #7ee787; }
 .hljs-subst { color: var(--fg); }
-.hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: bold; }
 @media (prefers-color-scheme: light) {
   .hljs-comment, .hljs-quote { color: #6e7781; }
   .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #cf222e; }
+  .hljs-deletion, .hljs-selector-pseudo { color: #cf222e; }
   .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
   .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #0a3069; }
   .hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #953800; }
@@ -2126,7 +2271,7 @@ code.language-patch {
 .msg-edit-save, .msg-edit-cancel {
   padding: 3px 10px;
   font-size: 11.5px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   border: 1px solid var(--border);
   background: var(--bg-3);
@@ -2156,7 +2301,7 @@ code.language-patch {
   flex: 1;
   background: var(--bg-3);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 3px 8px;
   font-size: 12.5px;
   color: var(--fg);
@@ -2170,14 +2315,17 @@ code.language-patch {
   justify-content: center;
   background: none;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--fg-dim);
   cursor: pointer;
   font-size: 12px;
   padding: 2px 6px;
+  /* U13: 24px minimum hit target (glyphs unchanged). */
+  min-width: 24px;
+  min-height: 24px;
 }
 .msg-search-nav:hover, .msg-search-close:hover { color: var(--fg); border-color: var(--fg-dim); }
-mark.search-highlight { background: color-mix(in srgb, var(--gold) 35%, transparent); color: inherit; border-radius: 2px; }
+mark.search-highlight { background: color-mix(in srgb, var(--gold) 35%, transparent); color: inherit; border-radius: var(--radius-sm); }
 mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, transparent); outline: 1px solid var(--gold); }
 
 /* ── Multi-select bar ───────────────────────────────────────────────────── */
@@ -2195,7 +2343,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .multiselect-delete-btn {
   font-size: 11.5px;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
   background: color-mix(in srgb, var(--error) 10%, transparent);
   color: var(--error);
@@ -2206,7 +2354,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .multiselect-cancel-btn {
   font-size: 11.5px;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: none;
   color: var(--fg-dim);
@@ -2242,7 +2390,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   max-width: 95vw;
   max-height: 90vh;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   cursor: zoom-out;
 }
@@ -2288,7 +2436,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .approval-risk {
   font-size: 0.75em;
   padding: 1px 7px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -2507,7 +2655,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   content: '';
   width: 32px;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--fg-dim);
 }
 .detail-thread-resize-handle:hover { background: var(--accent-dim); }
@@ -2521,7 +2669,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong);
   background: var(--bg-2);
   color: var(--fg);
@@ -2582,8 +2730,9 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .msg-provider {
   display: block;
   font-size: 9.5px;
-  color: var(--fg-dim);
-  opacity: 0.6;
+  /* U14: contrast in the token, not a 0.6 alpha dim (see --fg-faint). */
+  color: var(--fg-faint);
+  opacity: 1;
   margin-bottom: 4px;
   text-align: left;
   user-select: none;
@@ -2596,7 +2745,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   display: block;
   max-width: 260px;
   max-height: 180px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   margin: 6px 0;
 }
@@ -2627,12 +2776,15 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .outline-rail .tick {
   flex: none;
   width: 24px;
-  height: 16px;
+  /* U13: 16px was under the 20px floor for this rail's hit rows. The dense
+     overflow mode keeps its deliberate 12px (its whole point is a smaller,
+     scrollable hit area — see outline-rail.js layoutStrip()). */
+  height: 20px;
   padding: 0 4px 0 0;   /* 视觉线距右缘 6px，留呼吸感 */
   border: 0;
   background: none;
   appearance: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -2644,13 +2796,18 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   content: '';
   width: 12px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--border-strong);
   opacity: 0.75;
   transition: width 0.16s ease, background-color 0.16s ease, opacity 0.16s ease;
 }
 .outline-rail .tick:hover::before { width: 16px; background: var(--fg); opacity: 0.6; }
-.outline-rail .tick:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.outline-rail .tick:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  /* U3: single ring — suppress the global *:focus-visible halo (double ring). */
+  box-shadow: none;
+}
 .outline-rail .tick.active::before { width: 16px; background: var(--accent); opacity: 1; }
 .outline-rail-strip.dense .tick { height: 12px; }
 .outline-rail-preview {
@@ -2786,130 +2943,9 @@ dialog.lightbox-overlay:not([open]) {
 .pdb-legend-chip i {
   width: 9px;
   height: 9px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
-
-/* ─── Visual refinement pass: reading desk ────────────────────────────────
-   A quiet annotation surface: stronger grouping at the edges, lighter touch
-   in the transcript, and one clear warm action for sending. */
-.topbar {
-  min-height: 48px;
-  padding: 9px 12px 8px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 70%, transparent), transparent),
-    var(--bg);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent);
-}
-.topbar::after {
-  content: '';
-  align-self: stretch;
-  width: 1px;
-  margin-left: auto;
-  background: var(--border-soft);
-  order: 1;
-}
-.topbar .provider { order: 0; }
-.topbar .iconbtn { order: 2; }
-.wordmark {
-  font-size: 13px;
-  letter-spacing: 0.075em;
-}
-.provider {
-  min-width: 0;
-  background-color: color-mix(in srgb, var(--bg-2) 80%, transparent);
-  border-color: var(--border);
-}
-.provider:focus-visible,
-.iconbtn:focus-visible,
-.attachbtn:focus-visible,
-.sendbtn:focus-visible,
-.qa-btn:focus-visible,
-.ctx-pill:has(input:focus-visible) {
-  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
-  outline-offset: 2px;
-  /* The global *:focus-visible rule above paints a 2px-bg+4px-accent box-shadow
-     halo on EVERYTHING; without resetting it here these controls rendered both
-     systems at once — a halo plus an offset outline (double ring). One system
-     per control: this outline. */
-  box-shadow: none;
-}
-.iconbtn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  color: var(--fg-dim);
-  transition: background var(--t), color var(--t), transform var(--t);
-}
-.iconbtn:hover { transform: translateY(-1px); }
-
-.messages {
-  padding: 18px 14px 16px;
-  gap: 10px;
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 34%),
-    var(--bg);
-}
-.msg.user {
-  box-shadow: 0 2px 8px color-mix(in srgb, #000 12%, transparent);
-}
-.msg.assistant {
-  border-left-width: 3px;
-  border-left-color: color-mix(in srgb, var(--accent) 42%, var(--border-soft));
-  padding-left: 13px;
-}
-
-.quickbar {
-  margin: 0 12px 8px;
-  padding: 5px 6px;
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px);
-}
-.quickbar-toggle { width: 25px; height: 25px; }
-.qa-btn {
-  min-height: 26px;
-  padding-inline: 11px;
-  border-color: transparent;
-  background: transparent;
-  color: var(--fg-dim);
-}
-.qa-btn:hover {
-  border-color: var(--border);
-  background: var(--bg-3);
-  color: var(--fg);
-  transform: translateY(-1px);
-}
-
-.composer {
-  padding: 8px 12px 11px;
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg-2) 75%, transparent) 24%), var(--bg);
-}
-.composer-box {
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
-  box-shadow: 0 6px 22px color-mix(in srgb, #000 18%, transparent);
-  transition: border-color var(--t), box-shadow var(--t), background var(--t);
-}
-.composer-box:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 70%, var(--border-strong));
-  background: var(--bg-2);
-  box-shadow: 0 0 0 3px var(--accent-dim), 0 8px 24px color-mix(in srgb, #000 22%, transparent);
-}
-.composer-box textarea { padding-top: 12px; padding-bottom: 12px; }
-.sendbtn {
-  width: 32px;
-  height: 32px;
-  margin-right: 6px;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-.sendbtn:hover:not(:disabled) { transform: translateY(-1px); }
-.composer-footer { padding: 7px 4px 0; }
-.composerinfo { padding-inline: 4px; }
 
 @media (max-width: 320px) {
   .topbar { gap: 5px; padding-inline: 8px; }

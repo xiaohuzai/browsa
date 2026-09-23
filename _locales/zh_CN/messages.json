@@ -40,7 +40,7 @@
     "description": "Auto-attach checkbox"
   },
   "inputPlaceholder": {
-    "message": "问点什么…（Enter 发送，Shift+Enter 换行）",
+    "message": "问点什么…",
     "description": "Composer placeholder"
   },
   "sendButton": {
@@ -1218,5 +1218,104 @@
   "slashPromptDesc": {
     "message": "显示当前生效的系统提示词",
     "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "再次点击确认删除"
+  },
+  "deleteTitle": {
+    "message": "删除消息"
+  },
+  "deleteFailed": {
+    "message": "删除失败，消息已保留"
+  },
+  "sessionLoadFailed": {
+    "message": "会话加载失败"
+  },
+  "quickbarAria": {
+    "message": "快捷操作"
+  },
+  "continueMaxTurns": {
+    "message": "→ 继续"
+  },
+  "retryAction": {
+    "message": "重试"
+  },
+  "quoteTitle": {
+    "message": "引用"
+  },
+  "editResendTitle": {
+    "message": "编辑并重发"
+  },
+  "copyResponseTitle": {
+    "message": "复制回复"
+  },
+  "collapseExpandTitle": {
+    "message": "折叠/展开"
+  },
+  "editSendBtn": {
+    "message": "发送"
+  },
+  "editCancelBtn": {
+    "message": "取消"
+  },
+  "clearChatTitle": {
+    "message": "清空对话"
+  },
+  "clearChatMsg": {
+    "message": "删除全部消息？此操作不可撤销。"
+  },
+  "clearChatConfirm": {
+    "message": "清空"
+  },
+  "clearAllTitle": {
+    "message": "清空全部会话"
+  },
+  "clearAllMsg": {
+    "message": "删除全部已保存会话？此操作不可撤销。"
+  },
+  "clearAllConfirm": {
+    "message": "全部清空"
+  },
+  "sessionDeleted": {
+    "message": "会话已删除"
+  },
+  "sessionRenamed": {
+    "message": "会话已重命名"
+  },
+  "sessionsCleared": {
+    "message": "已清空全部会话"
+  },
+  "sessionLoaded": {
+    "message": "已加载"
+  },
+  "dblClickRename": {
+    "message": "双击重命名"
+  },
+  "exportMarkdown": {
+    "message": "导出为 Markdown"
+  },
+  "relJustNow": {
+    "message": "刚刚"
+  },
+  "copyThinkingTitle": {
+    "message": "复制思考内容"
+  },
+  "multiDeletedOk": {
+    "message": "已删除 $1 条消息"
+  },
+  "multiDeletedPartial": {
+    "message": "已删除 $1 条，$2 条失败（索引已重校准）"
+  },
+  "composerAria": {
+    "message": "消息内容——Enter 发送，Shift+Enter 换行"
+  },
+  "slashAria": {
+    "message": "斜杠命令"
+  },
+  "sessionExportFailed": {
+    "message": "无法加载会话"
+  },
+  "sessionExported": {
+    "message": "会话已导出"
   }
 }

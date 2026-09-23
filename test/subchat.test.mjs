@@ -132,16 +132,25 @@ test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs br
   assert.doesNotMatch(subchatSrc, /getOrCreateHermesSessionId/,
     'SUBCHAT must never reuse the MAIN chat Hermes session id — that would mix the side question into the main agent context');
   assert.match(subchatSrc, /subChatRunIds/, 'run ids must be tracked for server-side cancellation');
-  assert.match(subchatSrc, /\/v1\/runs\/\$\{encodeURIComponent\(runInfo\.runId\)\}\/stop/,
+  // C4 后 /stop 的 fetch 唯一住在 agent-stream-session.js；subchat-handler 只调用。
+  assert.match(subchatSrc, /stopHermesRun\(runInfo\)/, 'abort must fire the shared server-side /stop helper');
+  const agentSrc = await (async () => {
+    const fs = await import('fs/promises');
+    return fs.readFile(new URL('../lib/handlers/agent-stream-session.js', import.meta.url), 'utf8');
+  })();
+  assert.match(agentSrc, /\/v1\/runs\/\$\{encodeURIComponent\(runInfo\.runId\)\}\/stop/,
     'abort must fire the server-side /stop (there is no /cancel route) so a stopped follow-up stops executing tools');
 });
 
 // --------------- SUBCHAT: shares CAPABILITY_HINTS with CHAT -----------------
 
 test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single definition)', async () => {
-  const src = await readBackgroundSrc();
-  const defCount = (src.match(/const CAPABILITY_HINTS = \[/g) || []).length;
+  // C5 后常量住 lib/prompt-assembly.js（单一定义）——pin 跟着搬家，「全局唯一」意图不变。
+  const promptSrc = await readPromptAssemblySrc();
+  const defCount = (promptSrc.match(/const CAPABILITY_HINTS = \[/g) || []).length;
   assert.equal(defCount, 1, 'CAPABILITY_HINTS must be defined exactly once (shared by CHAT and SUBCHAT)');
+  const src = await readBackgroundSrc();
+  assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
   const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /role: 'system', content: capabilityHints/, 'SUBCHAT must prepend the capabilityHints param (background.js\'s CAPABILITY_HINTS) as a system message');
@@ -152,7 +161,7 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
     const fs = await import('fs/promises');
     return fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
   })();
-  assert.match(chatHandlerSrc, /effectiveSystemPrompt = \[[^\]]*capabilityHints/, 'CHAT must still reference capabilityHints');
+  assert.match(chatHandlerSrc, /buildEffectiveSystemPrompt\(all, \{[^}]*capabilityHints/, 'CHAT must still reference capabilityHints (via the shared assembly)');
 });
 
 // --------------- SUBCHAT: must not leak CHOICE_REQUEST into plain text -----
@@ -168,17 +177,22 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
 // effectiveSystemPrompt, never to SUBCHAT's messages.
 
 test('CHOICE_REQUEST instruction is CHAT-only, never included in SUBCHAT', async () => {
-  const src = await readBackgroundSrc();
-  assert.match(src, /const CHOICE_REQUEST_HINT =/, 'CHOICE_REQUEST_HINT must be its own constant');
-  assert.doesNotMatch(CAPABILITY_HINTS_SRC(src), /CHOICE_REQUEST/, 'CAPABILITY_HINTS itself must not mention CHOICE_REQUEST');
+  const promptSrc = await readPromptAssemblySrc();
+  assert.match(promptSrc, /const CHOICE_REQUEST_HINT =/, 'CHOICE_REQUEST_HINT must be its own constant');
+  assert.doesNotMatch(CAPABILITY_HINTS_SRC(promptSrc), /CHOICE_REQUEST/, 'CAPABILITY_HINTS itself must not mention CHOICE_REQUEST');
 
   const subchatSrc = await readSubchatHandlerSrc();
   assert.doesNotMatch(subchatSrc, /CHOICE_REQUEST/, 'SUBCHAT must never reference CHOICE_REQUEST_HINT or the literal string');
 
   const fs = await import('fs/promises');
   const chatHandlerSrc = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
-  assert.match(chatHandlerSrc, /effectiveSystemPrompt = \[[^\]]*choiceRequestHint/, 'CHAT must append choiceRequestHint (background.js\'s CHOICE_REQUEST_HINT) to effectiveSystemPrompt');
+  assert.match(chatHandlerSrc, /buildEffectiveSystemPrompt\(all, \{[^}]*choiceRequestHint/, 'CHAT must append choiceRequestHint (never to SUBCHAT)');
 });
+
+async function readPromptAssemblySrc() {
+  const fs = await import('fs/promises');
+  return fs.readFile(new URL('../lib/prompt-assembly.js', import.meta.url), 'utf8');
+}
 
 function CAPABILITY_HINTS_SRC(src) {
   const start = src.indexOf('const CAPABILITY_HINTS = [');

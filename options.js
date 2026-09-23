@@ -9,6 +9,7 @@ import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 import { providerModelList, resolveBridgeApiKey } from './lib/handlers/provider-resolver.js';
 import { BRIDGE_CARD_LABEL } from './lib/provider-display.js';
 import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
+import { isImeComposing } from './lib/sidepanel/ui-utils.js';
 
 const $ = (id) => document.getElementById(id);
 // i18n convenience — same idiom as sidepanel.js: t() resolves explicit-language
@@ -39,9 +40,9 @@ async function init() {
   // UI Language 下拉：选择即生效（写 storage），watchUiLang 统一重渲染。
   const uiLangSel = $('uiLang');
   if (uiLangSel) {
-    chrome.storage.local.get('uiLang', ({ uiLang }) => { uiLangSel.value = uiLang || 'auto'; });
+    storage.get('uiLang').then((uiLang) => { uiLangSel.value = uiLang || 'auto'; });
     uiLangSel.addEventListener('change', () => {
-      chrome.storage.local.set({ uiLang: uiLangSel.value });
+      storage.set({ uiLang: uiLangSel.value });
     });
   }
   watchUiLang(() => {
@@ -109,7 +110,7 @@ async function saveChatPrefs() {
   if (!Number.isFinite(fs)) fs = 13.5; // empty/invalid range value → keep the default, don't store NaN
   const ss = $('sendShortcut')?.value || 'enter';
   const tac = !!$('thoughtAutoCollapse')?.checked;
-  await chrome.storage.local.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
+  await storage.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
   cachedCfg.fontSize = fs;
   cachedCfg.sendShortcut = ss;
   cachedCfg.thoughtAutoCollapse = tac;
@@ -224,7 +225,7 @@ async function saveAsr() {
     flash('err', tSub('asrPlanUrlRewritten', `已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。`, savedBaseUrl));
   }
   cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
-  await chrome.storage.local.set({ asr: cachedCfg.asr });
+  await storage.set({ asr: cachedCfg.asr });
   flash('ok', tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
 }
 
@@ -287,7 +288,7 @@ function renderProviders() {
           e.stopPropagation();
           if (cachedCfg.localAgentTab === id) return;
           cachedCfg.localAgentTab = id;
-          try { await chrome.storage.local.set({ localAgentTab: id }); } catch (_) {}
+          try { await storage.set({ localAgentTab: id }); } catch (_) {}
           renderProviders();
         });
         return b;
@@ -600,7 +601,9 @@ function buildProviderCard(name, cfg, opts = {}) {
       syncChips();
     };
     chipInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addChips(); }
+      // Enter 即提交口必须过 IME 判定（isImeComposing，与 ui-utils.js 同一约定）：
+      // 输入法确认候选字的 Enter 不能被当成提交——否则候选字上不了屏且半截文本被切成 chip。
+      if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addChips(); }
     });
     chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
     chipsWrap.addEventListener('click', (e) => {
@@ -761,12 +764,12 @@ async function saveCard(name, card) {
       return;
     }
   }
-  await chrome.storage.local.set({ providers: cachedCfg.providers });
+  await storage.set({ providers: cachedCfg.providers });
   delete _pingState[name]; // config changed — ping state no longer valid
-  chrome.storage.local.get('pingStates', ({ pingStates }) => {
+  storage.get('pingStates').then((pingStates) => {
     const updated = { ...(pingStates || {}) };
     delete updated[name];
-    chrome.storage.local.set({ pingStates: updated });
+    storage.set({ pingStates: updated });
   });
   if (wasReserved) {
     // The reserved empty slot just became a real provider: re-render so it
@@ -823,7 +826,7 @@ async function pingCard(name, card) {
             r.url,
             (agents[r.url] || '').trim() || r.agent || '',
           ]));
-          await chrome.storage.local.set({ providers: cachedCfg.providers });
+          await storage.set({ providers: cachedCfg.providers });
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
           for (const row of card.querySelectorAll('.bridge-row')) {
@@ -855,7 +858,7 @@ async function pingCard(name, card) {
     if (!wasReachable && cachedCfg.activeProvider !== name) {
       cachedCfg.activeProvider = name;
       cachedCfg.activeModel = ''; // 首次 Ping 通自动切换：未指定具体模型，用卡上第一个
-      await chrome.storage.local.set({ activeProvider: name, activeModel: '' });
+      await storage.set({ activeProvider: name, activeModel: '' });
       document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       activeNote = _t('setActiveNote', ' — set as active provider');
@@ -871,7 +874,7 @@ async function pingCard(name, card) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
         cachedCfg.providers[name].isHermes = hasRuns;
-        await chrome.storage.local.set({ providers: cachedCfg.providers });
+        await storage.set({ providers: cachedCfg.providers });
       }
       flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]${activeNote}`);
     } else {
@@ -888,9 +891,9 @@ function setBadge(card, state, name) {
   if (name) {
     _pingState[name] = state;
     // Persist to storage so the sidebar dropdown can reflect ping state
-    chrome.storage.local.get('pingStates', ({ pingStates }) => {
+    storage.get('pingStates').then((pingStates) => {
       const updated = { ...(pingStates || {}), [name]: state };
-      chrome.storage.local.set({ pingStates: updated });
+      storage.set({ pingStates: updated });
     });
   }
   const badge = card.querySelector('.provider-badge');
@@ -914,14 +917,14 @@ async function resetCard(name, card) {
   // blank template — a user-added card's "stored default" is just its own
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
-  await chrome.storage.local.set({ providers: cachedCfg.providers });
+  await storage.set({ providers: cachedCfg.providers });
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
   delete _pingState[name];
-  chrome.storage.local.get('pingStates', ({ pingStates }) => {
+  storage.get('pingStates').then((pingStates) => {
     const updated = { ...(pingStates || {}) };
     delete updated[name];
-    chrome.storage.local.set({ pingStates: updated });
+    storage.set({ pingStates: updated });
   });
   renderProviders();
 }
@@ -938,7 +941,7 @@ async function addProvider() {
   while (cachedCfg.providers[`llm-${n}`]) n++;
   const name = `llm-${n}`;
   cachedCfg.providers[name] = { ...BLANK_LLM };
-  await chrome.storage.local.set({ providers: cachedCfg.providers });
+  await storage.set({ providers: cachedCfg.providers });
   renderProviders();
   // Auto-expand + focus the alias field of the newly added card so the user
   // can immediately type a name.
@@ -960,16 +963,16 @@ async function removeProvider(name) {
   if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
   delete _pingState[name];
-  await chrome.storage.local.set({ providers: cachedCfg.providers });
-  chrome.storage.local.get('pingStates', ({ pingStates }) => {
+  await storage.set({ providers: cachedCfg.providers });
+  storage.get('pingStates').then((pingStates) => {
     const updated = { ...(pingStates || {}) };
     delete updated[name];
-    chrome.storage.local.set({ pingStates: updated });
+    storage.set({ pingStates: updated });
   });
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
     cachedCfg.activeModel = '';
-    await chrome.storage.local.set({ activeProvider: 'hermes', activeModel: '' });
+    await storage.set({ activeProvider: 'hermes', activeModel: '' });
   }
   renderProviders();
 }
@@ -980,13 +983,13 @@ function applySystemPrompt() {
   if (!el) return;
   el.value = cachedCfg.systemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? '';
   document.querySelector('button[data-act="save-system-prompt"]')?.addEventListener('click', async () => {
-    await chrome.storage.local.set({ systemPrompt: el.value });
+    await storage.set({ systemPrompt: el.value });
     flash('ok', _t('systemPromptSaved', 'System prompt saved.'));
   });
   document.querySelector('button[data-act="reset-system-prompt"]')?.addEventListener('click', async () => {
     if (!window.confirm(_t('confirmResetSystemPrompt', '恢复默认系统提示词？当前内容将被替换。'))) return;
     el.value = DEFAULT_SYSTEM_PROMPT;
-    await chrome.storage.local.set({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
+    await storage.set({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
     flash('ok', _t('systemPromptReset', 'System prompt reset to default.'));
   });
 }
@@ -996,7 +999,7 @@ function applyReplyLanguage() {
   if (!el) return;
   el.value = cachedCfg.replyLanguage || '';
   document.querySelector('button[data-act="save-reply-language"]')?.addEventListener('click', async () => {
-    await chrome.storage.local.set({ replyLanguage: el.value });
+    await storage.set({ replyLanguage: el.value });
     flash('ok', el.value ? tSub('replyLanguageSet', `Reply language set to "$1".`, el.options[el.selectedIndex]?.text) : _t('replyLanguageAutoSet', 'Reply language: Auto.'));
   });
 }
@@ -1004,11 +1007,11 @@ function applyReplyLanguage() {
 function applyToolbarToggle() {
   const el = $('showSelectionToolbar');
   if (!el) return;
-  chrome.storage.local.get('showSelectionToolbar', ({ showSelectionToolbar }) => {
+  storage.get('showSelectionToolbar').then((showSelectionToolbar) => {
     el.checked = showSelectionToolbar !== false; // default on
   });
   el.addEventListener('change', () => {
-    chrome.storage.local.set({ showSelectionToolbar: el.checked });
+    storage.set({ showSelectionToolbar: el.checked });
     flash('ok', el.checked ? _t('toolbarEnabledFlash', 'Floating toolbar enabled.') : _t('toolbarDisabledFlash', 'Floating toolbar disabled.'));
   });
 }
@@ -1016,11 +1019,11 @@ function applyToolbarToggle() {
 function applyLlmsTxt() {
   const el = $('llmsTxtEnabled');
   if (!el) return;
-  chrome.storage.local.get('llmsTxtEnabled', ({ llmsTxtEnabled }) => {
+  storage.get('llmsTxtEnabled').then((llmsTxtEnabled) => {
     el.checked = llmsTxtEnabled !== false; // default true
   });
   el.addEventListener('change', () => {
-    chrome.storage.local.set({ llmsTxtEnabled: el.checked });
+    storage.set({ llmsTxtEnabled: el.checked });
     flash('ok', el.checked ? _t('llmsTxtOnFlash', 'llms.txt will be included when attaching a page.') : _t('llmsTxtOffFlash', 'llms.txt disabled.'));
   });
 }
@@ -1028,11 +1031,11 @@ function applyLlmsTxt() {
 function applyDeepExtract() {
   const el = $('deepExtractEnabled');
   if (!el) return;
-  chrome.storage.local.get('deepExtractEnabled', ({ deepExtractEnabled }) => {
+  storage.get('deepExtractEnabled').then((deepExtractEnabled) => {
     el.checked = deepExtractEnabled !== false; // default true
   });
   el.addEventListener('change', () => {
-    chrome.storage.local.set({ deepExtractEnabled: el.checked });
+    storage.set({ deepExtractEnabled: el.checked });
     flash('ok', el.checked
       ? _t('deepExtractOnFlash', 'Automatic expand-and-page on incomplete pages enabled.')
       : _t('deepExtractOffFlash', 'Automatic expand-and-page disabled.'));

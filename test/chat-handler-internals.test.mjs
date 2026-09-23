@@ -7,12 +7,21 @@
 // long tool calls with minutes of SSE silence hit the 5-minute idle
 // timeout and get falsely cancelled).
 //
-// handleChat() itself needs a fuller chrome.storage.local mock than any
-// other test file in this suite sets up (see subchat.test.mjs's header
-// comment for the same tradeoff) -- so fetchLlmsTxt is tested directly
-// (exported for this reason) and the CHOICE_REQUEST pieces are
-// tested by replicating the exact literal regex/logic from the source,
-// same convention as test/page-extractor.test.mjs's zero-width-char test.
+// handleChat() itself needs a fuller chrome.storage.local mock than most
+// files want to set up (see subchat.test.mjs's header comment for the same
+// tradeoff) -- so fetchLlmsTxt is tested directly (exported for this reason)
+// and the CHOICE_REQUEST pieces are tested by replicating the exact literal
+// regex/logic from the source, same convention as
+// test/page-extractor.test.mjs's zero-width-char test.
+//
+// 2026-09-23 (C2, behavior over source pins): the source-regex pins that
+// guarded the three REBUILD passes (overflow rebuild / output-cap
+// continuation / timestamp rewrite — assert.match(block/cont/rewrite/contFn/
+// rwFn, …)) were retired: test/chat-rebuild-channels.test.mjs now drives the
+// real handleChat end-to-end and pins those behaviors at the wire request
+// shapes. Source-text pins remain only where the behavior is NOT observable
+// at the wire (the CHOICE_REQUEST + rewrite-gate literal locksteps below, and
+// the _stCont stream-state accumulator semantics — a STREAM_PEEK surface).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -290,18 +299,6 @@ test('chat-handler.js source defines the timestamp-rewrite gate (stay in lockste
   assert.ok(src.includes('fullReply.length > 50'), 'gate requires a non-trivial reply');
 });
 
-test('chat-handler.js wires the silent rewrite + TS_STATUS + v1 fallback (stay in lockstep)', async () => {
-  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
-  assert.ok(src.includes('const doStream = async (opts = {}) =>'),
-    'doStream must accept an opts arg so it can run silently');
-  assert.ok(src.includes('await doStream({ silent: true })'),
-    'the rewrite must invoke doStream silently (deltas swallowed, not pushed to UI)');
-  assert.ok(src.includes("type: 'TS_STATUS'"),
-    'the rewrite must push a TS_STATUS chunk so the side panel shows a transient status');
-  assert.ok(src.includes('keeping original reply'),
-    'on abort/error during the rewrite, v1 must be kept (not discarded)');
-});
-
 test('shouldRewriteTimestamps: triggers on a notes request whose reply lacks timestamps', () => {
   assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '# 概述\n'.repeat(12), userText: '总结一下这个视频' }), true);
   assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'bilibili' }, fullReply: 'a'.repeat(80), userText: 'please summarize' }), true);
@@ -333,17 +330,17 @@ test('shouldRewriteTimestamps: bare mm:ss without brackets does NOT count as pre
 });
 
 // --------------- buildRunsConversationHistory (Hermes /v1/runs) ------------
-// Verifies inline images are preserved as input_image parts (not flattened to
-// text), so XHS / PDF figures / screenshots attached via 📎 reach Hermes.
-// handleChat itself needs a heavier chrome.storage mock than this suite sets
-// up, so the pure helper is tested directly.
+// /v1/runs 契约（2026-09-24 按服务器源码订正）：history content 一律字符串——
+// 多模态 entry 扁平化为文本 + [image] 标记（服务端 str() 数组会把 base64 灌进
+// 提示词，部件也到不了严格层）；partStyle:'responses' 保留 input_* 多模态部件。
+// handleChat 本体需要更重的 chrome.storage mock，纯函数直测。
 
 let _buildRunsConversationHistory;
-async function buildRunsConversationHistory(history) {
+async function buildRunsConversationHistory(history, opts) {
   if (!_buildRunsConversationHistory) {
     ({ buildRunsConversationHistory: _buildRunsConversationHistory } = await import('../lib/handlers/chat-handler.js'));
   }
-  return _buildRunsConversationHistory(history);
+  return _buildRunsConversationHistory(history, opts);
 }
 
 test('buildRunsConversationHistory: plain text turns pass through as strings', async () => {
@@ -359,7 +356,7 @@ test('buildRunsConversationHistory: plain text turns pass through as strings', a
   ]);
 });
 
-test('buildRunsConversationHistory: multimodal user turn keeps image_url -> input_image', async () => {
+test('buildRunsConversationHistory: multimodal turn flattens to text + [image] markers (no base64 leak)', async () => {
   // The exact shape stored by ATTACH_PAGE/ATTACH_PDF_CONFIRM/screenshot: a text
   // block plus one or more {type:'image_url', image_url:{url}} blocks.
   const out = await buildRunsConversationHistory([
@@ -375,48 +372,63 @@ test('buildRunsConversationHistory: multimodal user turn keeps image_url -> inpu
     { role: 'user', content: 'Describe the figures' },
   ]);
   assert.equal(out.length, 3);
-  // First turn: text normalized to input_text, both images become input_image,
-  // order preserved (text first, then images in storage order).
+  // 文本按行拼接、每图降级 [image]；base64 绝不进历史（烧 token 且服务端会 repr）。
   assert.deepEqual(out[0], {
     role: 'user',
-    content: [
-      { type: 'input_text', text: '[Page context]\nURL: https://example.com\n...\n## Figures\n1. Figure 1.1: ...' },
-      { type: 'input_image', image_url: 'data:image/jpeg;base64,FIG1' },
-      { type: 'input_image', image_url: 'data:image/jpeg;base64,FIG2' },
-    ],
+    content: '[Page context]\nURL: https://example.com\n...\n## Figures\n1. Figure 1.1: ...\n[image]\n[image]',
   });
+  assert.ok(!JSON.stringify(out).includes('base64'), 'base64 must never leak into the runs history');
   assert.deepEqual(out[1], { role: 'assistant', content: 'What would you like to know?' });
   assert.deepEqual(out[2], { role: 'user', content: 'Describe the figures' });
 });
 
 test('buildRunsConversationHistory: image-only turn is kept (not dropped, not "[multimodal message]")', async () => {
   // Regression guard for the old text-only flatten, which turned an image-only
-  // turn into the literal '[multimodal message]' placeholder. The image must
-  // survive as an input_image part, and the turn must NOT be filtered out.
+  // turn into the literal '[multimodal message]' placeholder. The turn must
+  // survive as a '[image]' marker string, and must NOT be filtered out.
   const out = await buildRunsConversationHistory([
     { role: 'user', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,ONLY' } }] },
   ]);
   assert.equal(out.length, 1, 'image-only turn must not be dropped');
-  assert.deepEqual(out[0], {
-    role: 'user',
-    content: [{ type: 'input_image', image_url: 'data:image/png;base64,ONLY' }],
-  });
+  assert.deepEqual(out[0], { role: 'user', content: '[image]' });
   assert.notEqual(out[0].content, '[multimodal message]');
 });
 
-test('buildRunsConversationHistory: accepts bare-string image_url shape defensively', async () => {
-  // /v1/responses uses {type:'image_url', image_url:'data:...'} (string, not
-  // nested). Old history or other callers might store that shape; handle it.
+test('buildRunsConversationHistory: accepts bare-string image_url shape; responses branch keeps parts', async () => {
+  // /v1/responses 使用 {image_url:'data:...'} 裸串形——flatten 路径同样识别为图。
   const out = await buildRunsConversationHistory([
     { role: 'user', content: [
       { type: 'text', text: 'look' },
       { type: 'image_url', image_url: 'data:image/png;base64,BARE' },
     ] },
   ]);
-  assert.deepEqual(out[0].content, [
+  assert.deepEqual(out[0].content, 'look\n[image]');
+  // /v1/responses 分支（partStyle:'responses'）保留多模态部件——该 API 的原生
+  // 拼写就是 input_text/input_image，历史图片可达模型。
+  const resp = await buildRunsConversationHistory([
+    { role: 'user', content: [
+      { type: 'text', text: 'look' },
+      { type: 'image_url', image_url: 'data:image/png;base64,BARE' },
+    ] },
+  ], { partStyle: 'responses' });
+  assert.deepEqual(resp[0].content, [
     { type: 'input_text', text: 'look' },
     { type: 'input_image', image_url: 'data:image/png;base64,BARE' },
   ]);
+});
+
+test('buildHermesTurn: image turn uses canonical text/image_url parts (agent pipeline strict enum)', async () => {
+  // 2026-09-24 真机 422 回归钉：agent 管线严格层只认 text/image_url/file，
+  // input_text/input_image 只是入口白名单的别名、/v1/runs 不过归一化。
+  const { buildHermesTurn } = await import('../lib/handlers/chat-handler.js');
+  const turn = buildHermesTurn({ userText: '解释下', images: ['data:image/png;base64,AAA'] }, []);
+  assert.deepEqual(turn.input, [{
+    role: 'user',
+    content: [
+      { type: 'text', text: '解释下' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AAA' } },
+    ],
+  }]);
 });
 
 test('buildRunsConversationHistory: drops empty turns but keeps image-only ones', async () => {
@@ -429,8 +441,7 @@ test('buildRunsConversationHistory: drops empty turns but keeps image-only ones'
   ]);
   assert.equal(out.length, 2);
   assert.equal(out[0].role, 'assistant');
-  assert.equal(out[1].content.length, 1);
-  assert.equal(out[1].content[0].type, 'input_image');
+  assert.equal(out[1].content, '[image]');
 });
 
 test('buildRunsConversationHistory: filters to user/assistant roles only', async () => {
@@ -477,19 +488,20 @@ test('buildHermesTurn: no images -> input is the text, history is built normally
   ]);
 });
 
-test('buildHermesTurn: pasted images go into input as input_image, NOT into conversation_history', async () => {
+test('buildHermesTurn: pasted images go into input as canonical image_url parts, NOT into conversation_history', async () => {
   const out = await buildHermesTurn(
     { userText: 'what color is this?', images: ['data:image/png;base64,A', 'data:image/png;base64,B'] },
     [{ role: 'assistant', content: 'earlier reply' }],
   );
-  // input is a structured user message: text + both images as input_image,
-  // order preserved (text first, then images). NOT a plain string.
+  // input is a structured user message: text + both images as canonical
+  // image_url parts ({url} object form — the agent pipeline's strict enum),
+  // order preserved. NOT a plain string.
   assert.deepEqual(out.input, [{
     role: 'user',
     content: [
-      { type: 'input_text', text: 'what color is this?' },
-      { type: 'input_image', image_url: 'data:image/png;base64,A' },
-      { type: 'input_image', image_url: 'data:image/png;base64,B' },
+      { type: 'text', text: 'what color is this?' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,A' } },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,B' } },
     ],
   }]);
   // conversation_history is just the built prior history -- NO synthetic
@@ -497,23 +509,22 @@ test('buildHermesTurn: pasted images go into input as input_image, NOT into conv
   assert.deepEqual(out.conversationHistory, [{ role: 'assistant', content: 'earlier reply' }]);
 });
 
-test('buildHermesTurn: empty userText with images -> input_text is empty string, image still in input', async () => {
+test('buildHermesTurn: empty userText with images -> text part is empty string, image still in input', async () => {
   const out = await buildHermesTurn({ userText: '', images: ['data:image/png;base64,X'] }, []);
   assert.deepEqual(out.input, [{
     role: 'user',
     content: [
-      { type: 'input_text', text: '' },
-      { type: 'input_image', image_url: 'data:image/png;base64,X' },
+      { type: 'text', text: '' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,X' } },
     ],
   }]);
   assert.deepEqual(out.conversationHistory, []);
 });
 
-test('buildHermesTurn: prior history images preserved in conversation_history, new pasted image in input', async () => {
+test('buildHermesTurn: prior history images degrade to [image] markers, new pasted image rides input', async () => {
   // A prior page-context turn (text + image) is in history; the user now
-  // pastes another image. The prior image stays in conversation_history (via
-  // buildRunsConversationHistory -> input_image); the new pasted image goes in
-  // the current `input`.
+  // pastes another image. /v1/runs 历史只吃字符串（2026-09-24 服务器源码实锤）：
+  // prior 图降级 [image] 标记、不泄 base64；新贴的图走当前 input 的规范部件。
   const out = await buildHermesTurn(
     { userText: 'and this one?', images: ['data:image/png;base64,NEW'] },
     [{
@@ -524,19 +535,16 @@ test('buildHermesTurn: prior history images preserved in conversation_history, n
       ],
     }],
   );
-  // New pasted image is in input, alongside the text question.
   assert.deepEqual(out.input, [{
     role: 'user',
     content: [
-      { type: 'input_text', text: 'and this one?' },
-      { type: 'input_image', image_url: 'data:image/png;base64,NEW' },
+      { type: 'text', text: 'and this one?' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,NEW' } },
     ],
   }]);
-  // Prior turn (text + prior image) preserved in conversation_history.
   assert.equal(out.conversationHistory.length, 1);
-  assert.equal(out.conversationHistory[0].content[0].type, 'input_text');
-  assert.equal(out.conversationHistory[0].content[1].type, 'input_image');
-  assert.equal(out.conversationHistory[0].content[1].image_url, 'data:image/png;base64,PRIOR');
+  assert.equal(out.conversationHistory[0].content, '[Page context]\n[image]');
+  assert.ok(!JSON.stringify(out.conversationHistory).includes('base64'), 'base64 must not leak into history');
 });
 
 test('buildHermesTurn: null/undefined msg -> empty input, built history', async () => {
@@ -638,30 +646,18 @@ test('buildAnthropicMessages: history image_url data URLs convert to base64 imag
 
 
 // --------------- auto-continuation on output-cap truncation ------------------
-// handleChat() 本身不做端到端 mock（见文件头说明），这里按本文件惯例做源级
-// 结构断言：续写块必须存在、必须门控在 replyTruncated、必须静默第二遍、
-// 必须在时间戳重写【之前】执行（重写作用于续写后的全文）。
+// 2026-09-23 (C2): the continuation block's structural pins (gated on
+// replyTruncated, silent second pass, merged-not-replaced, still-truncated
+// re-derived, runs before the timestamp rewrite, per-kind rebuild via
+// turn.continueWith, anti-repetition instruction) were retired — all covered
+// end-to-end by test/chat-rebuild-channels.test.mjs's continuation cases.
+// What stays here is the one thing NOT observable at the wire: the
+// _stCont stream-state accumulator semantics (a STREAM_PEEK surface —
+// mid-turn tab-switch recovery reads `acc`, which no request body exposes).
 
-test('chat-handler: auto-continuation block sits between the retry loop and the timestamp rewrite', async () => {
-  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
-  const contIdx = src.indexOf('Auto-continuation on output-cap truncation');
-  const rewriteIdx = src.indexOf('Auto timestamp rewrite (video notes)');
-  assert.ok(contIdx > 0, 'continuation block must exist');
-  assert.ok(rewriteIdx > contIdx, 'continuation must run BEFORE the timestamp rewrite (rewrite operates on the merged full text)');
-
-  const block = src.slice(contIdx, rewriteIdx);
-  assert.match(block, /if \(replyTruncated && fullReply\)/, 'gated on the truncation flag');
-  assert.match(block, /doStream\(\{ silent: true \}\)/, 'second pass is silent (deltas swallowed, DONE.full replaces the bubble)');
-  assert.match(block, /fullReply = fullReply \+ rc\.full/, 'merged, not replaced (continuation resumes mid-sentence)');
-  assert.match(block, /replyTruncated = rc\.finishReason === 'length'/, 'still-truncated flag re-derived from the continuation leg');
-  assert.match(block, /turn\.continueWith\(/, 'the per-kind rebuild lives in the turn request (Hermes runs-path mirrors the rewrite conversation rebuild there — see turn-request.js continueWith)');
-  assert.match(block, /Do NOT repeat any content already written/, 'anti-repetition instruction present');
-});
-
-test('chat-handler: continuation reuses the silent-second-pass contract (TS_STATUS pushed, acc reset+merged)', async () => {
+test('chat-handler: continuation reuses the silent-second-pass contract (acc reset+merged)', async () => {
   const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
   const block = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(block, /pushChunk\(tabId, \{ type: 'TS_STATUS'/, 'user-visible status while the silent pass runs');
   assert.match(block, /_stCont\.acc = ''/, 'stream-state accumulator reset before the silent pass (no v1+v2 double in PEEK)');
   assert.match(block, /_stCont\.acc = fullReply/, 'acc holds the MERGED text after the continuation (tab-switch PEEK correctness)');
 });
@@ -702,33 +698,11 @@ test('buildTimestampRewriteHistory: falls back to full history when no videoSrc 
   assert.deepEqual(out[3], { role: 'assistant', content: 'a' });
 });
 
-test('chat-handler: rewrite + continuation branches rebuild every apiStyle input', async () => {
-  // 2026-09-20 deepening pass: the per-apiStyle rebuild ladders moved from
-  // chat-handler.js into lib/handlers/turn-request.js (continueWith /
-  // rewriteWith) — chat-handler now CALLS them. The regression this guards
-  // (continuation used to rebuild ONLY the chat-style messages, so
-  // responses/anthropic providers silently resent the original request)
-  // is pinned at the new seam: the turn-request module must branch on every
-  // kind in both methods, and chat-handler must route both passes through it.
-  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
-  const cont = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(cont, /turn\.continueWith\(contInstruction, fullReply\)/, 'continuation must go through the turn request (was chat-only — responses providers resent the original request)');
-  const rewrite = src.slice(src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(rewrite, /turn\.rewriteWith\(rewriteInstruction, rewriteHistory\)/, 'rewrite must go through the turn request');
-  assert.match(rewrite, /buildTimestampRewriteHistory\(history, videoSrc/, 'rewrite history built from the RAW history (aged copy may have stubbed the transcript)');
-
-  const trSrc = await readFile(new URL('../lib/handlers/turn-request.js', import.meta.url), 'utf8');
-  const contFn = trSrc.slice(trSrc.indexOf('t.continueWith ='), trSrc.indexOf('t.rewriteWith ='));
-  assert.match(contFn, /kind === 'responses'/, 'continueWith must rebuild responsesInput');
-  assert.match(contFn, /kind === 'anthropic'/, 'continueWith must rebuild anthropicMessages');
-  assert.match(contFn, /buildMessages\(/, 'continueWith must rebuild chat messages (the final else branch)');
-  assert.match(contFn, /kind === 'hermes'/, 'continueWith must rebuild the runs conversation');
-  const rwFn = trSrc.slice(trSrc.indexOf('t.rewriteWith ='));
-  assert.match(rwFn, /kind === 'responses'/, 'rewriteWith must rebuild responsesInput');
-  assert.match(rwFn, /kind === 'anthropic'/, 'rewriteWith must rebuild anthropicMessages');
-  assert.match(rwFn, /buildMessages\(/, 'rewriteWith must rebuild chat messages (the final else branch)');
-  assert.match(rwFn, /kind === 'hermes'/, 'rewriteWith must rebuild the runs conversation');
-});
+// 2026-09-23 (C2): the "every apiStyle rebuilt" source pins (cont/rewrite in
+// chat-handler + contFn/rwFn per-kind branches in turn-request.js) were
+// retired — the exact regression they guarded (continuation rebuilding ONLY
+// chat messages, so responses/anthropic resent the original request) is now
+// pinned at the wire by test/chat-rebuild-channels.test.mjs, per apiStyle.
 
 // --------------- isContextOverflowError (overflow self-rescue) ---------------
 // The matcher that arms handleChat's one-shot overflow rescue (stub oversized

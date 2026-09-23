@@ -3,13 +3,13 @@
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
-import { getActiveSessionId } from './lib/storage.js';
+import * as storage from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
-import { classifyToolTier } from './lib/sidepanel/tool-tier.js';
+import { createTurnChrome, addProviderChip } from './lib/sidepanel/turn-chrome.js';
 import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
-import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, _findCard, _insertCard, isImeComposing, scheduleIdle } from './lib/sidepanel/ui-utils.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeComposing, scheduleIdle } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, addRichRenderFeatures,
+  renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, finishBubble,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
 } from './lib/sidepanel/render.js';
@@ -43,7 +43,8 @@ import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orc
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
-import { applyI18n, initI18n, watchUiLang, t, tSub } from './lib/i18n.js';
+import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
+import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { AGENT_TURN_MAX_IMAGES, AGENT_TURN_IMAGE_BUDGET_CHARS, imageRejectReason } from './lib/image-budget.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
@@ -67,7 +68,7 @@ const streamRendererOpts = {
     // 异步读 history，fire-and-forget：失败只影响缩略图，不影响正文渲染。
     (async () => {
       try {
-        const { history } = await chrome.storage.local.get('history');
+        const history = await storage.getHistory();
         decorateFigureRefs(el, figuresBeforeEntry(Array.isArray(history) ? history : [], (history || []).length));
       } catch (_) {}
     })();
@@ -108,7 +109,8 @@ const images = [];             // { dataUrl, name } — attached for this turn
 
 // ─── Feature state ────────────────────────────────────────────────────────────
 let sendShortcut = 'enter';       // 'enter' | 'ctrl-enter'
-let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
+// (the first-chunk timestamp for the usage chip's t/s lives on the per-turn
+// `state.startedAt`, not a module global — see wireChatStreamPort)
 // Per-tab conversation DOM snapshot. When the user switches tabs, we save
 // the current messagesEl.innerHTML here and restore it when they switch back.
 // This preserves in-flight streaming replies that haven't been persisted to
@@ -116,6 +118,21 @@ let streamStartAt = 0;            // timestamp of first CHUNK (for tokens/sec)
 // tabStates removed — single global session, no per-tab DOM snapshots needed.
 const clearBtn = $('clear');
 const slashSuggestEl = $('slash-suggest');
+
+// ─── Turn chrome ──────────────────────────────────────────────────────────────
+// The turn-process shell (思考中… Ns wait indicator, .tool-progress line,
+// .tool-history fold, token-usage chip, approval / clarify cards) is shared
+// with detail-thread cards via lib/sidepanel/turn-chrome.js — it used to be
+// ~250 lines of private near-copy in each file, held in lockstep by comments
+// and already drifted (2026-09-23 C8). Only the real per-surface differences
+// are parameterized: the APPROVAL_RESPOND / CLARIFY_RESPOND relay names and the
+// tabId key, PINNED on each card at render time (reading currentTabId at click
+// time mis-targets after a tab switch and orphans the pending entry).
+const turnChrome = createTurnChrome({
+  key: { field: 'tabId', get: () => currentTabId, parse: Number },
+  relay: { approval: 'APPROVAL_RESPOND', clarify: 'CLARIFY_RESPOND' },
+  scope: messagesEl,
+});
 
 init();
 
@@ -133,10 +150,13 @@ async function init() {
   await initI18n();
   applyI18n();
   applyEmptyHint();
+  // <html lang> 跟随界面语言（U11）：写死 zh 会让英文界面被读屏按中文朗读。
+  document.documentElement.lang = currentUiLang();
   // 设置里切换语言：静态文案重填 + provider 下拉按新语言重建（状态随 GET_CONFIG 刷新）。
   watchUiLang(async () => {
     applyI18n();
     applyEmptyHint();
+    document.documentElement.lang = currentUiLang();
     try {
       const res = await sendMessage({ type: 'GET_CONFIG' });
       const cfg = res?.data || res;
@@ -236,7 +256,7 @@ async function init() {
   });
   $('quickbar-toggle')?.addEventListener('click', () => {
     const collapsed = $('quickbar').classList.toggle('collapsed');
-    chrome.storage.local.set({ quickbarCollapsed: collapsed });
+    storage.set({ quickbarCollapsed: collapsed });
   });
   inputEl.addEventListener('input', () => { updateComposerInfo(); updateSlashSuggest(); });
   inputEl.addEventListener('blur', () => setTimeout(() => hideSlashSuggest(), 150));
@@ -562,10 +582,10 @@ async function init() {
   // Show a one-time notice when the extension was just updated.
   // Clears the badge and storage flag so it only appears once.
   try {
-    const { pendingUpdateNotice } = await chrome.storage.local.get('pendingUpdateNotice');
+    const { pendingUpdateNotice } = await storage.get(['pendingUpdateNotice']);
     if (pendingUpdateNotice) {
       appendSystem(`🔄 browsa updated to v${pendingUpdateNotice} — if the floating toolbar doesn't respond on a page, refresh it once.`);
-      await chrome.storage.local.remove('pendingUpdateNotice');
+      await storage.remove('pendingUpdateNotice');
       chrome.action.setBadgeText({ text: '' });
     }
   } catch (_) {}
@@ -1070,12 +1090,12 @@ function hideHistoryUpgradeIndicator() {
 async function newSession() {
   cancelStream(); // 先停流：否则在途回复会在清空后落进新会话
   // Auto-save current conversation if it has messages, then clear
-  const { history } = await chrome.storage.local.get('history');
+  const history = await storage.getHistory();
   const hasMessages = Array.isArray(history) && history.some(m => m.role === 'user' || m.role === 'assistant');
   if (hasMessages) {
     // 会话归属同 loadSession：已归属的对话原地写回，全新对话才新建条目。
     // 之后的 CLEAR_HISTORY 会把归属指针一并清掉（storage.clearHistory）。
-    const activeId = await getActiveSessionId();
+    const activeId = await storage.getActiveSessionId();
     const res = await sendMessage({ type: 'SAVE_SESSION', id: activeId || undefined });
     if (res?.ok && res.data?.session) {
       showToast(tSub('sessionSaved', 'Session saved: "$1"', res.data.session.name), 'success');
@@ -1095,9 +1115,9 @@ async function newSession() {
 
 async function clearChatHistory() {
   const ok = await showConfirmDialog({
-    title: 'Clear conversation',
-    message: 'Delete all messages? This cannot be undone.',
-    confirmLabel: 'Clear',
+    title: _t('clearChatTitle', 'Clear conversation'),
+    message: _t('clearChatMsg', 'Delete all messages? This cannot be undone.'),
+    confirmLabel: _t('clearChatConfirm', 'Clear'),
     danger: true
   });
   if (!ok) return;
@@ -1121,7 +1141,7 @@ async function clearChatHistory() {
  */
 async function reconcileHistoryIdx() {
   try {
-    const { history: h } = await chrome.storage.local.get('history');
+    const h = await storage.getHistory();
     // Anchor on the LOWEST-hidx bubble (attach bubbles are never rendered, so
     // that isn't necessarily index 0) and let the pure planner decide whether
     // the drift is a real front-trim (shift DOM down) or a failed append
@@ -1194,7 +1214,7 @@ function setStreamingUI(on) {
     setStatusDotState('idle');
     messagesEl.setAttribute('aria-live', 'polite');
     messagesEl.removeAttribute('aria-busy');
-    stopWaitingIndicator(); // catch-all: cancel / resume-end / error teardown
+    turnChrome.stopWait(); // catch-all: cancel / resume-end / error teardown
   }
 }
 
@@ -1257,8 +1277,8 @@ function cancelStream() {
     // Clear any transient tool-progress / TS_STATUS indicator so a cancel
     // mid-rewrite (or mid-tool-call) doesn't leave the status lingering
     // above the now-finalized bubble.
-    clearToolProgress(cancelledEl);
-    stopWaitingIndicator();
+    turnChrome.clearToolProgress(cancelledEl);
+    turnChrome.stopWait();
     cancelledRenderStream?.destroy?.();
   }
   activeController = null;
@@ -1555,34 +1575,46 @@ function showNoChunkHint(el, state) {
   }
 }
 
-// Shared `browsa-chat` port message handler, used by BOTH onSend() (a fresh
-// send) and resumeInFlightStream() (reconnecting to a stream already running
-// on the background). These two call sites used to each hand-roll their own
-// near-identical `port.onMessage.addListener(async (m) => {...})` body; a
-// real bug sweep (see test/lib-sidepanel-resume-streaming.test.mjs) found
-// four places where a feature added to onSend()'s copy was never mirrored
-// into resumeInFlightStream()'s (videoSrc stamp, CHOICE_REQUEST buttons, the
-// max-turns "→ 继续" button, and ERROR/ABORTED rendering). Extracting the
-// CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY/DONE/ERROR handling into one function
-// removes the possibility of that class of drift going forward — only the
-// genuinely different bits (RETRY behavior, and what to do right after DONE)
-// stay as caller-supplied hooks.
-//
-//   getEl()        — returns the CURRENT assistant bubble element. For
-//                    onSend() this is just the fixed bubble it created; for
-//                    resumeInFlightStream() it re-resolves on every call
-//                    since a prior panel session's DOM can have been replaced.
-//   getRenderer()  — returns the CURRENT renderStream() closure (may be
-//                    swapped by onRetry/DOM-identity-change).
-//   state          — mutable { acc, toolEvents } shared with the caller.
-//   stopKeepAlive()— clears the caller's SW_PING setInterval.
-//   onRetry(m)     — RETRY handling differs: onSend() wipes the bubble and
-//                    starts a fresh renderer; resume just shows a toast.
-//   afterDone(el)  — extra caller-specific cleanup once DONE has already run
-//                    the shared handling (onSend has none; resume also calls
-//                    setStreamingUI(false)).
-//   onAborted()    — extra caller-specific cleanup on ERROR/ABORTED (resume
-//                    also disconnects its port; onSend does not).
+// ─── StreamTarget ─────────────────────────────────────────────────────────────
+// The (bubble, renderer) pair wireChatStreamPort() streams into:
+//   getEl()          — the CURRENT assistant bubble element
+//   getRenderer()    — the CURRENT makeStreamRenderer() closure
+//   onElementChanged — notified (newEl, newRenderer) when the implementation
+//                      swapped bubbles mid-stream, so the owner can re-point
+//                      its own bookkeeping (activeController)
+// Two implementations, one per call site (C10 — the "DOM identity drift"
+// semantics used to be scattered across both callers' closures):
+//   createFixedStreamTarget — onSend(): the bubble exists from the start and
+//     only the RETRY hook swaps the renderer (through the getRenderer closure).
+//   createDriftingStreamTarget — resumeInFlightStream(): the bubble is
+//     re-resolved on EVERY access (a renderHistory()/innerHTML restore replaces
+//     the whole subtree, so node identity can change mid-stream) and the
+//     renderer is rebuilt on identity change — the abandoned one's paced reveal
+//     is destroyed so it can't keep writing into a detached node.
+function createFixedStreamTarget(el, getRenderer) {
+  return { getEl: () => el, getRenderer, onElementChanged: () => {} };
+}
+
+function createDriftingStreamTarget({ initialEl, resolveEl, makeRenderer, onElementChanged }) {
+  let el = initialEl;
+  let renderer = makeRenderer(initialEl);
+  function ensure() {
+    const cur = resolveEl();
+    if (cur !== el) {
+      renderer?.destroy?.(); // stop the stale-el renderer's paced reveal
+      el = cur;
+      renderer = makeRenderer(el);
+      onElementChanged?.(el, renderer);
+    }
+    return renderer;
+  }
+  return {
+    getEl: () => { ensure(); return el; },
+    getRenderer: () => ensure(),
+    onElementChanged,
+  };
+}
+
 // Sends STREAM_HELLO on `port` and waits for STREAM_HELLO_ACK, with a 500ms
 // safety-net timeout that resolves unconditionally so we never hang. Shared
 // by onSend() (which also calls `onAck` — the `attachChunkListener` wiring
@@ -1604,14 +1636,49 @@ function waitForStreamHelloAck(port, tabId, { onAck } = {}) {
   });
 }
 
-function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAlive, onRetry, afterDone, onAborted }) {
-  startWaitingIndicator(getEl);
+// Shared `browsa-chat` port message handler, used by BOTH onSend() (a fresh
+// send) and resumeInFlightStream() (reconnecting to a stream already running
+// on the background). These two call sites used to each hand-roll their own
+// near-identical `port.onMessage.addListener(async (m) => {...})` body; a
+// real bug sweep (see test/lib-sidepanel-resume-streaming.test.mjs) found
+// four places where a feature added to onSend()'s copy was never mirrored
+// into resumeInFlightStream()'s (videoSrc stamp, CHOICE_REQUEST buttons, the
+// max-turns "→ 继续" button, and ERROR/ABORTED rendering). Extracting the
+// CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY/DONE/ERROR handling into one function
+// removes the possibility of that class of drift going forward — only the
+// genuinely different bits stay as caller-supplied hooks.
+//
+//   port / tabId   — the turn's dedicated port and the tab it streams for.
+//   target         — StreamTarget { getEl, getRenderer, onElementChanged } (see
+//                    above): fixed bubble for onSend, drifting for resume.
+//   state          — mutable { acc, toolEvents, startedAt } shared with the
+//                    caller. startedAt = first-chunk timestamp for the usage
+//                    chip's t/s (resume seeds it from STREAM_PEEK.startedAt so
+//                    the rate reflects the WHOLE stream, not the post-resume
+//                    part).
+//   hooks          — the genuinely caller-specific bits, all optional:
+//     stopKeepAlive()— clears the caller's SW_PING setInterval.
+//     onRetry(m)   — caller-specific RETRY reset, run BEFORE the shared
+//                    ⟳ Retrying… line (onSend() wipes the bubble and starts a
+//                    fresh renderer; resume needs no reset).
+//     afterDone(el)— extra cleanup once DONE has run the shared handling
+//                    (onSend has none; resume also calls setStreamingUI(false)).
+//     onAborted()  — extra cleanup on ERROR/ABORTED (resume also disconnects
+//                    its port; onSend does not).
+function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
+  const {
+    stopKeepAlive = () => {},
+    onRetry = null,
+    afterDone = null,
+    onAborted = null,
+  } = hooks;
+  turnChrome.startWait(target.getEl);
   port.onMessage.addListener(async (m) => {
     if (m.type === 'CHUNK') {
-      stopWaitingIndicator();
-      if (!streamStartAt) streamStartAt = Date.now(); // mark first-token time
+      turnChrome.stopWait();
+      if (!state.startedAt) state.startedAt = Date.now(); // mark first-token time
       state.acc += m.delta;
-      getRenderer()(m.delta, false); // pass delta, not accumulated text
+      target.getRenderer()(m.delta, false); // pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
       // Fence sniff: the instant a diagram fence appears in the stream, warm
       // the multi-MB chart vendors so the render at DONE finds them cached.
@@ -1621,39 +1688,39 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       if (m.delta.includes('`') && wantsChartVendors(state.acc)) preloadChartVendors();
 
     } else if (m.type === 'TOOL_PROGRESS') {
-      stopWaitingIndicator();
+      turnChrome.stopWait();
       state.toolEvents.push(m.text);
-      showToolProgress(getEl(), m.text);
+      turnChrome.showToolProgress(target.getEl(), m.text);
 
     } else if (m.type === 'TS_STATUS') {
-      stopWaitingIndicator();
+      turnChrome.stopWait();
       // Transient status from the background's auto timestamp-rewrite
       // (video notes whose first reply lacked [mm:ss]). Shown like
       // tool-progress but NOT recorded into toolEvents, so DONE's
       // renderToolHistory won't render it as a tool event; DONE's
-      // existing clearToolProgress removes it.
-      showToolProgress(getEl(), m.text, 'warn');
+      // existing clearTurnChrome removes it.
+      turnChrome.showToolProgress(target.getEl(), m.text, 'warn');
 
     } else if (m.type === 'APPROVAL') {
-      stopWaitingIndicator();
-      showApprovalCard(getEl(), m.data);
+      turnChrome.stopWait();
+      turnChrome.showApprovalCard(target.getEl(), m.data);
 
     } else if (m.type === 'CLARIFY') {
-      stopWaitingIndicator();
-      showClarifyCard(getEl(), m.data);
+      turnChrome.stopWait();
+      turnChrome.showClarifyCard(target.getEl(), m.data);
 
     } else if (m.type === 'RETRY') {
-      onRetry(m);
+      // Caller-specific reset first (onSend wipes the bubble + rebuilds the
+      // renderer), then the shared retry line both call sites show.
+      onRetry?.(m);
+      turnChrome.showToolProgress(target.getEl(), `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
 
     } else if (m.type === 'DONE') {
-      const el = getEl();
-      const r = getRenderer();
-      stopWaitingIndicator();
-      clearToolProgress(el);
-      _findCard(el, 'approval-card')?.remove();
-      _findCard(el, 'clarify-card')?.remove();
+      const el = target.getEl();
+      const r = target.getRenderer();
+      turnChrome.clearTurnChrome(el); // wait indicator + tool-progress line + pending agent cards
       if (state.toolEvents.length > 0) {
-        renderToolHistory(el, state.toolEvents);
+        turnChrome.renderToolHistory(el, state.toolEvents);
         state.toolEvents = [];
       }
       const finalText = m.full || state.acc;
@@ -1663,16 +1730,19 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       hidxAssign(el); // assistant turn stored in background
       el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
       await r(finalText, true);
-      // linkifyTimestamps already ran inside renderStream's isDone path;
-      // stamp the video source (carried in the DONE chunk by the chat
-      // handler) so the clickable [mm:ss] markers know which tab/URL to seek.
+      // finishBubble（decorate/linkify/thinkCopy/richRender）已在 renderStream
+      // 的 isDone 路径里跑完（C3）；这里只补站点差异——videoSrc 落戳（[mm:ss]
+      // 点击时才知道 seek 哪个 tab/URL）。
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
-      addRichRenderFeatures(el);
-      if (m.providerLabel) addProviderLabel(el, m.providerLabel);
+      if (m.providerLabel) addProviderChip(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
-      // Show token usage if the provider returned it
-      if (m.usage) showTokenUsage(el, m.usage);
+      // Show token usage if the provider returned it — explicit timer start
+      // (state.startedAt), de-duplicated per bubble inside showTokenUsage.
+      if (m.usage) {
+        turnChrome.showTokenUsage(el, m.usage, state.startedAt);
+        state.startedAt = 0;
+      }
       // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
       // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
       if (m.outputTruncated) {
@@ -1684,7 +1754,7 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
       // Detect max-turns: agent hit the tool-call ceiling and is asking
       // the user to continue. Show a one-click Continue button.
       if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
-        appendMsgAction(el, '→ 继续', () => { inputEl.value = '继续'; onSend(); });
+        appendMsgAction(el, _t('continueMaxTurns', '→ 继续'), () => { inputEl.value = '继续'; onSend(); });
       }
       stopKeepAlive();
       try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
@@ -1702,11 +1772,11 @@ function wireChatStreamPort({ port, tabId, getEl, getRenderer, state, stopKeepAl
     } else if (m.type === 'ERROR') {
       // Only ABORTED reaches here — real errors are re-thrown by background
       // and handled via the !res.ok block below (no pushChunk for real errors).
-      stopWaitingIndicator();
+      turnChrome.stopWait();
       stopKeepAlive();
-      getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
+      target.getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
       if (m.code === 'ABORTED') {
-        const r = getRenderer();
+        const r = target.getRenderer();
         await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
       }
       // The background never disconnects the port after pushing ERROR —
@@ -1729,7 +1799,12 @@ async function onSend() {
   }
   const rawText = inputEl.value.trim();
 
-  if (!rawText) return;
+  if (!rawText) {
+    // 纯图发送合法（2026-09-24 真机 bug：空文本门把「只发图」挡死）。
+    // followup 队列只承载文字（图无法随队列重发）——流式期间的纯图不排队不动。
+    if (!images.length) return;
+    if (activeController && !activeController.cancelled) return;
+  }
 
   // Chart vendors are no longer pre-warmed on every send (2026-09-23): the
   // CHUNK handler below warms them the moment a diagram fence actually
@@ -1784,7 +1859,7 @@ async function onSend() {
 
   // User bubble — show the original slash command, not the expanded prompt
   lastSentRaw = rawText;
-  pushInputHistory(rawText); // ↑ recall list
+  if (rawText) pushInputHistory(rawText); // ↑ recall list（纯图轮不进召回）
   const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
   const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
   hidxAssign(userBubble); // user turn stored in background CHAT handler
@@ -1799,9 +1874,13 @@ async function onSend() {
 
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('');
-  const state = { acc: '', toolEvents: [] };   // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel
+  // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel;
+  // startedAt is the first-chunk timestamp for the usage chip's t/s.
+  const state = { acc: '', toolEvents: [], startedAt: 0 };
   let renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
-  streamStartAt = 0; // reset for tokens/sec calculation
+  // StreamTarget: one FIXED bubble for this turn — the renderer is swapped
+  // only through the RETRY hook below (which reassigns renderStream).
+  const target = createFixedStreamTarget(assistantEl, () => renderStream);
 
   // Open streaming port FIRST so the background can push CHUNKs as they
   // arrive. We pass the port's name to the background via msg.port; the
@@ -1826,25 +1905,27 @@ async function onSend() {
     wireChatStreamPort({
       port,
       tabId: currentTabId,
-      getEl: () => assistantEl,
-      getRenderer: () => renderStream,
+      target,
       state,
-      stopKeepAlive: () => clearInterval(_swPingInterval),
-      onRetry: (m) => {
-        // Background is retrying. Reset accumulator and renderer so the bubble
-        // shows only the new attempt's content, not stale content from the failed one.
-        state.acc = '';
-        state.toolEvents = [];
-        outputTokens = 0;
-        // Remove any stale live-think block from the previous attempt.
-        // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
-        const prevSib = assistantEl.previousElementSibling;
-        if (prevSib?.classList.contains('live-think')) prevSib.remove();
-        assistantEl.innerHTML = '';
-        renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
-        renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
-        if (activeController) activeController.renderStream = renderStream;
-        showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
+      hooks: {
+        stopKeepAlive: () => clearInterval(_swPingInterval),
+        onRetry: (m) => {
+          // Background is retrying. Reset accumulator and renderer so the bubble
+          // shows only the new attempt's content, not stale content from the failed one.
+          state.acc = '';
+          state.toolEvents = [];
+          outputTokens = 0;
+          // Remove any stale live-think block from the previous attempt.
+          // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
+          const prevSib = assistantEl.previousElementSibling;
+          if (prevSib?.classList.contains('live-think')) prevSib.remove();
+          assistantEl.innerHTML = '';
+          renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
+          renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
+          if (activeController) activeController.renderStream = renderStream;
+          // (the shared "⟳ Retrying…" line is rendered by wireChatStreamPort
+          // right after this hook returns)
+        },
       },
     });
   }
@@ -1891,7 +1972,7 @@ async function onSend() {
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
-      appendMsgAction(assistantEl, '重试', () => {
+      appendMsgAction(assistantEl, _t('retryAction', '重试'), () => {
         if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
       }, ICONS.retry);
       if (res.hint) appendSystem(res.hint);
@@ -1909,7 +1990,7 @@ async function onSend() {
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
-    appendMsgAction(assistantEl, '重试', () => {
+    appendMsgAction(assistantEl, _t('retryAction', '重试'), () => {
       if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
     }, ICONS.retry);
     reconcileHistoryIdx();
@@ -1952,10 +2033,9 @@ async function resumeInFlightStream(tabId) {
     // (called by onActivated / init) has shown it. Nothing to do.
     return;
   }
-  // Seed streamStartAt from the real stream origin so tokens/sec in
-  // showTokenUsage() reflects total stream duration, not just the
-  // post-resume portion.
-  streamStartAt = peek.startedAt || Date.now();
+  // Seed the usage chip's timer from the real stream origin so tokens/sec
+  // reflects total stream duration, not just the post-resume portion.
+  const startedAt = peek.startedAt || Date.now();
   // From here, the background is still streaming. The DOM is whatever
   // the previous panel session left behind (or just renderHistory()
   // output if the panel was opened fresh). We need to:
@@ -1971,10 +2051,7 @@ async function resumeInFlightStream(tabId) {
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
   // Same SW keep-alive as the onSend path — resumed streams face identical risk.
   const _swPingInterval = startSwPingKeepAlive(port);
-  const state = { acc: peek.acc || '', toolEvents: [] };
-  const initialBubble = getOrCreateAssistantBubble();
-  let renderStream = makeStreamRenderer(initialBubble, streamRendererOpts);
-  let assistantEl = initialBubble;
+  const state = { acc: peek.acc || '', toolEvents: [], startedAt };
   function getOrCreateAssistantBubble() {
     // Reuse the tail assistant bubble only when it is the very last `.msg`.
     // Deliberately NOT `.msg.assistant:last-of-type` — that pseudo-class
@@ -1995,30 +2072,35 @@ async function resumeInFlightStream(tabId) {
     const el = (tail && tail.classList.contains('assistant')) ? tail : appendAssistant('');
     return el;
   }
-  function ensureAssistantEl() {
+  function resolveAssistantEl() {
     // The DOM node identity may have changed (innerHTML restore
-    // replaces the whole subtree). Re-resolve on every chunk.
+    // replaces the whole subtree). Re-resolve on every access.
     let el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
     if (!el) el = appendAssistant('');
-    if (el !== assistantEl) {
-      // Switch the stream renderer's target. makeStreamRenderer
-      // holds a closure over the original el — that one's renderStream
-      // function is now stale. Build a new renderer for the fresh el.
-      assistantEl = el;
-      renderStream.destroy?.(); // stop the stale-el renderer's paced reveal
-      renderStream = makeStreamRenderer(el, streamRendererOpts);
-      if (activeController) { activeController.el = assistantEl; activeController.renderStream = renderStream; }
-    }
-    return renderStream;
+    return el;
   }
+  // StreamTarget: DRIFTING — re-resolves the bubble on every access and
+  // rebuilds the renderer on identity change (see createDriftingStreamTarget).
+  // The INITIAL bubble goes through getOrCreateAssistantBubble's tail guard
+  // (never adopt the previous reply's bubble); later drift re-resolves by
+  // node identity the way this path always has.
+  const target = createDriftingStreamTarget({
+    initialEl: getOrCreateAssistantBubble(),
+    resolveEl: resolveAssistantEl,
+    makeRenderer: (el) => makeStreamRenderer(el, streamRendererOpts),
+    onElementChanged: (el, renderer) => {
+      // Re-point the controller's bookkeeping at the swapped bubble/renderer.
+      if (activeController) { activeController.el = el; activeController.renderStream = renderer; }
+    },
+  });
   // Pre-render the accumulated text from the PEEK. This is the only
   // place this initial text is rendered — the background's STREAM_HELLO
   // does NOT push a drain chunk (see background.js for why). Subsequent
   // CHUNKs are pure new deltas; state.acc += m.delta inside
   // wireChatStreamPort is correct because we seed state.acc from
   // peek.acc, not ''.
-  if (state.acc) renderStream(state.acc, false);
-  if (peek.providerLabel) addProviderLabel(assistantEl, peek.providerLabel);
+  if (state.acc) target.getRenderer()(state.acc, false);
+  if (peek.providerLabel) addProviderChip(target.getEl(), peek.providerLabel);
   // HELLO the background so it knows this port owns the stream now.
   // Wait for ACK so any in-flight delta that's about to fire from the
   // LLM (after the PEEK/HELLO race window) goes to a port that's
@@ -2026,27 +2108,25 @@ async function resumeInFlightStream(tabId) {
   await waitForStreamHelloAck(port, tabId);
   // The DONE/ERROR/CHUNK/TOOL_PROGRESS/APPROVAL/CLARIFY handling itself is
   // shared with onSend() via wireChatStreamPort — see its doc comment. Only
-  // the genuinely different bits stay here: RETRY is just a toast (no bubble
-  // reset, unlike onSend()'s), afterDone also calls setStreamingUI(false)
-  // (onSend()'s own port.onDisconnect already does that; this path's
-  // onDisconnect fires on user-Esc/cleanup, not on a normal DONE), and
-  // onAborted additionally disconnects the port (onSend()'s ABORTED branch
-  // relies on the background having already disconnected first).
+  // the genuinely different bits live in the hooks: afterDone also calls
+  // setStreamingUI(false) (onSend()'s own port.onDisconnect already does that;
+  // this path's onDisconnect fires on user-Esc/cleanup, not on a normal DONE),
+  // and onAborted additionally disconnects the port (onSend()'s ABORTED branch
+  // relies on the background having already disconnected first). No onRetry
+  // reset is needed here — wireChatStreamPort's shared ⟳ line covers it.
   wireChatStreamPort({
     port,
     tabId,
-    getEl: () => { ensureAssistantEl(); return assistantEl; },
-    getRenderer: () => ensureAssistantEl(),
+    target,
     state,
-    stopKeepAlive: () => clearInterval(_swPingInterval),
-    onRetry: (m) => {
-      showToolProgress(assistantEl, `⟳ Retrying… (attempt ${m.attempt}/${m.maxAttempts})`, 'warn');
-    },
-    afterDone: () => {
-      setStreamingUI(false);
-    },
-    onAborted: () => {
-      try { port.disconnect(); } catch (_) {}
+    hooks: {
+      stopKeepAlive: () => clearInterval(_swPingInterval),
+      afterDone: () => {
+        setStreamingUI(false);
+      },
+      onAborted: () => {
+        try { port.disconnect(); } catch (_) {}
+      },
     },
   });
   port.onDisconnect.addListener(() => {
@@ -2063,7 +2143,7 @@ async function resumeInFlightStream(tabId) {
   // sends STREAM_RELEASE; the background keeps streaming but no chunks
   // reach us, and PEEK stops returning in-flight. Reasonable trade-off
   // for v0.20.4; v0.20.5 will plumb an AbortController through.
-  activeController = { port, cancelled: false, tabId, resumed: true, el: assistantEl, renderStream };
+  activeController = { port, cancelled: false, tabId, resumed: true, el: target.getEl(), renderStream: target.getRenderer() };
 }
 
 /**
@@ -2356,7 +2436,7 @@ async function retargetVideoSrcToLiveTab(vs) {
 // carries the `## 字幕` block as [mm:ss] lines.
 async function getVideoTranscriptSource() {
   try {
-    const { history } = await chrome.storage.local.get('history');
+    const history = await storage.getHistory();
     const list = Array.isArray(history) ? history : [];
     for (let i = list.length - 1; i >= 0; i--) {
       const m = list[i];
@@ -2428,6 +2508,11 @@ function appendAssistant(initial, done = false) {
  * assistant, plain text for user) — used for history content matching.
  */
 function addMsgActions(el, getRaw) {
+  // 图标按钮的无障碍命名：title 与 aria-label 同源（U10）。
+  const labelIconBtn = (btn, key, fallback) => {
+    btn.title = _t(key, fallback);
+    btn.setAttribute('aria-label', btn.title);
+  };
   if (el.querySelector('.msg-actions')) return; // idempotent
   const wrap = document.createElement('div');
   wrap.className = 'msg-actions';
@@ -2435,7 +2520,7 @@ function addMsgActions(el, getRaw) {
   // Reply / quote
   const replyBtn = document.createElement('button');
   replyBtn.className = 'msg-action-icon';
-  replyBtn.title = 'Quote';
+  labelIconBtn(replyBtn, 'quoteTitle', 'Quote');
   replyBtn.innerHTML = ICONS.reply;
   replyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -2451,26 +2536,42 @@ function addMsgActions(el, getRaw) {
   // Delete
   const delBtn = document.createElement('button');
   delBtn.className = 'msg-action-icon delete-icon';
-  delBtn.title = 'Delete message';
+  labelIconBtn(delBtn, 'deleteTitle', 'Delete message');
   delBtn.innerHTML = ICONS.trash;
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
     // Serialise: ignore rapid concurrent clicks to prevent index races.
     if (deleteLock) return;
+    // 两步 armed（同会话删除的既有形态）：首击武装 2s、再击才删；Ctrl/Cmd+click 直删。
+    if (!delBtn.classList.contains('armed') && !(e.ctrlKey || e.metaKey)) {
+      delBtn.classList.add('armed');
+      labelIconBtn(delBtn, 'deleteConfirmTitle', '再次点击确认删除');
+      setTimeout(() => {
+        delBtn.classList.remove('armed');
+        labelIconBtn(delBtn, 'deleteTitle', 'Delete message');
+      }, 2000);
+      return;
+    }
     deleteLock = true;
     const idx = parseInt(el.dataset.hidx, 10);
-    el.remove(); // optimistic DOM removal
     try {
-      if (!isNaN(idx)) {
+      if (isNaN(idx)) {
+        // 不在 storage 里的气泡（如未落库的空泡）：直接移除 DOM。
+        el.remove();
+      } else {
         const res = await sendMessage({ type: 'REMOVE_HISTORY_ENTRY_BY_INDEX', index: idx }).catch(() => null);
         // 真判据在 envelope 的 data.ok 里——res.ok 只是「handler 没抛异常」，
         // 索引超界时 storage 静默返回 ok:false，误当成功会平移错所有 hidx。
         if (res?.data?.ok) {
+          // 确认成功才动 DOM。失败时气泡必须留在屏上：storage 条目还在，
+          // 删了 DOM 会在 reload 后复活（multiselect 同款兜底，单删此前缺失）。
+          el.remove();
           // Confirmed: shift indices of all remaining bubbles after the deleted slot.
           hidxShiftAfter(idx);
         } else {
           // Removal failed (index out of range or storage error) — resync.
           reconcileHistoryIdx();
+          showToast(_t('deleteFailed', '删除失败，消息已保留'), 'error');
         }
       }
     } finally {
@@ -2486,7 +2587,7 @@ function addMsgActions(el, getRaw) {
   if (el.classList.contains('user')) {
     const editBtn = document.createElement('button');
     editBtn.className = 'msg-action-icon';
-    editBtn.title = 'Edit & resend';
+    labelIconBtn(editBtn, 'editResendTitle', 'Edit & resend');
     editBtn.innerHTML = ICONS.edit;
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2501,7 +2602,7 @@ function addMsgActions(el, getRaw) {
     // flow edit&resend uses, just without letting the user touch the text).
     const regenBtn = document.createElement('button');
     regenBtn.className = 'msg-action-icon';
-    regenBtn.title = _t('regenTitle', 'Regenerate response');
+    labelIconBtn(regenBtn, 'regenTitle', 'Regenerate response');
     regenBtn.innerHTML = ICONS.retry;
     regenBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2512,7 +2613,7 @@ function addMsgActions(el, getRaw) {
 
     const copyBtn = document.createElement('button');
     copyBtn.className = 'msg-action-icon';
-    copyBtn.title = 'Copy response';
+    labelIconBtn(copyBtn, 'copyResponseTitle', 'Copy response');
     copyBtn.innerHTML = ICONS.copy;
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -2554,7 +2655,7 @@ function addMsgActions(el, getRaw) {
     // guessing to get wrong.
     const foldBtn = document.createElement('button');
     foldBtn.className = 'msg-action-icon fold-btn';
-    foldBtn.title = 'Collapse/expand';
+    labelIconBtn(foldBtn, 'collapseExpandTitle', 'Collapse/expand');
     foldBtn.innerHTML = ICONS.chevron;
     foldBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2606,6 +2707,10 @@ async function regenerateReply(userBubble) {
     sib.remove();
     sib = next;
   }
+  // 旧 user 气泡必须一并移除：onSend 会新建一条并 hidxAssign 出同一个 idx，
+  // 留着旧泡就是两条同 hidx 气泡争同一 storage 槽（删任一条都会删错条目）。
+  // 旧泡上的附件图也随 storage 截断一起没了，留着反而与历史分叉。
+  userBubble.remove();
   hidxResetTo(idx);
 
   // onSend() reads the composer as its input source; preserve whatever is
@@ -2642,11 +2747,11 @@ function startMsgEdit(el) {
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'msg-edit-save';
-  saveBtn.textContent = 'Send';
+  saveBtn.textContent = _t('editSendBtn', 'Send');
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'msg-edit-cancel';
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = _t('editCancelBtn', 'Cancel');
 
   bar.append(saveBtn, cancelBtn);
 
@@ -2663,15 +2768,10 @@ function startMsgEdit(el) {
   saveBtn.addEventListener('click', async () => {
     const newText = textarea.value.trim();
     if (!newText) return;
-    // Update the bubble
-    el.dataset.raw = newText;
-    const newSpan = document.createElement('span');
-    newSpan.className = 'msg-text';
-    newSpan.textContent = newText;
-    textarea.replaceWith(newSpan);
-    bar.remove();
-
     const idx = parseInt(el.dataset.hidx, 10);
+
+    // 先截 storage、成功了才动 DOM：失败时保持编辑态——否则气泡显示新文本
+    // 而 storage 仍是旧的（toast 说「未保存修改」界面却像已保存）。
     if (!isNaN(idx)) {
       // Cancel any in-flight stream before truncating history — otherwise
       // the old port's CHUNK/DONE events would land on the new turn and
@@ -2687,12 +2787,15 @@ function startMsgEdit(el) {
         sib.remove();
         sib = next;
       }
-      hidxResetTo(idx); // will be re-assigned when CHAT handler stores new turns
     }
+    // 旧气泡一并移除，由 onSend 的新气泡取代（同 regenerateReply）：留着旧泡
+    // 就是两条同 hidx 气泡争同一 storage 槽。
+    el.remove();
+    if (!isNaN(idx)) hidxResetTo(idx); // will be re-assigned when CHAT handler stores new turns
     // Re-send as new turn
     lastSentRaw = newText;
     inputEl.value = newText;
-    onSend();
+    await onSend();
   });
 
   textarea.addEventListener('keydown', (e) => {
@@ -3214,17 +3317,15 @@ function scrollToBottom(force = false) {
 
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────
 async function showEffectivePrompt() {
-  const cfg = await chrome.storage.local.get(null);
-
-  // Replicate the same logic as background.js buildEffectivePrompt
-  const base = cfg.systemPrompt || '';
-  const langMap = { en: 'Please always respond in English.', zh: '请始终用中文回答。', ja: '常に日本語で回答してください。', ko: '항상 한국어로 답변해 주세요.', de: 'Bitte antworte immer auf Deutsch.', fr: 'Veuillez toujours répondre en français.', es: 'Por favor, responde siempre en español.' };
-  const langExtra = langMap[cfg.replyLanguage] || '';
-
-  const sections = [
-    base && { label: 'Base system prompt', text: base },
-    langExtra && { label: 'Language instruction', text: langExtra },
-  ].filter(Boolean);
+  // C5：所见即所发——分节视图与发送组装共用 prompt-assembly 的同一套零件
+  //（此前是不完整镜像：缺 capabilityHints 与 choiceRequestHint，用户看到的
+  // 比实际发出的少两块）。定点读两个键，不 get(null)（会全量反序列化
+  // history/savedSessions 的重键）。
+  const cfg = await storage.get(['systemPrompt', 'replyLanguage']);
+  const sections = effectiveSystemPromptSections(cfg, {
+    capabilityHints: CAPABILITY_HINTS,
+    choiceRequestHint: CHOICE_REQUEST_HINT,
+  });
 
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
@@ -3294,7 +3395,7 @@ async function renderHistory() {
   disposeChartObservers(); // chart/markmap ResizeObservers hold strong refs to the DOM we're about to wipe
   messagesEl.innerHTML = '';
   messagesEl.classList.remove('cv-settled');
-  const { history } = await chrome.storage.local.get('history');
+  const history = await storage.getHistory();
   const list = Array.isArray(history) ? history : [];
   hidxResetTo(list.length); // keep local mirror in sync with storage
 
@@ -3393,10 +3494,8 @@ async function renderHistory() {
     const runUpgrade = async ({ el, rawContent, figs, providerLabel }) => {
       const html = await renderSafe(rawContent);
       el.innerHTML = html;
-      decorateLinks(el);
-      linkifyTimestamps(el);
+      finishBubble(el); // innerHTML 重建后全部装饰重跑（C3 单一收尾）
       decorateFigureRefs(el, figs);
-      addRichRenderFeatures(el); // re-wires copy buttons on the upgraded content
       // el.innerHTML above wipes out the .msg-actions row appended during the
       // sync pass (it's a child of el, not a sibling) — re-add it here.
       // addMsgActions is idempotent (no-ops if .msg-actions already present),

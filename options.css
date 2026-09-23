@@ -30,18 +30,20 @@ body {
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%),
+    var(--bg);
   color: var(--fg);
   padding: 36px 24px 80px;
   -webkit-font-smoothing: antialiased;
 }
 
 main {
-  max-width: 660px;
+  max-width: 720px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* ── Page header ─────────────────────────────────────────────────────────── */
@@ -49,8 +51,6 @@ main {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 0 20px;
-  margin-bottom: 8px;
   /* Stitched-line divider — same visual vocabulary as the sidepanel's Rail
      signature element, echoed here as a horizontal binding line rather than
      a plain hairline border. */
@@ -62,18 +62,22 @@ main {
   background-position: bottom;
   background-size: 100% 2px;
   background-repeat: no-repeat;
+  padding: 4px 2px 22px;
+  margin-bottom: 6px;
 }
 .page-header .logo {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
+  width: 42px;
+  height: 42px;
+  /* 12px 介于 theme.css 的 --radius(10px) 与 --radius-lg(14px) 之间，三档无等值档；
+     合并要求计算样式严格等价，从 --radius-lg 派生保持 12px，不向档位对齐（那是视觉变化）。 */
+  border-radius: calc(var(--radius-lg) - 2px);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .page-header h1 {
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 19px;
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: .01em;
   line-height: 1.2;
 }
 .page-header .subtitle {
@@ -91,25 +95,28 @@ main {
 
 /* ── Section cards ────────────────────────────────────────────────────────── */
 /* "Tab" language, not the generic all-around-border-plus-shadow SaaS card:
-   a colored top rule (like a binder-tab divider) instead of a full border. */
+   a binder-tab divider top rule (heavier hairline) instead of a full heavy
+   border. 并块约束：refinement 块的 border-color 四边简写把顶条从 accent 压成
+   了同色细线——合并后计算样式等价于此，勿改回 accent。 */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-top: 3px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-top-width: 2px;
   border-radius: var(--radius);
   padding: 0;
+  box-shadow: 0 5px 18px color-mix(in srgb, #000 10%, transparent);
   /* overflow visible, not hidden: the ? tooltip bubbles (which open below
      their icon and can be taller than the card) must never be clipped. */
   overflow: visible;
 }
 
 .card-header {
-  padding: 14px 20px 13px;
+  padding: 15px 21px 14px;
   border-bottom: 1px solid var(--border);
 }
 
 .card-body {
-  padding: 16px 20px;
+  padding: 18px 21px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -117,9 +124,9 @@ main {
 
 .card h2 {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: .09em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -164,6 +171,7 @@ main {
   gap: 1px;
   background: var(--border);
   border-radius: calc(var(--radius) - 1px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
   overflow: hidden;
 }
 
@@ -211,7 +219,7 @@ main {
 .local-agent-tab.on.configured::after { background: #fff; }
 
 .provider-group-header {
-  padding: 9px 14px;
+  padding: 10px 14px;
   /* An elevated surface strip distinct from both the page (--bg) and the
      hairline-gap grid of cards (--border) — NOT the border color itself:
      an earlier `var(--surface-2, var(--border))` reference pointed at a
@@ -334,9 +342,10 @@ details.provider-group[open] > .provider-group-header::before {
   font: inherit;
   font-size: 13px;
   padding: 7px 10px;
-  border: 1px solid var(--border);
+  min-height: 36px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
   color: var(--fg);
   width: 100%;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -425,9 +434,10 @@ details.provider-group[open] > .provider-group-header::before {
   font: inherit;
   font-size: 13px;
   padding: 7px 10px;
-  border: 1px solid var(--border);
+  min-height: 36px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
   color: var(--fg);
   width: 100%;
   box-sizing: border-box;
@@ -698,9 +708,10 @@ textarea {
   font-size: 12px;
   line-height: 1.6;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  min-height: 36px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
   color: var(--fg);
   width: 100%;
   resize: vertical;
@@ -737,6 +748,7 @@ button.primary {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 button.primary:hover {
   filter: brightness(1.1);
@@ -1004,7 +1016,8 @@ input[type="range"] { accent-color: var(--accent); }
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  padding: 10px 4px;
+  padding: 12px 6px;
+  border-radius: var(--radius-sm);
   user-select: none;
   list-style: none;
   display: flex;
@@ -1021,62 +1034,14 @@ input[type="range"] { accent-color: var(--accent); }
 .advanced-section[open] .advanced-summary::after {
   transform: rotate(90deg);
 }
-.advanced-summary:hover { color: var(--fg-2); }
+.advanced-summary:hover { color: var(--fg-2); background: var(--hover-bg); }
 .advanced-section[open] .advanced-summary { color: var(--fg-2); }
 
-/* ─── Visual refinement pass: settings as a calm control room ──────────── */
-body {
-  background:
-    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 34%),
-    var(--bg);
-}
-main { max-width: 720px; gap: 14px; }
-.page-header {
-  padding: 4px 2px 22px;
-  margin-bottom: 6px;
-}
-.page-header .logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  box-shadow: 0 5px 16px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.page-header h1 {
-  font-family: 'Space Grotesk', -apple-system, sans-serif;
-  font-size: 21px;
-  letter-spacing: .01em;
-}
-.card {
-  border-color: color-mix(in srgb, var(--border) 72%, transparent);
-  border-top-width: 2px;
-  box-shadow: 0 5px 18px color-mix(in srgb, #000 10%, transparent);
-}
-.card-header { padding: 15px 21px 14px; }
-.card-body { padding: 18px 21px 20px; }
-.card h2 { font-size: 11px; letter-spacing: .09em; }
+/* ── State accents + responsive ───────────────────────────────────────────── */
+/* 原「visual refinement pass」覆盖块已逐条并回上方基础规则（双份真相清除）；
+   此处只留无法并入的状态规则与窄屏变体。 */
 .card:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
-.provider-group { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent); }
-.provider-group-header { padding: 10px 14px; }
-.row input[type="text"],
-.row input[type="password"],
-.row input[type="number"],
-.row select,
-.field input[type="text"],
-.field input[type="password"],
-.field select,
-textarea {
-  min-height: 36px;
-  border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
-}
-button.primary {
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-.advanced-summary {
-  padding: 12px 6px;
-  border-radius: var(--radius-sm);
-}
-.advanced-summary:hover { background: var(--hover-bg); }
+
 @media (max-width: 560px) {
   body { padding: 24px 14px 56px; }
   .card-header, .card-body { padding-inline: 16px; }

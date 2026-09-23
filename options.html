@@ -2,6 +2,9 @@
 <html lang="zh">
   <head>
     <meta charset="utf-8" />
+    <!-- theme-color 取 lib/theme.css 两主题的 --bg（改主题色时同步这两行） -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f6f3" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0f14" />
     <title>browsa — settings</title>
     <link rel="stylesheet" href="lib/theme.css" />
     <link rel="stylesheet" href="options.css" />
@@ -51,8 +54,8 @@
           <h2 data-i18n="systemPromptHeading">System Prompt</h2>
         </div>
         <div class="card-body">
-          <p class="hint" data-i18n-html="systemPromptHintHtml">Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.</p>
-          <textarea id="systemPrompt" rows="5" data-i18n-placeholder="systemPromptPlaceholder" placeholder="e.g. You are a helpful assistant. Use $...$ for inline math and $$...$$ for display math."></textarea>
+          <p class="hint" id="systemPromptHint" data-i18n-html="systemPromptHintHtml">Prepended as <code>role: system</code> before every conversation. Use this to set the assistant's language, tone, and formatting rules.</p>
+          <textarea id="systemPrompt" rows="5" data-i18n-placeholder="systemPromptPlaceholder" placeholder="e.g. You are a helpful assistant. Use $…$ for inline math and $$…$$ for display math." data-i18n-aria="systemPromptHeading" aria-label="System Prompt" aria-describedby="systemPromptHint"></textarea>
           <div class="card-actions">
             <button data-act="save-system-prompt" class="primary" data-i18n="saveBtn">Save</button>
             <button data-act="reset-system-prompt" data-i18n="resetToDefaultBtn">Reset to default</button>
@@ -182,25 +185,25 @@
               <div class="field">
                 <label for="asrApiKey">
                   <span class="field-title">API Key</span>
-                  <input id="asrApiKey" type="password" autocomplete="off" spellcheck="false" />
+                  <input id="asrApiKey" name="asrApiKey" type="password" autocomplete="off" spellcheck="false" />
                 </label>
               </div>
               <div class="field">
                 <label for="asrBaseUrl">
                   <span class="field-title">Base URL<span class="tip" tabindex="0">?<span id="asrBaseUrlTip" class="tip-bubble"></span></span></span>
-                  <input id="asrBaseUrl" type="text" spellcheck="false" />
+                  <input id="asrBaseUrl" name="asrBaseUrl" type="text" autocomplete="url" spellcheck="false" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrModel">
                   <span class="field-title" data-i18n="asrModelLabel">模型 ID（音频转写）</span>
-                  <input id="asrModel" type="text" spellcheck="false" />
+                  <input id="asrModel" name="asrModel" type="text" autocomplete="off" spellcheck="false" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrVideoModel">
                   <span class="field-title" data-i18n="asrVideoModelLabel">视频模型 ID（视频解析用，留空则用上面的模型）</span>
-                  <input id="asrVideoModel" type="text" spellcheck="false" data-i18n-placeholder="asrVideoModelPlaceholder" placeholder="留空 = 同转写模型" />
+                  <input id="asrVideoModel" name="asrVideoModel" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="asrVideoModelPlaceholder" placeholder="留空 = 同转写模型" />
                 </label>
               </div>
             </div>
@@ -216,7 +219,7 @@
 
       </details>
 
-      <div id="status" class="status"></div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
     </main>
 
     <script type="module" src="options.js"></script>

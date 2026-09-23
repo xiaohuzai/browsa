@@ -40,7 +40,7 @@
     "description": "Auto-attach checkbox"
   },
   "inputPlaceholder": {
-    "message": "Type a question for your agent… (Enter to send, Shift+Enter for newline)",
+    "message": "Ask anything…",
     "description": "Composer placeholder"
   },
   "sendButton": {
@@ -1218,5 +1218,104 @@
   "slashPromptDesc": {
     "message": "Show the current active system prompt",
     "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "Click again to confirm delete"
+  },
+  "deleteTitle": {
+    "message": "Delete message"
+  },
+  "deleteFailed": {
+    "message": "Delete failed — message kept"
+  },
+  "sessionLoadFailed": {
+    "message": "Failed to load session"
+  },
+  "quickbarAria": {
+    "message": "Quick actions"
+  },
+  "continueMaxTurns": {
+    "message": "→ Continue"
+  },
+  "retryAction": {
+    "message": "Retry"
+  },
+  "quoteTitle": {
+    "message": "Quote"
+  },
+  "editResendTitle": {
+    "message": "Edit & resend"
+  },
+  "copyResponseTitle": {
+    "message": "Copy response"
+  },
+  "collapseExpandTitle": {
+    "message": "Collapse/expand"
+  },
+  "editSendBtn": {
+    "message": "Send"
+  },
+  "editCancelBtn": {
+    "message": "Cancel"
+  },
+  "clearChatTitle": {
+    "message": "Clear conversation"
+  },
+  "clearChatMsg": {
+    "message": "Delete all messages? This cannot be undone."
+  },
+  "clearChatConfirm": {
+    "message": "Clear"
+  },
+  "clearAllTitle": {
+    "message": "Clear all sessions"
+  },
+  "clearAllMsg": {
+    "message": "Delete all saved sessions? This cannot be undone."
+  },
+  "clearAllConfirm": {
+    "message": "Clear all"
+  },
+  "sessionDeleted": {
+    "message": "Session deleted"
+  },
+  "sessionRenamed": {
+    "message": "Session renamed"
+  },
+  "sessionsCleared": {
+    "message": "All sessions cleared"
+  },
+  "sessionLoaded": {
+    "message": "Loaded"
+  },
+  "dblClickRename": {
+    "message": "Double-click to rename"
+  },
+  "exportMarkdown": {
+    "message": "Export as Markdown"
+  },
+  "relJustNow": {
+    "message": "just now"
+  },
+  "copyThinkingTitle": {
+    "message": "Copy thinking"
+  },
+  "multiDeletedOk": {
+    "message": "Deleted $1 messages"
+  },
+  "multiDeletedPartial": {
+    "message": "Deleted $1, $2 failed (indices recalibrated)"
+  },
+  "composerAria": {
+    "message": "Message — Enter to send, Shift+Enter for newline"
+  },
+  "slashAria": {
+    "message": "Slash commands"
+  },
+  "sessionExportFailed": {
+    "message": "Could not load session"
+  },
+  "sessionExported": {
+    "message": "Session exported"
   }
 }
