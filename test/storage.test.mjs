@@ -402,11 +402,12 @@ test('loadSession restores a saved session into the live history and returns its
   assert.deepEqual((await storage.getHistory()).map(m => m.content), ['a', 'b']);
 });
 
-test('loadSession returns 0 for an unknown session id and does not touch history', async () => {
+test('loadSession returns -1 for an unknown session id and does not touch history (B5)', async () => {
+  // -1 ≠ 0（0 是合法的空会话长度）——handleSession 的 ok: len >= 0 靠这个区分。
   reset();
   await storage.setHistory([{ role: 'user', content: 'untouched' }]);
   const len = await storage.loadSession('does-not-exist');
-  assert.equal(len, 0);
+  assert.equal(len, -1);
   assert.deepEqual((await storage.getHistory()).map(m => m.content), ['untouched']);
 });
 

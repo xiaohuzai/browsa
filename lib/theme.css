@@ -40,6 +40,11 @@
   --fg:           #eef0ee;
   --fg-2:         #c7cbd1;
   --fg-dim:       #9aa0ab;
+  /* Micro-text tier (9.5-10.5px timestamps / provider stamps / placeholders).
+     Contrast is BAKED INTO the color instead of multiplied by an element
+     opacity:0.x — an alpha-dimmed --fg-dim has no stable contrast ratio and
+     failed AA against both grounds. */
+  --fg-faint:     #767c86;
   --border:       #262b38;
   --border-soft:  #1e222c;
   --border-strong:#343a4a;
@@ -66,13 +71,33 @@
   --warn:         #e0b23a;
   --success:      #4ade80;
 
+  /* Process-tier accents (sidepanel.css's .tool-progress rows: searching /
+     running / reading). The dark trio is the original blue/violet/green; the
+     light block remaps them to darker same-hue values — the originals sat at
+     2.2 / 2.3 / 1.6:1 on the light ground. */
+  --tier-search:  #60a5fa;
+  --tier-run:     #a78bfa;
+  --tier-read:    #34d399;
+
   /* Radius — three tiers only: controls / cards+composer / large surfaces
      (user bubble's outer corners, composer box). Previously five+ competing
      radii (20px pills, 8px icon buttons, 16px composer, 10px cards, 999px
-     qa-btns) with no shared rule. */
+     qa-btns) with no shared rule.
+
+     Button SHAPE LANGUAGE (2026-09-23, keep this rule when adding buttons):
+     · primary / destructive ACTION buttons (confirm dialog, message-edit
+       save/cancel, multiselect delete/cancel, send, …) = ROUNDED RECTANGLE
+       at the controls tier (--radius-sm) — squared corners read as "this does
+       something to your data";
+     · QUICK pills (choice buttons, qa-bar shortcuts, follow-up chips,
+       timestamp chips, floating ask/follow affordances) = FULL CAPSULE
+       (--radius-pill) — they read as "pick one of these", never as actions;
+     · true circles (50%) are reserved for round icon controls (send/scroll/
+       close glyphs). */
   --radius-sm:    6px;
   --radius:       10px;
   --radius-lg:    14px;
+  --radius-pill:  999px;
 
   --t:            0.15s ease;
   --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
@@ -105,6 +130,7 @@
     --fg:           #14171f;
     --fg-2:         #3a3f4a;
     --fg-dim:       #5b6270;
+    --fg-faint:     #5b6270; /* micro-text tier (see the dark block) */
     --border:       #dfe2dc;
     --border-soft:  #e8eae5;
     --border-strong:#c5c9c2;
@@ -123,6 +149,14 @@
 
     --error:        #c0392b;
     --warn:         #926c0d; /* same contrast fix as --gold above — was #a3790f */
+    --success:      #16803c; /* the one status color that never got a light
+                                remap — #4ade80 reads at ~1.9:1 on white */
+
+    /* Process-tier accents (see the dark block): darker same-hue remaps of
+       #60a5fa/#a78bfa/#34d399, which fail contrast on the light ground. */
+    --tier-search:  #0b6bcb;
+    --tier-run:     #6941c6;
+    --tier-read:    #1a7f37;
 
     --shadow-sm:    0 1px 4px rgba(0,0,0,0.08);
     --shadow-md:    0 4px 16px rgba(0,0,0,0.10);

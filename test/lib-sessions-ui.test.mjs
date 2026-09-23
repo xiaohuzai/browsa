@@ -23,6 +23,7 @@ let serverSessions = [
 // Generic chrome.storage.local KV backing store (activeSessionId 等 history
 // 之外的键)；history 走上面的 storageHistory 变量，测试用例直接改写它。
 let localStore = {};
+let loadSessionOk = true; // B5 用例用：模拟 LOAD_SESSION 未命中（内层 ok:false）
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
@@ -41,7 +42,10 @@ globalThis.chrome = {
         const s = serverSessions.find(s => s.id === msg.id);
         return cb({ data: { session: s ? { ...s, history: storageHistory } : null } });
       }
-      if (msg.type === 'LOAD_SESSION') return cb({ ok: true });
+      if (msg.type === 'LOAD_SESSION') {
+        // 真实 envelope：外层 ok 恒 true，判据在内层 data.ok（B5 修复后的唯一读法）。
+        return cb({ ok: true, data: { ok: loadSessionOk, len: loadSessionOk ? 2 : -1 } });
+      }
       cb({ ok: true });
     },
     lastError: undefined,
@@ -254,4 +258,20 @@ test('loadSession with a fresh (untracked) conversation saves without an id — 
   assert.ok(save, 'fresh conversation still gets archived before switching');
   assert.equal(save.id, undefined, 'no activeSessionId → plain create, background falls back to a new entry');
   assert.equal(localStore.activeSessionId, 's2', 'identity pointer lands on the loaded session');
+});
+
+test('loadSession surfaces a missing session instead of faking success (B5)', async () => {
+  // LOAD_SESSION 未命中（内层 ok:false）必须报错、不重指身份、抽屉不关——
+  // 此前混层 && 被外层 ok:true 短路，点开已删会话曾 toast Loaded 并挂错 activeSessionId。
+  loadSessionOk = false;
+  storageHistory = [{ role: 'user', content: 'in place' }];
+  localStore.activeSessionId = 's1';
+  sentMessages.length = 0;
+  openSessionsDrawer();
+  const renderedBefore = deps.renderHistoryCalled;
+  await loadSession('gone', 'Ghost session');
+  assert.equal(deps.renderHistoryCalled, renderedBefore, 'history must not re-render for a failed load');
+  assert.equal(localStore.activeSessionId, 's1', 'identity pointer must not move');
+  assert.equal(getSessionsDrawer().hidden, false, 'drawer must stay open so the user can pick another');
+  loadSessionOk = true;
 });
