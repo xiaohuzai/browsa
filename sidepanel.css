@@ -348,6 +348,18 @@ body {
 /* ─── Collapse/expand a long assistant reply (manual, ephemeral) ────────── */
 .fold-btn svg { transition: transform var(--t); }
 .msg.assistant.collapsed .fold-btn svg { transform: rotate(180deg); }
+/* A COLLAPSED reply keeps its expand control persistently visible — the bar's
+   hover-reveal (`.msg:hover` above) turns a folded bubble into a dead end:
+   collapsing shrinks the bubble to the 150px window and whatever sits below it
+   (an inline 追问 card) jumps up under the pointer, so :hover stops matching
+   the bubble and the icon "never comes out" (user report 2026-09-23). The
+   "nothing stays permanently visible over the text" rule targets unread text
+   occlusion — a collapsed preview's alternative is being stuck, so only the
+   expand control (not the whole bar) opts out of the hover gate. */
+.msg.assistant.collapsed .msg-actions .fold-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
 .msg.assistant.collapsed {
   max-height: 150px;
   /* overflow-y only — the shorthand overflow:hidden also sets overflow-x,
@@ -1962,6 +1974,20 @@ code.language-patch {
   background: var(--error);
 }
 /* Content-only search hit: tiny dot after the date; full context on hover. */
+/* In-flight turn marker on a session row (2026-09-24 background streams:
+   the reply keeps running after a session switch). */
+.session-active-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: session-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes session-dot-pulse { 50% { opacity: 0.35; } }
+
 .session-content-hit {
   display: inline-block;
   width: 5px;
@@ -2609,8 +2635,17 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   color: var(--fg);
   /* Match the message text size (the card base is var(--msg-font-size)) — a
      chat input smaller than the bubbles it sits under reads as an afterthought. */
+  font: inherit;
   font-size: 1em;
   outline: none;
+  /* textarea（2026-09-23 用户报告：单行 input 不会自动分行，长文只横向滚动）——
+     换行 + field-sizing 自动增高，同一套约定见主 composer 的 #input。 */
+  resize: none;
+  field-sizing: content;
+  min-height: 22px;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.5;
 }
 .detail-thread-input:focus { border-color: var(--accent); }
 .detail-thread-input:disabled { opacity: 0.6; }

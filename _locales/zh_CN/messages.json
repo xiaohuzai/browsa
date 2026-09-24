@@ -691,6 +691,10 @@
     "message": "先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server 文档</a>",
     "description": "Options: opencode server setup tip"
   },
+  "squillaTip": {
+    "message": "OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 ~/.opensquilla/config.toml 的 cors.allowed_origins（v0.5.5 起原生支持扩展 origin）。<a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla 文档</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
   "bridgeTip": {
     "message": "本地桥的安装与启动见 <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge 文档</a>。一行填一个桥地址。",
     "description": "Options: agent-bridge setup tip"
@@ -1214,6 +1218,30 @@
   "localAgentTabHermes": {
     "message": "Hermes",
     "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "思考档位",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "auto（不发送）",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "额外 reasoning 字段(JSON)",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "进行中的回复已转入后台，完成后写入原会话",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "sessionActiveDot": {
+    "message": "进行中",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
   },
   "slashPromptDesc": {
     "message": "显示当前生效的系统提示词",

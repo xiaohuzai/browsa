@@ -8,13 +8,26 @@
 // Screenshots go through CDP Page.captureScreenshot (Playwright's page.screenshot has
 // a dark-mode artifact issue on this box — see AGENTS.md history / dev-preview notes).
 
-import { chromium } from '/tmp/pwshot/node_modules/playwright-core/index.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+// playwright-core is not a repo dependency; probe the known install locations
+// (the promo-video skill's node_modules is the durable one, /tmp/pwshot is historic).
+let chromium;
+for (const c of [
+  path.join(root, '.agents/skills/promo-video/scripts/node_modules/playwright-core/index.mjs'),
+  '/tmp/pwshot/node_modules/playwright-core/index.mjs',
+]) {
+  try { ({ chromium } = await import(c)); break; } catch { /* try next */ }
+}
+if (!chromium) {
+  console.error('playwright-core not found — run `npm i` in .agents/skills/promo-video/scripts first');
+  process.exit(1);
+}
 const exe = '/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
 const FONT = 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf';
 const PORT = 8947;

@@ -3,6 +3,8 @@ import * as storage from './lib/storage.js';
 import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingOpencode } from './lib/opencode-client.js';
+import { pingSquilla } from './lib/squilla-client.js';
+import { reasoningLevelOptions } from './lib/reasoning-levels.js';
 import { pingBridge, normalizeBridgeUrl } from './lib/bridge-client.js';
 import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
@@ -283,6 +285,8 @@ function renderProviders() {
           ? _t('localAgentTabBridge', 'Codex / Claude Code / pi')
           : id === 'opencode'
           ? _t('localAgentTabOpencode', 'OpenCode')
+          : id === 'squilla'
+          ? _t('localAgentTabSquilla', 'OpenSquilla')
           : _t('localAgentTabHermes', 'Hermes');
         b.addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -293,14 +297,14 @@ function renderProviders() {
         });
         return b;
       };
-      for (const id of ['bridge', 'opencode', 'hermes']) {
+      for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
         if (!providers[id]) continue;
         tabsWrap.append(tabBtn(id));
       }
       // 分段控件直接住进「可见卡」的标题行——tab 就是标题（该卡的 .name 隐藏，
       // 消掉「Codex/Claude Code」出现两遍的重复），控件与卡读作一个整体。
       details.appendChild(tabsWrap);
-      for (const id of ['bridge', 'opencode', 'hermes']) {
+      for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
         if (!entries.some(([n]) => n === id)) continue;
         const cardEl = buildProviderCard(id, providers[id]);
         if (id !== tab) cardEl.style.display = 'none';
@@ -312,7 +316,7 @@ function renderProviders() {
           h3.insertBefore(tabsWrap, nameSpan);
         }
       }
-      for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'hermes')) {
+      for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'squilla' && n !== 'hermes')) {
         details.appendChild(buildProviderCard(name, cfg));
       }
     } else {
@@ -351,7 +355,7 @@ function renderProviders() {
 // there was the exact "Hermes 永远常驻" complaint this merge fixes); finally
 // the bridge default (the recommended first path).
 function localAgentTab() {
-  const AGENTS = ['bridge', 'opencode', 'hermes'];
+  const AGENTS = ['bridge', 'opencode', 'squilla', 'hermes'];
   const pref = cachedCfg.localAgentTab;
   if (AGENTS.includes(pref)) return pref;
   const p = cachedCfg.providers || {};
@@ -476,13 +480,40 @@ function buildProviderCard(name, cfg, opts = {}) {
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。')}</span></span>`
     : cfg.isOpencode
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
+    : cfg.isSquilla
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('squillaTip', 'OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 ~/.opensquilla/config.toml 的 cors.allowed_origins（v0.5.5 起原生支持扩展 origin）。<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>')}</span></span>`
     : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
+
+  // Thinking level field (LLM cards only): the OPTION LIST follows the card's
+  // model ids — filling in `glm-5` offers {关,开}, `gpt-5.6` offers the effort
+  // ladder (lib/reasoning-levels.js, ported from ZCode's model registry).
+  // `auto` sends nothing (provider defaults); an option some listed model
+  // doesn't speak degrades to `auto` for that model at request time.
+  const modelIds = (cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean);
+  const thinkingLevels = (() => {
+    const out = ['auto'];
+    for (const id of modelIds) for (const l of reasoningLevelOptions(id)) if (!out.includes(l)) out.push(l);
+    return out;
+  })();
+  const thinkingField = !isAgent ? `
+      <div class="field">
+        <label>${_t('thinkingLevelLabel', 'Thinking level')}
+          <select data-k="reasoningDefault" data-thinking-select>
+            ${thinkingLevels.map((l) => `<option value="${escapeAttr(l)}"${(cfg.reasoningDefault || 'auto') === l ? ' selected' : ''}>${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="field">
+        <label>${_t('reasoningRawLabel', 'Extra reasoning fields (JSON)')}
+          <input data-k="reasoningRaw" type="text" value="${escapeAttr(cfg.reasoningRaw || '')}" placeholder='{"reasoning_effort":"high"}' />
+        </label>
+      </div>` : '';
 
   // Base URL field: a plain input for LLM/Hermes/opencode, a per-row endpoint
   // editor (URL + alias per row, ＋ to add) for the bridge card. Precomputed
   // OUTSIDE the card template on purpose — same V8 nested-conditional rule as
   // agentBaseUrlTip above.
-  const agentPlaceholder = cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080';
+  const agentPlaceholder = cfg.isSquilla ? 'ws://127.0.0.1:18791/ws' : cfg.isOpencode ? 'http://127.0.0.1:4096' : 'http://127.0.0.1:8080';
   const baseUrlField = isAgent && cfg.isBridge
     ? `
       <div class="field field-full">
@@ -557,6 +588,7 @@ function buildProviderCard(name, cfg, opts = {}) {
           </select>
         </label>
       </div>` : ''}
+      ${thinkingField}
     </div>
     <div class="row action-row">
       <button data-act="save">${_t('saveBtn', 'Save')}</button>
@@ -586,7 +618,19 @@ function buildProviderCard(name, cfg, opts = {}) {
     const hidden = card.querySelector('input[data-k="model"]');
     const chipInput = chipsWrap.querySelector('.chip-input');
     const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
-    const syncChips = () => { hidden.value = chipIds().join(', '); };
+    const syncChips = () => {
+      hidden.value = chipIds().join(', ');
+      // 思考档位的选项跟着模型 id 自适应（填 glm-5 出 {关,开}、gpt-5.6 出力度
+      // 梯）——lib/reasoning-levels.js 的词表。改完 chips 现刷选项。
+      const sel = card.querySelector('[data-thinking-select]');
+      if (sel) {
+        const levels = ['auto'];
+        for (const id of chipIds()) for (const l of reasoningLevelOptions(id)) if (!levels.includes(l)) levels.push(l);
+        const cur = sel.value;
+        sel.innerHTML = levels.map((l) => `<option value="${escapeAttr(l)}">${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
+        sel.value = levels.includes(cur) ? cur : 'auto';
+      }
+    };
     const addChips = () => {
       const parts = chipInput.value.split(',').map((s) => s.trim()).filter(Boolean);
       if (!parts.length) return;
@@ -846,6 +890,8 @@ async function pingCard(name, card) {
           if (!r.ok) throw new Error(r.error || `no healthy opencode server at ${r.url}`);
           return 'opencode server healthy';
         })()
+      : cfg.isSquilla
+      ? await pingSquilla({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey })
       : await ping({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: cfg.model, apiStyle: cfg.apiStyle || 'chat' });
 
     // First time this provider goes from not-reachable to reachable, make
@@ -1050,6 +1096,7 @@ function prettyProviderName(name) {
   if (name === 'hermes') return 'Hermes Agent';
   if (name === 'opencode') return 'OpenCode Agent';
   if (name === 'bridge') return BRIDGE_CARD_LABEL;
+  if (name === 'squilla') return 'OpenSquilla';
   const m = /^llm-(\d+)$/.exec(name);
   if (m) return `LLM ${m[1]}`;
   return name.charAt(0).toUpperCase() + name.slice(1);

@@ -105,9 +105,25 @@ test('STREAM_ABORT triggers the AbortController stored for the tab', async () =>
   assert.equal(abortCalled, true, 'controller.abort() must be called');
   assert.equal(abortReason, 'user-cancel', 'abort reason should be user-cancel for UX distinguishability');
 
-  // streamState should be cleared (the handler clears it defensively
-  // even if the CHAT handler's catch block will do it too).
-  assert.equal(streamState.has(7), false, 'streamState must be cleared after abort');
+  // streamState must SURVIVE the abort (2026-09-24 收尸): the CHAT handler's
+  // catch reads streamState.acc to persist the partial text as an interrupted
+  // turn, then clears it itself. A defensive clear here would wipe the salvage
+  // material before the catch runs.
+  assert.equal(streamState.has(7), true, 'streamState must be kept for the interrupted-turn salvage');
+});
+
+test('STREAM_ABORT with salvage:false aborts with reason drop (explicit destruction)', async () => {
+  streamState.clear();
+  chatControllers.clear();
+  let abortReason = null;
+  const controller = new AbortController();
+  const origAbort = controller.abort.bind(controller);
+  controller.abort = (reason) => { abortReason = reason; return origAbort(reason); };
+  chatControllers.set(8, controller);
+
+  const r = await handle({ type: 'STREAM_ABORT', tabId: 8, salvage: false });
+  assert.equal(r.aborted, true);
+  assert.equal(abortReason, 'drop', "clearChatHistory's path must tell the handler to skip the salvage");
 });
 
 test('STREAM_ABORT with no live controller is a safe no-op', async () => {
@@ -224,30 +240,29 @@ test('CHAT handler clears chatControllers in finally (no leaks)', async () => {
     'chatControllers.delete must be inside a finally block to run on errors too');
 });
 
-test('CHAT handler catches AbortError and does NOT append to history', async () => {
+test('CHAT handler catches AbortError, salvages the partial as interrupted, and skips the success-path persist', async () => {
   // We can't easily run the full CHAT handler here (it calls out to
-  // an LLM). Instead, verify the source has a catch that detects
-  // AbortError and returns early without reaching the
-  // `appendToHistory(tabId, { role: 'assistant'...})` line.
+  // an LLM). Instead, verify the source: the catch detects AbortError,
+  // SALVAGES the streamed text as an interrupted turn (2026-09-24 收尸 —
+  // Esc / idle-timeout / network drop must not evaporate thinking; the
+  // explicit-destruction path abort('drop') opts out), and returns early
+  // without reaching the success-path persist.
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
-  // The AbortError catch block must (a) detect the abort, (b) push
-  // an ERROR {code: 'ABORTED'} chunk, (c) clearStreamState, (d) return
-  // before the appendToHistory assistant line.
-  const abortMatch = src.match(/e\?\.name === 'AbortError'[\s\S]{0,800}?return \{ ok: true, cancelled: true \}/);
+  const abortMatch = src.match(/e\?\.name === 'AbortError'[\s\S]{0,2000}?return \{ ok: true, cancelled: true \}/);
   assert.ok(abortMatch, 'CHAT handler must have a catch block for AbortError that returns cancelled');
   const block = abortMatch[0];
   assert.match(block, /clearStreamState\(tabId\)/, 'catch must clear streamState');
   assert.match(block, /ABORTED/, 'catch must push ERROR with code ABORTED');
-  // The appendToHistory assistant line must be AFTER the abort-return
-  // in the source — abort returns early, so the line after it only
-  // runs on the success path. The check: catch-return's index is
-  // strictly less than the next appendToHistory assistant index.
+  assert.match(block, /interrupted: true/, 'catch must salvage the partial text as an interrupted turn');
+  assert.match(block, /reason !== 'drop'/, "explicit destruction (abort('drop')) must skip the salvage");
+  // The success-path persist must be AFTER the abort-return in the source —
+  // abort returns early, so only a naturally-completed turn reaches it.
   const catchReturnIdx = src.indexOf('return { ok: true, cancelled: true }');
-  const appendIdx = src.indexOf("await storage.appendToHistory({ role: 'assistant'", catchReturnIdx);
+  const appendIdx = src.indexOf("await persistTurnEntry(tabId, { role: 'assistant'", catchReturnIdx);
   assert.ok(appendIdx > catchReturnIdx,
-    'appendToHistory for assistant must appear AFTER the abort-return; abort returns early, skipping it');
+    'the success-path assistant persist must appear AFTER the abort-return');
 });
 
 // --------------- llm-client reader cancellation ----------------------------

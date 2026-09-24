@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — Side-panel AI for your browser</title>
-<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API, the Hermes / opencode agents, or your Codex / Claude Code / pi via agent-bridge.">
+<meta name="description" content="browsa is a Chrome / Edge side-panel extension: bring the current page into the conversation — articles, subtitles, PDFs — and stream replies right next to it. Any OpenAI-compatible API, the Hermes / opencode / OpenSquilla agents, or your Codex / Claude Code / pi via agent-bridge.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — Side-panel AI for your browser">
@@ -311,7 +311,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>Stream replies <span class="tag">any backend</span></h3>
-          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, the Hermes / opencode agents — your subscription-logged-in Codex / Claude Code via agent-bridge, or pi with its own configured models. The UI follows your browser language — English / 中文 switchable.</p>
+          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, the Hermes / opencode / OpenSquilla agents — your subscription-logged-in Codex / Claude Code via agent-bridge, or pi with its own configured models. The UI follows your browser language — English / 中文 switchable.</p>
         </div>
       </div>
       <p class="site-note">Installed? <a href="guide/quickstart.html">Quick start</a> walks you through the first question; the <a href="guide/">full guide</a> covers reading, video, rendering, sessions, backends and settings.</p>
@@ -376,9 +376,11 @@
           <ul>
             <li>Hermes Agent: tool execution, approval for risky actions, progress display</li>
             <li>OpenCode Agent: direct line to the opencode CLI agent — same full tool &amp; approval flow</li>
+            <li>OpenSquilla Agent: local desktop agent over its gateway WebSocket — server-side session memory, thinking output, server-side cancellation</li>
             <li>Agent Bridge: bridges local CLI agents — subscription-logged-in Codex / Claude Code (the model side runs on your subscription), or pi with whatever model you configure it with; one card connects several agents at once</li>
             <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
             <li>Add multiple models per card — switch via “Alias · model” in the sidebar</li>
+            <li>Per-model thinking level: the choices follow the model family and the request fields adapt to each API dialect</li>
             <li>Ping to verify connectivity and capabilities</li>
           </ul>
         </div>
@@ -410,6 +412,7 @@
           <p>Long conversations stay organized:</p>
           <ul>
             <li>Save / restore named sessions, export Markdown</li>
+            <li>Switching sessions mid-reply never kills the reply — it finishes in the background and lands in the session it started in</li>
             <li>Full-text in-conversation search (<code>Ctrl+F</code>)</li>
             <li>"Detail-thread" any text in a reply without touching the main history; the input's ↑/↓ recalls follow-up questions only</li>
           </ul>
@@ -462,7 +465,7 @@
           <li><span class="tick">›</span><span><b>Ollama / LM Studio local models</b> — fully offline works too.</span></li>
           <li><span class="tick">›</span><span><b>Real agents</b>: tool execution, live progress, approval before risky actions.</span></li>
         </ul>
-        <div class="prov-board" data-label="Connection examples" role="img" aria-label="Connection examples: model APIs, local models, Hermes, OpenCode and Agent Bridge">
+        <div class="prov-board" data-label="Connection examples" role="img" aria-label="Connection examples: model APIs, local models, Hermes, OpenCode, OpenSquilla and Agent Bridge">
           <div class="prov-card">
             <span class="prov-ava pa-openai">O</span>
             <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
@@ -486,6 +489,11 @@
           <div class="prov-card">
             <span class="prov-ava pa-opencode">oc</span>
             <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">not pinged</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-squilla">Sq</span>
+            <span class="prov-info"><span class="prov-name">OpenSquilla Agent</span><span class="prov-model">gateway /ws · tools · approvals</span></span>
             <span class="prov-badge pb-idle">not pinged</span>
           </div>
           <div class="prov-card">

@@ -1,8 +1,10 @@
 // test/history-compactor.test.mjs
-// Pure-function tests for history image compaction (compactEntryImageParts +
-// parseFigureLabels). The I/O wrapper compactImagePartsInHistory is thin
-// (read -> map -> write-if-changed) and needs a chrome.storage mock; the
-// compaction logic itself is fully testable without one.
+// History-image lifecycle: pure policy (compactEntryImageParts /
+// parseFigureLabels / prepareHistoryForModel — the request-side model view)
+// plus the two storage mutators' behavior (markImagesSeenInHistory's seen
+// stamp and boundUnseenImageBytes' thumbnail budget). Storage pixels must
+// NEVER be destroyed by these paths — that invariant (气泡里该有啥就有啥) is
+// pinned here.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +14,8 @@ import assert from 'node:assert/strict';
 // never touch chrome.
 globalThis.chrome = { runtime: {}, storage: { local: { get: async () => ({}), set: async () => {} } } };
 
-const { compactEntryImageParts, parseFigureLabels, imagePartsBytes, boundUnseenImageBytes } = await import('../lib/handlers/history-compactor.js');
+const { compactEntryImageParts, parseFigureLabels, imagePartsBytes, boundUnseenImageBytes, markImagesSeenInHistory } = await import('../lib/handlers/history-compactor.js');
+const { prepareHistoryForModel, IMAGE_SEEN_FLAG, buildMessages, buildAnthropicMessages, buildRunsConversationHistory } = await import('../lib/message-builder.js');
 
 // --------------- parseFigureLabels ------------------------------------------
 
@@ -197,26 +200,33 @@ function statefulStorage(initialHistory) {
   return { sets, read: () => stored.history };
 }
 
-test('boundUnseenImageBytes: over budget → compacts oldest parked entry, spares the newest', async () => {
+// Deterministic stand-in for downscaleDataUrl: idempotent (`.thumb`-suffixed
+// inputs come back unchanged), which is exactly the real impl's "already
+// thumbnail-sized → return input" contract.
+const fakeThumb = async (url) => (url.endsWith('.thumb') ? url : `${url}.thumb`);
+
+test('boundUnseenImageBytes: over budget → downscales oldest parked entry to a thumbnail, spares the newest', async () => {
   const big = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
   const { sets, read } = statefulStorage([
     attachEntry('old', big),
     { role: 'assistant', content: 'reply' },
     attachEntry('new', big),
   ]);
-  const n = await boundUnseenImageBytes(1500); // total 2000 → oldest must go
+  const n = await boundUnseenImageBytes(1500, { downscale: fakeThumb }); // total 2000 → oldest must go
   assert.equal(n, 1);
   const history = read();
-  assert.equal(history[0].content[1].type, 'text', 'oldest attach compacted to placeholder');
-  assert.match(history[0].content[1].text, /^\[image 1\]$/);
-  assert.equal(history[2].content[1].type, 'image_url', 'newest attach keeps its pixels');
+  // Display fidelity: the part is STILL an image (a thumbnail), not a label —
+  // the bubble must keep its picture.
+  assert.equal(history[0].content[1].type, 'image_url', 'oldest attach keeps a display image');
+  assert.equal(history[0].content[1].image_url.url, `${big}.thumb`);
+  assert.equal(history[2].content[1].image_url.url, big, 'newest attach keeps full pixels');
   assert.ok(sets.length >= 1, 'a write happened');
 });
 
 test('boundUnseenImageBytes: within budget → read-only, no write at all', async () => {
   const big = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
   const { sets } = statefulStorage([attachEntry('only', big)]);
-  const n = await boundUnseenImageBytes(5000);
+  const n = await boundUnseenImageBytes(5000, { downscale: fakeThumb });
   assert.equal(n, 0);
   assert.equal(sets.length, 0, 'no write when within budget');
 });
@@ -227,13 +237,29 @@ test('boundUnseenImageBytes: single image-bearing entry over budget is spared (f
     { role: 'assistant', content: 'hi' },
     attachEntry('only-bearer', big),
   ]);
-  const n = await boundUnseenImageBytes(10);
+  const n = await boundUnseenImageBytes(10, { downscale: fakeThumb });
   assert.equal(n, 0);
   assert.equal(sets.length, 0, 'no write when the only bearer is the newest');
-  assert.equal(read()[1].content[1].type, 'image_url');
+  assert.equal(read()[1].content[1].image_url.url, big);
 });
 
-test('boundUnseenImageBytes: compacts as many oldest entries as the budget needs, then stops', async () => {
+test('boundUnseenImageBytes: undecodable payload → labeled placeholder is the fallback', async () => {
+  const big = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
+  const { read } = statefulStorage([
+    attachEntry('old', big),
+    attachEntry('new', big),
+  ]);
+  const n = await boundUnseenImageBytes(1500, {
+    downscale: async () => { throw new Error('undecodable'); },
+  });
+  assert.equal(n, 1);
+  const history = read();
+  assert.equal(history[0].content[1].type, 'text', 'fallback keeps the old label behavior');
+  assert.match(history[0].content[1].text, /^\[image 1\]$/);
+  assert.equal(history[1].content[1].image_url.url, big, 'newest spared');
+});
+
+test('boundUnseenImageBytes: downscales as many oldest entries as the budget needs, then stops', async () => {
   const big = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
   const { read } = statefulStorage([
     attachEntry('a', big),
@@ -241,22 +267,144 @@ test('boundUnseenImageBytes: compacts as many oldest entries as the budget needs
     attachEntry('c', big),
     attachEntry('d', big),
   ]);
-  // total 4000, budget 2500 → compact a+b → remaining 2000 ≤ 2500.
-  const n = await boundUnseenImageBytes(2500);
+  // total 4000, budget 2500 → downscale a+b → remaining 2000 ≤ 2500.
+  const n = await boundUnseenImageBytes(2500, { downscale: fakeThumb });
   assert.equal(n, 2);
   const history = read();
-  assert.equal(history[0].content[1].type, 'text');
-  assert.equal(history[1].content[1].type, 'text');
-  assert.equal(history[2].content[1].type, 'image_url');
-  assert.equal(history[3].content[1].type, 'image_url');
+  assert.equal(history[0].content[1].image_url.url, `${big}.thumb`);
+  assert.equal(history[1].content[1].image_url.url, `${big}.thumb`);
+  assert.equal(history[2].content[1].image_url.url, big);
+  assert.equal(history[3].content[1].image_url.url, big);
 });
 
 test('boundUnseenImageBytes: idempotent — a second run writes nothing', async () => {
   const big = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
   const { sets } = statefulStorage([attachEntry('old', big), attachEntry('new', big)]);
-  await boundUnseenImageBytes(1500);
+  await boundUnseenImageBytes(1500, { downscale: fakeThumb });
   const writesAfterFirst = sets.length;
-  const n2 = await boundUnseenImageBytes(1500);
+  const n2 = await boundUnseenImageBytes(1500, { downscale: fakeThumb });
   assert.equal(n2, 0);
   assert.equal(sets.length, writesAfterFirst, 'no additional write on the second run');
+});
+
+// --------------- markImagesSeenInHistory ------------------------------------
+
+test('markImagesSeenInHistory: stamps image-bearing entries once, pixels untouched', async () => {
+  const { read } = statefulStorage([
+    attachEntry('a', 'data:image/png;base64,AAA'),
+    { role: 'assistant', content: 'reply' },
+    { role: 'user', content: 'plain text' },
+    attachEntry('b', 'data:image/png;base64,BBB'),
+  ]);
+  const n = await markImagesSeenInHistory();
+  assert.equal(n, 2, 'both image-bearing entries stamped');
+  const history = read();
+  assert.equal(history[0][IMAGE_SEEN_FLAG], true);
+  assert.equal(history[0].content[1].type, 'image_url', 'pixels untouched');
+  assert.equal(history[0].content[1].image_url.url, 'data:image/png;base64,AAA');
+  assert.equal(history[1][IMAGE_SEEN_FLAG], undefined, 'assistant turn untouched');
+  assert.equal(history[2][IMAGE_SEEN_FLAG], undefined, 'text-only turn untouched');
+  assert.equal(history[3][IMAGE_SEEN_FLAG], true);
+  const n2 = await markImagesSeenInHistory();
+  assert.equal(n2, 0, 'idempotent');
+});
+
+// --------------- prepareHistoryForModel (request-side compaction) ------------
+
+function imageEntry(extra, url = 'data:image/png;base64,PIX') {
+  return {
+    role: 'user',
+    ...extra,
+    content: [
+      { type: 'text', text: (extra && extra.text) || 'look' },
+      { type: 'image_url', image_url: { url } },
+    ],
+  };
+}
+
+test('prepareHistoryForModel: seen images become labels (figure captions win) and the flag never leaks', () => {
+  const entry = {
+    role: 'user',
+    [IMAGE_SEEN_FLAG]: true,
+    content: [
+      { type: 'text', text: 'body\n\n## Figures\n1. Figure 3: training pipeline' },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,PIX' } },
+    ],
+  };
+  const out = prepareHistoryForModel([entry]);
+  assert.deepEqual(out[0].content, [
+    { type: 'text', text: 'body\n\n## Figures\n1. Figure 3: training pipeline' },
+    { type: 'text', text: '[Figure 3: training pipeline]' },
+  ]);
+  assert.ok(!JSON.stringify(out).includes(IMAGE_SEEN_FLAG), 'flag stripped from the model view');
+});
+
+test('prepareHistoryForModel: unseen images pass through by reference (ADR-0005 — restored snapshots resend pixels)', () => {
+  const entry = imageEntry();
+  const out = prepareHistoryForModel([entry]);
+  assert.equal(out[0], entry, 'untouched entries keep identity');
+  assert.equal(out[0].content[1].type, 'image_url', 'pixels ride the request');
+});
+
+test('prepareHistoryForModel: the flag is stripped even from text-only entries', () => {
+  const entry = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: 'plain' };
+  const out = prepareHistoryForModel([entry]);
+  assert.deepEqual(out[0], { role: 'user', content: 'plain' });
+  assert.notEqual(out[0], entry);
+});
+
+test('prepareHistoryForModel: mixed history — only seen image entries are rewritten', () => {
+  const seen = imageEntry({ [IMAGE_SEEN_FLAG]: true }, 'data:image/png;base64,OLD');
+  const fresh = imageEntry({}, 'data:image/png;base64,NEW');
+  const text = { role: 'assistant', content: 'reply' };
+  const out = prepareHistoryForModel([seen, fresh, text]);
+  assert.equal(out[0].content[1].type, 'text');
+  assert.equal(out[1], fresh);
+  assert.equal(out[2], text);
+  assert.notEqual(out[0], seen);
+});
+
+// --------------- builder integration (what the provider actually receives) --
+
+test('buildMessages: answered images become labels; unanswered ride as pixels; flag never leaks', () => {
+  const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
+    { type: 'text', text: 'seen turn' },
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
+  ] };
+  const fresh = { role: 'user', content: [
+    { type: 'text', text: 'fresh turn' },
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,NEW' } },
+  ] };
+  const msgs = buildMessages({ history: [seen, fresh], userText: 'q', systemPrompt: 'sys' });
+  const wire = JSON.stringify(msgs);
+  assert.ok(!wire.includes('OLD'), 'answered pixels are not resent');
+  assert.ok(wire.includes('NEW'), 'fresh pixels ride the request');
+  assert.ok(!wire.includes(IMAGE_SEEN_FLAG), 'no flag in the request body');
+  assert.ok(wire.includes('[image 1]'), 'answered image becomes a label');
+});
+
+test('buildAnthropicMessages: answered → no image blocks; unanswered → base64 image blocks', () => {
+  const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
+  ] };
+  const fresh = { role: 'user', content: [
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,NEW' } },
+  ] };
+  const out = buildAnthropicMessages({ userText: 'q' }, [seen, fresh]);
+  const wire = JSON.stringify(out);
+  assert.ok(!wire.includes('OLD'));
+  assert.ok(wire.includes('NEW'));
+  assert.ok(wire.includes('"type":"image"'), 'fresh image becomes an Anthropic image block');
+});
+
+test('buildRunsConversationHistory (responses style): answered → labels; unanswered → input_image', () => {
+  const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
+  ] };
+  const fresh = { role: 'user', content: [
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,NEW' } },
+  ] };
+  const out = buildRunsConversationHistory([seen, fresh], { partStyle: 'responses' });
+  assert.deepEqual(out[0].content, [{ type: 'input_text', text: '[image 1]' }]);
+  assert.deepEqual(out[1].content, [{ type: 'input_image', image_url: 'data:image/png;base64,NEW' }]);
 });

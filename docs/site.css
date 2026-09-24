@@ -644,7 +644,7 @@ main section{padding:64px 0;position:relative}
   display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;
 }
-.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--md-accent)}.pa-opencode{background:#7c5cff}
+.pa-openai{background:#10a37f}.pa-claude{background:#d97757}.pa-ollama{background:#3a3f4a}.pa-hermes{background:var(--md-accent)}.pa-opencode{background:#7c5cff}.pa-squilla{background:#2b8a9e}
 .prov-info{flex:1;min-width:0}
 .prov-name{display:block;font-size:13px;font-weight:600;color:var(--md-fg);line-height:1.3}
 .prov-model{display:block;font-family:var(--mono);font-size:10.5px;color:var(--md-fg-light);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

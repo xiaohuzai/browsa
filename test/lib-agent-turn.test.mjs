@@ -205,18 +205,18 @@ test('withAgentRenderHints: first turn appends the hint block; later turns retur
   assert.match(AGENT_RENDER_HINT, /"style":"fcnn"/, 'the fcnn (neuron-circle) form must be taught too');
 });
 
-test('withAgentRenderHints is wired into all four agent branches (chat + subchat, opencode + bridge)', async () => {
+test('withAgentRenderHints is wired into all six agent branches (chat + subchat, opencode + bridge + squilla)', async () => {
   const fs = await import('node:fs/promises');
   const chatSrc = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
   const subchatSrc = await fs.readFile(new URL('../lib/handlers/subchat-handler.js', import.meta.url), 'utf8');
   // chat-handler delegates its payload building to lib/handlers/turn-request.js
-  // (2026-09-20 deepening pass) — the hint must be wired in BOTH agent branches
-  // there; subchat keeps its own ladder (dedicated per-subId sessions) and
-  // hints both branches itself.
+  // (2026-09-20 deepening pass) — the hint must be wired in ALL agent branches
+  // there (opencode / bridge / squilla); subchat keeps its own ladder
+  // (dedicated per-subId sessions) and hints each branch itself.
   const turnSrc = await fs.readFile(new URL('../lib/handlers/turn-request.js', import.meta.url), 'utf8');
-  assert.equal((turnSrc.match(/withAgentRenderHints\(/g) || []).length, 2, 'turn-request must hint both opencode and bridge turns');
+  assert.equal((turnSrc.match(/withAgentRenderHints\(/g) || []).length, 3, 'turn-request must hint opencode, bridge and squilla turns');
   assert.equal((chatSrc.match(/withAgentRenderHints\(/g) || []).length, 0, 'chat-handler must have delegated the hint wiring to turn-request');
-  assert.equal((subchatSrc.match(/withAgentRenderHints\(/g) || []).length, 2, 'subchat-handler must hint both opencode and bridge turns');
+  assert.equal((subchatSrc.match(/withAgentRenderHints\(/g) || []).length, 3, 'subchat-handler must hint opencode, bridge and squilla turns');
   // Hermes/LLM branches must NOT double-hint — CAPABILITY_HINTS already covers them.
   assert.doesNotMatch(turnSrc.replace(/withAgentRenderHints\([^)]*\)/g, ''), /AGENT_RENDER_HINT/,
     'the runs/dispatch paths must not reference the agent hint');

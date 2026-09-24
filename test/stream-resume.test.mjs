@@ -228,11 +228,11 @@ test('CHAT handler clears streamState after appendToHistory (no leaks)', async (
 
   // Find the chatStream call and check that clearStreamState(tabId)
   // appears AFTER appendToHistory in the CHAT handler.
-  const persistIdx = src.indexOf('await storage.appendToHistory({ role: \'assistant\'');
+  const persistIdx = src.indexOf('await persistTurnEntry(tabId, { role: \'assistant\'');
   const clearIdx = src.indexOf('clearStreamState(tabId)', persistIdx);
-  assert.ok(persistIdx > 0, 'background.js should persist assistant turn');
+  assert.ok(persistIdx > 0, 'chat-handler should persist assistant turn (via persistTurnEntry — session-scoped)');
   assert.ok(clearIdx > 0,
-    'clearStreamState(tabId) must be called after appendToHistory so PEEK stops returning in-flight for a finished reply');
+    'clearStreamState(tabId) must be called after the persist so PEEK stops returning in-flight for a finished reply');
 });
 
 test('handle accepts new STREAM_PEEK and STREAM_RELEASE case labels', async () => {

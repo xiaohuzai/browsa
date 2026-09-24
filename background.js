@@ -889,18 +889,39 @@ async function handle(msg, sender) {
     case 'STREAM_PEEK': {
       // Side panel asks "is there an in-flight stream for this tab, and
       // if so, what do you have so far?" Used on init / tab switch to
-      // rehydrate the assistant bubble from streamState.acc.
+      // rehydrate the assistant bubble from streamState.acc. With
+      // `sessionId` it also ATTACHES a watcher: a backgrounded stream (the
+      // user switched sessions mid-turn) resumes pushing only when the
+      // attached session is the turn's ORIGIN — never re-render another
+      // conversation's reply into this one.
       const t = msg.tabId;
       const st = streamState.get(t);
       if (!st) return { inFlight: false };
+      if (msg.sessionId != null && st.originSessionId === msg.sessionId) st.bg = false;
       return {
         inFlight: true,
         acc: st.acc,
         startedAt: st.startedAt,
         lastDeltaAt: st.lastDeltaAt,
         providerLabel: st.providerLabel,
-        providerKey: st.providerKey
+        providerKey: st.providerKey,
+        originSessionId: st.originSessionId || null,
+        bg: !!st.bg
       };
+    }
+
+    case 'REASSIGN_STREAM_SESSION': {
+      // Session switch with an in-flight turn: the stream goes to the
+      // BACKGROUND — its reply must land in the session it STARTED in
+      // (msg.sessionId, just snapshotted by the switch-away auto-save), not
+      // the conversation the user switched to. The panel detaches its port
+      // separately (stop-watching, not cancelling).
+      const st = streamState.get(msg.tabId);
+      if (st) {
+        if (msg.sessionId) st.originSessionId = msg.sessionId;
+        st.bg = true;
+      }
+      return { reassigned: !!st };
     }
 
     case 'STREAM_RELEASE': {
@@ -923,7 +944,10 @@ async function handle(msg, sender) {
       const t = msg.tabId;
       const controller = chatControllers.get(t);
       if (controller) {
-        try { controller.abort('user-cancel'); } catch (_) {}
+        // `salvage: false` (clearChatHistory — explicit destruction) aborts
+        // with reason 'drop': the CHAT handler's catch then skips the
+        // interrupted-turn salvage. Everything else keeps the partial text.
+        try { controller.abort(msg.salvage === false ? 'drop' : 'user-cancel'); } catch (_) {}
       }
       // For Hermes /v1/runs: also stop the server-side agent so it stops
       // executing tools rather than continuing in the background. The
@@ -936,7 +960,8 @@ async function handle(msg, sender) {
         stopHermesRun(runInfo);
         activeRunIds.delete(t);
       }
-      clearStreamState(t);
+      // Do NOT clearStreamState here: the CHAT handler's abort catch reads
+      // streamState.acc for the interrupted-turn salvage and clears it itself.
       return { aborted: !!controller };
     }
 

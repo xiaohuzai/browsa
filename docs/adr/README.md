@@ -16,3 +16,5 @@
 | [0009](0009-main-world-nested-helpers.md) | MAIN-world 注入函数的 helper 必须内嵌 | 2026-09-20 |
 | [0010](0010-capability-hints-frozen-renderers-auto.md) | CAPABILITY_HINTS 体积冻结；图表渲染器自动渲染不加按钮 | 2026-09-16 |
 | [0011](0011-streaming-render-block-commit.md) | 流式渲染块级提交；不采用 vendor 增量解析器 | 2026-09-23 |
+| [0012](0012-efficiency-pass-wontfix-list.md) | 效率审计 wontfix 清单（取舍已定，勿重报） | 2026-09-23 |
+| [0013](0013-history-images-display-fidelity.md) | 历史图片像素永不销毁——压缩只在请求侧 | 2026-09-23 |
