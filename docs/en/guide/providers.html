@@ -61,12 +61,17 @@
       </p>
 
       <h2>Two kinds of backends</h2>
+      <p>They split into two kinds — <strong>LLM providers</strong> are plain chat models, <strong>Agent providers</strong> are agents that can act on their own:</p>
       <ul>
         <li><strong>LLM providers</strong> — plain chat endpoints, covering nearly every service: OpenAI, Anthropic, Ollama, Groq, LiteLLM, aggregation gateways.</li>
-        <li><strong>Hermes Agent</strong> — a self-hosted agent with server-side tool execution: it can search, run commands, and operate files. Built into browsa; just point it at your server.</li>
-        <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
-        <li><strong>OpenSquilla Agent</strong> — <a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a>, a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills; browsa talks to its gateway WebSocket, with session memory living server-side.</li>
-        <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude, pi…): a standalone daemon turns local CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
+        <li><strong>Agent providers</strong> — full agent backends with server-side tool execution: they can search, run commands, and operate files — the kind that can actually <em>do</em> things. Four are supported:
+          <ul>
+            <li><strong>Hermes Agent</strong> — a self-hosted agent, built into browsa; just point it at your server.</li>
+            <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
+            <li><strong>OpenSquilla Agent</strong> — <a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a>, a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills; browsa talks to its gateway WebSocket, with session memory living server-side.</li>
+            <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude, pi…): a standalone daemon turns local CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
+          </ul>
+        </li>
       </ul>
       <p>When you switch to any agent, browsa asks what to do with the current conversation — carry it over as the new agent's first message, or start a new session from scratch; every reply is labeled with the provider / agent that produced it.</p>
 

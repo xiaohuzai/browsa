@@ -60,12 +60,17 @@
       </p>
 
       <h2>两类后端</h2>
+      <p>按接入方式分两类——<strong>LLM 提供商</strong>是纯对话模型，<strong>Agent 提供商</strong>是能自己动手干活的智能体：</p>
       <ul>
         <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
-        <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
-        <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
-        <li><strong>OpenSquilla Agent</strong>——<a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 本地桌面智能体（网关 + 网页界面 + 桌面应用），省 token 的微内核设计、模型路由与技能系统；browsa 走它的网关 WebSocket，会话记忆在服务端。</li>
-        <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
+        <li><strong>Agent 提供商</strong>——自带工具执行的完整智能体后端：能搜索、跑命令、操作文件，是「能做事」的那一类。browsa 支持四种：
+          <ul>
+            <li><strong>Hermes Agent</strong>——自托管智能体，内置在 browsa 里，填个地址就能用。</li>
+            <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
+            <li><strong>OpenSquilla Agent</strong>——<a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 本地桌面智能体（网关 + 网页界面 + 桌面应用），省 token 的微内核设计、模型路由与技能系统；browsa 走它的网关 WebSocket，会话记忆在服务端。</li>
+            <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
+          </ul>
+        </li>
       </ul>
       <p>切换到任一智能体时，browsa 会询问当前对话的去留——把对话记录作为第一条消息带给新 agent 接续上下文，或新建会话从零开始；每条回复都标注来自哪个 provider / agent。</p>
 
