@@ -69,5 +69,15 @@ UP主：前端晚自习
       role: 'assistant',
       content: '```mermaid\nflowchart LR\n  A[页面内容] --> B[侧边栏]\n  B --> C{Provider}\n  C -->|Agent| D[Hermes /v1/runs]\n  C -->|LLM| E[Chat Completions]\n  D --> F[流式回复]\n  E --> F\n```',
     },
+    // 多模态轮：带图消息（重试 / 编辑重发的像素保真验证素材——ADR-0013，
+    // storage 图片原样重发，气泡该有啥就有啥）。
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: '解释下这张图片。' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFElEQVR4nGP8z8DwnwEPYMInOXwUADDaJYkYODUuAAAAAElFTkSuQmCC' } },
+      ],
+    },
+    { role: 'assistant', content: '这是一张 8×8 的红色测试图——预览环境用它验证多模态轮的渲染与重试。' },
   ],
 };

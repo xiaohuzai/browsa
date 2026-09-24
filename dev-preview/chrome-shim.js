@@ -21,9 +21,11 @@
   }
   const storageLocal = {
     get: storageGet,
-    set(obj) { Object.assign(mem, obj); for (const l of storageListeners) l(obj, 'local'); },
-    remove(k) { delete mem[k]; },
-    clear() { for (const k of Object.keys(mem)) delete mem[k]; },
+    // set/remove 必须返回 Promise——composer-state 的 .catch() 链会在 undefined
+    // 上炸断 onSend（promo-video harness 同款坑，2026-09-18 实录）。
+    set(obj) { Object.assign(mem, obj); for (const l of storageListeners) l(obj, 'local'); return Promise.resolve(); },
+    remove(k) { delete mem[k]; for (const l of storageListeners) l({ [k]: undefined }, 'local'); return Promise.resolve(); },
+    clear() { for (const k of Object.keys(mem)) delete mem[k]; return Promise.resolve(); },
   };
 
   // ── runtime port ─────────────────────────────────────────────────────────
@@ -129,6 +131,15 @@
       // playback-follow worked in preview but pinned to line 1 on-device.
       case 'GET_VIDEO_TIME': return { ok: true, data: { ok: true, time: seedConfig.__videoTime ?? 450, paused: false } };
       case 'SEEK_VIDEO': return { ok: true, data: { ok: true } };
+      // Mirror background: storage.truncateHistoryFromIndex → { ok }（信封再包
+      // 一层 data，sidepanel 读 data.ok）。真截 mem.history，让重试/编辑重发
+      // 在预览里走通。
+      case 'TRUNCATE_HISTORY_FROM_INDEX': {
+        const i = Number(msg.index) || 0;
+        const ok = Array.isArray(mem.history) && i >= 0 && i <= mem.history.length;
+        if (ok) mem.history = mem.history.slice(0, i);
+        return { ok: true, data: { ok } };
+      }
       default: return { ok: true, data: {} };
     }
   }
@@ -194,7 +205,7 @@
     },
     storage: {
       local: storageLocal,
-      session: { get: async () => ({}), set: noop, remove: noop },
+      session: { get: async () => ({}), set: async () => {}, remove: async () => {} },
       onChanged: { addListener(l) { storageListeners.push(l); }, removeListener() {} },
     },
     tabs: {

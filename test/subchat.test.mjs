@@ -117,7 +117,10 @@ test('SUBCHAT never calls storage.appendToHistory', async () => {
 test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs branch on a DEDICATED per-subId session', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /dispatchStyleStream\(/, 'LLM provider styles must use the shared LLM stream dispatcher');
-  assert.match(subchatSrc, /chatMessages: messages/, 'SUBCHAT must route the chat/completions path its message array');
+  assert.match(subchatSrc, /chatMessages: buildMessages\(/, 'SUBCHAT must route the chat/completions path through the shared message builder (image turns included)');
+  // 图片轮（2026-09-25）：追问卡随 SUBCHAT 带图，转发前必须过共享轮预算。
+  assert.match(subchatSrc, /pickTurnImages\(Array\.isArray\(msg\.images\)/, 'forwarded images must go through the shared per-turn budget (lib/image-budget.js)');
+  assert.match(subchatSrc, /images: turnImages/, 'opencode/bridge streams must receive the turn images');
   const dispatchSrc = await (await import('node:fs/promises')).readFile(new URL('../lib/handlers/stream-dispatch.js', import.meta.url), 'utf8');
   assert.match(dispatchSrc, /chatStream\(\{/, 'the dispatcher must provide the chatStream path');
   // 2026-09-11 reversal of the old "never runsApiStream" rule: the compat
@@ -127,6 +130,7 @@ test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs br
   // storage-backed session id, or the side Q&A would pour into the main
   // conversation's server-side agent context.
   assert.match(subchatSrc, /provider\.isHermes/, 'Hermes must get its own runs branch');
+  assert.match(subchatSrc, /buildHermesTurn\(/, 'the runs input must be built by the shared builder (image turns become text/image_url parts)');
   assert.match(subchatSrc, /runsApiStream\(/, 'the Hermes branch must stream via runsApiStream (reasoning.available → <thinking>)');
   assert.match(subchatSrc, /subchatHermesSessions\.get\(subId\)/, 'the runs session must come from the per-subId detail-thread map');
   assert.doesNotMatch(subchatSrc, /getOrCreateHermesSessionId/,
@@ -153,7 +157,7 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
   assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
   const subchatSrc = await readSubchatHandlerSrc();
-  assert.match(subchatSrc, /role: 'system', content: capabilityHints/, 'SUBCHAT must prepend the capabilityHints param (background.js\'s CAPABILITY_HINTS) as a system message');
+  assert.match(subchatSrc, /const sysPrompt = capabilityHints/, 'SUBCHAT must use the capabilityHints param (background.js\'s CAPABILITY_HINTS) as its system prompt, fed to the shared builders/dispatcher');
 
   // CHAT still builds effectiveSystemPrompt from the same constant (passed
   // in as the capabilityHints param from background.js's CAPABILITY_HINTS).

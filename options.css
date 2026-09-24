@@ -175,10 +175,12 @@ main {
   overflow: hidden;
 }
 
-/* 本地 Agent 合并卡（options.js renderProviders）：三张 agent 卡共用一个
-   连体分段控件，控件住进可见卡的标题行（该卡的 .name 隐藏，tab 即标题），
-   同屏只显示当前类型的那张。 */
-.local-agent-tabs {
+/* 服务商分段标签（options.js renderProviders）：Agent 合并卡与 LLM 组共用
+   同一套连体分段控件——Agent 是四个固定类型 tab，LLM 是「别名 tab × N ＋
+   常驻新建 tab」。控件住进可见卡的标题行（该卡的 .name 隐藏，tab 即标题），
+   同屏只显示当前标签的那张卡；组内没有可见卡时（reserved 态）控件独占一条
+   band 落在组头之下。 */
+.provider-tabs {
   display: inline-flex;
   flex: 1;
   border: 1px solid var(--border);
@@ -187,7 +189,17 @@ main {
   background: var(--bg);
   min-width: 0;
 }
-.local-agent-tab {
+.provider-group > .provider-tabs {
+  /* reserved 态：没有可见卡可住，控件独占 band（flex:1 在列向组里会竖向
+     撑开，这里锁回内容高度并融进分组头的条带语言）。 */
+  flex: 0 0 auto;
+  align-self: stretch;
+  padding: 7px 14px;
+  border-radius: 0;
+  border: none;
+  background: var(--bg-3);
+}
+.provider-tab {
   border: none;
   border-right: 1px solid var(--border);
   padding: 3px 11px;
@@ -197,16 +209,19 @@ main {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.local-agent-tab:last-child { border-right: none; }
-.local-agent-tab:hover { color: var(--fg); background: var(--bg-2); }
-.local-agent-tab.on {
+.provider-tab:last-child { border-right: none; }
+.provider-tab:hover { color: var(--fg); background: var(--bg-2); }
+.provider-tab.on {
   background: var(--accent);
   color: #fff;
 }
-.local-agent-tab.on:hover { color: #fff; }
+.provider-tab.on:hover { color: #fff; }
 /* 已配置指示点：该 tab 背后的 provider 存有配置（可能是多个桥 agent） */
-.local-agent-tab.configured::after {
+.provider-tab.configured::after {
   content: '';
   display: inline-block;
   width: 5px;
@@ -216,7 +231,14 @@ main {
   margin-left: 5px;
   vertical-align: middle;
 }
-.local-agent-tab.on.configured::after { background: #fff; }
+.provider-tab.on.configured::after { background: #fff; }
+.provider-tab-add {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+}
+.provider-tab-add:hover { color: var(--accent); }
 
 .provider-group-header {
   padding: 10px 14px;
@@ -650,33 +672,7 @@ details.provider-group[open] > .provider-group-header::before {
   margin-top: 4px;
 }
 
-/* ── Add-provider button + provider delete button ───────────────────────── */
-.add-provider-btn {
-  align-self: center;
-  /* Full-width quiet footer row of the LLM group. The pill used to float on
-     the group's --border gap-grid fill, which read as a disabled gray strip
-     around it; sitting flush on a card surface with a top hairline matches
-     the group header band instead. */
-  margin: 0;
-  width: 100%;
-  padding: 10px;
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--accent);
-  border: none;
-  border-top: 1px solid var(--border);
-  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
-  background: var(--surface);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.add-provider-btn:hover {
-  color: var(--accent);
-  background: var(--accent-hover, var(--accent-bg));
-}
-
-
+/* ── Provider delete button ──────────────────────────────────────────────── */
 .provider-h3 {
   display: flex;
   align-items: center;

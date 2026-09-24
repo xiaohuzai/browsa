@@ -231,6 +231,10 @@ async function saveAsr() {
   flash('ok', tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
 }
 
+// LLM 编辑标签：当前显示哪张 LLM 卡（页内跨重渲记忆；不持久化——刷新后回落
+// 激活 provider 或第一个。Agent 侧的 localAgentTab 是持久化偏好，两码事。）
+let llmEditorTab = null;
+
 function renderProviders() {
   const groupOpenStates = new Map(
     [...providersEl.querySelectorAll('.provider-group')]
@@ -267,7 +271,7 @@ function renderProviders() {
       // 只显示当前类型的那张。切换偏好持久化在 localAgentTab（纯 UI 偏好）。
       const tab = localAgentTab();
       const tabsWrap = document.createElement('div');
-      tabsWrap.className = 'local-agent-tabs';
+      tabsWrap.className = 'provider-tabs';
       // 已配置指示点：切走的 tab 背后若存有配置（如 codex 桥配了三个 agent、
       // 又配了 opencode 直连），pill 上点一个点——多 agent 用户一眼看出
       // 「哪个 tab 背后有东西」，不用来回切。
@@ -279,7 +283,7 @@ function renderProviders() {
       const tabBtn = (id) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'local-agent-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
+        b.className = 'provider-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
         b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
         b.textContent = id === 'bridge'
           ? _t('localAgentTabBridge', 'Codex / Claude Code / pi')
@@ -319,29 +323,61 @@ function renderProviders() {
       for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'squilla' && n !== 'hermes')) {
         details.appendChild(buildProviderCard(name, cfg));
       }
-    } else {
-      for (const [name, cfg] of entries) {
-        details.appendChild(buildProviderCard(name, cfg));
-      }
     }
 
     if (group.type === 'llm') {
+      // 标签栏呈现（与 Agent 合并卡同一分段控件）：每个 LLM 服务商一个横条标签
+      // （别名即标签），末尾常驻 ＋ 标签 = 唯一的新建入口。同屏只显示当前标签
+      // 的那张卡。
+      const tabsWrap = document.createElement('div');
+      tabsWrap.className = 'provider-tabs';
+      for (const [name, cfg] of entries) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'provider-tab' + (name === llmEditorTab ? ' on' : '');
+        b.textContent = (cfg.alias || '').trim() || name.replace(/^llm-/, 'LLM ');
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (llmEditorTab === name) return;
+          llmEditorTab = name;
+          renderProviders();
+        });
+        tabsWrap.append(b);
+      }
+      const addTab = document.createElement('button');
+      addTab.type = 'button';
+      addTab.className = 'provider-tab provider-tab-add';
+      addTab.textContent = '＋';
+      addTab.title = _t('addProviderBtn', '＋ Add Provider');
+      addTab.setAttribute('aria-label', addTab.title);
+      addTab.addEventListener('click', () => addProvider());
+      tabsWrap.append(addTab);
+
       // The reserved empty "LLM 1" slot only exists while there are NO LLM
       // providers at all (fresh install / every card deleted). It is
       // render-only — NOT persisted — so the sidebar dropdown never lists an
       // unconfigured "LLM 1 — not set". The moment any provider is committed,
       // the slot is consumed and never comes back on its own.
       if (entries.length === 0) {
+        details.appendChild(tabsWrap);
         details.appendChild(buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true }));
+      } else {
+        if (!entries.some(([n]) => n === llmEditorTab)) {
+          const active = cachedCfg.activeProvider;
+          llmEditorTab = entries.some(([n]) => n === active) ? active : entries[0][0];
+        }
+        for (const [name, cfg] of entries) {
+          const cardEl = buildProviderCard(name, cfg);
+          if (name !== llmEditorTab) cardEl.style.display = 'none';
+          details.appendChild(cardEl);
+          if (name === llmEditorTab) {
+            const h3 = cardEl.querySelector('.provider-h3');
+            const nameSpan = h3.querySelector('.name');
+            if (nameSpan) nameSpan.style.display = 'none';
+            h3.insertBefore(tabsWrap, nameSpan);
+          }
+        }
       }
-      // "＋ Add Provider" is always available and is the ONLY way to create
-      // new empty cards; they append BELOW the already-configured ones.
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'add-provider-btn';
-      addBtn.textContent = _t('addProviderBtn', '＋ Add Provider');
-      addBtn.addEventListener('click', () => addProvider());
-      details.appendChild(addBtn);
     }
 
     providersEl.appendChild(details);
@@ -988,14 +1024,17 @@ async function addProvider() {
   const name = `llm-${n}`;
   cachedCfg.providers[name] = { ...BLANK_LLM };
   await storage.set({ providers: cachedCfg.providers });
+  // 新服务商即刻成为选中标签（它就是标签栏里横着出现的那一个）。
+  llmEditorTab = name;
   renderProviders();
-  // Auto-expand + focus the alias field of the newly added card so the user
-  // can immediately type a name.
-  const cards = document.querySelectorAll('.provider');
-  const last = cards[cards.length - 1];
-  if (last) {
-    if (last.scrollIntoView) last.scrollIntoView({ block: 'center' });
-    const alias = last.querySelector('[data-k="alias"]');
+  // Focus the alias field of the newly added card so the user can immediately
+  // type a name. Locate it by its stable data-name — with the tabbed layout
+  // only the selected card is visible, and node order no longer implies
+  // "newest".
+  const cardEl = document.querySelector(`.provider[data-name="${name}"]`);
+  if (cardEl) {
+    if (cardEl.scrollIntoView) cardEl.scrollIntoView({ block: 'center' });
+    const alias = cardEl.querySelector('[data-k="alias"]');
     if (alias) { alias.focus(); alias.select(); }
   }
 }
