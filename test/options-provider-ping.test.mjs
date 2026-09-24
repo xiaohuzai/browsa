@@ -948,7 +948,7 @@ test('options.js: agent tab switches preserve both provider groups open states',
   groups()[0].open = false;
   groups()[1].open = true;
 
-  for (const label of ['Hermes', 'Codex / Claude Code / pi', 'OpenCode']) {
+  for (const label of ['Hermes', 'Agent Bridge', 'OpenCode']) {
     const previousGroup = groups()[0];
     const tab = agentTabs()
       .find((button) => button.textContent === label);
