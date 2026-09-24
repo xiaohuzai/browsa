@@ -220,7 +220,7 @@ allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 
 任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。
 
-打开 ⚙ 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**，或随时用 **＋ Add Provider** 添加更多：
+打开 ⚙ 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**。服务商以标签形式收在一张卡里，随时点标签栏末尾的 **＋** 新建：
 
 | 字段 | 值 |
 |---|---|
@@ -267,7 +267,7 @@ allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 | **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿 |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` 代码块内联渲染，各带缩放/复制/导出 SVG 工具栏；直接说要一张图表或思维导图——模型懂这个格式。Mermaid 解析失败时，一键让 AI 修复重绘——修复后的图先经本地解析校验再替换 |
 | **分子式 · 蛋白质 · 神经网络** | ` ```smiles ` / ` ```pdb ` / ` ```nn ` 代码块同样内联实时渲染——2D 结构式与化学反应式、按 PDB ID 交互查看蛋白质 3D 结构、出版级网络架构图；各带复制/导出工具栏 |
-| **追问（Follow-up）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调；输入框 ↑/↓ 只召回追问里发过的问题 |
+| **追问（Follow-up）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调；可直接粘贴图片，与主输入框一致；输入框 ↑/↓ 只召回追问里发过的问题 |
 | **大纲导航** | 对话满 4 轮后出现刻度导航条——点击跳转、悬停预览 |
 | **编辑并重发 · 重新生成** | ✏ 编辑并重发任意用户消息；⟳ 重新运行任意回复 |
 | **排队追问** | 流式回答期间继续输入会自动排队，回答结束后依次发出 |

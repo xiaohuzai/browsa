@@ -2715,16 +2715,48 @@ function findPrevUserBubble(el) {
 }
 
 /**
+ * Read a user history entry back from storage for retry / edit-and-resend.
+ * Text parts join into the canonical raw; image parts come back verbatim —
+ * display pixels ARE storage pixels (ADR-0013), so replaying these URLs
+ * re-sends exactly what the bubble showed. Null when storage is unreadable
+ * or the index doesn't point at a user turn (callers fall back to the
+ * bubble's rendered text).
+ */
+async function readUserEntryForResend(idx) {
+  try {
+    const history = await storage.getHistory();
+    const entry = Array.isArray(history) ? history[idx] : null;
+    if (!entry || entry.role !== 'user') return null;
+    if (Array.isArray(entry.content)) {
+      const text = entry.content
+        .filter((p) => p?.type === 'text' || p?.type === 'input_text')
+        .map((p) => p?.text || '')
+        .join('\n');
+      const imageUrls = entry.content
+        .filter((p) => p?.type === 'image_url')
+        .map((p) => (typeof p.image_url === 'string' ? p.image_url : p.image_url?.url))
+        .filter(Boolean);
+      return { text, imageUrls };
+    }
+    return { text: String(entry.content ?? ''), imageUrls: [] };
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
  * Regenerate: cancel any stream, truncate stored history from the user turn
  * onward, drop the reply (and anything after it) from the DOM, re-send the
- * SAME user text. Inline images attached to the original turn are not
- * replayed — same limitation edit&resend has; text-only turns are exact.
+ * SAME user turn — text AND attached images, both read back from storage
+ * (ADR-0013: the bubble shows storage pixels, so replay is byte-identical).
  */
 async function regenerateReply(userBubble) {
   const idx = parseInt(userBubble.dataset.hidx, 10);
   if (isNaN(idx)) return;
-  const raw = (userBubble.dataset.raw || userBubble.querySelector('.msg-text')?.textContent || '').trim();
-  if (!raw) return;
+  const stored = await readUserEntryForResend(idx);
+  const raw = (stored?.text ?? userBubble.dataset.raw ?? userBubble.querySelector('.msg-text')?.textContent ?? '').trim();
+  const imageUrls = stored?.imageUrls || [];
+  if (!raw && !imageUrls.length) return;
 
   if (activeController && !activeController.cancelled) cancelStream();
   const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
@@ -2739,9 +2771,12 @@ async function regenerateReply(userBubble) {
   }
   // 旧 user 气泡必须一并移除：onSend 会新建一条并 hidxAssign 出同一个 idx，
   // 留着旧泡就是两条同 hidx 气泡争同一 storage 槽（删任一条都会删错条目）。
-  // 旧泡上的附件图也随 storage 截断一起没了，留着反而与历史分叉。
   userBubble.remove();
   hidxResetTo(idx);
+
+  // 原轮次的图片原样重发（onSend 消费 composer 的 images 数组并在 CHAT 交接
+  // 后清空）——重试丢图的根因就是只摆渡了文本。
+  images.push(...imageUrls.map((u) => ({ dataUrl: u })));
 
   // onSend() reads the composer as its input source; preserve whatever is
   // parked there and restore after the regenerated turn has been handed off.
@@ -2799,14 +2834,15 @@ function startMsgEdit(el) {
     const newText = textarea.value.trim();
     if (!newText) return;
     const idx = parseInt(el.dataset.hidx, 10);
+    if (activeController && !activeController.cancelled) cancelStream();
+    // 原条目的图片部件要先于截断读回（ADR-0013）：编辑只改文本，重发不能把
+    // 原轮次的图弄丢。
+    const stored = !isNaN(idx) ? await readUserEntryForResend(idx) : null;
+    const imageUrls = stored?.imageUrls || [];
 
     // 先截 storage、成功了才动 DOM：失败时保持编辑态——否则气泡显示新文本
     // 而 storage 仍是旧的（toast 说「未保存修改」界面却像已保存）。
     if (!isNaN(idx)) {
-      // Cancel any in-flight stream before truncating history — otherwise
-      // the old port's CHUNK/DONE events would land on the new turn and
-      // corrupt history indices.
-      if (activeController && !activeController.cancelled) cancelStream();
       // Truncate history from this point onward, then re-send
       const truncRes = await sendMessage({ type: 'TRUNCATE_HISTORY_FROM_INDEX', index: idx }).catch(() => null);
       if (!truncRes?.data?.ok) { showToast(_t('truncEditNotSaved', '历史截断失败，未保存修改'), 'error'); return; }
@@ -2822,7 +2858,8 @@ function startMsgEdit(el) {
     // 就是两条同 hidx 气泡争同一 storage 槽。
     el.remove();
     if (!isNaN(idx)) hidxResetTo(idx); // will be re-assigned when CHAT handler stores new turns
-    // Re-send as new turn
+    // Re-send as new turn — original images ride along verbatim.
+    images.push(...imageUrls.map((u) => ({ dataUrl: u })));
     lastSentRaw = newText;
     inputEl.value = newText;
     await onSend();

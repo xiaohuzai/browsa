@@ -220,7 +220,7 @@ Notes: each browsa conversation maps to one gateway session (gateway-assigned ke
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
 
-Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**, or use **＋ Add Provider** anytime:
+Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**. Providers live as tabs on one card; add more anytime with the **＋** tab at the end of the tab bar:
 
 | Field | Value |
 |---|---|
@@ -267,7 +267,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
 | **Molecules · Proteins · Neural nets** | ```smiles / ```pdb / ```nn code blocks render live too — 2D structure and reaction diagrams, interactive protein 3D from a PDB ID, and publication-style network architecture figures; each with copy / export controls |
-| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable; the input's ↑/↓ recalls follow-up questions only |
+| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable; paste images into the card, same as the main composer; the input's ↑/↓ recalls follow-up questions only |
 | **Outline rail** | from 4 turns on, a quiet tick rail tracks the conversation — click to jump, hover to preview |
 | **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
 | **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |

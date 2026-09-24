@@ -309,9 +309,14 @@ function providerCards() {
 }
 
 function clickAddProvider() {
-  const btn = document.querySelector('.add-provider-btn');
-  assert.ok(btn, 'an Add Provider button must be present');
+  const btn = document.querySelector('.provider-tab-add');
+  assert.ok(btn, 'the ＋ add-provider tab must be present in the LLM tab bar');
   btn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+}
+
+function agentTabs() {
+  // LLM 组也有标签（别名 tab × N ＋ 常驻 ＋），agent 计数断言必须按组圈定。
+  return [...document.querySelectorAll('.provider-group[data-group-type="agent"] .provider-tab')];
 }
 
 // Add a fresh blank LLM card and return it. On a fresh install a render-only
@@ -352,7 +357,7 @@ test('options.js: init() renders the agent squad (bridge + opencode + squilla + 
   // 合并呈现：四个类型 tab + 同屏只显示当前类型的那张卡。全新安装无任何
   // 配置、activeProvider 默认是未配置的 hermes —— 不得因此默认落在 Hermes
   // （「Hermes 永远常驻」正是要修的抱怨），应落在推荐首选 bridge。
-  const tabs = document.querySelectorAll('.local-agent-tab');
+  const tabs = agentTabs();
   assert.equal(tabs.length, 4, 'four agent type tabs (bridge / opencode / squilla / hermes)');
   assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, '', 'bridge card is the default visible tab on a fresh install');
   assert.equal(findProviderCard('OpenCode Agent').style.display, 'none', 'opencode card hidden under the default tab');
@@ -362,7 +367,7 @@ test('options.js: init() renders the agent squad (bridge + opencode + squilla + 
   assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
   assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
   assert.equal(reserved.querySelector('[data-act="delete"]'), null, 'the reserved slot has no delete button (nothing persisted yet)');
-  assert.equal(document.querySelector('.add-provider-btn') != null, true, 'Add Provider button is always present — even with the reserved slot');
+  assert.equal(document.querySelector('.provider-tab-add') != null, true, 'the ＋ add-provider tab is always present — even with the reserved slot');
 });
 
 test('options.js: settings header carries the usage-guide link (zh site by default, new tab)', () => {
@@ -919,8 +924,8 @@ test('options.js: the local-agent tab pref switches which card is visible and pe
   // Fresh module instance over a clean store: default tab = bridge.
   await import('../options.js?local-agent-tabs-1');
   await new Promise((r) => setTimeout(r, 50));
-  const tabs = [...document.querySelectorAll('.local-agent-tab')];
-  assert.equal(tabs.length, 4, 'four tabs on the fresh instance (bridge / opencode / squilla / hermes)');
+  const tabs = agentTabs();
+  assert.equal(tabs.length, 4, 'four agent tabs on the fresh instance (bridge / opencode / squilla / hermes)');
   const bridgeCard = findProviderCard(BRIDGE_CARD_LABEL);
   const opencodeCard = findProviderCard('OpenCode Agent');
   assert.equal(bridgeCard.style.display, '', 'bridge visible by default');
@@ -945,7 +950,7 @@ test('options.js: agent tab switches preserve both provider groups open states',
 
   for (const label of ['Hermes', 'Codex / Claude Code / pi', 'OpenCode']) {
     const previousGroup = groups()[0];
-    const tab = [...document.querySelectorAll('.local-agent-tab')]
+    const tab = agentTabs()
       .find((button) => button.textContent === label);
     assert.ok(tab);
     tab.click();
@@ -1000,7 +1005,7 @@ test('options.js: configured agent tabs show a dot indicator (multi-agent visibi
   storedData.localAgentTab = 'bridge';
   await import('../options.js?local-agent-tabs-4');
   await new Promise((r) => setTimeout(r, 50));
-  const on = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
+  const on = agentTabs().map((b) => b.classList.contains('configured'));
   assert.deepEqual(on, [true, true, false, false], 'configured tabs show the dot (squilla/hermes unconfigured → none)');
   // Unconfigured tab carries no dot.
   storedData.providers = {
@@ -1009,7 +1014,7 @@ test('options.js: configured agent tabs show a dot indicator (multi-agent visibi
   };
   await import('../options.js?local-agent-tabs-5');
   await new Promise((r) => setTimeout(r, 50));
-  const flags = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
+  const flags = agentTabs().map((b) => b.classList.contains('configured'));
   assert.deepEqual(flags, [true, false, false, false], 'only the configured side gets the dot');
 });
 
@@ -1027,6 +1032,6 @@ test('options.js: a Hermes-only user sees the Hermes card under the merged tabs'
   assert.equal(findProviderCard('Hermes Agent').style.display, '', 'the only configured agent is the visible tab');
   assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, 'none', 'bridge hidden');
   assert.equal(findProviderCard('OpenCode Agent').style.display, 'none', 'opencode hidden');
-  const onTab = [...document.querySelectorAll('.local-agent-tab')].find((b) => b.classList.contains('on'));
+  const onTab = agentTabs().find((b) => b.classList.contains('on'));
   assert.equal(onTab.textContent, 'Hermes', 'the Hermes pill is the active tab');
 });

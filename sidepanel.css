@@ -2612,6 +2612,15 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
    (see openDetailThread in sidepanel.js) — no parallel bubble styling here,
    so they can never drift out of sync with the main chat's look. */
 .subchat-error { color: var(--error); }
+/* 追问卡的粘贴图缩略条（detail-thread.js）：主 composer 的 .imagepreview
+   缩略样式直接复用，这里只管条本身的布局与空态隐藏。 */
+.detail-thread-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+.detail-thread-imgs:empty { display: none; }
 .detail-thread-input-row {
   display: flex;
   gap: 6px;
