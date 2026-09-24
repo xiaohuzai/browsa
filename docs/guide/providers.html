@@ -136,7 +136,7 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791</pre></li>
         <li>放行扩展——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进<strong>网关实际读取的那份配置</strong>——命令行网关读 <code>~/.opensquilla/config.toml</code>，<strong>桌面版读它自己 profile 目录里的 config.toml</strong>（macOS 官方包：<code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code>）。<strong>路径里有空格，终端里必须加引号</strong>（如 <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>），否则会静默编辑到另一个文件去：
 <pre class="doc-code">[cors]
-allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]</pre>
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]</pre>
           这是 browsa 的扩展 ID（可在 <code>chrome://extensions</code> → browsa → <strong>ID</strong> 核对；解包加载填实际显示的值），<strong>逐字精确匹配</strong>（<code>*</code> 无效）。本地网关请用 <code>ws://</code>——<code>wss</code> 会被拒。改完重启网关（桌面版完全退出再重开）。</li>
         <li>在 browsa 设置里切到 <strong>OpenSquilla</strong> 标签，Base URL 填 <code>ws://127.0.0.1:18791/ws</code>；API Key 仅当网关配置了令牌时填写。</li>
         <li>点击 <strong>Ping</strong> 验证——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。</li>
