@@ -1,6 +1,6 @@
 # browsa · Chrome Web Store Listing 文案包
 
-> 线上地址（2026-09-09 起）：https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho
+> 线上地址（2026-09-09 起）：https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn
 > ——README 双语、官网首页与快速上手页的安装步骤都以这条链接为准（商店版自动更新，但审核有延迟，可能落后 GitHub 版几天）。
 >
 > 用法：Phase 0 发布时，把下面各字段**原样粘贴**到 [Developer Dashboard](https://chrome.google.com/webstore/devconsole) → 你的商品 →「Store listing」。

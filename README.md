@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
+  <a href="https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
@@ -76,7 +76,7 @@ flowchart LR
 
 Choose one installation method:
 
-**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). Store review may lag behind GitHub releases.
+**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn). Store review may lag behind GitHub releases.
 
 **GitHub — manual installation and updates.**
 
@@ -185,7 +185,7 @@ hermes gateway
 
 [OpenSquilla](https://github.com/opensquilla/opensquilla) is a local desktop agent (gateway + Web UI + Electron app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.
 
-**1. Install & start the gateway** — v0.5.5 or newer (that release's origin guard natively accepts whitelisted extension origins):
+**1. Get a gateway running** — its origin guard must be v0.5.5 or newer (that release natively accepts whitelisted extension origins). The **desktop app** starts its own gateway — check its settings for the gateway URL (typically `http://127.0.0.1:18791`; it takes the first free port in 18791–18830) and skip the commands below. To run the gateway yourself:
 
 ```bash
 uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
@@ -193,14 +193,14 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791
 ```
 
-**2. Let the extension in** — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to `~/.opensquilla/config.toml`:
+**2. Let the extension in** — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to the gateway's config — the CLI gateway reads `~/.opensquilla/config.toml`, while **the desktop app reads its own profile config** (macOS official package: `~/Library/Application Support/OpenSquilla/opensquilla/config.toml` — the path contains a space, so quote it in a terminal, e.g. `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"`; an unquoted path quietly edits a different file):
 
 ```toml
 [cors]
-allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
+allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]
 ```
 
-This is browsa's **pinned extension ID** (fixed via the manifest key — the same on every machine and matching the store listing; verify at `chrome://extensions` → browsa → **ID**). Since v0.5.5 the origin guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
+This is browsa's extension ID (verify at `chrome://extensions` → browsa → **ID** — use whatever value is shown there if you run an unpacked build). The listing is an exact string match (`*` does nothing). Since v0.5.5 the origin guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway). Restart the gateway after editing — for the desktop app, quit it fully and reopen.
 
 **3. Configure browsa** — open ⚙ Settings, select the **OpenSquilla** tab:
 
