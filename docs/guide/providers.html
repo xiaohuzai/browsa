@@ -83,7 +83,7 @@
       </table>
       <p>保存后点 <strong>Ping</strong>：验证连通性并自动识别模型能力。第一个 Ping 通的提供商会自动设为当前使用；之后在侧边栏顶部下拉里随时切换，多模型的卡会按「别名 · 模型」逐个列出。</p>
       <figure class="shot">
-        <img src="../assets/readme/providers-zh.png" alt="browsa 设置页：OpenAI、Claude、Ollama、Hermes Agent、OpenCode Agent 与 Agent Bridge 六张提供商卡" loading="lazy">
+        <img src="../assets/readme/providers-zh.png" alt="browsa 设置页：OpenAI、Claude、Ollama 提供商卡与合并智能体卡（Codex / Claude Code / pi、OpenCode、Hermes、OpenSquilla 四个标签）" loading="lazy">
         <figcaption>设置页：每张卡独立协议、独立别名，Ping 状态一目了然。</figcaption>
       </figure>
 
@@ -125,14 +125,14 @@ agent:
       <h2 id="opensquilla">OpenSquilla Agent</h2>
       <p><a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 是本地桌面智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的<strong>网关 WebSocket</strong>（<code>/ws</code>）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。</p>
       <ol>
-        <li>安装并启动网关——请用 <strong>v0.5.5 或更新版本</strong>（该版本的来源守卫原生支持放行白名单里的扩展来源）：
+        <li>让网关跑起来——内核需 <strong>v0.5.5 或更新</strong>（该版本的来源守卫原生支持放行白名单里的扩展来源）。<strong>桌面版本身就带网关</strong>（设置里可见网关地址，通常 <code>http://127.0.0.1:18791</code>，自动取 18791–18830 首个空闲端口），可跳过下面的命令。想自己起网关则：
 <pre class="doc-code">uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
 opensquilla gateway start
 # → running: http://127.0.0.1:18791</pre></li>
-        <li>放行扩展——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进 <code>~/.opensquilla/config.toml</code>：
+        <li>放行扩展——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进<strong>网关实际读取的那份配置</strong>——命令行网关读 <code>~/.opensquilla/config.toml</code>，<strong>桌面版读它自己 profile 目录里的 config.toml</strong>（macOS 官方包：<code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code>）。<strong>路径里有空格，终端里必须加引号</strong>（如 <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>），否则会静默编辑到另一个文件去：
 <pre class="doc-code">[cors]
-allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]</pre>
-          这是 browsa <strong>固定的扩展 ID</strong>（manifest 的 key 字段锁定，所有机器一致、与商店上架一致；可在 <code>chrome://extensions</code> → browsa → <strong>ID</strong> 核对）。本地网关请用 <code>ws://</code>——<code>wss</code> 会被拒。</li>
+allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]</pre>
+          这是 browsa 的扩展 ID（可在 <code>chrome://extensions</code> → browsa → <strong>ID</strong> 核对；解包加载填实际显示的值），<strong>逐字精确匹配</strong>（<code>*</code> 无效）。本地网关请用 <code>ws://</code>——<code>wss</code> 会被拒。改完重启网关（桌面版完全退出再重开）。</li>
         <li>在 browsa 设置里切到 <strong>OpenSquilla</strong> 标签，Base URL 填 <code>ws://127.0.0.1:18791/ws</code>；API Key 仅当网关配置了令牌时填写。</li>
         <li>点击 <strong>Ping</strong> 验证——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。</li>
       </ol>

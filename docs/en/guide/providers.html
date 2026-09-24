@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>Connecting backends · browsa guide</title>
-<meta name="description" content="Connect browsa to your own models: OpenAI / Anthropic / Ollama / self-hosted gateways, multiple protocols and models per card; installing Hermes / opencode agents and their approval flows.">
+<meta name="description" content="Connect browsa to your own models: OpenAI / Anthropic / Ollama / self-hosted gateways, multiple protocols and models per card; installing the Hermes / opencode / OpenSquilla agents and their approval flows.">
 <link rel="icon" type="image/png" href="../../icon48.png">
 <link rel="stylesheet" href="../../site.css">
 <link rel="stylesheet" href="../../docs.css">
@@ -65,6 +65,7 @@
         <li><strong>LLM providers</strong> — plain chat endpoints, covering nearly every service: OpenAI, Anthropic, Ollama, Groq, LiteLLM, aggregation gateways.</li>
         <li><strong>Hermes Agent</strong> — a self-hosted agent with server-side tool execution: it can search, run commands, and operate files. Built into browsa; just point it at your server.</li>
         <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
+        <li><strong>OpenSquilla Agent</strong> — <a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a>, a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills; browsa talks to its gateway WebSocket, with session memory living server-side.</li>
         <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude, pi…): a standalone daemon turns local CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
       </ul>
       <p>When you switch to any agent, browsa asks what to do with the current conversation — carry it over as the new agent's first message, or start a new session from scratch; every reply is labeled with the provider / agent that produced it.</p>
@@ -83,7 +84,7 @@
       </table>
       <p>Save, then hit <strong>Ping</strong>: connectivity is verified and capabilities auto-detected. The first provider to ping successfully becomes active automatically; switch anytime from the dropdown at the top of the panel — multi-model cards expand to one "Alias · model" entry each.</p>
       <figure class="shot">
-        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama, Hermes Agent, OpenCode Agent, and Agent Bridge provider cards" loading="lazy">
+        <img src="../../assets/readme/providers-en.png" alt="browsa settings listing OpenAI, Claude, Ollama provider cards and a merged agent card with Codex / Claude Code / pi, OpenCode, Hermes, and OpenSquilla tabs" loading="lazy">
         <figcaption>Settings: each card carries its own protocol and alias; ping state at a glance.</figcaption>
       </figure>
 
@@ -122,6 +123,22 @@ agent:
   "permission": { "bash": "ask", "edit": "ask" }
 }</pre>
 
+
+      <h2 id="opensquilla">OpenSquilla Agent</h2>
+      <p><a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> is a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its <strong>gateway WebSocket</strong> (<code>/ws</code>) — the same channel its own web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.</p>
+      <ol>
+        <li>Get a gateway running — its origin guard must be <strong>v0.5.5 or newer</strong> (that release natively accepts whitelisted extension origins). The <strong>desktop app</strong> starts its own gateway (its settings show the gateway URL — typically <code>http://127.0.0.1:18791</code>, the first free port in 18791–18830); skip the commands below in that case. To run the gateway yourself:
+<pre class="doc-code">uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
+opensquilla gateway start
+# → running: http://127.0.0.1:18791</pre></li>
+        <li>Let the extension in — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to the config the gateway actually reads — the CLI gateway reads <code>~/.opensquilla/config.toml</code>, while <strong>the desktop app reads its own profile config</strong> (macOS official package: <code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code> — the path contains a space, so quote it in a terminal, e.g. <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>; an unquoted path quietly edits a different file):
+<pre class="doc-code">[cors]
+allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]</pre>
+          This is browsa's extension ID (verify at <code>chrome://extensions</code> → browsa → <strong>ID</strong> — use whatever value is shown there for an unpacked build); the listing is an <strong>exact string match</strong> (<code>*</code> does nothing). Use <code>ws://</code> for a local gateway — <code>wss</code> is rejected. Restart the gateway after editing (desktop app: quit fully and reopen).</li>
+        <li>In browsa settings, switch to the <strong>OpenSquilla</strong> tab: Base URL <code>ws://127.0.0.1:18791/ws</code>; fill the API Key only if your gateway requires a token.</li>
+        <li>Hit <strong>Ping</strong> to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.</li>
+      </ol>
+      <p>Notes: each browsa conversation maps to one gateway session (reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message); a huge page (over 60k chars) is uploaded as a <code>page-context.md</code> document the agent reads with its own tools. Pasted screenshots stay in browsa's own history and are not forwarded yet.</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
       <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude, pi</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as the model source — no separate model-API purchase needed; pi runs on whatever model providers you configure inside it.</p>

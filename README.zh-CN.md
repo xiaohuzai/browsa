@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
+  <a href="https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
@@ -76,7 +76,7 @@ flowchart LR
 
 选择一种安装方式即可：
 
-**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店审核可能晚于 GitHub 发布。
+**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn)。商店审核可能晚于 GitHub 发布。
 
 **GitHub —— 手动安装与更新。**
 
@@ -185,7 +185,7 @@ hermes gateway
 
 [OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地桌面智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。
 
-**1. 安装并启动网关**——请用 v0.5.5 或更新版本（该版本的来源守卫原生支持放行白名单里的扩展来源）：
+**1. 让网关跑起来**——内核需 v0.5.5 或更新（该版本的来源守卫原生支持放行白名单里的扩展来源）。**桌面版本身就带网关**——在它的设置里能看到网关地址（通常是 `http://127.0.0.1:18791`；它会自动取 18791–18830 里第一个空闲端口），可跳过下面的命令。想自己起网关则：
 
 ```bash
 uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
@@ -193,14 +193,14 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791
 ```
 
-**2. 放行扩展**——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进 `~/.opensquilla/config.toml`：
+**2. 放行扩展**——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进**网关实际读取的那份配置**——命令行网关读 `~/.opensquilla/config.toml`，**桌面版读它自己 profile 目录里的 config.toml**（macOS 官方包：`~/Library/Application Support/OpenSquilla/opensquilla/config.toml`）。**路径里有空格，终端里必须加引号**，否则会静默编辑到另一个文件去，例如 `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"`：
 
 ```toml
 [cors]
-allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
+allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]
 ```
 
-这是 browsa **固定的扩展 ID**（manifest 里的 key 字段锁定，所有机器一致、与商店上架一致；可在 `chrome://extensions` → browsa → **ID** 核对）。v0.5.5 起，来源守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
+这是 browsa 的扩展 ID（可在 `chrome://extensions` → browsa → **ID** 核对；解包加载请填那里实际显示的值）。白名单是**逐字精确匹配**（`*` 无效）。v0.5.5 起，来源守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。改完配置要重启网关——桌面版请完全退出再重开。
 
 **3. 配置 browsa**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
 
