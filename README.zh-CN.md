@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
+  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
@@ -76,7 +76,7 @@ flowchart LR
 
 选择一种安装方式即可：
 
-**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn)。商店审核可能晚于 GitHub 发布。
+**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店审核可能晚于 GitHub 发布。
 
 **GitHub —— 手动安装与更新。**
 
@@ -197,7 +197,7 @@ opensquilla gateway start
 
 ```toml
 [cors]
-allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 ```
 
 这是 browsa 的扩展 ID（可在 `chrome://extensions` → browsa → **ID** 核对；解包加载请填那里实际显示的值）。白名单是**逐字精确匹配**（`*` 无效）。v0.5.5 起，来源守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。改完配置要重启网关——桌面版请完全退出再重开。

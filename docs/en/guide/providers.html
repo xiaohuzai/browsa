@@ -138,7 +138,7 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791</pre></li>
         <li>Let the extension in — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to the config the gateway actually reads — the CLI gateway reads <code>~/.opensquilla/config.toml</code>, while <strong>the desktop app reads its own profile config</strong> (macOS official package: <code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code> — the path contains a space, so quote it in a terminal, e.g. <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>; an unquoted path quietly edits a different file):
 <pre class="doc-code">[cors]
-allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]</pre>
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]</pre>
           This is browsa's extension ID (verify at <code>chrome://extensions</code> → browsa → <strong>ID</strong> — use whatever value is shown there for an unpacked build); the listing is an <strong>exact string match</strong> (<code>*</code> does nothing). Use <code>ws://</code> for a local gateway — <code>wss</code> is rejected. Restart the gateway after editing (desktop app: quit fully and reopen).</li>
         <li>In browsa settings, switch to the <strong>OpenSquilla</strong> tab: Base URL <code>ws://127.0.0.1:18791/ws</code>; fill the API Key only if your gateway requires a token.</li>
         <li>Hit <strong>Ping</strong> to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.</li>

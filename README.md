@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
+  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
@@ -76,7 +76,7 @@ flowchart LR
 
 Choose one installation method:
 
-**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/dnolbfoenflikbafpogjckibgapfcedn). Store review may lag behind GitHub releases.
+**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). Store review may lag behind GitHub releases.
 
 **GitHub — manual installation and updates.**
 
@@ -197,7 +197,7 @@ opensquilla gateway start
 
 ```toml
 [cors]
-allowed_origins = ["chrome-extension://dnolbfoenflikbafpogjckibgapfcedn"]
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 ```
 
 This is browsa's extension ID (verify at `chrome://extensions` → browsa → **ID** — use whatever value is shown there if you run an unpacked build). The listing is an exact string match (`*` does nothing). Since v0.5.5 the origin guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway). Restart the gateway after editing — for the desktop app, quit it fully and reopen.

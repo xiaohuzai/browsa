@@ -5,7 +5,7 @@
 ```markdown
 # browsa vX.Y.Z · CWS 更新填写包（完整照抄版 · YYYY-MM-DD）
 
-> 用途：把已上线的 item（ID `dnolbfoenflikbafpogjckibgapfcedn`，商店线上 **vBASE**）
+> 用途：把已上线的 item（ID `kghjmmajnpbkljankbbjbmnhfdocaeho`，商店线上 **vBASE**）
 > 更新到 **vX.Y.Z**。本文按 Dashboard 左侧页签顺序排列，每个文本框给的都是完整内容：
 > 全选删除 → 整段粘贴即可。标记：↻ = 有变化；✅ = 照抄一遍最稳；— = 不用动。
 >
@@ -84,7 +84,7 @@ https://xiaohuzai.github.io/browsa/privacy.html
 （逐张列 zh 区 cws-1..5 / EN 区 cws-en-1..5：不变或需重渲染；重渲染源 `dev-preview/banners/*.html`，`node dev-preview/banners/render.mjs`；旧图备份 `_backup-*`。可选：宣传视频字段——`store-assets/promo/browsa-promo-62s.mp4` 传 YouTube 后填链接）
 
 ## 10. 提交顺序（Dashboard 手动操作）
-1. 打开 Developer Dashboard → 商品 dnolbfoenflikbafpogjckibgapfcedn
+1. 打开 Developer Dashboard → 商品 kghjmmajnpbkljankbbjbmnhfdocaeho
 2. 软件包 → 上传 zip（§1，先确认链接可下载）
 3. 商品详情 EN → 名称/简短说明/详细说明（§2）
 4. 商品详情 EN → What's new（§4 EN）
