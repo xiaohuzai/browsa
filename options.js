@@ -286,7 +286,7 @@ function renderProviders() {
         b.className = 'provider-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
         b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
         b.textContent = id === 'bridge'
-          ? _t('localAgentTabBridge', 'Codex / Claude Code / pi')
+          ? _t('localAgentTabBridge', 'Agent Bridge')
           : id === 'opencode'
           ? _t('localAgentTabOpencode', 'OpenCode')
           : id === 'squilla'

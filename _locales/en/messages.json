@@ -1204,7 +1204,7 @@
     "message": "Export PNG"
   },
   "localAgentTabBridge": {
-    "message": "Codex / Claude Code / pi",
+    "message": "Agent Bridge",
     "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
   },
   "localAgentTabOpencode": {
