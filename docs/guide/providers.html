@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>连接后端 · browsa 指南</title>
-<meta name="description" content="把 browsa 连到你自己的模型：OpenAI / Anthropic / Ollama / 自建网关，多协议多模型；Hermes / opencode 智能体的安装步骤与工具审批流。">
+<meta name="description" content="把 browsa 连到你自己的模型：OpenAI / Anthropic / Ollama / 自建网关，多协议多模型；Hermes / opencode / OpenSquilla 智能体的安装步骤与工具审批流。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <link rel="stylesheet" href="../docs.css">
@@ -64,6 +64,7 @@
         <li><strong>LLM 提供商</strong>——普通对话端点，覆盖市面上几乎所有服务：OpenAI、Anthropic、Ollama、Groq、LiteLLM、各种聚合网关。</li>
         <li><strong>Hermes Agent</strong>——自带工具执行的自托管智能体：能搜索、跑命令、操作文件，是「能做事」的后端。内置在 browsa 里，填个地址就能用。</li>
         <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
+        <li><strong>OpenSquilla Agent</strong>——<a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 本地桌面智能体（网关 + 网页界面 + 桌面应用），省 token 的微内核设计、模型路由与技能系统；browsa 走它的网关 WebSocket，会话记忆在服务端。</li>
         <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
       </ul>
       <p>切换到任一智能体时，browsa 会询问当前对话的去留——把对话记录作为第一条消息带给新 agent 接续上下文，或新建会话从零开始；每条回复都标注来自哪个 provider / agent。</p>
@@ -120,6 +121,22 @@ agent:
       <pre class="doc-code">{
   "permission": { "bash": "ask", "edit": "ask" }
 }</pre>
+
+      <h2 id="opensquilla">OpenSquilla Agent</h2>
+      <p><a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 是本地桌面智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的<strong>网关 WebSocket</strong>（<code>/ws</code>）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。</p>
+      <ol>
+        <li>安装并启动网关——请用 <strong>v0.5.5 或更新版本</strong>（该版本的来源守卫原生支持放行白名单里的扩展来源）：
+<pre class="doc-code">uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
+opensquilla gateway start
+# → running: http://127.0.0.1:18791</pre></li>
+        <li>放行扩展——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进 <code>~/.opensquilla/config.toml</code>：
+<pre class="doc-code">[cors]
+allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]</pre>
+          这是 browsa <strong>固定的扩展 ID</strong>（manifest 的 key 字段锁定，所有机器一致、与商店上架一致；可在 <code>chrome://extensions</code> → browsa → <strong>ID</strong> 核对）。本地网关请用 <code>ws://</code>——<code>wss</code> 会被拒。</li>
+        <li>在 browsa 设置里切到 <strong>OpenSquilla</strong> 标签，Base URL 填 <code>ws://127.0.0.1:18791/ws</code>；API Key 仅当网关配置了令牌时填写。</li>
+        <li>点击 <strong>Ping</strong> 验证——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。</li>
+      </ol>
+      <p>说明：每个 browsa 对话对应一个网关会话（清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次）；超大页面（超过 6 万字符）会作为 <code>page-context.md</code> 文档上传，由智能体用自己的工具分段阅读。粘贴的截图保留在 browsa 自己的历史里，暂不转发。</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
       <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi</strong> 等 CLI 智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；pi 则用你在它内部配置好的模型供应商。</p>

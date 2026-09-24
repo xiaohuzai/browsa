@@ -106,6 +106,33 @@ test('the close button removes the card and, if a request is in flight, sends SU
   assert.ok(sentMessages.some(m => m.type === 'SUBCHAT_ABORT'), 'closing mid-flight must abort the in-flight subchat turn');
 });
 
+test('the card input is a textarea (long questions wrap) and Shift+Enter never sends', async () => {
+  // 2026-09-23 user report: the card input was a single-line <input> — text
+  // past a screenful just scrolled sideways instead of breaking into lines.
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  assert.equal(input.tagName, 'TEXTAREA', 'a single-line input can never wrap — must be a textarea');
+
+  input.value = 'a question long enough to wrap';
+  const shiftEnter = input.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+    key: 'Enter', shiftKey: true, bubbles: true, cancelable: true,
+  }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(!sentMessages.some(m => m.type === 'SUBCHAT'), 'Shift+Enter must not send');
+  assert.equal(shiftEnter, true, 'Shift+Enter must not be preventDefault-ed (native newline stands)');
+
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(sentMessages.some(m => m.type === 'SUBCHAT'), 'plain Enter must send');
+
+  // Tear the in-flight turn down (AGENTS.md jsdom gotcha: a dangling turn
+  // port leaks its 20s SW_PING interval and hangs node --test).
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
 test('a streamed reply renders progressively and finalizes with markdown + a done class on SUBCHAT_DONE', async () => {
   sentMessages.length = 0;
   const bubble = makeAssistantBubble('Reply about bold text.');

@@ -342,19 +342,21 @@ async function addLlmCard() {
   return added;
 }
 
-test('options.js: init() renders the merged agent trio (bridge + opencode + hermes) plus a reserved empty LLM slot', () => {
+test('options.js: init() renders the agent squad (bridge + opencode + squilla + hermes) plus a reserved empty LLM slot', () => {
   const cards = providerCards();
-  assert.equal(cards.length, 4, 'Hermes Agent + OpenCode Agent + Agent Bridge (three fixed agent cards) + one reserved empty LLM slot');
+  assert.equal(cards.length, 5, 'four fixed agent cards (Hermes Agent / OpenSquilla / OpenCode Agent / Agent Bridge) + one reserved empty LLM slot');
   assert.equal(findProviderCard('Hermes Agent') != null, true, 'Hermes Agent card present');
+  assert.equal(findProviderCard('OpenSquilla') != null, true, 'OpenSquilla card present');
   assert.equal(findProviderCard('OpenCode Agent') != null, true, 'OpenCode Agent card present');
   assert.equal(findProviderCard(BRIDGE_CARD_LABEL) != null, true, 'Agent Bridge card present');
-  // 合并呈现：三个类型 tab + 同屏只显示当前类型的那张卡。全新安装无任何
+  // 合并呈现：四个类型 tab + 同屏只显示当前类型的那张卡。全新安装无任何
   // 配置、activeProvider 默认是未配置的 hermes —— 不得因此默认落在 Hermes
   // （「Hermes 永远常驻」正是要修的抱怨），应落在推荐首选 bridge。
   const tabs = document.querySelectorAll('.local-agent-tab');
-  assert.equal(tabs.length, 3, 'three agent type tabs (bridge / opencode / hermes)');
+  assert.equal(tabs.length, 4, 'four agent type tabs (bridge / opencode / squilla / hermes)');
   assert.equal(findProviderCard(BRIDGE_CARD_LABEL).style.display, '', 'bridge card is the default visible tab on a fresh install');
   assert.equal(findProviderCard('OpenCode Agent').style.display, 'none', 'opencode card hidden under the default tab');
+  assert.equal(findProviderCard('OpenSquilla').style.display, 'none', 'squilla card hidden under the default tab');
   assert.equal(findProviderCard('Hermes Agent').style.display, 'none', 'unconfigured Hermes must NOT be the default tab (user complaint: it permanently parked there)');
   const reserved = document.querySelector('.provider.reserved');
   assert.equal(reserved != null, true, 'an empty LLM group shows a reserved empty slot card');
@@ -385,14 +387,14 @@ test('options.js: configuring + saving the reserved slot does NOT auto-create an
 
   assert.equal(document.querySelector('.provider.reserved'), null, 'the reserved slot is consumed once a provider is committed');
   const names = providerCards().map((c) => c.querySelector('.name').textContent);
-  // 组序（LLM 在前）+ 合并呈现后的卡序（与 tab 顺序一致：bridge → opencode → hermes）
-  assert.deepEqual(names, ['My OpenAI', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'Hermes Agent'], 'only the configured provider renders — no auto-appearing empty card');
+  // 组序（LLM 在前）+ 合并呈现后的卡序（与 tab 顺序一致：bridge → opencode → squilla → hermes）
+  assert.deepEqual(names, ['My OpenAI', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'OpenSquilla', 'Hermes Agent'], 'only the configured provider renders — no auto-appearing empty card');
 
   // Now an explicit Add appends a new card BELOW the configured one.
   clickAddProvider();
   await new Promise((r) => setTimeout(r, 10));
   const after = providerCards().map((c) => c.querySelector('.name').textContent);
-  assert.deepEqual(after, ['My OpenAI', 'LLM 2', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'Hermes Agent'], 'Add appends below the configured provider, inside the LLM group');
+  assert.deepEqual(after, ['My OpenAI', 'LLM 2', BRIDGE_CARD_LABEL, 'OpenCode Agent', 'OpenSquilla', 'Hermes Agent'], 'Add appends below the configured provider, inside the LLM group');
   const added = findProviderCard('LLM 2');
   assert.ok(added?.querySelector('[data-act="delete"]'), 'the appended card is a real, deletable provider');
 });
@@ -918,14 +920,14 @@ test('options.js: the local-agent tab pref switches which card is visible and pe
   await import('../options.js?local-agent-tabs-1');
   await new Promise((r) => setTimeout(r, 50));
   const tabs = [...document.querySelectorAll('.local-agent-tab')];
-  assert.equal(tabs.length, 3, 'three tabs on the fresh instance (bridge / opencode / hermes)');
+  assert.equal(tabs.length, 4, 'four tabs on the fresh instance (bridge / opencode / squilla / hermes)');
   const bridgeCard = findProviderCard(BRIDGE_CARD_LABEL);
   const opencodeCard = findProviderCard('OpenCode Agent');
   assert.equal(bridgeCard.style.display, '', 'bridge visible by default');
   assert.equal(opencodeCard.style.display, 'none', 'opencode hidden by default');
   assert.equal(findProviderCard('Hermes Agent').style.display, 'none', 'hermes hidden by default');
 
-  // Click the OpenCode tab: the trio swaps visibility and the pref persists.
+  // Click the OpenCode tab: the squad swaps visibility and the pref persists.
   tabs.find((b) => b.textContent === 'OpenCode').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
   const opencodeAfter = findProviderCard('OpenCode Agent');
@@ -999,7 +1001,7 @@ test('options.js: configured agent tabs show a dot indicator (multi-agent visibi
   await import('../options.js?local-agent-tabs-4');
   await new Promise((r) => setTimeout(r, 50));
   const on = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
-  assert.deepEqual(on, [true, true, false], 'configured tabs show the dot (hermes unconfigured → none)');
+  assert.deepEqual(on, [true, true, false, false], 'configured tabs show the dot (squilla/hermes unconfigured → none)');
   // Unconfigured tab carries no dot.
   storedData.providers = {
     bridge: { type: 'agent', isBridge: true, baseUrl: 'http://127.0.0.1:3948', model: '' },
@@ -1008,7 +1010,7 @@ test('options.js: configured agent tabs show a dot indicator (multi-agent visibi
   await import('../options.js?local-agent-tabs-5');
   await new Promise((r) => setTimeout(r, 50));
   const flags = [...document.querySelectorAll('.local-agent-tab')].map((b) => b.classList.contains('configured'));
-  assert.deepEqual(flags, [true, false, false], 'only the configured side gets the dot');
+  assert.deepEqual(flags, [true, false, false, false], 'only the configured side gets the dot');
 });
 
 test('options.js: a Hermes-only user sees the Hermes card under the merged tabs', async () => {

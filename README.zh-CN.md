@@ -19,7 +19,7 @@
 
 **读到哪里，问到哪里。**
 
-browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi**，连接 **opencode / Hermes**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
@@ -43,6 +43,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
+| OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
 
 一张 browsa 卡可以同时连多个 agent，侧边栏下拉逐个切换。
 
@@ -63,7 +64,7 @@ flowchart LR
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
     subgraph Y["你的后端 —— 云端、本机或自托管"]
         A1["Codex · Claude Code · pi<br/>agent-bridge 桥 · 沿用 CLI 认证"]
-        A2["opencode · Hermes<br/>官方服务直连"]
+        A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
     P -->|"📎 读出正文 / 字幕 / 表格 / 插图"| B
@@ -180,6 +181,41 @@ hermes gateway
 </details>
 
 <details>
+<summary><b>🦑 OpenSquilla Agent</b>——网关 WebSocket 直连的本地桌面智能体</summary>
+
+[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地桌面智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。
+
+**1. 安装并启动网关**——请用 v0.5.5 或更新版本（该版本的来源守卫原生支持放行白名单里的扩展来源）：
+
+```bash
+uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
+opensquilla gateway start
+# → running: http://127.0.0.1:18791
+```
+
+**2. 放行扩展**——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进 `~/.opensquilla/config.toml`：
+
+```toml
+[cors]
+allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
+```
+
+这是 browsa **固定的扩展 ID**（manifest 里的 key 字段锁定，所有机器一致、与商店上架一致；可在 `chrome://extensions` → browsa → **ID** 核对）。v0.5.5 起，来源守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
+
+**3. 配置 browsa**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
+
+| 字段 | 值 |
+|---|---|
+| Base URL | `ws://127.0.0.1:18791/ws` |
+| API Key | 仅当网关配置了令牌时填写（可选） |
+
+**4. 点击 Ping 验证**——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。
+
+说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次，之后就住在网关自己的对话记录里）；超大页面（超过 6 万字符）会作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读。页面插图会以图片附件随行（路由器若选到纯文字模型会自动降级为纯文字）。粘贴的截图保留在 browsa 自己的历史里，暂不转发。此协议没有系统提示词字段，语言偏好以普通指令拼在消息开头。
+
+</details>
+
+<details>
 <summary><b>💬 LLM Providers</b>——OpenAI · Anthropic · Ollama · Groq · LiteLLM · 任意兼容端点</summary>
 
 任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。
@@ -194,7 +230,7 @@ hermes gateway
 | Model ID | **必填**——输入模型 ID 后按 **Enter** 或点 **＋** 添加，点 **✕** 移除；也支持一次输入多个逗号分隔的 ID。侧边栏下拉按「Alias · 模型」逐个选择 |
 | API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
-想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenCode / Agent Bridge 智能体卡片固定不可删）。
+想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenSquilla / OpenCode / Agent Bridge 智能体卡片固定不可删）。
 
 </details>
 
@@ -220,6 +256,8 @@ hermes gateway
 
 <details>
 <summary><b>聊天</b>——流式回复、思考块、图表、追问……</summary>
+
+回复进行中切换会话不会杀掉它：回复转入后台继续跑，完成后写回它所属的会话（抽屉里以跳动的圆点标记进行中）。手动停止则保留已流出的部分并标记「已中断」——长时间的思考永不白费。
 
 | 功能 | 说明 |
 |---|---|
@@ -275,6 +313,7 @@ hermes gateway
 | **回复语言** | 无论页面语言，强制用指定语言回复 |
 | **界面语言** | English / 中文 / Auto（跟随浏览器语言）——即时生效，无需重载 |
 | **划词工具栏与 llms.txt** | 开关划选文字时的浮动工具栏；附加页面（📎）时抓取一次 `<origin>/llms.txt`，把站点 LLM 指令烘入页面上下文——放在系统提示词之外，保证提示词前缀跨轮次字节稳定（对 prompt 缓存友好） |
+| **思考档位** | 按模型设置思考深度（`auto` 不发送；其余按模型自带的档位——GLM/Qwen 类是开关档，GPT/Claude 类是低→最高力度梯）。可选项跟着你填的模型 id 自适应，请求字段按各家 API 方言自动适配（`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`……） |
 | **阅读偏好** | 消息字号、发送快捷键（Enter / Shift+Enter）、思考块自动折叠 |
 | **ASR 字幕识别** | 无字幕视频的语音转写服务商（默认火山方舟）：API Key、语言、字幕来源 |
 | **长附件自动总结** | 自动进行——超过阈值（默认 100,000 字符）的页面或字幕会分块、并行总结、后台合并；`[mm:ss]` 标记显式保留，跳转链接继续可用；任何错误都安全失败、静默保留原文 |

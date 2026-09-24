@@ -19,7 +19,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi** through Agent Bridge, use **opencode / Hermes**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -43,6 +43,7 @@ Connect your existing CLI agent through Agent Bridge, using its configured sign-
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
+| OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
 
 One browsa card connects to several agents at once; the sidebar dropdown switches between them.
 
@@ -63,7 +64,7 @@ flowchart LR
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi<br/>via agent-bridge · existing CLI authentication"]
-        A2["opencode · Hermes<br/>official server, direct"]
+        A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
     P -->|"📎 attach: text / subtitles / tables / figures"| B
@@ -180,6 +181,41 @@ hermes gateway
 </details>
 
 <details>
+<summary><b>🦑 OpenSquilla Agent</b> — local desktop agent over gateway WebSocket</summary>
+
+[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local desktop agent (gateway + Web UI + Electron app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.
+
+**1. Install & start the gateway** — v0.5.5 or newer (that release's origin guard natively accepts whitelisted extension origins):
+
+```bash
+uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
+opensquilla gateway start
+# → running: http://127.0.0.1:18791
+```
+
+**2. Let the extension in** — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to `~/.opensquilla/config.toml`:
+
+```toml
+[cors]
+allowed_origins = ["chrome-extension://apoodheofdhglelbnmggeokbhampbmgn"]
+```
+
+This is browsa's **pinned extension ID** (fixed via the manifest key — the same on every machine and matching the store listing; verify at `chrome://extensions` → browsa → **ID**). Since v0.5.5 the origin guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
+
+**3. Configure browsa** — open ⚙ Settings, select the **OpenSquilla** tab:
+
+| Field | Value |
+|---|---|
+| Base URL | `ws://127.0.0.1:18791/ws` |
+| API Key | only if your gateway requires a token (optional) |
+
+**4. Ping** to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.
+
+Notes: each browsa conversation maps to one gateway session (gateway-assigned key, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); a huge page (over 60k chars) is uploaded as a `page-context.md` document the agent reads with its own tools. Page figures ride along as image attachments (a text-only router model degrades to text automatically). Pasted screenshots stay in browsa's own history and are not forwarded yet. The reply-language preference is prepended to the message since this protocol has no system-prompt field.
+
+</details>
+
+<details>
 <summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
@@ -194,7 +230,7 @@ Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for
 | Model ID | Required. Enter a model ID and press **Enter** or **＋** to add it; **✕** removes a model. Comma-separated input adds several at once. Each appears as "Alias · model" in the sidebar dropdown |
 | API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenCode, Agent Bridge — are fixed and not removable).
+Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenSquilla, OpenCode, Agent Bridge — are fixed and not removable).
 
 </details>
 
@@ -220,6 +256,8 @@ The full reference lives here:
 
 <details>
 <summary><b>Chat</b> — streaming, thinking blocks, diagrams, follow-up…</summary>
+
+Switching sessions mid-reply never kills the reply: it keeps running in the background and is saved to the session it started in (marked with a pulsing dot in the drawer until it lands). Stopping a reply yourself keeps whatever already streamed, marked as interrupted — long thinking never evaporates.
 
 | Feature | What you get |
 |---|---|
@@ -275,6 +313,7 @@ Everyday settings are shown directly: interface language, providers, system prom
 | **Reply language** | force replies in a specific language regardless of page language |
 | **UI language** | English, 中文, or Auto (follows the browser) — applies immediately, no reload |
 | **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
+| **Thinking level** | per-model reasoning depth (`auto` sends nothing; then the model's own ladder — GLM/Qwen-class is an on/off toggle, GPT/Claude-class is low→max effort). The choices follow the model id you filled in, and the request fields adapt to each API dialect (`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`…) automatically |
 | **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
 | **ASR** | the speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source |
 | **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |

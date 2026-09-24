@@ -168,7 +168,13 @@ async function init() {
   currentTabId = tab?.id;
 
   initSessionsUI({
-    cancelActiveStream: () => { if (activeController && !activeController.cancelled) cancelStream(); },
+    // 切会话不再取消在途回复（2026-09-24）：转后台 + 停止观看，回复完成后
+    // 写回来源会话快照。isStreaming/stopWatchingStream/getTabId 支撑这条流；
+    // resumeInFlight 供切回时续接渲染。
+    isStreaming: () => !!(activeController && !activeController.cancelled),
+    stopWatchingStream: () => stopWatchingStream(),
+    getTabId: () => currentTabId,
+    resumeInFlight: () => { resumeInFlightStream(); },
     renderHistory,
     scrollToBottom,
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); }
@@ -1088,18 +1094,28 @@ function hideHistoryUpgradeIndicator() {
 }
 
 async function newSession() {
-  cancelStream(); // 先停流：否则在途回复会在清空后落进新会话
+  // 在途回复不取消（2026-09-24）：转后台写回刚保存的会话快照——写入按来源
+  // 会话分槽（persistTurnEntry）后，「清空后回复落进新会话开头」的孤儿回复
+  // 问题就此了结。
+  const wasStreaming = activeController && !activeController.cancelled;
   // Auto-save current conversation if it has messages, then clear
   const history = await storage.getHistory();
   const hasMessages = Array.isArray(history) && history.some(m => m.role === 'user' || m.role === 'assistant');
+  let savedId = '';
   if (hasMessages) {
     // 会话归属同 loadSession：已归属的对话原地写回，全新对话才新建条目。
     // 之后的 CLEAR_HISTORY 会把归属指针一并清掉（storage.clearHistory）。
     const activeId = await storage.getActiveSessionId();
     const res = await sendMessage({ type: 'SAVE_SESSION', id: activeId || undefined });
     if (res?.ok && res.data?.session) {
+      savedId = res.data.session.id;
       showToast(tSub('sessionSaved', 'Session saved: "$1"', res.data.session.name), 'success');
     }
+  }
+  if (wasStreaming) {
+    sendMessage({ type: 'REASSIGN_STREAM_SESSION', tabId: currentTabId, sessionId: savedId }).catch(() => {});
+    stopWatchingStream();
+    showToast(_t('streamMovedToBackground', '进行中的回复已转入后台，完成后写入原会话'));
   }
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
@@ -1121,7 +1137,7 @@ async function clearChatHistory() {
     danger: true
   });
   if (!ok) return;
-  cancelStream(); // 确认后再停流：取消确认不应误杀进行中的回复
+  cancelStream({ salvage: false }); // 确认后再停流（显式弃置，不收尸）：取消确认不应误杀进行中的回复
   await sendMessage({ type: 'CLEAR_HISTORY' });
   messagesEl.innerHTML = '';
   hidxResetTo(0);
@@ -1237,7 +1253,7 @@ function maybeDrainFollowups() {
   }, 50);
 }
 
-function cancelStream() {
+function cancelStream({ salvage = true, detach = false } = {}) {
   if (!activeController) return;  activeController.cancelled = true;
   const wasResumed = activeController.resumed === true;
   const port = activeController.port;
@@ -1257,8 +1273,11 @@ function cancelStream() {
   // NOT send STREAM_RELEASE — the CHAT handler's abort catch already
   // calls clearStreamState, and a second release would just be a
   // harmless no-op, but skipping it keeps the wire clean.
-  if (currentTabId != null) {
-    sendMessage({ type: 'STREAM_ABORT', tabId: currentTabId }).catch(() => {});
+  // detach-only（切会话/新会话转后台）：服务端继续跑，只解除本地观看——不发
+  // STREAM_ABORT。salvage:false（clearChatHistory 显式弃置）随 ABORT 传递，
+  // 服务端据此跳过「已中断」收尸。
+  if (!detach && currentTabId != null) {
+    sendMessage({ type: 'STREAM_ABORT', tabId: currentTabId, salvage }).catch(() => {});
   }
   if (port) {
     try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
@@ -1287,8 +1306,13 @@ function cancelStream() {
   // of a resumed stream (wasResumed=true). A resumed stream's "cancel"
   // is closer to "stop watching" — the LLM is still running for the
   // tab. Same UX though: the local assistant bubble is dropped.
-  appendSystem(wasResumed ? '⚠ Stopped watching resumed stream' : '⚠ Stream cancelled');
+  if (!detach) appendSystem(wasResumed ? '⚠ Stopped watching resumed stream' : '⚠ Stream cancelled');
 }
+
+// 切会话/新会话：停止观看（本地收尾同 cancelStream——端口分离、气泡定稿、
+// UI 复位）但不取消服务端的回复——流转后台，完成后写回来源会话快照
+// （chat-handler 的 persistTurnEntry）。
+function stopWatchingStream() { cancelStream({ detach: true }); }
 
 let outputTokens = 0;
 // CJK count without allocation: `.match(re).length` builds one array entry
@@ -1948,6 +1972,9 @@ async function onSend() {
     document.querySelectorAll('.provider-switch-card').forEach((c) => c.remove());
     const backfill = pendingAgentBackfill;
     pendingAgentBackfill = false; // 一次性：无论本轮是否 agent，意图已消费
+    // sessionId 钉住这一轮属于哪个会话：中途切会话时回复写回它（转后台），
+    // 而不是落进用户切过去的对话（见 chat-handler 的 persistTurnEntry）。
+    const sessionForTurn = (await storage.getActiveSessionId()) || undefined;
     const res = await sendMessage({
       type: 'CHAT',
       tabId: currentTabId,
@@ -1955,7 +1982,8 @@ async function onSend() {
       stream: true,
       portName: 'browsa-chat',
       images: imageDataUrls,
-      backfill
+      backfill,
+      sessionId: sessionForTurn
     });
     if (!res.ok) {
       // Real error (re-thrown by background, port receives nothing).
@@ -2024,9 +2052,11 @@ async function resumeInFlightStream(tabId) {
   // Ask the background: is there a stream for this tab, and if so,
   // what do you have so far? The bridge envelopes every reply as
   // { ok, data } — the payload fields live under .data.
-  const peekRes = await sendMessage({ type: 'STREAM_PEEK', tabId });
+  // sessionId 让服务端在「这个会话正是该流的来源」时把它从后台召回（bg 解除）；
+  // 不匹配则仍是别的会话在后台跑的流——绝不能渲染进当前视图（peek.bg 挡下）。
+  const peekRes = await sendMessage({ type: 'STREAM_PEEK', tabId, sessionId: (await storage.getActiveSessionId()) || undefined });
   const peek = peekRes?.data || {};
-  if (!peek.inFlight) {
+  if (!peek.inFlight || peek.bg) {
     // No stream running. The "switch tab and come back" path lands
     // here for the common case where the stream finished while the
     // user was away — storage already has the reply, renderHistory
@@ -3428,7 +3458,13 @@ async function renderHistory() {
     sniffText(m.content); // runs before any `continue` — attached (skipped) entries carry the PDF traces
     if (m.role === 'user') {
       if (Array.isArray(m.content)) {
-        const textPart = m.content.find(p => p.type === 'text')?.text || '';
+        // ALL text parts, in order — a first-text-part-only read silently
+        // dropped everything after an image (interleaved entries render as
+        // "strip + text"; the text must be everything that was typed).
+        const textPart = m.content
+          .filter(p => p?.type === 'text' || p?.type === 'input_text')
+          .map(p => p?.text || '')
+          .join('\n');
         if (textPart.startsWith(PAGE_CONTEXT_PREFIX)) continue;
         const imgUrls = m.content
           .filter(p => p.type === 'image_url')

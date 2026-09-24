@@ -691,6 +691,10 @@
     "message": "Start <code>opencode serve --port 4096</code> in a terminal and fill in the address it prints (pinning the port is recommended — otherwise it changes on every restart). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server docs</a>",
     "description": "Options: opencode server setup tip"
   },
+  "squillaTip": {
+    "message": "OpenSquilla gateway WebSocket address — default ws://127.0.0.1:18791/ws. The gateway needs this extension's origin listed in cors.allowed_origins in ~/.opensquilla/config.toml (native support since v0.5.5). <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla docs</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
   "bridgeTip": {
     "message": "See the <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge docs</a> for installing and running the local bridge. One bridge address per row.",
     "description": "Options: agent-bridge setup tip"
@@ -1214,6 +1218,30 @@
   "localAgentTabHermes": {
     "message": "Hermes",
     "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "Thinking level",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "auto (send nothing)",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "Extra reasoning fields (JSON)",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "Reply continues in the background and will be saved to its original session",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "sessionActiveDot": {
+    "message": "In flight",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
   },
   "slashPromptDesc": {
     "message": "Show the current active system prompt",

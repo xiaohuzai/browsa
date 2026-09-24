@@ -4,6 +4,8 @@ window.__BROWSA_PREVIEW_SEED = {
   pingStates: { llm1: 'reachable', hermes: 'unreachable' },
   providers: {
     hermes: { type: 'agent', alias: 'Hermes Agent', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
+    squilla: { type: 'agent', alias: 'OpenSquilla', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, isSquilla: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
+    opencode: { type: 'agent', alias: 'OpenCode Agent', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, isOpencode: true, apiStyle: 'chat', temperature: null, maxTokens: 0 },
     bridge: {
       type: 'agent', alias: '', baseUrl: 'http://127.0.0.1:3948', apiKey: 'sk-preview-bridge', model: '',
       stream: true, isBridge: true, bridgeAgents: { 'http://127.0.0.1:3948': 'codex', 'http://127.0.0.1:3949': '', 'http://127.0.0.1:3950': 'pi' },

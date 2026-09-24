@@ -69,13 +69,18 @@ const {
 } = await import('../lib/sidepanel/sessions-ui.js');
 
 const deps = {
-  cancelled: false,
   renderHistoryCalled: 0,
   scrollForced: null,
   imagesCleared: false,
+  streaming: false,
+  stoppedWatching: false,
+  resumed: false,
 };
 initSessionsUI({
-  cancelActiveStream: () => { deps.cancelled = true; },
+  isStreaming: () => deps.streaming,
+  stopWatchingStream: () => { deps.stoppedWatching = true; },
+  getTabId: () => 7,
+  resumeInFlight: () => { deps.resumed = true; },
   renderHistory: async () => { deps.renderHistoryCalled++; },
   scrollToBottom: (force) => { deps.scrollForced = force; },
   clearPendingImages: () => { deps.imagesCleared = true; },
@@ -83,7 +88,8 @@ initSessionsUI({
 
 function setupDom() {
   sentMessages.length = 0;
-  deps.cancelled = false; deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
+  deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
+  deps.streaming = false; deps.stoppedWatching = false; deps.resumed = false;
   localStore = {}; // 归属指针等 local 键随用例复位
   serverSessions = [
     { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
@@ -219,15 +225,23 @@ test('clearAllSessions sends CLEAR_ALL_SESSIONS when confirmed', async () => {
   assert.ok(sentMessages.some(m => m.type === 'CLEAR_ALL_SESSIONS'));
 });
 
-test('loadSession cancels the active stream, saves the current conversation, loads the target, and clears pending images', async () => {
+test('loadSession keeps an in-flight reply running in the background, saves, loads, and clears pending images', async () => {
+  // 2026-09-24：切换会话不再取消在途回复（旧行为把 thinking 烧几分钟的回复
+  // 直接蒸发）——转后台 + 停止观看 + 把写入归属钉到来源会话。
   storageHistory = [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'yo' }];
+  deps.streaming = true;
   await loadSession('s2', 'Second session');
-  assert.equal(deps.cancelled, true);
+  assert.equal(deps.stoppedWatching, true, 'the stream is detached (stop-watching), NOT cancelled');
+  assert.ok(!sentMessages.some(m => m.type === 'STREAM_ABORT'), 'switching sessions must never abort the turn');
+  const reassign = sentMessages.find(m => m.type === 'REASSIGN_STREAM_SESSION');
+  assert.ok(reassign, 'the reply is re-pointed at its origin session (background routing)');
+  assert.equal(reassign.tabId, 7);
   assert.ok(sentMessages.some(m => m.type === 'SAVE_SESSION'), 'must auto-save before switching since history has messages');
   assert.ok(sentMessages.some(m => m.type === 'LOAD_SESSION' && m.id === 's2'));
   assert.equal(deps.renderHistoryCalled, 1);
   assert.equal(deps.scrollForced, true);
   assert.equal(deps.imagesCleared, true);
+  assert.equal(deps.resumed, true, 'reattach hooks run after the swap (switch-back resumes rendering)');
   assert.equal(getSessionsDrawer().hidden, true, 'drawer must close after loading');
 });
 
