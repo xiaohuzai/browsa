@@ -1806,6 +1806,58 @@ math[display="block"] {
 /* ─── User message text span ─────────────────────────────────────────────────── */
 .msg.user .msg-text { white-space: pre-wrap; }
 
+/* ─── User-bubble code blocks (restricted render, 2026-09-26) ────────────────── */
+/* 只认 ``` 围栏与行内 `code`（appendUser→renderUserContent），其余文字逐字原样。
+   代码块镜像助手气泡的 token（--bg-2/--border/--radius + 全局 .hljs-* 主题色），
+   但语言标签条只在用户写了语言标签（[data-lang]）时才有——裸围栏靠自动检测，
+   无标签可展示。 */
+.msg.user .msg-text pre.user-code {
+  display: block;
+  position: relative;
+  margin: 6px 0;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  white-space: pre;
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.84em;
+  line-height: 1.55;
+  text-align: left;
+}
+.msg.user .msg-text pre.user-code[data-lang] { padding-top: 30px; }
+.msg.user .msg-text pre.user-code::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 8px; left: 12px;
+  font-size: 9px;
+  font-family: ui-monospace, monospace;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.msg.user .msg-text pre.user-code code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  white-space: pre;
+}
+.msg.user .msg-text > code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.855em;
+  background: color-mix(in srgb, var(--bg-3) 80%, var(--bg-2));
+  color: var(--fg-2);
+  padding: 0.15em 0.42em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
 /* ─── Attached images inside user bubble ─────────────────────────────────────── */
 .msg-images {
   display: flex;

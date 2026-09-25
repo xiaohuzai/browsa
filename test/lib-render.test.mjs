@@ -31,7 +31,7 @@ const {
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
-  wantsChartVendors, FENCED_RENDERERS
+  wantsChartVendors, FENCED_RENDERERS, renderUserContent
 } = await import('../lib/sidepanel/render.js');
 
 test('wantsChartVendors detects every FENCED_RENDERERS language fence, nothing else', () => {
@@ -540,10 +540,18 @@ test('render.js sanitizes the parsed ECharts option before chart.setOption(), bu
 // These exercise the video-note timestamp linker (TreeWalker over text nodes).
 // Must wrap bracketed timestamps, support hour form, strip BiliNote's
 // *Content- prefix, and leave non-timestamp text + timestamps inside <a> alone.
+// 门控（2026-09-26）：链接化只在带 videoSrc 盖章的 .msg 气泡里发生——胶囊的唯一
+// 动作是 seek，落点全靠盖章；无视频上下文的气泡里一律保持纯文本（误报剪枝）。
+function tsMsg(html) {
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.dataset.videoSrc = JSON.stringify({ platform: 'youtube', url: 'https://youtu.be/x', tabId: 7 });
+  el.innerHTML = html;
+  return el;
+}
 
 test('linkifyTimestamps: wraps [mm:ss] into a span.browsa-ts with data-s seconds', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>see [01:23] for details</p>';
+  const el = tsMsg('<p>see [01:23] for details</p>');
   linkifyTimestamps(el);
   const ts = el.querySelector('.browsa-ts');
   assert.ok(ts, 'a timestamp span was created');
@@ -552,8 +560,7 @@ test('linkifyTimestamps: wraps [mm:ss] into a span.browsa-ts with data-s seconds
 });
 
 test('linkifyTimestamps: supports [h:mm:ss] hour form', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>chapter [1:02:03]</p>';
+  const el = tsMsg('<p>chapter [1:02:03]</p>');
   linkifyTimestamps(el);
   const ts = el.querySelector('.browsa-ts');
   assert.ok(ts);
@@ -562,8 +569,7 @@ test('linkifyTimestamps: supports [h:mm:ss] hour form', () => {
 });
 
 test('linkifyTimestamps: wraps native 3-digit total-minute stamps [105:30]', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>quote from a long video [105:30] here</p>';
+  const el = tsMsg('<p>quote from a long video [105:30] here</p>');
   linkifyTimestamps(el);
   const ts = el.querySelector('.browsa-ts');
   assert.ok(ts, '3-digit total-minute stamps must be clickable too');
@@ -571,8 +577,7 @@ test('linkifyTimestamps: wraps native 3-digit total-minute stamps [105:30]', () 
 });
 
 test('linkifyTimestamps: strips BiliNote *Content- prefix in display but keeps the time', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>Intro *Content-[00:10]</p>';
+  const el = tsMsg('<p>Intro *Content-[00:10]</p>');
   linkifyTimestamps(el);
   const ts = el.querySelector('.browsa-ts');
   assert.ok(ts);
@@ -582,15 +587,13 @@ test('linkifyTimestamps: strips BiliNote *Content- prefix in display but keeps t
 });
 
 test('linkifyTimestamps: leaves bare mm:ss (no brackets) and non-timestamps untouched', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>ratio 12:00 and version 1.2:3 and [not-a-time]</p>';
+  const el = tsMsg('<p>ratio 12:00 and version 1.2:3 and [not-a-time]</p>');
   linkifyTimestamps(el);
   assert.equal(el.querySelectorAll('.browsa-ts').length, 0, 'no false-positive links');
 });
 
 test('linkifyTimestamps: skips timestamps already inside an &lt;a&gt;', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p><a href="x">[00:05]</a> and [00:10]</p>';
+  const el = tsMsg('<p><a href="x">[00:05]</a> and [00:10]</p>');
   linkifyTimestamps(el);
   const spans = el.querySelectorAll('.browsa-ts');
   assert.equal(spans.length, 1, 'only the non-link timestamp is wrapped');
@@ -598,8 +601,7 @@ test('linkifyTimestamps: skips timestamps already inside an &lt;a&gt;', () => {
 });
 
 test('linkifyTimestamps: wraps multiple timestamps in one text node, preserving surrounding text', () => {
-  const el = document.createElement('div');
-  el.innerHTML = '<p>[00:01] first [00:02] second</p>';
+  const el = tsMsg('<p>[00:01] first [00:02] second</p>');
   linkifyTimestamps(el);
   const spans = el.querySelectorAll('.browsa-ts');
   assert.equal(spans.length, 2);
@@ -608,6 +610,76 @@ test('linkifyTimestamps: wraps multiple timestamps in one text node, preserving 
   // surrounding words survive
   assert.match(el.textContent, /first/);
   assert.match(el.textContent, /second/);
+});
+
+// ─── 序列切片误判防线（2026-09-26 用户报告）──────────────────────────────────
+// 模型讨论数组时会写 [0:23] / [26:49] 这类 Python 切片区间，形状与 [mm:ss] 全同。
+// 两道防线：代码块内一律不链（fence 里是逐字数据，不是跳转入口）；正文里贴着
+// 标识符的 `[` 不链（name[0:23] 是切片，真实时间戳几乎总有空格/行首隔离）。
+
+test('linkifyTimestamps: never touches timestamps inside a code fence (pre/code) — slice rows stay plain', () => {
+  const el = tsMsg('<pre><code>[0:23]  msa     0 0 0\n[26:49] profile 0 0 .33\n</code></pre><p>at [01:10] seek here</p>');
+  linkifyTimestamps(el);
+  assert.equal(el.querySelector('pre').querySelectorAll('.browsa-ts').length, 0,
+    'code-fence content is verbatim data (slice intervals), not seek affordances');
+  const ts = el.querySelector('p .browsa-ts');
+  assert.ok(ts, 'prose timestamps outside the fence still linkify');
+  assert.equal(ts.dataset.s, '70');
+  assert.match(el.querySelector('pre').textContent, /\[0:23\]/, 'fence text preserved verbatim');
+});
+
+test('linkifyTimestamps: never touches inline code like msa_feat[0:23]', () => {
+  const el = tsMsg('<p>take <code>msa_feat[0:23]</code> then <code>arr[0:2][0:23]</code></p>');
+  linkifyTimestamps(el);
+  assert.equal(el.querySelectorAll('.browsa-ts').length, 0, 'inline-code slices must stay plain');
+});
+
+test('linkifyTimestamps: prose slice glued to a name (name[0:23]) is not a timestamp', () => {
+  const el = tsMsg('<p>取 msa_feat[0:23] 的行，再看 x.arr[26:49]。</p>');
+  linkifyTimestamps(el);
+  assert.equal(el.querySelectorAll('.browsa-ts').length, 0,
+    'a [ preceded by an identifier char is slice indexing, not a stamp');
+});
+
+test('linkifyTimestamps: standalone [mm:ss] after whitespace/line start still links (guard must not over-block)', () => {
+  const el = tsMsg('<p>见 [0:23] 处的跳变；下一行：</p><p><strong>Intro</strong>[0:45]</p>');
+  linkifyTimestamps(el);
+  const spans = el.querySelectorAll('.browsa-ts');
+  assert.equal(spans.length, 2, 'space-preceded and node-initial stamps still linkify');
+  assert.equal(spans[0].dataset.s, '23');
+  assert.equal(spans[1].dataset.s, '45');
+});
+
+test('linkifyTimestamps: videoSrc gate — no stamped .msg means nothing links, even real stamps', () => {
+  // 误报剪枝：无视频上下文时胶囊是样式说谎（点击 seekVideo(null) 弹「视频源已失效」），
+  // 所以独立切片 [26:49] 和真时间戳 [01:10] 一律保持纯文本。
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.innerHTML = '<p>行 [26:49] 是 profile，视频见 [01:10]。</p>';
+  linkifyTimestamps(el);
+  assert.equal(el.querySelectorAll('.browsa-ts').length, 0, 'unstamped bubble never linkifies');
+  // 不是 .msg 壳（追问卡的气泡）同理：
+  const card = document.createElement('div');
+  card.className = 'detail-thread-msg';
+  card.innerHTML = '<p>quoted [01:10] from selection</p>';
+  linkifyTimestamps(card);
+  assert.equal(card.querySelectorAll('.browsa-ts').length, 0, 'non-.msg roots never linkify');
+});
+
+test('linkifyTimestamps: seconds > 59 can only be a slice → never links (zero-false-positive prune)', () => {
+  const el = tsMsg('<p>行 [0:80] 到 [26:99]；但 [00:59] 是时间戳。</p>');
+  linkifyTimestamps(el);
+  const spans = el.querySelectorAll('.browsa-ts');
+  assert.equal(spans.length, 1, 'only [00:59] linkifies — real stamps never carry seconds > 59');
+  assert.equal(spans[0].dataset.s, '59');
+});
+
+test('linkifyTimestamps: is idempotent — re-running does not nest spans', () => {
+  const el = tsMsg('<p>see [01:23] here</p>');
+  linkifyTimestamps(el);
+  linkifyTimestamps(el);
+  assert.equal(el.querySelectorAll('.browsa-ts').length, 1);
+  assert.equal(el.querySelectorAll('.browsa-ts .browsa-ts').length, 0, 'existing pills must be skipped, not double-wrapped');
 });
 
 test('figuresBeforeEntry: nearest preceding user entry with image parts wins', () => {
@@ -641,4 +713,92 @@ test('decorateFigureRefs: [图N] text tokens become inline thumbnails; out-of-ra
   decorateFigureRefs(el2, []);
   assert.equal(el2.querySelectorAll('img').length, 0);
   assert.match(el2.textContent, /\[图1\]/);
+});
+
+// ─── renderUserContent: 用户气泡代码受限渲染（2026-09-26）─────────────────────
+// 只认 ``` 围栏（未闭合 → 代码到末尾）与行内 `code`，其余文字逐字原样——刻意
+// 不做全量 Markdown（用户输入的 # 注释、URL 下划线等常无 Markdown 意图）。
+
+function userSpan() {
+  return document.createElement('span');
+}
+
+test('renderUserContent: fenced block with lang → pre.user-code > code.language-*, verbatim text', () => {
+  const el = userSpan();
+  renderUserContent(el, '帮我看看：\n```python\ndef f(x):\n    return x[0:23]\n```\n谢谢');
+  const pre = el.querySelector('pre.user-code');
+  assert.ok(pre, 'a user-code pre is created');
+  const code = pre.querySelector('code.language-python');
+  assert.ok(code, 'language class carries the fence tag');
+  assert.equal(code.textContent, 'def f(x):\n    return x[0:23]', 'code text verbatim, no trailing newline');
+  const first = el.firstChild;
+  assert.equal(first.nodeType, Node.TEXT_NODE, 'non-code text stays a verbatim text node');
+  assert.match(first.textContent, /^帮我看看：$/);
+});
+
+test('renderUserContent: unclosed fence → code to the end (streaming-partial semantics)', () => {
+  const el = userSpan();
+  renderUserContent(el, '看这个：\n```\nx = 1\ny = 2');
+  const pre = el.querySelector('pre.user-code');
+  assert.ok(pre, 'unclosed fence still renders as a code block');
+  assert.equal(pre.querySelector('code').textContent, 'x = 1\ny = 2');
+  assert.equal(pre.querySelector('code').className, '', 'no lang tag → no language class');
+});
+
+test('renderUserContent: inline code renders as code; lone backtick stays literal', () => {
+  const el = userSpan();
+  renderUserContent(el, 'take `x[0]` and a " ` " char');
+  assert.equal(el.querySelectorAll('code').length, 1);
+  assert.equal(el.querySelector('code').textContent, 'x[0]');
+  assert.match(el.textContent, /a " ` " char/, 'unpaired backtick survives verbatim');
+});
+
+test('renderUserContent: markdown-LOOKING non-code text is never interpreted', () => {
+  const el = userSpan();
+  const raw = '# 注释不是标题 <script>alert(1)</script> a_b_c *em*';
+  renderUserContent(el, raw);
+  assert.equal(el.children.length, 0, 'no elements at all — everything is text nodes');
+  assert.equal(el.textContent, raw, 'byte-for-byte verbatim');
+});
+
+test('renderUserContent: multiple fences keep document order with text segments between', () => {
+  const el = userSpan();
+  renderUserContent(el, 'A\n```js\nlet a=1;\n```\nB\n```cpp\nint b;\n```\nC');
+  assert.deepEqual([...el.children].map((n) => n.nodeName), ['PRE', 'PRE']);
+  assert.match(el.childNodes[0].textContent, /^A$/);
+  assert.match(el.childNodes[2].textContent, /^B$/);
+  assert.match(el.childNodes[4].textContent, /^C$/);
+  assert.match(el.children[0].querySelector('code').className, /language-js/);
+  assert.match(el.children[1].querySelector('code').className, /language-cpp/);
+});
+
+test('addCodeCopyButtons autoDetect: bare no-lang fence highlights via highlightAuto; plain prose stays plain', () => {
+  // 阈值 >5 是保守线（预存）：太短/特征太弱的片段宁可保持纯等宽也不误报——
+  // 探针实测：两行 python relevance=5（不亮），中文散文 relevance=0（不亮）。
+  const el = document.createElement('div');
+  el.innerHTML = '<pre class="user-code"><code>names = ["alice", "bob"]\nfor n in names:\n    print(f"hello {n}")\n    if len(n) > 3:\n        print("long")</code></pre>'
+    + '<pre class="user-code"><code>这只是一段没有代码特征的中文说明文字而已</code></pre>';
+  addCodeCopyButtons(el, { autoDetect: true });
+  const pres = el.querySelectorAll('pre');
+  assert.equal(pres[0].querySelector('code').dataset.highlighted, '1', 'python detected and highlighted');
+  assert.equal(pres[0].querySelectorAll('.hljs-keyword').length > 0, true, 'token spans present');
+  assert.equal(pres[1].querySelector('code').dataset.highlighted, undefined, 'low-relevance prose not highlighted');
+  for (const pre of pres) {
+    assert.ok(pre.querySelector('.code-copy-btn'), 'copy button present on both');
+    assert.equal(pre.style.position, 'relative');
+  }
+  // 默认（助手路径）保持原行为：no-lang 围栏不做自动检测
+  const el2 = document.createElement('div');
+  el2.innerHTML = '<pre><code>names = ["alice", "bob"]\nfor n in names:\n    print(f"hello {n}")</code></pre>';
+  addCodeCopyButtons(el2);
+  assert.equal(el2.querySelector('code').dataset.highlighted, undefined, 'default: no auto-detect');
+});
+
+test('sidepanel.js appendUser routes backtick-bearing input through renderUserContent (source pin)', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(text\.includes\('`'\)\) \{\s*\n\s*\/\/ 用户代码受限渲染[\s\S]*?renderUserContent\(span, text\)/,
+    'appendUser must route backtick-bearing text through renderUserContent');
+  assert.match(src, /span\.querySelector\('pre'\)\) addCodeCopyButtons\(el, \{ autoDetect: true \}\)/,
+    'user bubbles must enable autoDetect for bare fences');
 });
