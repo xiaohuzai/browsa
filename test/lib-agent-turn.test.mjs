@@ -69,16 +69,26 @@ test('pickTurnImages — non-array input is an empty pick', () => {
   assert.deepEqual(pickTurnImages(undefined), { images: [], dropped: 0 });
 });
 
-test('withTurnImages — clean pick leaves text untouched', () => {
+test('withTurnImages — clean pick keeps user text + appends the [图N] anchor (no drop note)', () => {
   const r = withTurnImages('看这张图', [IMG('A')]);
-  assert.equal(r.text, '看这张图');
+  assert.ok(r.text.startsWith('看这张图'), 'user text comes first');
+  assert.match(r.text, /\[图1\]/, 'surviving images are anchored as [图N] so「这张图」pins to THIS turn');
+  assert.doesNotMatch(r.text, /未能随附/, 'clean pick never mentions drops');
   assert.deepEqual(r.images, [IMG('A')]);
 });
+
+test('withTurnImages — multi-image turns span [图1]…[图N]', () => {
+  const r = withTurnImages('对比两张图', [IMG('A'), IMG('B')]);
+  assert.match(r.text, /\[图1\]…\[图2\]/);
+  assert.deepEqual(r.images, [IMG('A'), IMG('B')]);
+});
+
 
 test('withTurnImages — drops append a model-facing note with the count', () => {
   const r = withTurnImages('看图', ['not-a-url', IMG('A')]);
   assert.equal(r.images.length, 1);
   assert.match(r.text, /1 张图片因超出单条消息大小上限未能随附/);
+  assert.match(r.text, /\[图1\]/, 'the surviving image is still anchored');
   assert.ok(r.text.startsWith('看图'));
 });
 
