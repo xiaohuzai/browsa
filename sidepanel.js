@@ -11,7 +11,8 @@ import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeCom
 import {
   renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, finishBubble,
   addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
-  makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry
+  makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry,
+  renderUserContent
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
 import { initMathCopy, addMathCopyButtons } from './lib/sidepanel/math-copy.js';
@@ -1753,11 +1754,13 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       if (wantsChartVendors(finalText)) preloadChartVendors();
       hidxAssign(el); // assistant turn stored in background
       el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
+      // videoSrc 必须在最终渲染前落戳：renderStream isDone 里的 finishBubble→
+      // linkifyTimestamps 靠 data-video-src 门控（无盖章不链，2026-09-26）——
+      // 倒置 = 视频笔记回复的时间戳静默失效（resume-streaming 回归测试锁这一点）。
+      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
       await r(finalText, true);
       // finishBubble（decorate/linkify/thinkCopy/richRender）已在 renderStream
-      // 的 isDone 路径里跑完（C3）；这里只补站点差异——videoSrc 落戳（[mm:ss]
-      // 点击时才知道 seek 哪个 tab/URL）。
-      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
+      // 的 isDone 路径里跑完（C3）；provider 铭牌等站点差异在渲染后补。
       if (m.providerLabel) addProviderChip(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
       outputTokens = 0;
@@ -2388,8 +2391,16 @@ function appendUser(text, imageDataUrls) {
   }
   const span = document.createElement('span');
   span.className = 'msg-text';
-  span.textContent = text;
+  if (text.includes('`')) {
+    // 用户代码受限渲染（2026-09-26）：``` 围栏 → 高亮代码块、`code` → 行内码，
+    // 其余文字逐字原样（刻意不做全量 Markdown——用户输入常含非 Markdown 意图的
+    // 字符）。dataset.raw 不动：重试/编辑重发/复制拿的仍是原文。
+    renderUserContent(span, text);
+  } else {
+    span.textContent = text; // 快路径：绝大多数消息没有反引号
+  }
   el.appendChild(span);
+  if (span.querySelector('pre')) addCodeCopyButtons(el, { autoDetect: true });
   addTimestamp(el);
   addMsgActions(el, () => el.dataset.raw || text);
   messagesEl.appendChild(el);

@@ -264,6 +264,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 | **Streaming replies** | tokens appear as they arrive; click **■** in the composer or press `Esc` to stop |
 | **Think blocks** | `<think>` / `<thinking>` content in a collapsible block, auto-collapsed after streaming |
 | **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
+| **Your code renders too** | paste a ```` ``` ```` fenced block in the composer and your own bubble shows it as a highlighted code block with a copy button; no language tag needed (auto-detected). Everything else in your message stays byte-for-byte as typed — no markdown re-interpretation of your words |
 | **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
 | **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-SVG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
 | **Molecules · Proteins · Neural nets** | ```smiles / ```pdb / ```nn code blocks render live too — 2D structure and reaction diagrams, interactive protein 3D from a PDB ID, and publication-style network architecture figures; each with copy / export controls |

@@ -276,7 +276,10 @@ test('SW_PING for a tab with no registered resetIdleTimer is a safe no-op', asyn
 // NOT trigger a rewrite, and a reply that already has [mm:ss] must not be
 // rewritten. Replicated here in lockstep with chat-handler.js's source.
 
-const TS_PRESENT_RE = /\[(?:\d+:)?\d{1,2}:\d{2}\]/;
+// 与 render.js 的 linkifyTimestamps 同步（2026-09-26）：lookbehind 排除贴名切片
+// name[0:23]；秒位 [0-5]\d 排除秒位>59 的独立切片（[0:80]）——都不算「已有时间戳」，
+// 否则编程类视频页的总结回复被误判而跳过补写。
+const TS_PRESENT_RE = /(?<![A-Za-z0-9_$\]\)])\[(?:\d+:)?\d{1,2}:[0-5]\d\]/;
 const NOTES_REQUEST_RE = /总结|笔记|纪要|要点|大纲|概要|梳理|summary|summarize|notes?|outline|takeaways?|key points/i;
 function shouldRewriteTimestamps({ videoSrc, fullReply, userText }) {
   return !!videoSrc
@@ -327,6 +330,15 @@ test('shouldRewriteTimestamps: bare mm:ss without brackets does NOT count as pre
   // linkifyTimestamps only matches bracketed [mm:ss]; a bare 1:23 wouldn't
   // be linkified, so the rewrite should still fire to fix it.
   assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: 'see 1:23 for the demo ' + 'x'.repeat(60), userText: '总结' }), true);
+});
+
+test('shouldRewriteTimestamps: slice notation name[0:23] does NOT count as present', () => {
+  // 编程类视频页的总结回复常含切片区间（与 [mm:ss] 同形）——不能让它误判为
+  // 「已有时间戳」而跳过补写；真实时间戳（空格/行首前缀）仍然算 present。
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '取 msa_feat[0:23] 的行，再看 arr[26:49]。\n'.repeat(6) + 'x'.repeat(60), userText: '总结' }), true);
+  // 秒位>59 的独立切片同理（真实时间戳秒位 ≤59）：
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '行区间 [0:80] 到 [26:99] 如上。\n'.repeat(6) + 'x'.repeat(60), userText: '总结' }), true);
+  assert.equal(shouldRewriteTimestamps({ videoSrc: { platform: 'youtube' }, fullReply: '章节一 [12:34]\n内容'.repeat(12), userText: '总结' }), false);
 });
 
 // --------------- buildRunsConversationHistory (Hermes /v1/runs) ------------
