@@ -13,7 +13,7 @@ globalThis.document = dom.window.document;
 const {
   texSourceOf, formatTex, replaceMathWithTex,
   expandRangeToFormulas, stripCopyChrome, serializeNode,
-  buildMathCopyPayload, initMathCopy, addMathCopyButtons,
+  buildMathCopyPayload, initMathCopy, addMathCopyButtons, selectionTextWithMath,
 } = await import('../lib/sidepanel/math-copy.js');
 
 const doc = dom.window.document;
@@ -241,4 +241,49 @@ test('addMathCopyButtons：点击把 LaTeX 源码写进剪贴板（display 带�
   inlineBtn.click();
   await new Promise(r => setTimeout(r, 0));
   assert.deepEqual(copied, ['$$A+B$$', '$Q$']);
+});
+
+// ─── selectionTextWithMath：追问卡引用文本的公式感知提取（2026-09-26）─────────
+// sel.toString() 对公式拿到的是 MathML 逐记号换行的碎片；引用文本要把碰到的
+// 公式吸附为整体并写成 LaTeX（$…$ / $$…$$），没碰到公式时逐字等于 toString()。
+
+function fakeSel(range, str) {
+  return { isCollapsed: false, rangeCount: 1, getRangeAt: () => range, toString: () => str };
+}
+
+test('selectionTextWithMath：部分覆盖公式 → 吸附为整体并写成 LaTeX', () => {
+  const bubble = mount(`<p>前文 ${katexHtml('Q', false)} 中 ${katexHtml('A+B', true)}</p>`);
+  const p = bubble.querySelector('p');
+  const range = doc.createRange();
+  range.setStart(p.firstChild, 0); // 「前文 」文本节点开头
+  const ann = p.querySelectorAll('math')[1].querySelector('annotation');
+  range.setEnd(ann.firstChild, 1); // 终点拖进 display 公式内部
+  const out = selectionTextWithMath(fakeSel(range, '前文 X X'));
+  assert.match(out, /\$Q\$/, '行内公式写成 $…$');
+  assert.match(out, /\$\$A\+B\$\$/, 'display 公式写成 $$…$$');
+  assert.equal(out.includes('encoding'), false, '不带 MathML 碎片');
+  assert.equal(out.includes('后文'), false, '终点吸附到公式末尾');
+});
+
+test('selectionTextWithMath：选区完全落在公式内部 → 给整个公式', () => {
+  const bubble = mount(`<p>${katexHtml('A+B', true)}</p>`);
+  const ann = bubble.querySelector('annotation');
+  const range = doc.createRange();
+  range.setStart(ann.firstChild, 0);
+  range.setEnd(ann.firstChild, 2);
+  const out = selectionTextWithMath(fakeSel(range, 'A+'));
+  assert.equal(out.trim(), '$$A+B$$', '拖拽在公式内部起止是最常见手势，必须吸附到全身');
+});
+
+test('selectionTextWithMath：没碰到公式 → 逐字等于 toString()（旧行为不变）', () => {
+  const bubble = mount('<p>普通文字没有公式</p>');
+  const range = doc.createRange();
+  range.selectNodeContents(bubble.querySelector('p'));
+  const out = selectionTextWithMath(fakeSel(range, 'RAW\nTEXT'));
+  assert.equal(out, 'RAW\nTEXT');
+});
+
+test('selectionTextWithMath：collapsed / 无 range / null → null（调用方自行回退）', () => {
+  assert.equal(selectionTextWithMath(null), null);
+  assert.equal(selectionTextWithMath({ isCollapsed: true, rangeCount: 0 }), null);
 });

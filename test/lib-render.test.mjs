@@ -31,7 +31,7 @@ const {
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
-  wantsChartVendors, FENCED_RENDERERS, renderUserContent
+  wantsChartVendors, FENCED_RENDERERS, renderUserContent, renderMathInPlainText
 } = await import('../lib/sidepanel/render.js');
 
 test('wantsChartVendors detects every FENCED_RENDERERS language fence, nothing else', () => {
@@ -801,4 +801,48 @@ test('sidepanel.js appendUser routes backtick-bearing input through renderUserCo
     'appendUser must route backtick-bearing text through renderUserContent');
   assert.match(src, /span\.querySelector\('pre'\)\) addCodeCopyButtons\(el, \{ autoDetect: true \}\)/,
     'user bubbles must enable autoDetect for bare fences');
+});
+
+// ─── renderMathInPlainText：追问卡引用块的公式补渲染（2026-09-26）─────────────
+// 引用文本（selectionTextWithMath 产物）里的 $…$ / $$…$$ → KaTeX，其余文字
+// 保持逐字文本节点。刻意不走 renderSafe（全量 Markdown 会把引用里的普通文本
+// ——标题井号、下划线、星号——再解释一遍）。
+
+test('renderMathInPlainText: paired $…$ / $$…$$ render to KaTeX; prose verbatim', async () => {
+  const el = document.createElement('div');
+  el.textContent = '前文 $a^2+b^2$ 中 $$c_1$$ 后文';
+  await renderMathInPlainText(el);
+  const kats = el.querySelectorAll('.katex');
+  assert.equal(kats.length, 2, 'both formulas rendered');
+  assert.match(el.querySelector('.qtex-inline .katex annotation')?.textContent || '', /a\^2\+b\^2/,
+    'inline formula keeps its LaTeX in the annotation (copy/再提取 still work)');
+  assert.ok(el.querySelector('.math-block .katex'), 'display formula lands in a .math-block holder');
+  assert.match(el.textContent, /前文 /);
+  assert.match(el.textContent, / 后文/);
+  assert.equal(el.textContent.includes('$'), false, 'delimiters consumed by the render');
+});
+
+test('renderMathInPlainText: lone $ and $-free text stay byte-identical (no false math)', async () => {
+  const el = document.createElement('div');
+  el.textContent = '价格 $5 即可，# 不是标题';
+  const before = el.textContent;
+  await renderMathInPlainText(el);
+  assert.equal(el.childElementCount, 0, 'no elements created');
+  assert.equal(el.textContent, before);
+});
+
+test('renderMathInPlainText: null/empty el is a no-op', async () => {
+  await renderMathInPlainText(null);
+  const el = document.createElement('div');
+  await renderMathInPlainText(el);
+  assert.equal(el.childElementCount, 0);
+});
+
+test('detail-thread.js routes quote through selectionTextWithMath + renderMathInPlainText (source pin)', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../lib/sidepanel/detail-thread.js', import.meta.url), 'utf8');
+  assert.match(src, /selectionTextWithMath\(sel\) \?\? sel\.toString\(\)/,
+    'quote text must be formula-aware (MathML fragments are unusable)');
+  assert.match(src, /renderMathInPlainText\(quoteEl\)/,
+    'the quote block must render $…$/$$…$$ as KaTeX');
 });
