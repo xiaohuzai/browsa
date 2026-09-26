@@ -563,10 +563,36 @@ details.provider-group[open] > .provider-group-header::before {
 }
 .bridge-row-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 6px;
   align-items: center;
 }
+/* 每端点 Ping 状态点（2026-09-26）：灰=未测，绿/红=最近一次单测或整卡 Ping 的结果 */
+.bridge-row .bridge-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border);
+  opacity: 0.55;
+  justify-self: center;
+}
+.bridge-row .bridge-dot.reachable   { background: var(--ok); opacity: 1; }
+.bridge-row .bridge-dot.unreachable { background: var(--err); opacity: 1; }
+.bridge-row .bridge-row-ping {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.bridge-row .bridge-row-ping:hover { color: var(--accent); border-color: var(--border); }
 .bridge-row-sub {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);

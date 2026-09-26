@@ -1035,3 +1035,115 @@ test('options.js: a Hermes-only user sees the Hermes card under the merged tabs'
   const onTab = agentTabs().find((b) => b.classList.contains('on'));
   assert.equal(onTab.textContent, 'Hermes', 'the Hermes pill is the active tab');
 });
+
+// --------------- Ping 状态同步 + Bridge 每端点状态（2026-09-26 用户报告）------
+// 报告：Ping 全通 → 点保存 → 主页下拉变回「未 Ping」。根因：saveCard 无条件
+// 清 ping 状态（理由是「配置变了旧状态无效」，但没比对配置是否真的变了）。
+// 修复 = 连通性指纹：只有 baseUrl/model/apiKey/models/apiStyle/bridgeApiKeys
+// 真的变了才失效。同批：Bridge 多 Agent 每端点各自维护状态（providers.bridge
+// .endpointPing，行内状态点 + 单行 Ping 按钮，主页下拉按 agent 逐条显示）。
+
+const click = () => new dom.window.Event('click', { bubbles: true });
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('options.js: Save with UNCHANGED connectivity config keeps the ping state; changing baseUrl clears it', async () => {
+  const card = await addLlmCard();
+  const name = card.dataset.name;
+  card.querySelector('[data-k="alias"]').value = 'PingKeep';
+  card.querySelector('[data-k="baseUrl"]').value = 'http://pingkeep.example';
+  card.querySelector('[data-k="model"]').value = 'm1';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/v1/chat/completions')) return { ok: true, text: async () => '' };
+    if (u.includes('/v1/models')) return { ok: true, json: async () => ({}) };
+    throw new Error('unexpected URL ' + u);
+  };
+  card.querySelector('button[data-act="ping"]').dispatchEvent(click());
+  await sleepMs(60);
+  assert.equal(storedData.pingStates?.[name], 'reachable', 'Ping 通后状态必须持久化');
+
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  assert.equal(storedData.pingStates?.[name], 'reachable',
+    '原值重存（配置没变）不得抹掉 Ping 状态——用户报告的主症状');
+
+  card.querySelector('[data-k="baseUrl"]').value = 'http://changed.example';
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  assert.ok(!storedData.pingStates?.[name], '连通配置真的变了才清 Ping 状态');
+});
+
+test('options.js: Bridge card Ping writes per-endpoint states + row dots (partial failure keeps aggregate reachable)', async () => {
+  const card = findProviderCard(BRIDGE_CARD_LABEL);
+  assert.ok(card, 'bridge card present');
+  card.querySelector('[data-act="bridge-add"]')?.dispatchEvent(click());
+  await sleepMs(10);
+  const rows = card.querySelectorAll('.bridge-row');
+  rows[0].querySelector('[data-bridge-url]').value = 'http://127.0.0.1:3948';
+  rows[1].querySelector('[data-bridge-url]').value = 'http://127.0.0.1:3949';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('3948')) return { ok: true, json: async () => ({ ok: true, agent: 'codex' }) };
+    return { ok: false, status: 500, json: async () => null };
+  };
+  card.querySelector('button[data-act="ping"]').dispatchEvent(click());
+  await sleepMs(80);
+  const bridge = storedData.providers.bridge;
+  assert.equal(bridge.endpointPing['http://127.0.0.1:3948'], 'reachable');
+  assert.equal(bridge.endpointPing['http://127.0.0.1:3949'], 'unreachable');
+  assert.equal(storedData.pingStates?.bridge, 'reachable', '聚合语义：≥1 端点可达即可达');
+  const dots = [...card.querySelectorAll('.bridge-row .bridge-dot')];
+  assert.ok(dots[0].classList.contains('reachable'), 'row 1 dot green');
+  assert.ok(dots[1].classList.contains('unreachable'), 'row 2 dot red');
+  assert.equal(rows[0].querySelector('[data-bridge-alias]').value, 'codex', '/health 发现名写回空别名框（WYSIWYG）');
+
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  assert.equal(storedData.pingStates?.bridge, 'reachable', '保存（配置未变）不丢状态');
+  assert.ok(storedData.providers.bridge.endpointPing, '每端点状态同样跨保存保留');
+});
+
+test('options.js: per-row Ping updates only that endpoint and re-computes the aggregate badge', async () => {
+  const card = findProviderCard(BRIDGE_CARD_LABEL);
+  const row2 = [...card.querySelectorAll('.bridge-row')]
+    .find((r) => r.querySelector('[data-bridge-url]').value.includes('3949'));
+  assert.ok(row2, 'second bridge row present from the previous test');
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('3949')) return { ok: true, json: async () => ({ ok: true, agent: 'claude' }) };
+    return { ok: false, status: 500, json: async () => null };
+  };
+  row2.querySelector('[data-act="bridge-row-ping"]').dispatchEvent(click());
+  await sleepMs(60);
+  const bridge = storedData.providers.bridge;
+  assert.equal(bridge.endpointPing['http://127.0.0.1:3949'], 'reachable', '只有被点的端点更新');
+  assert.equal(bridge.endpointPing['http://127.0.0.1:3948'], 'reachable', '其他端点状态不动');
+  assert.equal(bridge.bridgeAgents['http://127.0.0.1:3949'], 'claude', '单行发现名同样进 bridgeAgents');
+  assert.equal(row2.querySelector('[data-bridge-alias]').value, 'claude', '发现名写回该行空别名框');
+  assert.equal(storedData.pingStates?.bridge, 'reachable', '聚合徽标随任一端点可达保持 reachable');
+  const dot2 = row2.querySelector('.bridge-dot');
+  assert.ok(dot2.classList.contains('reachable'), 'row 2 dot flips green in place');
+});
+
+test('sidepanel.js dropdown: bridge entries read per-endpoint status from providers.bridge.endpointPing (source pin)', async () => {
+  const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
+  assert.match(src, /pcfg\.endpointPing/, 'dropdown must consult the per-endpoint map');
+  assert.match(src, /epPing\[model\]/, 'per-agent status keyed by the endpoint URL (the models slot)');
+});
+
+test('options.js: Bridge — ping, then change URL + key, then Save resets ALL ping states (user-directed semantics)', async () => {
+  const card = findProviderCard(BRIDGE_CARD_LABEL);
+  // 前态：两端点可达（来自前两测）；改第一行 url + key → 保存 → 必须全清
+  const row1 = [...card.querySelectorAll('.bridge-row')][0];
+  row1.querySelector('[data-bridge-url]').value = 'http://127.0.0.1:3999';
+  row1.querySelector('[data-bridge-key]').value = 'sk-new';
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  const bridge = storedData.providers.bridge;
+  assert.ok(!storedData.pingStates?.bridge, '连通配置变了 → 卡级聚合状态必须重置');
+  assert.ok(!bridge.endpointPing || Object.keys(bridge.endpointPing).length === 0,
+    '每端点状态同样重置（旧 URL 的状态对新配置毫无意义）');
+  const dots = [...card.querySelectorAll('.bridge-row .bridge-dot')];
+  assert.ok(!dots[0].classList.contains('reachable') && !dots[0].classList.contains('unreachable'),
+    '行内状态点回到未测灰色');
+});
