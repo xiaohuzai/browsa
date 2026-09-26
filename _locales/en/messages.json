@@ -692,7 +692,7 @@
     "description": "Options: opencode server setup tip"
   },
   "squillaTip": {
-    "message": "OpenSquilla gateway WebSocket address — default ws://127.0.0.1:18791/ws. The gateway needs this extension's origin listed in cors.allowed_origins in ~/.opensquilla/config.toml (native support since v0.5.5). <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla docs</a>",
+    "message": "OpenSquilla gateway WebSocket address — default ws://127.0.0.1:18791/ws. The gateway needs this extension's origin listed in cors.allowed_origins — in ~/.opensquilla/config.toml for the CLI gateway, or in the desktop app's own profile config (macOS: ~/Library/Application Support/OpenSquilla/opensquilla/config.toml) — native support since v0.5.5. <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla docs</a>",
     "description": "Options: OpenSquilla gateway setup tip"
   },
   "bridgeTip": {

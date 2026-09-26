@@ -181,11 +181,28 @@ hermes gateway
 </details>
 
 <details>
-<summary><b>🦑 OpenSquilla Agent</b>——网关 WebSocket 直连的本地桌面智能体</summary>
+<summary><b>🦑 OpenSquilla Agent</b>——网关 WebSocket 直连的本地智能体（桌面版或命令行）</summary>
 
-[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地桌面智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。
+[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。
 
-**1. 让网关跑起来**——内核需 v0.5.5 或更新（该版本的来源守卫原生支持放行白名单里的扩展来源）。**桌面版本身就带网关**——在它的设置里能看到网关地址（通常是 `http://127.0.0.1:18791`；它会自动取 18791–18830 里第一个空闲端口），可跳过下面的命令。想自己起网关则：
+网关用**桌面版**或**命令行**二选一跑起来即可——browsa 对两者的接法完全一样，两条路线只有一处差别：网关读哪份配置文件（各自方式的第 2 步）。改错文件是「配了却连不上」的最常见原因。
+
+**方式 A：桌面版（无需终端）**
+
+1. **安装并启动** OpenSquilla 桌面应用，v0.5.5 或更新（更旧的包内嵌的网关来源守卫不认扩展）。应用会自动拉起自己的网关——打开应用设置，记下它显示的**网关地址**（通常是 `http://127.0.0.1:18791`；自动取 18791–18830 里第一个空闲端口）。
+2. **放行扩展**——桌面版**不读** `~/.opensquilla/config.toml`，读的是自己应用数据目录里的配置。macOS 官方包：`~/Library/Application Support/OpenSquilla/opensquilla/config.toml`（源码自建包则是 `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml`——两套数据完全隔离）。路径里有空格，终端里必须加引号，例如 `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"`——不加引号会静默编辑到另一个文件去。写入：
+
+```toml
+[cors]
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
+```
+
+3. **完全退出并重新打开应用**（只关窗口不算）——网关只在启动时读一次配置。桌面版的模型 / API key 在应用内配置（引导设置窗口），不读 shell 环境变量。进阶：桌面应用也能挂外部命令行网关——设 `OPENSQUILLA_DESKTOP_GATEWAY_URL`。
+4. 跳到下方「配置 browsa」。
+
+**方式 B：命令行**
+
+1. **安装并启动**网关（uv 提供 Python 3.12）：
 
 ```bash
 uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
@@ -193,23 +210,20 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791
 ```
 
-**2. 放行扩展**——网关的来源守卫会拒绝不认识的浏览器来源（这正是把恶意网页挡在外面的机制）。把 browsa 的来源写进**网关实际读取的那份配置**——命令行网关读 `~/.opensquilla/config.toml`，**桌面版读它自己 profile 目录里的 config.toml**（macOS 官方包：`~/Library/Application Support/OpenSquilla/opensquilla/config.toml`）。**路径里有空格，终端里必须加引号**，否则会静默编辑到另一个文件去，例如 `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"`：
+2. **放行扩展**——命令行网关读 `~/.opensquilla/config.toml`，写入与方式 A 相同的 `[cors]` 块。网关的模型路由也在这份配置里设（见 OpenSquilla 自身文档；LLM key 通常随启动时的环境变量注入）。
+3. **重启网关**（`Ctrl+C` 停掉，再 `opensquilla gateway start`）——配置只在启动时读一次。
+4. 跳到下方「配置 browsa」。
 
-```toml
-[cors]
-allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
-```
-
-这是 browsa 的扩展 ID（可在 `chrome://extensions` → browsa → **ID** 核对；解包加载请填那里实际显示的值）。白名单是**逐字精确匹配**（`*` 无效）。v0.5.5 起，来源守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。改完配置要重启网关——桌面版请完全退出再重开。
-
-**3. 配置 browsa**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
+**配置 browsa（两种方式相同）**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
 
 | 字段 | 值 |
 |---|---|
-| Base URL | `ws://127.0.0.1:18791/ws` |
+| Base URL | `ws://127.0.0.1:18791/ws`——以网关实际显示的地址为准（桌面版看应用设置；命令行看 `running:` 那行） |
 | API Key | 仅当网关配置了令牌时填写（可选） |
 
-**4. 点击 Ping 验证**——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。
+**点击 Ping 验证**——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。
+
+来源守卫细则（两种方式通用）：白名单是**逐字精确匹配**（`*` 无效）；可在 `chrome://extensions` → browsa → **ID** 核对实际 ID，解包加载请填那里实际显示的值。v0.5.5 起，守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
 
 说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次，之后就住在网关自己的对话记录里）；超大页面（超过 6 万字符）会作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读。页面插图会以图片附件随行（路由器若选到纯文字模型会自动降级为纯文字）。粘贴的截图保留在 browsa 自己的历史里，暂不转发。此协议没有系统提示词字段，语言偏好以普通指令拼在消息开头。
 

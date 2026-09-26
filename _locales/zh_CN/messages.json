@@ -692,7 +692,7 @@
     "description": "Options: opencode server setup tip"
   },
   "squillaTip": {
-    "message": "OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 ~/.opensquilla/config.toml 的 cors.allowed_origins（v0.5.5 起原生支持扩展 origin）。<a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla 文档</a>",
+    "message": "OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 cors.allowed_origins——命令行网关在 ~/.opensquilla/config.toml，桌面版在自己应用数据目录的 profile config（macOS 官方包：~/Library/Application Support/OpenSquilla/opensquilla/config.toml）（v0.5.5 起原生支持扩展 origin）。<a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla 文档</a>",
     "description": "Options: OpenSquilla gateway setup tip"
   },
   "bridgeTip": {

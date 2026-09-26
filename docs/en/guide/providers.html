@@ -130,19 +130,29 @@ agent:
 
 
       <h2 id="opensquilla">OpenSquilla Agent</h2>
-      <p><a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> is a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its <strong>gateway WebSocket</strong> (<code>/ws</code>) — the same channel its own web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.</p>
+      <p><a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> is a local agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its <strong>gateway WebSocket</strong> (<code>/ws</code>) — the same channel its own web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.</p>
+      <p>Run the gateway <strong>either</strong> as the desktop app <strong>or</strong> from the command line — browsa connects to both the same way. The tracks differ in exactly one thing: which config file the gateway reads (step 2 in each track). Editing the wrong file is the most common reason the connection silently fails.</p>
+      <p><strong>Way A — Desktop app (no terminal)</strong></p>
       <ol>
-        <li>Get a gateway running — its origin guard must be <strong>v0.5.5 or newer</strong> (that release natively accepts whitelisted extension origins). The <strong>desktop app</strong> starts its own gateway (its settings show the gateway URL — typically <code>http://127.0.0.1:18791</code>, the first free port in 18791–18830); skip the commands below in that case. To run the gateway yourself:
+        <li><strong>Install &amp; launch</strong> the OpenSquilla desktop app, v0.5.5 or newer (older builds bundle a gateway whose origin guard doesn't accept extensions). The app starts its own gateway automatically — open the app's settings and note the <strong>gateway URL</strong> it shows (typically <code>http://127.0.0.1:18791</code>; it takes the first free port in 18791–18830).</li>
+        <li><strong>Let the extension in</strong> — the desktop app does <strong>not</strong> read <code>~/.opensquilla/config.toml</code>; it reads a config in its own app-data directory. macOS official package: <code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code> (a self-built package uses <code>~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml</code> instead — the two data directories are fully separate). The path contains spaces, so quote it in a terminal (e.g. <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>) — an unquoted path quietly edits a different file. Add:
+<pre class="doc-code">[cors]
+allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]</pre></li>
+        <li><strong>Fully quit and reopen the app</strong> (closing the window is not enough) — the gateway reads this config once at startup. Models / API keys are configured inside the app (its setup window), not via shell env vars. Advanced: the app can also attach to an externally-run CLI gateway via <code>OPENSQUILLA_DESKTOP_GATEWAY_URL</code>.</li>
+        <li>Jump to <strong>Configure browsa</strong> below.</li>
+      </ol>
+      <p><strong>Way B — Command line</strong></p>
+      <ol>
+        <li><strong>Install &amp; start</strong> the gateway (uv provides Python 3.12):
 <pre class="doc-code">uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
 opensquilla gateway start
 # → running: http://127.0.0.1:18791</pre></li>
-        <li>Let the extension in — the gateway's origin guard rejects browser origins it doesn't know (that's what keeps hostile web pages out). Add browsa's origin to the config the gateway actually reads — the CLI gateway reads <code>~/.opensquilla/config.toml</code>, while <strong>the desktop app reads its own profile config</strong> (macOS official package: <code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code> — the path contains a space, so quote it in a terminal, e.g. <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>; an unquoted path quietly edits a different file):
-<pre class="doc-code">[cors]
-allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]</pre>
-          This is browsa's extension ID (verify at <code>chrome://extensions</code> → browsa → <strong>ID</strong> — use whatever value is shown there for an unpacked build); the listing is an <strong>exact string match</strong> (<code>*</code> does nothing). Use <code>ws://</code> for a local gateway — <code>wss</code> is rejected. Restart the gateway after editing (desktop app: quit fully and reopen).</li>
-        <li>In browsa settings, switch to the <strong>OpenSquilla</strong> tab: Base URL <code>ws://127.0.0.1:18791/ws</code>; fill the API Key only if your gateway requires a token.</li>
-        <li>Hit <strong>Ping</strong> to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.</li>
+        <li><strong>Let the extension in</strong> — the CLI gateway reads <code>~/.opensquilla/config.toml</code>. Add the same <code>[cors]</code> block as in Way A. The gateway's model routing is configured here too (see OpenSquilla's own docs; LLM keys typically come from the environment the gateway is started with).</li>
+        <li><strong>Restart the gateway</strong> (<code>Ctrl+C</code>, then <code>opensquilla gateway start</code> again) — the config is read once at startup.</li>
+        <li>Jump to <strong>Configure browsa</strong> below.</li>
       </ol>
+      <p><strong>Configure browsa (same for both)</strong>: in browsa settings, switch to the <strong>OpenSquilla</strong> tab — Base URL <code>ws://127.0.0.1:18791/ws</code> (use the URL your gateway actually shows); fill the API Key only if your gateway requires a token. Hit <strong>Ping</strong> to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.</p>
+      <p>This is browsa's extension ID (verify at <code>chrome://extensions</code> → browsa → <strong>ID</strong> — use whatever value is shown there for an unpacked build); the listing is an <strong>exact string match</strong> (<code>*</code> does nothing). Use <code>ws://</code> for a local gateway — <code>wss</code> is rejected.</p>
       <p>Notes: each browsa conversation maps to one gateway session (reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message); a huge page (over 60k chars) is uploaded as a <code>page-context.md</code> document the agent reads with its own tools. Pasted screenshots stay in browsa's own history and are not forwarded yet.</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
