@@ -359,8 +359,21 @@ function renderProviders() {
       // unconfigured "LLM 1 — not set". The moment any provider is committed,
       // the slot is consumed and never comes back on its own.
       if (entries.length === 0) {
-        details.appendChild(tabsWrap);
-        details.appendChild(buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true }));
+        // 空槽位也走与多卡相同的标签栏形态（用户拍板：两态必须同款，避免
+        // 「没配置时是标题头、配了之后变标签栏」的观感跳变）——「LLM 1」
+        // 活动标签 ＋ 常驻 ＋ 插进卡头 h3、隐藏标题名；reserved 卡无删除钮，
+        // 徽标照常留在标签右侧。
+        const reservedTab = document.createElement('button');
+        reservedTab.type = 'button';
+        reservedTab.className = 'provider-tab on';
+        reservedTab.textContent = 'LLM 1';
+        tabsWrap.insertBefore(reservedTab, addTab);
+        const cardEl = buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true });
+        details.appendChild(cardEl);
+        const h3 = cardEl.querySelector('.provider-h3');
+        const nameSpan = h3.querySelector('.name');
+        if (nameSpan) nameSpan.style.display = 'none';
+        h3.insertBefore(tabsWrap, nameSpan);
       } else {
         if (!entries.some(([n]) => n === llmEditorTab)) {
           const active = cachedCfg.activeProvider;
@@ -410,11 +423,15 @@ function localAgentTab() {
 // verbatim by the card render and the ＋ button (addBridgeRow) so the two
 // never drift. Two lines per row because the options page is 660px wide —
 // three inputs on one line would squeeze every field below legibility.
-function bridgeRowHtml(url, alias, apiKey) {
+function bridgeRowHtml(url, alias, apiKey, state = '') {
+  const dotTitle = state === 'reachable' ? _t('statusReachableBadge', '● reachable')
+    : state === 'unreachable' ? _t('statusUnreachableBadge', '○ unreachable') : '';
   return `
     <div class="bridge-row">
       <div class="bridge-row-main">
         <input data-bridge-url type="text" value="${escapeAttr(url)}" placeholder="http://127.0.0.1:3948" />
+        <span class="bridge-dot${state ? ' ' + state : ''}" data-bridge-dot title="${dotTitle}"></span>
+        <button type="button" class="bridge-row-ping" data-act="bridge-row-ping" title="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}" aria-label="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}">⟳</button>
         <button type="button" class="bridge-row-x" data-act="bridge-remove" title="${_t('bridgeRemoveTitle', '移除此地址')}" aria-label="${_t('bridgeRemoveTitle', '移除此地址')}">${ICON_CLOSE}</button>
       </div>
       <div class="bridge-row-sub">
@@ -445,57 +462,67 @@ function bridgeEndpointRows(cfg) {
   let urls = Array.isArray(cfg.models) ? cfg.models.map((s) => String(s).trim()).filter(Boolean) : [];
   if (!urls.length) urls = String(cfg.baseUrl || '').split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
   const agents = cfg.bridgeAgents || {};
-  const rows = [...new Set(urls)].map((u) => ({ url: u, alias: agents[u] || '', apiKey: bridgeRowApiKey(cfg, u) }));
-  if (!rows.length) rows.push({ url: '', alias: '', apiKey: '' });
+  const ping = cfg.endpointPing || {};
+  const rows = [...new Set(urls)].map((u) => ({ url: u, alias: agents[u] || '', apiKey: bridgeRowApiKey(cfg, u), state: ping[u] || '' }));
+  if (!rows.length) rows.push({ url: '', alias: '', apiKey: '', state: '' });
   return rows;
 }
 
-function addBridgeRow(wrap, { url = '', alias = '', apiKey = '' } = {}) {
+function addBridgeRow(wrap, { url = '', alias = '', apiKey = '', state = '' } = {}) {
   const anchor = wrap.querySelector('.bridge-actions') || wrap.querySelector('.bridge-add');
-  anchor.insertAdjacentHTML('beforebegin', bridgeRowHtml(url, alias, apiKey));
+  anchor.insertAdjacentHTML('beforebegin', bridgeRowHtml(url, alias, apiKey, state));
   const rows = wrap.querySelectorAll('.bridge-row');
   return rows[rows.length - 1];
 }
 
-// One-click setup prompt for the bridge card: the user pastes this into their
-// CLI agent (codex / claude code — the same audience that runs the bridge),
-// and the agent performs install → agents.json → serve → health-check itself
-// instead of the user following the docs steps by hand. Pattern borrowed from
-// ego-lite's agent-executable install doc (2026-09-09 audit). Adapter facts
-// (entry shape, sandbox/approval fields) are deliberately deferred to the
-// package's own agents.example.json/README — duplicating them here would
-// drift when the bridge repo changes.
-function bridgeAgentSetupPrompt() {
-  return _t('bridgeAgentSetupPrompt', '请在本机配置 agent-bridge 守护进程，让 browsa 浏览器扩展能通过本地 HTTP 调用你：\n\n1. 全局安装（Node ≥ 18，零依赖）：npm i -g @xiaohuzai/agent-bridge\n2. 在固定工作目录创建 agents.json（条目形态以包内 agents.example.json 与 README 为准），为你自己加一个条目。如果你是 codex，保留 "approval": "on-request"（否则操作确认无法弹到 browsa）与 "sandbox": "workspace-write"：\n   {"bridges":[{"name":"codex","port":3948,"apiKey":"","sandbox":"workspace-write","approval":"on-request"}]}\n   其他 CLI agent（如 claude、pi）条目只需 name/port/apiKey。\n3. 启动并验证：运行 agent-bridge serve（默认读 ./agents.json，前台驻留——验证要另开一条命令）：curl http://127.0.0.1:3948/health 应返回含你名字的 JSON。\n4. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。\n\n任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。');
-}
-
-// Clipboard write with an execCommand fallback (extension pages have the
-// clipboard API, but stay safe if it's absent or rejects).
-function copyTextToClipboard(text, done) {
-  const fallback = () => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); done(); } catch (_) {}
-    ta.remove();
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(done, fallback);
-  } else {
-    fallback();
+// 就地刷新 Bridge 行状态点（2026-09-26 用户拍板：多 Agent 各自维护 Ping 状态）。
+// 刻意不重渲整卡——重渲会丢用户未保存的行编辑；只按行输入框的 URL 对号入座。
+function updateBridgeRowDots(card, cfg) {
+  const map = cfg.endpointPing || {};
+  for (const row of card.querySelectorAll('.bridge-row')) {
+    const urlInput = row.querySelector('[data-bridge-url]');
+    const dot = row.querySelector('[data-bridge-dot]');
+    if (!urlInput || !dot) continue;
+    const raw = urlInput.value.trim();
+    const u = raw ? normalizeBridgeUrl(raw) : '';
+    const st = (u && map[u]) || '';
+    dot.className = 'bridge-dot' + (st ? ' ' + st : '');
+    dot.title = st === 'reachable' ? _t('statusReachableBadge', '● reachable')
+      : st === 'unreachable' ? _t('statusUnreachableBadge', '○ unreachable') : '';
   }
 }
 
-function copyBridgeSetupPrompt(btn) {
-  copyTextToClipboard(bridgeAgentSetupPrompt(), () => {
-    const prev = btn.textContent;
-    btn.textContent = _t('bridgeAgentSetupDone', '已复制 ✓ 粘给你的 CLI agent');
-    btn.disabled = true;
-    setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1600);
-  });
+// 单行 Ping：只打这一行的 /health，行点就地变色、状态随 providers 持久化
+// （主页下拉按 agent 逐条读取）。聚合徽标按「任一端点可达即可达；已测端点
+// 全不通才 unreachable」重算——与整卡 Ping 的聚合语义一致。
+async function rowPingBridge(card, row) {
+  const name = card.dataset.name;
+  const cfg = cachedCfg.providers[name];
+  if (!cfg?.isBridge) return;
+  const urlInput = row.querySelector('[data-bridge-url]');
+  const raw = (urlInput?.value || '').trim();
+  if (!raw) {
+    flashCard(card, 'err', _t('bridgeNeedEndpointErr', '先添加至少一个桥地址再 Ping。'));
+    return;
+  }
+  const rowBtn = row.querySelector('[data-act="bridge-row-ping"]');
+  if (rowBtn) rowBtn.textContent = '…';
+  const r = await pingBridge({ baseUrl: raw, apiKey: resolveBridgeApiKey(cfg, normalizeBridgeUrl(raw)) });
+  cfg.endpointPing = { ...(cfg.endpointPing || {}), [r.url]: r.ok ? 'reachable' : 'unreachable' };
+  // 发现名 WYSIWYG（与整卡 Ping 同规则）：写进 bridgeAgents + 回填该行空别名框；
+  // 用户手填的别名永不被覆盖。
+  if (r.ok && r.agent) {
+    cfg.bridgeAgents = { ...(cfg.bridgeAgents || {}) };
+    if (!(cfg.bridgeAgents[r.url] || '').trim()) cfg.bridgeAgents[r.url] = r.agent;
+    const aliasInput = row.querySelector('[data-bridge-alias]');
+    if (aliasInput && !aliasInput.value.trim()) aliasInput.value = r.agent;
+  }
+  await storage.set({ providers: cachedCfg.providers });
+  updateBridgeRowDots(card, cfg);
+  if (rowBtn) rowBtn.textContent = '⟳';
+  const states = Object.values(cfg.endpointPing);
+  if (states.includes('reachable')) setBadge(card, 'reachable', name);
+  else if (states.length && states.every((s) => s === 'unreachable')) setBadge(card, 'unreachable', name);
 }
 
 function buildProviderCard(name, cfg, opts = {}) {
@@ -555,10 +582,9 @@ function buildProviderCard(name, cfg, opts = {}) {
       <div class="field field-full">
         <label><span>Base URL${agentBaseUrlTip}</span>
           <div class="bridge-endpoints" data-bridge-endpoints>
-            ${bridgeEndpointRows(cfg).map(({ url, alias, apiKey }) => bridgeRowHtml(url, alias, apiKey)).join('')}
+            ${bridgeEndpointRows(cfg).map(({ url, alias, apiKey, state }) => bridgeRowHtml(url, alias, apiKey, state)).join('')}
             <div class="bridge-actions">
               <button type="button" class="bridge-add" data-act="bridge-add">${_t('bridgeAddBtn', '＋ 添加 Agent')}</button>
-              <button type="button" class="bridge-setup-copy" data-act="bridge-agent-setup">${_t('bridgeAgentSetupBtn', '复制配置提示词')}</button>
             </div>
           </div>
         </label>
@@ -713,12 +739,6 @@ function buildProviderCard(name, cfg, opts = {}) {
         addBridgeRow(bridgeWrap).querySelector('[data-bridge-url]').focus();
         return;
       }
-      const setup = e.target.closest('[data-act="bridge-agent-setup"]');
-      if (setup) {
-        e.stopPropagation();
-        copyBridgeSetupPrompt(setup);
-        return;
-      }
       const eye = e.target.closest('[data-act="bridge-key-eye"]');
       if (eye) {
         e.stopPropagation();
@@ -728,6 +748,12 @@ function buildProviderCard(name, cfg, opts = {}) {
           keyInput.type = show ? 'text' : 'password';
           eye.textContent = show ? '🙈' : '👁';
         }
+        return;
+      }
+      const rowPingBtn = e.target.closest('[data-act="bridge-row-ping"]');
+      if (rowPingBtn) {
+        e.stopPropagation();
+        rowPingBridge(card, rowPingBtn.closest('.bridge-row'));
         return;
       }
       const rm = e.target.closest('[data-act="bridge-remove"]');
@@ -790,6 +816,18 @@ function flashCard(card, cls, text) {
 async function saveCard(name, card) {
   const data = readCard(card);
   const wasReserved = !cachedCfg.providers[name];
+  // 连通性指纹（保存前抓旧值）：Ping 状态只在「连通相关配置真的变了」时才
+  // 失效——原值重存 / 只改别名等无关字段不再把刚 Ping 通的状态抹掉（用户
+  // 报告：Ping 全通 → 点保存 → 主页下拉变回「未 Ping」）。指纹只挑 Ping
+  // 实际依赖的字段：baseUrl / model / apiKey / models（LLM 模型列表与 Bridge
+  // 端点 URL 槽）/ apiStyle / bridgeApiKeys。
+  const prevCfg = wasReserved ? null : cachedCfg.providers[name];
+  const connFp = (p) => JSON.stringify({
+    baseUrl: p.baseUrl || '', model: p.model || '', apiKey: p.apiKey || '',
+    models: p.models || null, apiStyle: p.apiStyle || 'chat',
+    bridgeApiKeys: p.bridgeApiKeys || null,
+  });
+  const prevFp = prevCfg ? connFp(prevCfg) : null;
   // Merge the blank-LLM template as the base so a reserved (render-only,
   // not-yet-persisted) card keeps type/stream/isHermes/temperature/...
   // defaults on first Save; real providers just override their own values.
@@ -844,13 +882,34 @@ async function saveCard(name, card) {
       return;
     }
   }
+  const configChanged = prevFp !== connFp(cachedCfg.providers[name]);
+  if (configChanged) {
+    delete _pingState[name]; // config changed — ping state no longer valid
+    // Bridge 每端点状态同样随连通配置失效（端点列表/键变了，旧状态对不上号）。
+    // 必须在 storage.set 之前删——否则存储里残留旧 endpointPing，与内存分叉。
+    delete cachedCfg.providers[name].endpointPing;
+  }
   await storage.set({ providers: cachedCfg.providers });
-  delete _pingState[name]; // config changed — ping state no longer valid
-  storage.get('pingStates').then((pingStates) => {
-    const updated = { ...(pingStates || {}) };
-    delete updated[name];
-    storage.set({ pingStates: updated });
-  });
+  if (configChanged) {
+    storage.get('pingStates').then((pingStates) => {
+      const updated = { ...(pingStates || {}) };
+      delete updated[name];
+      storage.set({ pingStates: updated });
+    });
+    // 卡面同步回未测态——否则卡片还挂着旧「● reachable」，主页下拉已是
+    // 「未 Ping」，两处口径打架。就地改（不重渲，保住用户可能还在改的输入）。
+    const badge = card.querySelector('.provider-badge');
+    const cfgNow = cachedCfg.providers[name];
+    const isCfg = !!String(cfgNow.baseUrl || '').trim();
+    if (badge) {
+      badge.className = 'provider-badge ' + (isCfg ? 'configured' : 'unconfigured');
+      badge.textContent = isCfg ? _t('badgeNotPinged', '○ not pinged') : _t('badgeNotSet', '○ not set');
+    }
+    for (const dot of card.querySelectorAll('.bridge-dot')) {
+      dot.className = 'bridge-dot';
+      dot.title = '';
+    }
+  }
   if (wasReserved) {
     // The reserved empty slot just became a real provider: re-render so it
     // loses the dashed "reserved" styling and gains its delete button.
@@ -906,6 +965,9 @@ async function pingCard(name, card) {
             r.url,
             (agents[r.url] || '').trim() || r.agent || '',
           ]));
+          // 每端点状态（用户拍板：Bridge 多 Agent 各自维护 Ping 结果）——
+          // 主页下拉按 agent 逐条显示，卡片行内状态点就地更新。
+          cfg.endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
           await storage.set({ providers: cachedCfg.providers });
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
@@ -916,6 +978,7 @@ async function pingCard(name, card) {
             const u = normalizeBridgeUrl(urlInput.value.trim());
             if (cfg.bridgeAgents[u]) aliasInput.value = cfg.bridgeAgents[u];
           }
+          updateBridgeRowDots(card, cfg);
           const downs = results.length - okUrls.length;
           const names = okUrls.map((r) => cfg.bridgeAgents[r.url] || String(r.url).replace(/^https?:\/\//, '')).join(', ');
           return `agent-bridge ×${okUrls.length}/${results.length} healthy (${names})${downs ? ` — ${downs} down` : ''}`;

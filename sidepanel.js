@@ -808,7 +808,16 @@ function populateProviderSelect(cfg) {
     // 展示名用 Ping 时 /health 发现的 agent 名（alias），未 Ping 过用 host:port 兜底。
     const modelList = ((pcfg.type || 'llm') === 'llm' || isBridgeCard) && models.length ? models : [''];
     let status;
-    if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
+    // bridge 卡：每端点各自维护 Ping 状态（2026-09-26 用户拍板）——按 agent
+    // 逐条显示；endpointPing 缺席（旧数据 / 从未 Ping 过）回落卡级聚合。
+    const epPing = isBridgeCard ? pcfg.endpointPing : null;
+    if (epPing && model && Object.keys(epPing).length) {
+      const es = epPing[model];
+      status = es === 'reachable' ? _t('statusReachable', '● reachable')
+        : es === 'unreachable' ? _t('statusUnreachable', '○ unreachable')
+        : _t('statusNotPinged', 'not pinged');
+    }
+    else if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
     else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
     else                           status = _t('statusNotPinged', 'not pinged');
     for (const model of modelList) {
