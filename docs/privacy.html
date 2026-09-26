@@ -52,7 +52,7 @@
   <a class="back" href="./">← 返回 browsa 首页</a>
   <p class="eyebrow">privacy policy</p>
   <h1>隐私政策</h1>
-  <p class="updated">生效日期：2026-08-27 · 适用范围：browsa 浏览器扩展及官网</p>
+  <p class="updated">生效日期：2026-09-26 · 适用范围：browsa 浏览器扩展及官网</p>
 
   <div class="callout">
     一句话版本：<b>browsa 不收集任何数据。</b>没有账号体系，没有统计埋点，没有我们自己的服务器。你的对话、设置和 API Key 都只保存在你自己的浏览器里。
@@ -74,15 +74,16 @@
     <li><b>AI 对话：</b>发送到你自己在设置里填写的 Provider 地址（如 OpenAI、Anthropic 或任意 OpenAI 兼容 API、本地 Ollama）。请求由你的浏览器直接发给该端点，<b>不经过任何中间服务器</b>。附进对话的页面内容会经过一道本地预处理：URL 中的密码、令牌、签名等敏感参数会被隐去后再发送，该处理全部在你的浏览器内完成。</li>
     <li><b>语音转写（可选功能）：</b>若你在设置中启用 ASR 并填入火山方舟的 Key，音频会在本地转码后由浏览器直传该服务进行转写；未启用则此功能完全不运行。</li>
     <li><b>站点内容提取：</b>通过拦截浏览器自身已加载的数据读取字幕、正文等，不做额外登录，也不上传内容到第三方。</li>
-    <li><b>媒体下载：</b>仅在你点击下载时按需建立连接。</li>
+    <li><b>视听分析（可选功能）：</b>对视频/音频做转写或精读时，browsa 按需从该媒体的 CDN 拉取音视频字节（仅在你主动发起分析时建立连接；请求会带上 CDN 要求的 Referer/Cookie 等头），拉取的字节经本地转码后发给你配置的分析服务；不使用此功能则完全不发生。</li>
   </ul>
 
   <h2>权限用途说明</h2>
   <ul>
     <li><code>&lt;all_urls&gt;</code> / <code>tabs</code> / <code>scripting</code>：用于在你点击 📎 时读取当前页面的可读内容、注入只读提取脚本，以及点击时间戳时跳转视频进度。仅在你主动操作时运行。</li>
-    <li><code>cookies</code>：只读，且仅在下载某平台音视频流时读取该平台的登录态以携带你的下载凭证。</li>
-    <li><code>declarativeNetRequest</code>：临时会话级规则，为显式请求的媒体下载注入 Referer 头；规则随浏览器会话结束自动清除。</li>
-    <li><code>downloads</code>：保存你明确选择下载的媒体文件。</li>
+    <li><code>cookies</code>：只读，仅在视听分析按需拉取平台音视频时读取该媒体的登录态，用于构造 CDN 所需的请求头。</li>
+    <li><code>declarativeNetRequest</code>：临时会话级规则，仅在上述视听分析拉取音视频时为请求注入 Referer 等头以通过防盗链；用完即移除，随浏览器会话结束自动清除。</li>
+    <li><code>downloads</code>：保存你明确导出的文件（例如图表工具的「导出 SVG」）。</li>
+    <li><code>webNavigation</code>：感知当前标签页的地址变化，让侧边栏跟随页面导航；监听仅在侧边栏开启期间注册。</li>
     <li><code>storage</code>：上述本地数据存储。</li>
   </ul>
 
