@@ -933,6 +933,9 @@ async function pingCard(name, card) {
   // the DOM ref below stays attached to a live card.
   card = document.querySelector(`.provider[data-name="${name}"]`) || card;
   const cfg = cachedCfg.providers[name];
+  // saveCard() rejects a blank reserved slot by deleting it (error already
+  // flashed) — there is nothing to ping.
+  if (!cfg) return;
 
   // Only LLM providers require a model ID
   if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) {
