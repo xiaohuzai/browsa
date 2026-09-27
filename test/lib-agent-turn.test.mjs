@@ -213,6 +213,34 @@ test('withAgentRenderHints: first turn appends the hint block; later turns retur
   // failure the missing nn entry produced in the field.
   assert.match(AGENT_RENDER_HINT, /ALWAYS ```nn, never a Mermaid flowchart/, 'nn must carry the not-Mermaid rule');
   assert.match(AGENT_RENDER_HINT, /"style":"fcnn"/, 'the fcnn (neuron-circle) form must be taught too');
+  // The math rules ride along too (SHARED consts from prompt-assembly.js since
+  // 2026-09-28): before that the mirror had never carried a math rule and
+  // agent providers wrote formulas as backtick pseudo-math (`q_si^h = W_q m_si`
+  // in a code pill) — field report via Agent Bridge · claude.
+  assert.match(AGENT_RENDER_HINT, /always use LaTeX notation/i, 'the $...$ math rule must ride along');
+  assert.match(AGENT_RENDER_HINT, /never wrap them in backticks/, 'backtick pseudo-math must be forbidden explicitly');
+  assert.match(AGENT_RENDER_HINT, /\$\$\.\.\.\$\$/, 'the $$...$$ display-math form must be named');
+  assert.match(AGENT_RENDER_HINT, /Mermaid node labels, write math as \$\$\.\.\.\$\$/, 'the mermaid-label math rule must ride along too');
+});
+
+test('the render contract is SHARED byte-identically: both homes embed every channel-neutral entry verbatim', async () => {
+  const { CAPABILITY_HINTS_ENTRIES, CHAT_FENCE_SENTENCE, CAPABILITY_HINTS, SHARED_RENDER_RULES, FENCE_INDEX } = await import('../lib/prompt-assembly.js');
+  const { AGENT_RENDER_HINT } = await import('../lib/agent-turn.js');
+  for (const entry of CAPABILITY_HINTS_ENTRIES) {
+    assert.ok(CAPABILITY_HINTS.includes(entry), 'CAPABILITY_HINTS must embed its own entry verbatim');
+  }
+  // 通道专属只剩 chat 围栏句——文件条款对带工具的 agent 是反指令，不许漏进共享集。
+  assert.ok(!SHARED_RENDER_RULES.includes(CHAT_FENCE_SENTENCE), 'the chat-only fence sentence must not leak into the shared set');
+  for (const entry of CAPABILITY_HINTS_ENTRIES.filter(s => s !== CHAT_FENCE_SENTENCE)) {
+    assert.ok(AGENT_RENDER_HINT.includes(entry), 'AGENT_RENDER_HINT must embed every channel-neutral entry verbatim');
+  }
+  assert.ok(AGENT_RENDER_HINT.includes(FENCE_INDEX), 'the fence index must be shared too');
+  // Fence names on BOTH sides (the ```nn drift, 2026-09-14) — now implied by
+  // the shared entries, but pinned explicitly as the cheap early signal.
+  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn']) {
+    assert.ok(CAPABILITY_HINTS.includes('```' + fence), `CAPABILITY_HINTS must mention \`\`\`${fence}`);
+    assert.ok(AGENT_RENDER_HINT.includes('```' + fence), `AGENT_RENDER_HINT must mention \`\`\`${fence}`);
+  }
 });
 
 test('withAgentRenderHints is wired into all six agent branches (chat + subchat, opencode + bridge + squilla)', async () => {
