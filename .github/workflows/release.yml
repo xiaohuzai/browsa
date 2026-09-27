@@ -116,6 +116,7 @@ jobs:
         id: bump
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -137,10 +138,19 @@ jobs:
           git add package.json package-lock.json manifest.json
           PR_NEEDED=false
           if ! git diff --cached --quiet; then
-            # 刻意不带 [skip ci]：版本号 PR 要靠 pull_request CI 产出 main ruleset
-            # 所需的「Test + Compat Check」必需检查，门禁才过得去（release/vX 分支
-            # 与 tag 推送都不在 ci.yml 的 push branches 列表里，不会引发重复跑）。
-            git commit -m "chore: release v$VERSION"
+            # [skip ci] 与否按模式分流（2026-09-27 用户拍板：版本 PR 不跑 test）：
+            # - PAT 模式（secrets.RELEASE_PAT 已配）：bump 带 [skip ci]——版本号
+            #   PR 由 --admin 直接合并（Repository admin bypass ruleset），不需要
+            #   CI 检查；发版 run 几分钟前刚在同一份内容树上跑过全量测试，版本
+            #   PR 的 test 是纯重复，真正的内容防线是 PR 步骤的安全阀。
+            # - 无 PAT（github.token 模式）：不带 [skip ci]——PR 靠 pull_request
+            #   CI 产出 main ruleset 所需的「Test + Compat Check」必需检查，且
+            #   CI run 会停在 action_required 等管理员批准一次（防递归策略）。
+            if [ -n "$RELEASE_PAT" ]; then
+              git commit -m "chore: release v$VERSION [skip ci]"
+            else
+              git commit -m "chore: release v$VERSION"
+            fi
             PR_NEEDED=true
           fi
           git tag -a "v$VERSION" -m "browsa v$VERSION"
@@ -242,7 +252,8 @@ jobs:
       #    被杀（首跑实录）——放宽到 30min。
       - name: Open version bump PR and auto-merge
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           RELEASE_BRANCH="release/v$VERSION"
@@ -295,6 +306,16 @@ jobs:
               echo "::error::CI 检查未通过，版本号 PR 无法自动合入。v$VERSION 已发布成功，请修复后手动合并：$PR_URL"
               gh pr checks "$PR_URL" || true
               exit 1
+            fi
+            # PAT 模式直通：--admin 绕过必需检查与 up-to-date（strict）直接
+            # squash 合并——无 CI 即无批准问题，版本 PR 十秒收口。github.token
+            # 非 admin 走不到这条，落回下方 auto-merge 循环（等批准+检查）。
+            if [ -n "$RELEASE_PAT" ]; then
+              if gh pr merge "$PR_URL" --squash --admin >/dev/null 2>&1; then
+                echo "Version bump PR merged (--admin bypass): $PR_URL"
+                exit 0
+              fi
+              # 合并失败（并发竞态等）——继续循环重试
             fi
             if [ "$AUTO" = 0 ]; then
               if gh pr merge "$PR_URL" --auto --squash >/dev/null 2>&1; then
