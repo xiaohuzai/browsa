@@ -15,7 +15,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v5
@@ -223,16 +223,33 @@ jobs:
               echo "::notice::旧兜底 notes 已升级为 generate-notes 版"
           fi
 
-      # 版本号 PR 自动开、自动合（pi-feishu-notify 同款模式）。放在最后一步：
-      # zip/tag/release 都已落地，本步失败不影响已发布的产物，只会留下一个
-      # 待人工处理的 PR。仅当本次真的产生了 bump 提交才走（重跑补完场景跳过）。
+      # 版本号 PR 自动开、自动合（pi-feishu-notify 同款模式 + browsa 实测增强）。
+      # 放在最后一步：zip/tag/release 都已落地，本步失败不影响已发布的产物。
+      # 不看 pr_needed 门——「上次 run 死在本步」的恢复就是重跑一次（幂等自愈）。
+      # 历史旧 release 没有 release/vX 分支，分支守卫挡掉（无事可做）。
+      #
+      # v0.40.4 验证实录（2026-09-27，三次真跑踩出的全部分支）：
+      # 1. 仓库级「GitHub Actions is not permitted to create or approve pull
+      #    requests」默认关闭 → PR 创建直接 GraphQL 报错。已开
+      #    can_approve_pull_request_reviews（Settings→Actions→Workflow permissions）。
+      # 2. GITHUB_TOKEN 创建的 PR，其 pull_request CI run 会停在 action_required
+      #    （防递归策略）——需要仓库管理员在 Actions 页批准一次才会执行；批准后
+      #    检查通过即自动合并。想免批准：换 PAT（secrets）建 PR，见后续可选项。
+      # 3. 并发合入会让版本 PR 变 BEHIND（main ruleset 要求分支最新）→ 循环里
+      #    update-branch 后重等；bump 内容已随别的 PR 进 main 时 diff 为空 →
+      #    关闭 PR 正常收尾（版本号已对齐，无事可做）。
+      # 4. job timeout 15min 会在「整卡测试 + notes 重试 + PR CI 等待」叠加时
+      #    被杀（首跑实录）——放宽到 30min。
       - name: Open version bump PR and auto-merge
-        if: steps.bump.outputs.pr_needed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           RELEASE_BRANCH="release/v$VERSION"
+          if ! git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH" | grep -q .; then
+            echo "No $RELEASE_BRANCH branch on remote — historical release, nothing to do."
+            exit 0
+          fi
           PR_URL=$(gh pr list --base main --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url')
           if [ -z "$PR_URL" ]; then
             if gh pr list --base main --head "$RELEASE_BRANCH" --state merged --json number --jq '.[0].number' | grep -q '[0-9]'; then
@@ -241,46 +258,55 @@ jobs:
             fi
             PR_URL=$(gh pr create --base main --head "$RELEASE_BRANCH" \
               --title "chore: release v$VERSION" \
-              --body "发版流程自动创建：把 package.json / package-lock.json / manifest.json 的版本号对齐到已发布的 v$VERSION（此前 bump 提交只随 tag 走，main 的版本号一直落后——即 cws-listing 口径的「manifest 旧值属常态」）。仅版本号变更的 PR 由流程自动合并，无需人工处理。") \
+              --body "发版流程自动创建：把 package.json / package-lock.json / manifest.json 的版本号对齐到已发布的 v$VERSION。仅版本号变更的 PR 由流程自动合并，无需人工处理。") \
               || { echo "::error::版本号 PR 创建失败（$RELEASE_BRANCH）——请手动创建并合并（v$VERSION 已发布）"; exit 1; }
           fi
           echo "Version bump PR: $PR_URL"
-          # 安全阀：只自动合「仅版本号文件」的 PR，混入其它变更立即停下交人工审查
-          EXTRA=$(gh pr diff "$PR_URL" --name-only | grep -cvE '^(package\.json|package-lock\.json|manifest\.json)$' || true)
-          if [ "$EXTRA" -ne 0 ]; then
-            echo "::error::PR $PR_URL 除版本号外还有其它变更，已停止自动合并，请人工审查"
-            exit 1
-          fi
-          # bump 提交不带 [skip ci]，PR 照常跑 pull_request CI 产出 main ruleset
-          # 所需的「Test + Compat Check」必需检查（workflow_dispatch 手动补的
-          # 检查不计入 PR 门禁，实测无效，勿走回头路）。
-          # auto-merge：有必需检查在跑时 --auto 可用，GitHub 在检查通过后自动合入；
-          # 若仓库未开 auto-merge 或检查已过（clean status）→ --auto 被拒 → 直接
-          # 合并兜底，循环里两种路径都会反复尝试直到合入或检查失败。
           AUTO=0
-          for i in $(seq 1 120); do
+          for i in $(seq 1 240); do
             STATE=$(gh pr view "$PR_URL" --json state --jq .state)
             if [ "$STATE" = "MERGED" ]; then
-              echo "Version bump PR merged automatically: $PR_URL"
+              echo "Version bump PR merged: $PR_URL"
               exit 0
             fi
-            if [ "$AUTO" = 0 ]; then
-              if gh pr merge "$PR_URL" --auto --squash >/dev/null 2>&1; then
-                AUTO=1
-                echo "Auto-merge enabled for $PR_URL"
-              else
-                gh pr merge "$PR_URL" --squash >/dev/null 2>&1 \
-                  && { echo "Version bump PR merged directly: $PR_URL"; exit 0; }
-              fi
+            if [ "$STATE" != "OPEN" ]; then
+              echo "::error::版本号 PR 状态异常（$STATE）。v$VERSION 已发布成功，请人工检查：$PR_URL"
+              exit 1
             fi
-            # 检查失败则提前报错（auto-merge 永远不会完成），不装死
+            # 差异审计每轮重算（update-branch 后会变）：空差异 = 版本号已随其它
+            # PR 进 main，关闭收尾；混入非版本号文件 = 安全阀停下交人工。
+            DIFF_FILES=$(gh pr diff "$PR_URL" --name-only | grep -c . || true)
+            EXTRA=$(gh pr diff "$PR_URL" --name-only | grep -cvE '^(package\.json|package-lock\.json|manifest\.json)$' || true)
+            if [ "$DIFF_FILES" -eq 0 ]; then
+              gh pr close "$PR_URL" --comment "版本号已随其它变更进入 main，本 PR 无差异——发版流程自动关闭。"
+              echo "Version already aligned on main; empty-diff PR closed. Done."
+              exit 0
+            fi
+            if [ "$EXTRA" -ne 0 ]; then
+              echo "::error::PR $PR_URL 除版本号外还有其它变更，已停止自动合并，请人工审查"
+              exit 1
+            fi
+            MS=$(gh pr view "$PR_URL" --json mergeStateStatus --jq .mergeStateStatus)
+            if [ "$MS" = "BEHIND" ]; then
+              gh pr update-branch "$PR_URL" >/dev/null 2>&1 \
+                && { echo "Branch was behind base — update-branch issued, waiting for its check"; sleep 30; continue; }
+            fi
             if gh pr checks "$PR_URL" 2>/dev/null | grep -qw fail; then
               echo "::error::CI 检查未通过，版本号 PR 无法自动合入。v$VERSION 已发布成功，请修复后手动合并：$PR_URL"
               gh pr checks "$PR_URL" || true
               exit 1
             fi
+            if [ "$AUTO" = 0 ]; then
+              if gh pr merge "$PR_URL" --auto --squash >/dev/null 2>&1; then
+                AUTO=1
+                echo "Auto-merge enabled for $PR_URL (waiting for required checks)"
+              else
+                gh pr merge "$PR_URL" --squash >/dev/null 2>&1 \
+                  && { echo "Version bump PR merged directly: $PR_URL"; exit 0; }
+              fi
+            fi
             sleep 5
           done
-          echo "::error::版本号 PR 未自动合入（state=$STATE）。v$VERSION 已发布成功，请手动合并：$PR_URL"
+          echo "::error::版本号 PR 未自动合入（最后一次 state=$STATE / mergeState=$MS）。v$VERSION 已发布成功，请手动处理：$PR_URL"
           gh pr checks "$PR_URL" || true
           exit 1
