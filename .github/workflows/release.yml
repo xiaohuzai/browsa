@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -104,10 +105,13 @@ jobs:
           fi
           ls -lh "$ZIP"
 
-      # bump 提交只留在本地 runner，随 tag 一起推送（tag 指向含新版本号的
-      # commit）。不开 release 分支、不开 PR：gh 在 Actions 里没有 GH_TOKEN
-      # 会静默失败，历史上 release PR 从未建成过，11 个 release 的 tag 因此
-      # 互相不成祖先，自动 notes 一路回退锚到 v0.31.2、把历史 PR 全量重列。
+      # bump 提交随 tag 推到 release/vX 分支（tag 指向含新版本号的 commit），
+      # 并由末尾的「Open version bump PR and auto-merge」自动开 PR 合回 main——
+      # 此前（v0.31～v0.40.3 时代）bump 只随 tag 走、从不落回 main，gh 又没配
+      # GH_TOKEN 导致 release PR 从未建成，main 上的 manifest/package 版本号
+      # 长期落后于已发 tag（cws-listing 口径的「manifest 旧值属常态」）。现在
+      # GH_TOKEN 用 github.token + pull-requests: write 显式配齐，PR 自动开、
+      # 自动合（仅版本号文件才自动合，见末尾步骤的安全阀）。
       - name: Commit version bump + push tag
         id: bump
         env:
@@ -131,16 +135,29 @@ jobs:
             exit 0
           fi
           git add package.json package-lock.json manifest.json
+          PR_NEEDED=false
           if ! git diff --cached --quiet; then
-            git commit -m "chore: release v$VERSION [skip ci]"
+            # 刻意不带 [skip ci]：版本号 PR 要靠 pull_request CI 产出 main ruleset
+            # 所需的「Test + Compat Check」必需检查，门禁才过得去（release/vX 分支
+            # 与 tag 推送都不在 ci.yml 的 push branches 列表里，不会引发重复跑）。
+            git commit -m "chore: release v$VERSION"
+            PR_NEEDED=true
           fi
           git tag -a "v$VERSION" -m "browsa v$VERSION"
-          # bump commit 同时推到 release/vX 分支，让 tag 指向的提交保持分支
-          # 可达（克隆/浅检出可解析，不悬空）。注意：实测这对 generate-notes
-          # 的 404 滞后没有影响——v0.35.11 推了分支仍 404 满 7 分钟，v0.35.2
-          # 未推分支反而一次成功（Create 步骤注释）。推不动不阻塞。
-          git push origin "HEAD:refs/heads/release/v$VERSION" || echo "::warning::release 分支推送失败——tag 指向的提交将仅由 tag 引用保持可达"
+          # bump commit 同时推到 release/vX 分支：一是让 tag 指向的提交保持分支
+          # 可达（克隆/浅检出可解析，不悬空）；二是它就是版本号 PR 的头——PR 由
+          # 末尾的「Open version bump PR」步骤自动开、自动合（详见该步注释）。
+          # 注意：实测这对 generate-notes 的 404 滞后没有影响——v0.35.11 推了
+          # 分支仍 404 满 7 分钟，v0.35.2 未推分支反而一次成功（Create 步骤注释）。
+          # 推不动不阻塞。
+          git push origin "HEAD:refs/heads/release/v$VERSION" --force || echo "::warning::release 分支推送失败——tag 指向的提交将仅由 tag 引用保持可达"
           git push origin "v$VERSION"
+          # bump 顺手快进到 dev（resting 态 dev==main，纯 fast-forward）：否则下一
+          # 个 dev→main PR 会带着 dev 上的旧 manifest.json，把 main 刚对齐的版本
+          # 号又打回去——「manifest 旧值属常态」的根源。dev 有未合并提交时非
+          # fast-forward 被拒，warning 即可（此时本来就不该强推 dev）。
+          git push origin "HEAD:refs/heads/dev" || echo "::warning::bump 未快进到 dev（dev 已分叉）——下个 dev→main PR 会带回旧版本号，合并后请手动对齐 manifest/package 版本"
+          echo "pr_needed=$PR_NEEDED" >> "$GITHUB_OUTPUT"
 
       # 发布顺序（v0.35.11 复盘后倒转）：zip/tests 都已跑完，release 本身
       # 不该等 notes——generate-notes 后端对刚推 tag 的 404 滞后实测在
@@ -205,3 +222,65 @@ jobs:
             gh release edit "v$VERSION" --notes "$NOTES" >/dev/null && \
               echo "::notice::旧兜底 notes 已升级为 generate-notes 版"
           fi
+
+      # 版本号 PR 自动开、自动合（pi-feishu-notify 同款模式）。放在最后一步：
+      # zip/tag/release 都已落地，本步失败不影响已发布的产物，只会留下一个
+      # 待人工处理的 PR。仅当本次真的产生了 bump 提交才走（重跑补完场景跳过）。
+      - name: Open version bump PR and auto-merge
+        if: steps.bump.outputs.pr_needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          RELEASE_BRANCH="release/v$VERSION"
+          PR_URL=$(gh pr list --base main --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url')
+          if [ -z "$PR_URL" ]; then
+            if gh pr list --base main --head "$RELEASE_BRANCH" --state merged --json number --jq '.[0].number' | grep -q '[0-9]'; then
+              echo "Version bump PR already merged, nothing to do."
+              exit 0
+            fi
+            PR_URL=$(gh pr create --base main --head "$RELEASE_BRANCH" \
+              --title "chore: release v$VERSION" \
+              --body "发版流程自动创建：把 package.json / package-lock.json / manifest.json 的版本号对齐到已发布的 v$VERSION（此前 bump 提交只随 tag 走，main 的版本号一直落后——即 cws-listing 口径的「manifest 旧值属常态」）。仅版本号变更的 PR 由流程自动合并，无需人工处理。") \
+              || { echo "::error::版本号 PR 创建失败（$RELEASE_BRANCH）——请手动创建并合并（v$VERSION 已发布）"; exit 1; }
+          fi
+          echo "Version bump PR: $PR_URL"
+          # 安全阀：只自动合「仅版本号文件」的 PR，混入其它变更立即停下交人工审查
+          EXTRA=$(gh pr diff "$PR_URL" --name-only | grep -cvE '^(package\.json|package-lock\.json|manifest\.json)$' || true)
+          if [ "$EXTRA" -ne 0 ]; then
+            echo "::error::PR $PR_URL 除版本号外还有其它变更，已停止自动合并，请人工审查"
+            exit 1
+          fi
+          # bump 提交不带 [skip ci]，PR 照常跑 pull_request CI 产出 main ruleset
+          # 所需的「Test + Compat Check」必需检查（workflow_dispatch 手动补的
+          # 检查不计入 PR 门禁，实测无效，勿走回头路）。
+          # auto-merge：有必需检查在跑时 --auto 可用，GitHub 在检查通过后自动合入；
+          # 若仓库未开 auto-merge 或检查已过（clean status）→ --auto 被拒 → 直接
+          # 合并兜底，循环里两种路径都会反复尝试直到合入或检查失败。
+          AUTO=0
+          for i in $(seq 1 120); do
+            STATE=$(gh pr view "$PR_URL" --json state --jq .state)
+            if [ "$STATE" = "MERGED" ]; then
+              echo "Version bump PR merged automatically: $PR_URL"
+              exit 0
+            fi
+            if [ "$AUTO" = 0 ]; then
+              if gh pr merge "$PR_URL" --auto --squash >/dev/null 2>&1; then
+                AUTO=1
+                echo "Auto-merge enabled for $PR_URL"
+              else
+                gh pr merge "$PR_URL" --squash >/dev/null 2>&1 \
+                  && { echo "Version bump PR merged directly: $PR_URL"; exit 0; }
+              fi
+            fi
+            # 检查失败则提前报错（auto-merge 永远不会完成），不装死
+            if gh pr checks "$PR_URL" 2>/dev/null | grep -qw fail; then
+              echo "::error::CI 检查未通过，版本号 PR 无法自动合入。v$VERSION 已发布成功，请修复后手动合并：$PR_URL"
+              gh pr checks "$PR_URL" || true
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::版本号 PR 未自动合入（state=$STATE）。v$VERSION 已发布成功，请手动合并：$PR_URL"
+          gh pr checks "$PR_URL" || true
+          exit 1
