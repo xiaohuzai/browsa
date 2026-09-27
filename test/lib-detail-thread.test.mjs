@@ -55,7 +55,7 @@ globalThis.chrome = {
   },
 };
 
-const { openDetailThread, hideSelectionAskBtn } = await import('../lib/sidepanel/detail-thread.js');
+const { openDetailThread, hideSelectionAskBtn, findBlockAnchor } = await import('../lib/sidepanel/detail-thread.js');
 
 function makeAssistantBubble(raw) {
   const el = document.createElement('div');
@@ -76,6 +76,40 @@ test('openDetailThread creates a card with the escaped quoted excerpt right afte
   assert.match(card.querySelector('.detail-thread-quote').innerHTML, /&lt;b&gt;GPUs&lt;\/b&gt;/,
     'quoted text must be HTML-escaped, not injected raw');
   card.remove();
+});
+
+test('findBlockAnchor: card anchors to the selected list item, not the whole list', () => {
+  // 2026-09-28 用户报告：选中长列表中间的条目时，追问卡落到整张列表末尾——
+  // 旧锚点回溯到气泡直接子块（<ol>），列表条目没有自己的锚点。
+  const bubble = document.createElement('div');
+  bubble.className = 'msg assistant';
+  bubble.innerHTML = '<h2>标题</h2><ol><li>one</li><li>two <strong>bold</strong> tail</li><li>three</li></ol><p>tail para</p>';
+  document.getElementById('messages').appendChild(bubble);
+  const [li1, li2] = bubble.querySelectorAll('li');
+  assert.equal(findBlockAnchor(li2.querySelector('strong').firstChild, bubble), li2,
+    'text inside li > strong must anchor to the li');
+  assert.equal(findBlockAnchor(li1.firstChild, bubble), li1, 'plain li text anchors to its li');
+  const para = bubble.querySelector('p');
+  assert.equal(findBlockAnchor(para.firstChild, bubble), para, 'a top-level paragraph still anchors to itself');
+  const h2 = bubble.querySelector('h2');
+  assert.equal(findBlockAnchor(h2.firstChild, bubble), h2, 'a heading anchors to itself');
+
+  // 嵌套列表：锚到选中的那层 li，不是外层 li
+  bubble.innerHTML = '<ul><li>outer<ul><li>inner</li></ul></li></ul>';
+  const inner = bubble.querySelectorAll('li')[1];
+  assert.equal(findBlockAnchor(inner.firstChild, bubble), inner, 'nested list text anchors to the inner li');
+
+  // 跨消息选区（endContainer 不在气泡里）→ 回退气泡本身
+  const stranger = document.createElement('p');
+  stranger.textContent = 'elsewhere';
+  document.getElementById('messages').appendChild(stranger);
+  assert.equal(findBlockAnchor(stranger.firstChild, bubble), bubble, 'an out-of-bubble end falls back to the bubble');
+  // 纯文本气泡（无块级子元素）→ 也是气泡
+  const flat = makeAssistantBubble('just text');
+  assert.equal(findBlockAnchor(flat.firstChild, flat), flat);
+  bubble.remove();
+  stranger.remove();
+  flat.remove();
 });
 
 test('opening a second time on the same anchor focuses the existing card instead of duplicating it', () => {
