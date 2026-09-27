@@ -225,14 +225,23 @@ jobs:
 
       # 版本号 PR 自动开、自动合（pi-feishu-notify 同款模式）。放在最后一步：
       # zip/tag/release 都已落地，本步失败不影响已发布的产物，只会留下一个
-      # 待人工处理的 PR。仅当本次真的产生了 bump 提交才走（重跑补完场景跳过）。
+      # 待人工处理的 PR。不看 pr_needed 门——「上次 run 死在本步」的恢复路径
+      # 就是重跑一次（tag+release 已在 → 前面步骤幂等收尾，这里补齐 PR），
+      # 与本 workflow 的幂等自愈哲学一致；历史旧 release 没有 release/vX 分支，
+      # 分支存在性守卫在这里挡掉（无事可做）。v0.40.4 首跑实录：仓库级
+      # 「GitHub Actions 禁止创建 PR」开关未开时本步报
+      # GraphQL: not permitted to create or approve pull requests——
+      # 已在 Settings→Actions→Workflow permissions 打开 can_approve_pull_request_reviews。
       - name: Open version bump PR and auto-merge
-        if: steps.bump.outputs.pr_needed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           RELEASE_BRANCH="release/v$VERSION"
+          if ! git ls-remote --heads origin "refs/heads/$RELEASE_BRANCH" | grep -q .; then
+            echo "No $RELEASE_BRANCH branch on remote — historical release, nothing to do."
+            exit 0
+          fi
           PR_URL=$(gh pr list --base main --head "$RELEASE_BRANCH" --state open --json url --jq '.[0].url')
           if [ -z "$PR_URL" ]; then
             if gh pr list --base main --head "$RELEASE_BRANCH" --state merged --json number --jq '.[0].number' | grep -q '[0-9]'; then
