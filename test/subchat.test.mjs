@@ -150,9 +150,11 @@ test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs br
 
 test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single definition)', async () => {
   // C5 后常量住 lib/prompt-assembly.js（单一定义）——pin 跟着搬家，「全局唯一」意图不变。
+  // 2026-09-28 起 CAPABILITY_HINTS 由 CAPABILITY_HINTS_ENTRIES（唯一文本源，
+  // 与 AGENT_RENDER_HINT 共享）join 而来，单一定义 pin 跟到 entries 数组。
   const promptSrc = await readPromptAssemblySrc();
-  const defCount = (promptSrc.match(/const CAPABILITY_HINTS = \[/g) || []).length;
-  assert.equal(defCount, 1, 'CAPABILITY_HINTS must be defined exactly once (shared by CHAT and SUBCHAT)');
+  const defCount = (promptSrc.match(/const CAPABILITY_HINTS_ENTRIES = \[/g) || []).length;
+  assert.equal(defCount, 1, 'CAPABILITY_HINTS_ENTRIES must be defined exactly once (shared by CHAT, SUBCHAT and AGENT_RENDER_HINT)');
   const src = await readBackgroundSrc();
   assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
@@ -199,8 +201,8 @@ async function readPromptAssemblySrc() {
 }
 
 function CAPABILITY_HINTS_SRC(src) {
-  const start = src.indexOf('const CAPABILITY_HINTS = [');
-  const end = src.indexOf('].join(\' \');', start);
+  const start = src.indexOf('const CAPABILITY_HINTS_ENTRIES = [');
+  const end = src.indexOf('];', start);
   return src.slice(start, end);
 }
 
