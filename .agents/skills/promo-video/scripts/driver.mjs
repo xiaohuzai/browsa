@@ -34,7 +34,14 @@ const only = (s) => !onlySet.size || onlySet.has(s);
 mkdirSync(OUT, { recursive: true });
 for (const f of readdirSync(OUT)) unlinkSync(join(OUT, f));
 
-const launchOpts = { args: ['--no-sandbox', '--use-gl=swiftshader'] };
+// WebGL 旗标 2026-09-29 更新（Mol* 蛋白质镜头需要 WebGL2）：chromium-1234 起
+// `--use-gl=swiftshader` 不再创建 WebGL context（实测 "Could not create a WebGL
+// rendering context"），要 ANGLE+swiftshader 并显式允许软件 WebGL；且必须
+// headless:false（配合 xvfb-run -a 跑），headless 下同样拿不到 context。
+const launchOpts = {
+  headless: false,
+  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+};
 if (CHROME) launchOpts.executablePath = CHROME;
 const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });

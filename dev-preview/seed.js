@@ -79,5 +79,18 @@ UP主：前端晚自习
       ],
     },
     { role: 'assistant', content: '这是一张 8×8 的红色测试图——预览环境用它验证多模态轮的渲染与重试。' },
+    // ```pdb 轮：Mol* 渲染路径（RCSB ID 走 fetch 分支 + AlphaFold 走 API/pLDDT
+    // preset 分支）。预览页没有扩展 host_permissions，RCSB 无 CORS 头，真机
+    // 验证时用 Playwright route 代取；AF API/CDN 自带 ACAO:* 可直连。
+    { role: 'user', content: '展示一下泛素的实验结构' },
+    {
+      role: 'assistant',
+      content: '泛素（ubiquitin）的经典实验结构是 **1UBQ**，76 个残基的小 β-grasp 折叠：\n\n```pdb\n1UBQ\n```',
+    },
+    { role: 'user', content: '再看 EGFR 的 AlphaFold 预测结构，标一下置信度' },
+    {
+      role: 'assistant',
+      content: 'EGFR（P00533）的 AlphaFold 模型胞外域置信度高、跨膜区次之：\n\n```pdb\nAF-P00533-F1\n```',
+    },
   ],
 };

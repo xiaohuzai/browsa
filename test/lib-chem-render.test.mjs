@@ -1,14 +1,15 @@
 // test/lib-chem-render.test.mjs — tests for render.js's chemistry/biostructure
-// renderers (2026-09-13): renderSmiles (smiles-drawer, 2D structure diagrams)
-// and renderPdb (3Dmol WebGL viewer for RCSB PDB structures), following the
+// renderers: renderSmiles (smiles-drawer, 2D structure diagrams) and renderPdb
+// (Mol* WebGL viewer for RCSB PDB / AlphaFold DB structures), following the
 // same "model emits a fenced block → pipeline swaps it for a live render"
 // pattern as mermaid/echarts/markmap.
 //
 // jsdom has no canvas/WebGL, so the canvas/WebGL drawing itself can't execute
 // here — what IS execution-tested: parsePdbBlock's classification, the
-// vendor loaders, the fence→wrapper swap, the RCSB fetch shape, viewer API
-// calls against a mock, and every failure path restoring the original code
-// block (the raw SMILES/PDB text must never disappear).
+// vendor loaders, the fence→wrapper swap, the RCSB/AlphaFold fetch shapes,
+// the builder/preset calls against a mock (incl. WHICH preset id runs for
+// AlphaFold vs plain structures), and every failure path restoring the
+// original code block (the raw SMILES/PDB text must never disappear).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,26 +25,41 @@ globalThis.XMLSerializer = dom.window.XMLSerializer;
 globalThis.location = dom.window.location;
 dom.window.matchMedia = () => ({ matches: false, addListener() {}, addEventListener() {} });
 
-const { parsePdbBlock, plddtColor, renderSmiles, renderPdb, getSmilesDrawer } = await import('../lib/sidepanel/render.js');
+const { parsePdbBlock, renderSmiles, renderPdb, getSmilesDrawer, getMolstar, disposeMolstarViewers } = await import('../lib/sidepanel/render.js');
 
-// get3Dmol caches its promise module-level (correct in the browser — one lib),
-// so the $3Dmol stub must be installed ONCE and shared by every renderPdb
-// test; each test clears `stubState.calls` instead of re-stubbing.
-const stubState = { calls: [] };
-dom.window.$3Dmol = {
-  // Gradient: the real base class is a bare no-arg constructor that concrete
-  // gradients attach valueToHex/range onto — renderPdb builds its pLDDT
-  // gradient this way, so the stub must expose it too.
-  Gradient: function () {},
-  createViewer: (el, cfg) => {
-    stubState.calls.push(['createViewer', el, cfg]);
-    return {
-      addModel: (...a) => stubState.calls.push(['addModel', ...a]),
-      setStyle: (...a) => stubState.calls.push(['setStyle', ...a]),
-      addStyle: (...a) => stubState.calls.push(['addStyle', ...a]),
-      zoomTo: () => stubState.calls.push(['zoomTo']),
-      render: () => stubState.calls.push(['render']),
-    };
+// getMolstar caches its promise module-level (correct in the browser — one
+// lib), so the molstar stub must be installed ONCE and shared by every
+// renderPdb test; each test clears `stubState.calls` instead of re-stubbing.
+// The stub mirrors the exact surface renderPdb touches:
+// Viewer.create(el, opts) → viewer.plugin.builders.{data.rawData,
+// structure.parseTrajectory, structure.hierarchy.applyPreset} + dispose().
+const stubState = { calls: [], failPreset: false };
+dom.window.molstar = {
+  Viewer: {
+    create: async (el, opts) => {
+      stubState.calls.push(['create', el, opts]);
+      if (stubState.failCreate) throw new Error('webgl unavailable');
+      const viewer = {
+        disposed: false,
+        dispose() { viewer.disposed = true; stubState.calls.push(['dispose']); },
+        plugin: {
+          builders: {
+            data: { rawData: async ({ data, label }) => { stubState.calls.push(['rawData', data, label]); return 'data-cell'; } },
+            structure: {
+              parseTrajectory: async (cell, fmt) => { stubState.calls.push(['parseTrajectory', fmt]); return 'traj-cell'; },
+              hierarchy: {
+                applyPreset: async (traj, preset, params) => {
+                  if (stubState.failPreset) throw new Error('preset boom');
+                  stubState.calls.push(['applyPreset', preset, params]);
+                }
+              }
+            }
+          }
+        }
+      };
+      stubState.lastViewer = viewer;
+      return viewer;
+    }
   }
 };
 
@@ -106,9 +122,14 @@ test('renderSmiles: leaves non-smiles content and empty blocks untouched', async
   assert.ok(document.body.contains(pre), 'empty block stays as-is');
 });
 
-// ─── renderPdb (mock $3Dmol + mock RCSB fetch) ──────────────────────────────
+// ─── renderPdb (mock molstar + mock RCSB fetch) ─────────────────────────────
 
-test('renderPdb: bare PDB ID → fetches RCSB, swaps the fence for a viewer, drives the 3Dmol API', async () => {
+test('getMolstar: resolves the lib exposing Viewer.create', async () => {
+  const lib = await getMolstar();
+  assert.equal(typeof lib.Viewer.create, 'function');
+});
+
+test('renderPdb: bare PDB ID → fetches RCSB, swaps the fence for a viewer, drives the Mol* builders', async () => {
   document.body.innerHTML = '';
   const calls = stubState.calls; calls.length = 0;
   const fetches = [];
@@ -123,11 +144,17 @@ test('renderPdb: bare PDB ID → fetches RCSB, swaps the fence for a viewer, dri
   assert.ok(block, 'the fence is replaced by a .pdb-block');
   assert.ok(block.querySelector('.pdb-viewer'), 'with a .pdb-viewer container');
   assert.ok(!block.querySelector('.pdb-status'), 'the loading status is removed after a successful fetch');
-  assert.equal(calls.filter(c => c[0] === 'createViewer').length, 1);
-  assert.match(calls.find(c => c[0] === 'addModel')[1], /^HEADER    TEST/, 'the fetched payload is added as a pdb model');
-  assert.deepEqual(calls.find(c => c[0] === 'setStyle').slice(1), [{}, { cartoon: { color: 'spectrum' } }]);
-  assert.equal(calls.filter(c => c[0] === 'zoomTo').length, 1);
-  assert.equal(calls.filter(c => c[0] === 'render').length, 1);
+  assert.equal(calls.filter((c) => c[0] === 'create').length, 1);
+  const cfg = calls.find((c) => c[0] === 'create')[2];
+  assert.equal(cfg.layoutShowSequence, true, 'the sequence strip (RCSB feel) is on');
+  assert.equal(cfg.layoutShowControls, true, 'controls stay on — their gating also owns the top sequence strip');
+  assert.equal(cfg.layoutShowLeftPanel, false, 'the left panel is off');
+  assert.equal(cfg.viewportBackgroundColor, 'white', 'light-mode background (matchMedia stub: not dark)');
+  assert.equal(cfg.pdbProvider, 'rcsb');
+  assert.equal(calls.find((c) => c[0] === 'rawData')[1], 'HEADER    TEST\nATOM      1  N   ALA A   1\nEND', 'the fetched payload feeds rawData');
+  assert.equal(calls.find((c) => c[0] === 'parseTrajectory')[1], 'pdb');
+  assert.equal(calls.find((c) => c[0] === 'applyPreset')[1], 'default', 'the default trajectory-hierarchy preset drives model/structure/representation in one call');
+  assert.equal(calls.find((c) => c[0] === 'applyPreset')[2]?.representationPreset, 'preset-structure-representation-auto', 'plain structures use the standard auto representation preset');
   assert.ok(!document.body.contains(pre), 'the original fence is gone on success');
   delete globalThis.fetch;
 });
@@ -144,7 +171,7 @@ test('renderPdb: inline PDB payload renders directly without any fetch', async (
   await renderPdb(document.body);
 
   assert.deepEqual(fetches, [], 'inline payloads must not hit RCSB');
-  assert.equal(calls.find(c => c[0] === 'addModel')[1], payload);
+  assert.equal(calls.find((c) => c[0] === 'rawData')[1], payload);
   assert.ok(document.querySelector('.pdb-block'));
   delete globalThis.fetch;
 });
@@ -159,6 +186,36 @@ test('renderPdb: RCSB failure (bad ID) restores the raw code block', async () =>
 
   assert.ok(document.body.contains(pre), 'a failed fetch must restore the original fence');
   assert.equal(document.querySelectorAll('.pdb-block').length, 0, 'no broken viewer left in the DOM');
+  delete globalThis.fetch;
+});
+
+test('renderPdb: a preset failure after Viewer.create restores the block AND disposes the viewer', async () => {
+  document.body.innerHTML = '';
+  const calls = stubState.calls; calls.length = 0;
+  stubState.failPreset = true;
+  globalThis.fetch = async () => ({ ok: true, text: async () => 'ATOM      1  N   ALA A   1\n' });
+
+  const pre = makeFence('pdb', '1UBQ');
+  await renderPdb(document.body);
+
+  assert.ok(document.body.contains(pre), 'a failed preset must restore the original fence');
+  assert.equal(document.querySelectorAll('.pdb-block').length, 0, 'no broken viewer left in the DOM');
+  assert.ok(stubState.lastViewer.disposed, 'the created viewer is disposed (WebGL context freed)');
+  stubState.failPreset = false;
+  delete globalThis.fetch;
+});
+
+test('disposeMolstarViewers: disposes every live viewer from prior renders', async () => {
+  document.body.innerHTML = '';
+  const calls = stubState.calls; calls.length = 0;
+  globalThis.fetch = async () => ({ ok: true, text: async () => 'ATOM      1  N   ALA A   1\n' });
+
+  makeFence('pdb', '1UBQ');
+  await renderPdb(document.body);
+  const before = stubState.lastViewer.disposed;
+  disposeMolstarViewers();
+  assert.equal(before, false, 'the viewer was live after a successful render');
+  assert.ok(stubState.lastViewer.disposed, 'disposeMolstarViewers disposed it');
   delete globalThis.fetch;
 });
 
@@ -180,8 +237,10 @@ test('renderPdb: unrecognized content is left untouched and never fetched', asyn
 // or a bare UniProt accession. The current model file URL can ONLY come from
 // the DB's API — model versions advance (P00533 is at v6; a hardcoded v4
 // file URL 404s), so the render fetches the API first, then the file it
-// names, and colors by pLDDT (the PDB B-factor column) with the AlphaFold
-// four-band palette + legend.
+// names. Since the Mol* swap (2026-09-29) pLDDT coloring (the PDB B-factor
+// column) is molstar's OWN plddt-confidence preset — the palette lives in
+// the vendor, byte-identical to AlphaFold DB's four bands; our compact
+// legend strip stays as the visible key.
 
 test('parsePdbBlock: AlphaFold model IDs and bare UniProt accessions → {kind:alphafold}', () => {
   assert.deepEqual(parsePdbBlock('AF-P00533-F1'), { kind: 'alphafold', value: 'AF-P00533-F1' });
@@ -197,20 +256,7 @@ test('parsePdbBlock: AlphaFold model IDs and bare UniProt accessions → {kind:a
   assert.equal(parsePdbBlock('HEADER    X\nATOM      1  N   ALA A   1\n').kind, 'data');
 });
 
-test('plddtColor: the four AlphaFold confidence bands, clamped', () => {
-  assert.equal(plddtColor(95), '0053D6', 'very high ≥90');
-  assert.equal(plddtColor(90), '0053D6');
-  assert.equal(plddtColor(89.9), '65CBF3', 'confident 70–90');
-  assert.equal(plddtColor(70), '65CBF3');
-  assert.equal(plddtColor(69.9), 'FFDB13', 'low 50–70');
-  assert.equal(plddtColor(50), 'FFDB13');
-  assert.equal(plddtColor(49), 'FF7D45', 'very low <50');
-  assert.equal(plddtColor(100), '0053D6');
-  assert.equal(plddtColor(-5), 'FF7D45', 'clamped low');
-  assert.equal(plddtColor('abc'), 'FF7D45', 'non-numeric lands on the floor band, never a NaN color');
-});
-
-test('renderPdb: AlphaFold ID → API resolves the CURRENT file, pLDDT coloring + legend', async () => {
+test('renderPdb: AlphaFold ID → API resolves the CURRENT file, pLDDT preset + legend', async () => {
   document.body.innerHTML = '';
   const calls = stubState.calls; calls.length = 0;
   const pdbText = 'HEADER    AF\nATOM      1  N   ALA A   1      1.04  97.31\nEND';
@@ -226,15 +272,12 @@ test('renderPdb: AlphaFold ID → API resolves the CURRENT file, pLDDT coloring 
 
   const block = document.querySelector('.pdb-block');
   assert.ok(block, 'the fence is replaced by a viewer block');
-  const style = calls.find((c) => c[0] === 'setStyle')[2];
-  assert.equal(typeof style.cartoon.colorfunc, 'function', 'colors ride a per-atom colorfunc');
-  assert.equal(style.cartoon.colorfunc({ b: 95 }), '#0053D6', 'very high pLDDT → blue');
-  assert.equal(style.cartoon.colorfunc({ b: 60 }), '#FFDB13', 'low pLDDT → yellow');
-  assert.equal(style.cartoon.colorfunc({ b: undefined }), '#FF7D45', 'missing b-factor → floor band');
+  assert.equal(calls.find((c) => c[0] === 'applyPreset')[2]?.representationPreset, 'preset-structure-representation-ma-quality-assessment-plddt',
+    'AlphaFold models use molstar\'s built-in pLDDT-confidence preset');
+  assert.equal(calls.find((c) => c[0] === 'rawData')[1], pdbText, 'the API-resolved file is the loaded model');
   const legend = block.querySelector('.pdb-legend');
   assert.ok(legend, 'the four-band confidence legend is shown');
   assert.equal(legend.querySelectorAll('.pdb-legend-chip').length, 4);
-  assert.equal(calls.find((c) => c[0] === 'addModel')[1], pdbText, 'the API-resolved file is the added model');
   assert.ok(!document.body.contains(pre), 'the original fence is gone on success');
   delete globalThis.fetch;
 });
@@ -268,7 +311,7 @@ test('renderPdb: when the requested F model is absent, the first entry is used',
   await renderPdb(document.body);
 
   assert.ok(document.querySelector('.pdb-block'), 'degrades to F1 instead of dying on a missing F3');
-  assert.equal(calls.filter((c) => c[0] === 'createViewer').length, 1);
+  assert.equal(calls.filter((c) => c[0] === 'create').length, 1);
   delete globalThis.fetch;
 });
 

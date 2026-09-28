@@ -46,6 +46,7 @@ ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
 
 ## 坑清单（每一条都真翻过车）
 
+- **浏览器必须有头 + 新 WebGL 旗标**（2026-09-29，Mol* 换内核时实证）：`chromium.launch` 默认 headless 下 WebGL context 直接创建失败（"Could not create a WebGL rendering context"），`--use-gl=swiftshader` 老旗标在 chromium-1234 上同样失效。driver.mjs 现役配方 = `headless:false` + `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`，用 `xvfb-run -a node driver.mjs` 跑。
 - **chrome-shim 的 `storage.local.set/remove/clear` 必须注入为返回 Promise**——composer-state 会 `.catch()` 链上去，仓库 shim 返回 undefined 会把真实 onSend 在 `clearPersistedDraft` 处炸断（且时序随机：打字 debounce 是否触发决定崩不崩，最难查）。server.mjs 已注入此修复，勿删。
 - **pill / 浮条按钮必须 down+up 贴死**：追问 pill 在 mousedown 里自移除，按住不放 Chrome 会把按压重定向到底下文本，把选区弄花。
 - **涟漪序列末尾必须显式推相位 1**：`__ripple(x,y,phase)` 只在驱动调用时更新，最后一帧相位 <1 就永久冻结成半透明圆环，看着像水印（#139）。

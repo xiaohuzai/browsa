@@ -1879,13 +1879,17 @@ math[display="block"] {
 }
 
 /* ─── Diff syntax highlighting ───────────────────────────────────────────────── */
+/* Fences go through highlight.js's own diff grammar (render.js
+   highlightDiffBlocks); spans are inline and the code's pre whitespace keeps
+   the lines. Theme colors cover deletion(red)/meta(purple); addition needs a
+   diff-scoped override — the theme groups it with .hljs-type (blue), which
+   reads as plain code instead of a + line. */
 code.language-diff,
 code.language-patch {
   display: block;
 }
-.diff-add  { color: var(--success); display: block; }
-.diff-del  { color: var(--error); display: block; }
-.diff-hunk { color: var(--fg-dim); display: block; }
+code.language-diff .hljs-addition,
+code.language-patch .hljs-addition { color: #7ee787; }
 
 /* ── Sessions drawer ─────────────────────────────────────────────────────── */
 .sessions-drawer {
@@ -2324,6 +2328,8 @@ code.language-patch {
   .hljs-function, .hljs-title.function_ { color: #8250df; }
   .hljs-attr { color: #116329; }
   .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #116329; }
+  code.language-diff .hljs-addition,
+  code.language-patch .hljs-addition { color: #116329; }
 }
 
 /* ── Message edit mode ───────────────────────────────────────────────────── */
@@ -2989,7 +2995,8 @@ dialog.lightbox-overlay:not([open]) {
   max-width: 100%;
   height: auto;
 }
-/* 3D 蛋白质查看器：3Dmol 在容器里建 WebGL canvas，占满宽度定高 */
+/* 3D 蛋白质查看器（Mol*，```pdb fence）：molstar 插件填满容器（上方序列条
+   + 下方视口），定高按 300px 视口 + ~40px 序列条预留 */
 .pdb-block {
   margin: 8px 0;
 }
@@ -3004,7 +3011,7 @@ dialog.lightbox-overlay:not([open]) {
 .pdb-viewer {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: 340px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
