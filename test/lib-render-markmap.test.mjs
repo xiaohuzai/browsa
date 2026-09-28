@@ -67,7 +67,7 @@ test('addCodeCopyButtons excludes markmap (alongside our renderer languages) fro
   // (single home for the renderer fan-out) + diff/patch; the skip set derives
   // from it, so pin the derivation and the list contents.
   assert.match(src, /HLJS_SKIP_LANGS = new Set\(\[\.\.\.FENCED_RENDERERS, 'diff', 'patch'\]\)/);
-  assert.match(src, /FENCED_RENDERERS = \['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn'\]/);
+  assert.match(src, /FENCED_RENDERERS = \['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'dot'\]/);
 });
 
 test('renderMarkmap is exported', () => {

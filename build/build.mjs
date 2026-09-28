@@ -147,6 +147,20 @@ const VENDORS = [
     srcDir:    join(DEPS, 'node_modules'),
     esmBundle: true,
     outName:   'stream-markdown-parser'
+  },
+  {
+    // Graphviz compiled to WASM — the dist JS carries the .wasm base64-inlined
+    // (single self-contained file, instantiates via WebAssembly.instantiate,
+    // covered by the existing 'wasm-unsafe-eval' CSP). Model emits ```dot
+    // (Graphviz DOT), render.js's renderDot renders it to SVG. Primary
+    // architecture-diagram path since 2026-09-28, replacing the hand-rolled
+    // ```nn renderer: a custom JSON spec has zero model training prior, while
+    // DOT is what torchview/torchviz export — models know it cold.
+    name: 'viz',
+    srcEntry:  '@viz-js/viz/dist/viz.js',
+    srcDir:    join(ROOT, 'node_modules'),
+    esmBundle: true,
+    outName:   'viz'
   }
 ];
 

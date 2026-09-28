@@ -12,6 +12,7 @@
     "check-compat": "bash check-compat.sh"
   },
   "devDependencies": {
+    "@viz-js/viz": "^3.30.0",
     "esbuild": "^0.25.0",
     "highlight.js": "^11.11.1",
     "jsdom": "^29.1.1",

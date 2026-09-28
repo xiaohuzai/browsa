@@ -1016,8 +1016,9 @@ math[display="block"] {
   white-space: nowrap;
 }
 
-/* ─── Mermaid diagrams ──────────────────────────────────────────────────────── */
-.mermaid-diagram {
+/* ─── Mermaid / DOT diagrams（dot 复用同一 wrapper 规则）───────────────────── */
+.mermaid-diagram,
+.dot-diagram {
   position: relative;
   margin: 8px 0;
   background: var(--bg-2);
@@ -1049,7 +1050,7 @@ math[display="block"] {
 .markmap-diagram:hover .mermaid-toolbar,
 .smiles-block:hover .mermaid-toolbar,
 .pdb-viewer:hover .mermaid-toolbar,
-.nn-block:hover .mermaid-toolbar,
+.dot-diagram:hover .mermaid-toolbar,
 .katex:hover > .mermaid-toolbar { opacity: 1; }
 
 /* 公式悬浮「复制 LaTeX」按钮：.katex 是行内 span，作定位参照；
@@ -2992,15 +2993,13 @@ dialog.lightbox-overlay:not([open]) {
 .pdb-block {
   margin: 8px 0;
 }
-/* 神经网络架构图（render.js renderNn，```nn fence）：纯 SVG，宽度随气泡 */
-.nn-block {
-  position: relative;
-  margin: 8px 0;
-}
-.nn-block svg.nn-svg {
-  display: block;
-  max-width: 100%;
-  height: auto;
+/* Graphviz DOT（render.js renderDot，```dot fence）：wrapper 复用 .mermaid-diagram
+   规则，工具条/缩放复用 mermaid 的；渲染失败时错误条插在原代码块前（代码保留） */
+.dot-error {
+  margin: 8px 0 4px;
+  font-size: 12.5px;
+  color: var(--error);
+  font-family: var(--mono);
 }
 .pdb-viewer {
   position: relative;
