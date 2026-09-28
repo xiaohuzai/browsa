@@ -98,7 +98,6 @@ const imagePicker = $('imagepicker');
 let currentTabId = null;
 let activeController = null; // for cancelling in-flight stream
 let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
-let lastSentRaw = '';   // raw input text of last user send, used by Retry
 // The hidx mirror lives in lib/sidepanel/history-index.js (single owner of the
 // counter + the shift-after-delete protocol); mutate it only through those fns.
 let deleteLock = false; // serialises message-delete operations to prevent index races
@@ -1894,7 +1893,6 @@ async function onSend() {
   }
 
   // User bubble — show the original slash command, not the expanded prompt
-  lastSentRaw = rawText;
   if (rawText) pushInputHistory(rawText); // ↑ recall list（纯图轮不进召回）
   const pendingImageUrls = images.length > 0 ? images.map(i => i.dataUrl) : null;
   const userBubble = appendUser(rawText || (pendingImageUrls ? '(image)' : '(page only)'), pendingImageUrls);
@@ -2012,9 +2010,10 @@ async function onSend() {
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
-      appendMsgAction(assistantEl, _t('retryAction', '重试'), () => {
-        if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
-      }, ICONS.retry);
+      // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
+      // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
+      // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
+      appendMsgAction(assistantEl, _t('retryAction', '重试'), () => regenerateReply(userBubble), ICONS.retry);
       if (res.hint) appendSystem(res.hint);
       // Resync counter — user turn may or may not have been stored.
       reconcileHistoryIdx();
@@ -2030,9 +2029,10 @@ async function onSend() {
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
-    appendMsgAction(assistantEl, _t('retryAction', '重试'), () => {
-      if (lastSentRaw) { inputEl.value = lastSentRaw; onSend(); }
-    }, ICONS.retry);
+    // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
+    // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
+    // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
+    appendMsgAction(assistantEl, _t('retryAction', '重试'), () => regenerateReply(userBubble), ICONS.retry);
     reconcileHistoryIdx();
   } finally {
     setStreamingUI(false);
@@ -2775,7 +2775,11 @@ async function regenerateReply(userBubble) {
   if (isNaN(idx)) return;
   const stored = await readUserEntryForResend(idx);
   const raw = (stored?.text ?? userBubble.dataset.raw ?? userBubble.querySelector('.msg-text')?.textContent ?? '').trim();
-  const imageUrls = stored?.imageUrls || [];
+  // 图片读回的兜底链：storage 里没有这轮（发送本身失败、CHAT 未入库的错误重试）
+  // 就拿气泡里已渲染的 <img src>——展示像素即存储像素（ADR-0013），同一份 data URL。
+  const imageUrls = stored?.imageUrls?.length
+    ? stored.imageUrls
+    : [...userBubble.querySelectorAll('.msg-image')].map((img) => img.src).filter(Boolean);
   if (!raw && !imageUrls.length) return;
 
   if (activeController && !activeController.cancelled) cancelStream();
@@ -2880,7 +2884,6 @@ function startMsgEdit(el) {
     if (!isNaN(idx)) hidxResetTo(idx); // will be re-assigned when CHAT handler stores new turns
     // Re-send as new turn — original images ride along verbatim.
     images.push(...imageUrls.map((u) => ({ dataUrl: u })));
-    lastSentRaw = newText;
     inputEl.value = newText;
     await onSend();
   });
