@@ -1,8 +1,8 @@
 // test/lib-chem-render.test.mjs — tests for render.js's chemistry/biostructure
-// renderers: renderSmiles (smiles-drawer, 2D structure diagrams) and renderPdb
-// (Mol* WebGL viewer for RCSB PDB / AlphaFold DB structures), following the
-// same "model emits a fenced block → pipeline swaps it for a live render"
-// pattern as mermaid/echarts/markmap.
+// renderers: renderSmiles (RDKit, 2D structure/reaction diagrams + descriptors)
+// and renderPdb (Mol* WebGL viewer for RCSB PDB / AlphaFold DB structures),
+// following the same "model emits a fenced block → pipeline swaps it for a
+// live render" pattern as mermaid/echarts/markmap.
 //
 // jsdom has no canvas/WebGL, so the canvas/WebGL drawing itself can't execute
 // here — what IS execution-tested: parsePdbBlock's classification, the
@@ -25,7 +25,7 @@ globalThis.XMLSerializer = dom.window.XMLSerializer;
 globalThis.location = dom.window.location;
 dom.window.matchMedia = () => ({ matches: false, addListener() {}, addEventListener() {} });
 
-const { parsePdbBlock, renderSmiles, renderPdb, getSmilesDrawer, getMolstar, disposeMolstarViewers } = await import('../lib/sidepanel/render.js');
+const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, getMolstar, disposeMolstarViewers } = await import('../lib/sidepanel/render.js');
 
 // getMolstar caches its promise module-level (correct in the browser — one
 // lib), so the molstar stub must be installed ONCE and shared by every
@@ -94,25 +94,78 @@ test('parsePdbBlock: real PDB payloads (HEADER/ATOM/HETATM/MODEL lines) → {kin
   assert.equal(parsePdbBlock('MODEL 1').kind, 'data');
 });
 
-// ─── renderSmiles (vendor import + graceful no-canvas degradation) ──────────
+// ─── renderSmiles (mock RDKit) ───────────────────────────────────────────────
 
-test('getSmilesDrawer: the ESM bundle resolves to a lib with parse/Drawer/SvgDrawer', async () => {
-  const lib = await getSmilesDrawer();
-  assert.equal(typeof lib.parse, 'function');
-  assert.equal(typeof lib.Drawer, 'function');
-  assert.equal(typeof lib.SvgDrawer, 'function');
+// getRDKit caches its promise module-level — the initRDKitModule stub must be
+// installed ONCE before any renderSmiles test; the factory returns the stub
+// module whose surface mirrors exactly what renderSmiles touches:
+// get_mol/get_rxn (null = chemically invalid) → get_svg/get_descriptors/delete.
+const stubSvg = `<?xml version='1.0'?><svg version='1.1' width='300px' height='220px' viewBox='0 0 300 220'><rect style='opacity:1.0;fill:#FFFFFF;stroke:none'/><path style='fill:none;stroke:#000000'/></svg>`;
+const stubDescriptors = JSON.stringify({ amw: 180.159, CrippenClogP: 1.31, tpsa: 63.6, NumHBD: 1, NumHBA: 4 });
+const stubMol = {
+  is_valid: () => true,
+  get_svg: (w, h) => stubSvg.replace('300px', w + 'px').replace(/viewBox='([^']*)'/, `viewBox='0 0 ${w} ${h}'`),
+  get_descriptors: () => stubDescriptors,
+  delete() {},
+};
+const stubRxn = { get_svg: (w, h) => stubSvg, delete() {} };
+dom.window.initRDKitModule = () => Promise.resolve({
+  get_mol: (smi) => (String(smi).startsWith('BAD') ? null : stubMol),
+  get_rxn: (smi) => (String(smi).startsWith('BAD') ? null : stubRxn),
 });
 
-test('renderSmiles: swallows the no-canvas environment (jsdom) and restores the raw code block', async () => {
+test('getRDKit: resolves a module exposing get_mol/get_rxn', async () => {
+  const rdk = await getRDKit();
+  assert.equal(typeof rdk.get_mol, 'function');
+  assert.equal(typeof rdk.get_rxn, 'function');
+});
+
+test('renderSmiles: valid molecule → RDKit SVG with rethemed background, property caption, toolbar', async () => {
   const aspirin = 'CC(=O)OC1=CC=CC=C1C(=O)O';
   document.body.innerHTML = '';
   const pre = makeFence('smiles', aspirin);
   await renderSmiles(document.body);
-  // In jsdom canvas.getContext('2d') is null → draw throws → the wrapper must
-  // be swapped back to the original <pre> (raw SMILES never disappears).
-  assert.ok(document.body.contains(pre), 'the original code block must be restored');
-  assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no broken wrapper left in the DOM');
-  assert.equal(pre.querySelector('code').textContent, aspirin);
+
+  const block = document.querySelector('.smiles-block');
+  assert.ok(block, 'the fence is replaced by a .smiles-block');
+  const svg = block.querySelector('svg.smiles-svg');
+  assert.ok(svg, 'the drawing is an inline svg');
+  assert.ok(!svg.outerHTML.includes('?xml'), 'the xml prolog is stripped for innerHTML');
+  assert.ok(svg.outerHTML.includes("fill:none"), 'the white background rect is dropped (bubble bg shows through)');
+  assert.ok(!block.querySelector('.smiles-caption') === false, 'molecules get a caption');
+  const caption = block.querySelector('.smiles-caption');
+  assert.equal(caption.querySelectorAll('.smiles-caption-chip').length, 4);
+  assert.ok(caption.textContent.includes('MW') && caption.textContent.includes('180.16'), 'MW chip carries the descriptor value');
+  assert.ok(caption.textContent.includes('HBD/HBA') && caption.textContent.includes('1/4'), 'HBD/HBA chip');
+  assert.ok(block.querySelector('.mermaid-toolbar'), 'copy/export toolbar present');
+  assert.ok(!document.body.contains(pre), 'the original fence is gone on success');
+});
+
+test('renderSmiles: chemically invalid SMILES → explicit error note, raw block kept', async () => {
+  document.body.innerHTML = '';
+  const bad = 'BAD(C)(C)(C)O';
+  const pre = makeFence('smiles', bad);
+  await renderSmiles(document.body);
+
+  assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no viewer block');
+  const note = document.querySelector('.smiles-error');
+  assert.ok(note, 'the invalid-structure note is shown');
+  assert.ok(note.textContent.length > 0);
+  assert.ok(document.body.contains(pre), 'the raw source stays readable');
+  assert.equal(pre.querySelector('code').textContent, bad);
+});
+
+test('rethemeRdkitSvg: transparent bg both themes, light ink in dark, prolog stripped', () => {
+  const raw = `<?xml version='1.0'?><svg version='1.1' viewBox='0 0 300 220'><rect style='opacity:1.0;fill:#FFFFFF;stroke:none'/><path style='fill:none;stroke:#000000'/><text style='fill:#000000'>O</text></svg>`;
+  const light = rethemeRdkitSvg(raw, false);
+  assert.ok(!light.includes('?xml'), 'the xml prolog is stripped for innerHTML');
+  assert.ok(light.startsWith('<svg'), 'starts at the svg element');
+  assert.ok(light.includes('fill:none'), 'the white background rect is dropped');
+  assert.ok(light.includes('#000000'), 'ink stays black in light mode');
+  const dark = rethemeRdkitSvg(raw, true);
+  assert.ok(!dark.includes('#000000'), 'black ink is rewritten in dark mode');
+  assert.ok(dark.includes('#E1E1E6'), 'dark ink is the light gray');
+  assert.ok(dark.includes('fill:none'), 'background stays dropped in dark mode');
 });
 
 test('renderSmiles: leaves non-smiles content and empty blocks untouched', async () => {
@@ -318,46 +371,28 @@ test('renderPdb: when the requested F model is absent, the first entry is used',
 // ─── Reaction SMILES routing (2026-09-13) ────────────────────────────────────
 // ```smiles auto-detects reactions by the '>' separator (reactants>agents>
 // products) — a plain molecule SMILES can never contain '>' so it's lossless.
-// smiles-drawer's own ReactionDrawer/parseReaction do the drawing, so no
-// second vendor is involved.
+// Since the RDKit swap (2026-09-29) reactions draw via get_rxn → Reaction.
+// get_svg; reactions carry no descriptors, so no caption.
 
-test('the bundle exposes ReactionDrawer and parseReaction alongside the molecule API', async () => {
-  const lib = await getSmilesDrawer();
-  assert.equal(typeof lib.ReactionDrawer, 'function');
-  assert.equal(typeof lib.parseReaction, 'function');
-  // Real parse in Node (parser is pure JS): acetic acid + ethanol -> ethyl acetate + water
-  let tree = null;
-  lib.parseReaction('CC(=O)O.CCO>>CCOC(=O)CC.O',
-    (t) => { tree = t; },
-    (err) => { throw new Error('parseReaction failed: ' + err); });
-  assert.ok(tree, 'a valid reaction SMILES must parse');
-  assert.equal(tree.reactants.length, 2);
-  assert.equal(tree.products.length, 2);
-});
-
-test('renderSmiles: a reaction block degrades gracefully without canvas (jsdom), like molecules', async () => {
+test('renderSmiles: reaction fence routes to get_rxn and renders WITHOUT a property caption', async () => {
   document.body.innerHTML = '';
   const reaction = 'CC(=O)O.CCO>>CCOC(=O)CC.O';
   const pre = makeFence('smiles', reaction);
   await renderSmiles(document.body);
-  assert.ok(document.body.contains(pre), 'raw reaction SMILES must be restored when drawing is impossible');
-  assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no broken wrapper left');
-});
 
-test('renderSmiles reaction path: ReactionDrawer draws an SVG target (no canvas involved), sized by its own viewBox', async () => {
-  document.body.innerHTML = '';
-  // jsdom lacks createElementNS-based SVG layout, so the draw() try/catch will
-  // likely fall back — but the API contract must hold: when it DOES succeed,
-  // the wrapper must contain the svg target (never a canvas), and on failure
-  // the raw block must be restored. Drive both branches.
-  const reaction = 'CC(=O)O.CCO>>CCOC(=O)CC.O';
-  const pre = makeFence('smiles', reaction);
-  await renderSmiles(document.body);
   const wrapper = document.querySelector('.smiles-block');
-  if (wrapper) {
-    assert.ok(!wrapper.querySelector('canvas'), 'reaction path must never render into a canvas');
-    assert.ok(wrapper.querySelector('svg.smiles-svg'), 'the svg target carries the smiles-svg class');
-  } else {
-    assert.ok(document.body.contains(pre), 'fallback restores the raw block');
-  }
+  assert.ok(wrapper, 'a valid reaction renders');
+  assert.ok(wrapper.querySelector('svg.smiles-svg'), 'the reaction drawing is an inline svg');
+  assert.ok(!wrapper.querySelector('canvas'), 'never a canvas');
+  assert.ok(!wrapper.querySelector('.smiles-caption'), 'reactions carry no descriptor caption');
+  assert.ok(!document.body.contains(pre), 'the original fence is gone on success');
+});
+
+test('renderSmiles: chemically invalid reaction → error note, raw block kept', async () => {
+  document.body.innerHTML = '';
+  const pre = makeFence('smiles', 'BAD>>WORSE');
+  await renderSmiles(document.body);
+  assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no viewer block');
+  assert.ok(document.querySelector('.smiles-error'), 'the invalid-structure note is shown');
+  assert.ok(document.body.contains(pre), 'the raw source stays readable');
 });

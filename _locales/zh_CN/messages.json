@@ -1007,6 +1007,10 @@
     "message": "pLDDT 置信度",
     "description": "Sidepanel: AlphaFold structure viewer legend label"
   },
+  "smilesInvalid": {
+    "message": "不是有效的化学结构，已保留原文",
+    "description": "Sidepanel: RDKit rejected the SMILES block as chemically invalid"
+  },
   "mathCopyLatex": {
     "message": "复制 LaTeX",
     "description": "Sidepanel: formula hover copy-LaTeX button"

@@ -126,15 +126,6 @@ const VENDORS = [
     outName:   'pdf.worker'
   },
   {
-    // 2D chemical structure diagrams: model emits ```smiles (SMILES string),
-    // render.js's renderSmiles draws it via smiles-drawer's canvas Drawer.
-    name: 'smiles-drawer',
-    srcEntry:  'smiles-drawer/dist/smiles-drawer.min.mjs',
-    srcDir:    join(ROOT, 'node_modules'),
-    esmBundle: true,
-    outName:   'smiles-drawer'
-  },
-  {
     name: 'markstream-core',
     srcEntry:  'markstream-core/dist/index.js',
     srcDir:    join(DEPS, 'node_modules'),
@@ -246,6 +237,22 @@ const RAW_COPIES = [
     // katex/pdf precedents.
     srcDir:  join(ROOT, 'node_modules/docling.rs-wasm/web'),
     files:   ['docling_wasm_bg.wasm', 'docling_wasm.js']
+  },
+  {
+    // Chemistry rendering engine (replaced smiles-drawer, 2026-09-29, user
+    // call: adopt the industry heavyweight). RDKit is the pharma-standard
+    // cheminformatics toolkit; the MinimalLib WASM build draws molecules AND
+    // reactions (get_mol/get_rxn → get_svg, viewBox included), VALIDATES
+    // model-emitted SMILES (get_mol returns null for chemically impossible
+    // input — the anti-hallucination win smiles-drawer had no answer for) and
+    // computes descriptors (MW/logP/TPSA/HBD/HBA property line). The glue is
+    // an emscripten MODULARIZE script defining the global initRDKitModule —
+    // RAW copy + classic <script> load in getRDKit(); the .wasm is fetched
+    // relative to the script URL, so the pair must sit side by side. The
+    // 7.3MB wasm is the biggest vendor, lazy-loaded only when a ```smiles
+    // fence has been seen (fence-gated preload like pdf/molstar).
+    srcDir:  join(ROOT, 'node_modules/@rdkit/rdkit/dist'),
+    files:   ['RDKit_minimal.js', 'RDKit_minimal.wasm']
   }
 ];
 
