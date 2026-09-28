@@ -205,14 +205,15 @@ test('withAgentRenderHints: first turn appends the hint block; later turns retur
   // This list is the anti-drift guard for AGENT_RENDER_HINT: ```nn shipped
   // 2026-09-14 and was missing here for a day (agent providers answered
   // "there is no NN format"), so a new renderer must fail this assertion.
-  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn']) {
+  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'dot']) {
     assert.ok(AGENT_RENDER_HINT.includes('```' + fence), `hint must mention \`\`\`${fence}`);
   }
   assert.match(AGENT_RENDER_HINT, /never invent an ID/i, 'the pdb anti-fabrication rule must ride along');
-  // Plain layer stacks must go to ```nn, not a Mermaid flowchart — the exact
-  // failure the missing nn entry produced in the field.
-  assert.match(AGENT_RENDER_HINT, /ALWAYS ```nn, never a Mermaid flowchart/, 'nn must carry the not-Mermaid rule');
-  assert.match(AGENT_RENDER_HINT, /"style":"fcnn"/, 'the fcnn (neuron-circle) form must be taught too');
+  // Every neural-network architecture must route to ```dot (2026-09-28: the
+  // hand-rolled ```nn renderer was replaced — a custom JSON spec has zero
+  // model training prior, while DOT is what torchview/torchviz export).
+  assert.match(AGENT_RENDER_HINT, /including every neural-network architecture/, 'dot must own NN architectures');
+  assert.match(AGENT_RENDER_HINT, /rankdir/, 'the dot entry must teach at least one DOT directive');
   // The math rules ride along too (SHARED consts from prompt-assembly.js since
   // 2026-09-28): before that the mirror had never carried a math rule and
   // agent providers wrote formulas as backtick pseudo-math (`q_si^h = W_q m_si`
@@ -237,7 +238,7 @@ test('the render contract is SHARED byte-identically: both homes embed every cha
   assert.ok(AGENT_RENDER_HINT.includes(FENCE_INDEX), 'the fence index must be shared too');
   // Fence names on BOTH sides (the ```nn drift, 2026-09-14) — now implied by
   // the shared entries, but pinned explicitly as the cheap early signal.
-  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'nn']) {
+  for (const fence of ['mermaid', 'echarts', 'markmap', 'smiles', 'pdb', 'dot']) {
     assert.ok(CAPABILITY_HINTS.includes('```' + fence), `CAPABILITY_HINTS must mention \`\`\`${fence}`);
     assert.ok(AGENT_RENDER_HINT.includes('```' + fence), `AGENT_RENDER_HINT must mention \`\`\`${fence}`);
   }
