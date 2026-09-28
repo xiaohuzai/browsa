@@ -221,16 +221,19 @@ const RAW_COPIES = [
     files:   ['pdf_inspector_wasm_bg.wasm', 'pdf_inspector_wasm.js']
   },
   {
-    // Interactive 3D protein/small-molecule viewer: the model emits ```pdb
-    // (4-char RCSB PDB ID or raw PDB text) and render.js's renderPdb renders
-    // it via $3Dmol.createViewer (WebGL). The dist is a <script>-style
-    // concatenated build (jQuery included) relying on sloppy-mode globals —
-    // esbuild's CJS wrapper makes jQuery take its CommonJS branch
-    // (noGlobal=true, never sets window.$) and the 3Dmol half then throws
-    // "$ is not defined" at evaluation. RAW copy + classic <script> load in
-    // get3Dmol() keeps its exact browser semantics.
-    srcDir:  join(ROOT, 'node_modules/3dmol/build'),
-    files:   ['3Dmol-min.js']
+    // Interactive 3D protein viewer (replaced 3Dmol.js, 2026-09-29, user call:
+    // "业内都用 Mol*" — Mol* is what RCSB PDB / PDBe / AlphaFold DB embed, and
+    // it natively ships the info layer 3Dmol lacked: hover residue tooltips,
+    // sequence strip, pLDDT confidence coloring via the built-in
+    // ma-quality-assessment extension). The model emits ```pdb and render.js's
+    // renderPdb drives molstar.Viewer.create (WebGL). The dist is a prebuilt
+    // IIFE assigning the `molstar` global — RAW copy + classic <script> load
+    // in getMolstar(); molstar.css ships beside it and is injected as a <link>
+    // by the same loader. Bundle contains NO worker spawns; its only wasm
+    // (h264-mp4-encoder, base64-inlined) serves snapshot video export, which
+    // browsa never invokes — dormant under the existing 'wasm-unsafe-eval' CSP.
+    srcDir:  join(ROOT, 'node_modules/molstar/build/viewer'),
+    files:   ['molstar.js', 'molstar.css']
   },
   {
     // Office-document → Markdown conversion (docx/pptx/xlsx/odt/rtf/epub/…):

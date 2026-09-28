@@ -246,18 +246,28 @@ test('decorateLinks adds target=_blank + rel=noopener only to cross-origin links
   assert.equal(local.target, '');
 });
 
-test('highlightDiffBlocks classifies +/-/@@ lines and is idempotent', () => {
+test('highlightDiffBlocks: hljs diff grammar tokenizes +/-/@@ lines, idempotent', () => {
   const el = document.createElement('div');
   el.innerHTML = '<pre><code class="language-diff">@@ -1,2 +1,2 @@\n-old line\n+new line\n unchanged</code></pre>';
   highlightDiffBlocks(el);
   const code = el.querySelector('code');
-  const spans = [...code.querySelectorAll('span')];
-  assert.equal(spans[0].className, 'diff-hunk');
-  assert.equal(spans[1].className, 'diff-del');
-  assert.equal(spans[2].className, 'diff-add');
+  const addition = code.querySelector('.hljs-addition');
+  const deletion = code.querySelector('.hljs-deletion');
+  const meta = code.querySelector('.hljs-meta');
+  assert.ok(addition && addition.textContent === '+new line', '+ line rides the hljs-addition token');
+  assert.ok(deletion && deletion.textContent === '-old line', '- line rides the hljs-deletion token');
+  assert.ok(meta && meta.textContent === '@@ -1,2 +1,2 @@', 'hunk header rides the hljs-meta token');
+  assert.ok(code.textContent.includes(' unchanged'), 'plain lines stay verbatim');
   const before = code.innerHTML;
   highlightDiffBlocks(el); // second call must be a no-op (dataset.diffDone guard)
   assert.equal(code.innerHTML, before);
+});
+
+test('highlightDiffBlocks: language-patch alias goes through the same grammar', () => {
+  const el = document.createElement('div');
+  el.innerHTML = '<pre><code class="language-patch">+added</code></pre>';
+  highlightDiffBlocks(el);
+  assert.ok(el.querySelector('.hljs-addition'), 'patch alias shares the diff grammar');
 });
 
 test('addThinkCopyButtons adds exactly one copy button per think-block, idempotently', () => {
@@ -281,7 +291,7 @@ test('addCodeCopyButtons highlights code, adds a Copy button per <pre>, and runs
   assert.equal(pres.length, 2);
   for (const pre of pres) assert.ok(pre.querySelector('.code-copy-btn'), 'every <pre> gets a copy button');
   assert.equal(pres[0].querySelector('code').dataset.highlighted, '1', 'JS block goes through highlight.js');
-  assert.ok(pres[1].querySelector('.diff-add'), 'diff block still gets diff-colored spans');
+  assert.ok(pres[1].querySelector('.hljs-addition'), 'diff block goes through the hljs diff grammar');
 });
 
 test('extractCodeText: the copy fallback must NOT carry the button\'s own Copy label', () => {

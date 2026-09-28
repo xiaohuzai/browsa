@@ -10,7 +10,7 @@ import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShif
 import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeComposing, scheduleIdle } from './lib/sidepanel/ui-utils.js';
 import {
   renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, finishBubble,
-  addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers,
+  addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers, disposeMolstarViewers,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry,
   renderUserContent
 } from './lib/sidepanel/render.js';
@@ -3483,6 +3483,7 @@ let lastReplyKey = null;         // {name, model} of the provider that wrote the
 async function renderHistory() {
   if (historyUpgradeIO) { historyUpgradeIO.disconnect(); historyUpgradeIO = null; }
   disposeChartObservers(); // chart/markmap ResizeObservers hold strong refs to the DOM we're about to wipe
+  disposeMolstarViewers(); // Mol* viewers hold WebGL contexts — browsers cap ~16, dispose before the wipe
   messagesEl.innerHTML = '';
   messagesEl.classList.remove('cv-settled');
   const history = await storage.getHistory();
