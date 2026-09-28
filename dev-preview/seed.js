@@ -92,5 +92,11 @@ UP主：前端晚自习
       role: 'assistant',
       content: 'EGFR（P00533）的 AlphaFold 模型胞外域置信度高、跨膜区次之：\n\n```pdb\nAF-P00533-F1\n```',
     },
+    // ```smiles 轮：RDKit 渲染路径（分子 + 反应式 + 化学无效三种分支全覆盖）。
+    { role: 'user', content: '画出阿司匹林，再给一个酯化反应和一段无效 SMILES' },
+    {
+      role: 'assistant',
+      content: '**阿司匹林**（乙酰水杨酸）：\n\n```smiles\nCC(=O)OC1=CC=CC=C1C(=O)O\n```\n\n与乙醇的酯化反应：\n\n```smiles\nCC(=O)O.CCO>>CCOC(=O)CC.O\n```\n\n无效 SMILES（五价碳，应显示错误条并保留原文）：\n\n```smiles\nCC(C)(C)(C)O\n```',
+    },
   ],
 };

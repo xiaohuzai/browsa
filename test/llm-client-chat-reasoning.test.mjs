@@ -153,3 +153,60 @@ test('responsesStream default (omit) drops reasoning summary events; inline surf
   });
   assert.equal(full, '<thinking>\nthinking...\n</thinking>\nAnswer');
 });
+
+// ─── SSE spec: multi-data-line events (2026-09-29 sseDataPayload) ────────────
+// The spec allows one JSON to be split across several "data:" lines (values
+// joined with '\n'). No known provider does it, but the per-line extraction
+// this replaced silently dropped the continuation lines; the shared helper
+// joins them. Split points must sit after a comma so the rejoined payload is
+// valid JSON.
+
+function splitPayloadLines(payload) {
+  const i = payload.indexOf(',');
+  return [`data: ${payload.slice(0, i + 1)}`, `data: ${payload.slice(i + 1)}`];
+}
+
+test('chatStream: one JSON split across multiple data: lines joins per spec; comment keep-alives are ignored', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
+  const payload = JSON.stringify({ choices: [{ index: 0, delta: { content: 'split works' }, finish_reason: 'stop' }] });
+  const [l1, l2] = splitPayloadLines(payload);
+  const text = `: keep-alive ping\n${l1}\n${l2}\n\ndata: [DONE]\n\n`;
+  const encoder = new TextEncoder();
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({ start(c) { c.enqueue(encoder.encode(text)); c.close(); } }),
+    text: async () => '',
+  });
+
+  let full = '';
+  const result = await chatStream({
+    baseUrl: 'http://test', apiKey: 'sk-x',
+    messages: [{ role: 'user', content: 'x' }],
+    onDelta: (d) => { full += d; },
+  });
+  assert.equal(full, 'split works', 'the split JSON is reassembled, not dropped');
+  assert.equal(result.finishReason, 'stop');
+  delete globalThis.fetch;
+});
+
+test('responsesStream: multi-data-line event joins per spec too', async () => {
+  const { responsesStream } = await import('../lib/llm-client.js');
+  const payload = JSON.stringify({ type: 'response.output_text.delta', delta: 'joined!' });
+  const [l1, l2] = splitPayloadLines(payload);
+  const text = `event: response.output_text.delta\n${l1}\n${l2}\n\n`;
+  const encoder = new TextEncoder();
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({ start(c) { c.enqueue(encoder.encode(text)); c.close(); } }),
+    text: async () => '',
+  });
+
+  let full = '';
+  await responsesStream({
+    baseUrl: 'http://test', apiKey: 'sk-x',
+    input: [{ role: 'user', content: 'q' }],
+    onDelta: (d) => { full += d; },
+  });
+  assert.equal(full, 'joined!');
+  delete globalThis.fetch;
+});

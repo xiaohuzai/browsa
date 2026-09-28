@@ -2979,18 +2979,14 @@ dialog.lightbox-overlay:not([open]) {
 }
 
 /* ─── 化学结构 / 生物大分子渲染（render.js renderSmiles/renderPdb） ─────────── */
-/* 2D 结构式：smiles-drawer 画在 canvas 上，透明底随主题；等宽块换成交互图 */
+/* 2D 结构式：RDKit 画的内联 SVG（分子与反应式同路径），透明底随主题 */
 .smiles-block {
   position: relative;  /* hover 工具条的定位锚（此前缺省时锚到 .msg 右上角） */
   margin: 8px 0;
   text-align: center;
 }
-.smiles-block canvas {
-  max-width: 100%;
-  height: auto !important;
-}
-/* Reaction SVG: ReactionDrawer writes the content-fit viewBox + style width
-   itself — cap it to the bubble width and let height follow proportionally. */
+/* RDKit writes a content-fit viewBox itself — cap it to the bubble width and
+   let height follow proportionally. */
 .smiles-block svg.smiles-svg {
   max-width: 100%;
   height: auto;
@@ -3027,8 +3023,10 @@ dialog.lightbox-overlay:not([open]) {
   pointer-events: none;
 }
 .pdb-error { color: var(--error); }
-/* AlphaFold pLDDT 置信度图例（render.js _plddtLegend）：色块 + 数值区间 */
-.pdb-legend {
+/* AlphaFold pLDDT 置信度图例（render.js _plddtLegend）与分子性质条
+   （render.js _smilesCaption，RDKit descriptors）：同一 chip 视觉 */
+.pdb-legend,
+.smiles-caption {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -3037,7 +3035,8 @@ dialog.lightbox-overlay:not([open]) {
   font-size: 10px;
   color: var(--fg-dim);
 }
-.pdb-legend-chip {
+.pdb-legend-chip,
+.smiles-caption-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -3047,6 +3046,17 @@ dialog.lightbox-overlay:not([open]) {
   height: 9px;
   border-radius: var(--radius-sm);
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.smiles-caption-chip span:first-child {
+  color: var(--fg-dim);
+  margin-right: 1px;
+}
+/* 无效 SMILES（render.js renderSmiles，RDKit 判废）：错误条 + 原文保留，
+   同 renderDot 的 .dot-error 模式 */
+.smiles-error {
+  margin: 8px 0 4px;
+  font-size: 12.5px;
+  color: var(--error);
 }
 
 @media (max-width: 320px) {

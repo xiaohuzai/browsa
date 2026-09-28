@@ -22,12 +22,12 @@
   "license": "MIT",
   "dependencies": {
     "@firecrawl/pdf-inspector-wasm": "^0.1.1",
+    "@rdkit/rdkit": "^2026.3.6",
     "docling.rs-wasm": "^1.58.0",
     "echarts": "^6.1.0",
     "markmap-lib": "^0.18.12",
     "markmap-view": "^0.18.12",
-    "pdfjs-dist": "^6.1.200",
-    "smiles-drawer": "^2.4.1",
-    "molstar": "^5.12.0"
+    "molstar": "^5.12.0",
+    "pdfjs-dist": "^6.1.200"
   }
 }
