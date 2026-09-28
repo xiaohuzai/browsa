@@ -182,7 +182,7 @@ function loadContentScript(name) {
 // youtube-content-script.js
 // ============================================================================
 {
-  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
+  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, triggerCaptionTranscript, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
     loadContentScript('youtube-content-script.js');
 
   test('youtube: isYouTubePlayerUrl matches both apex and www hosts, prefix-matches the path', () => {
@@ -222,6 +222,105 @@ function loadContentScript(name) {
       { languageCode: 'fr', baseUrl: 'manual-fr' },
     ]);
     assert.equal(transcript, '[00:01] hello');
+  });
+
+  // triggerCaptionTranscript (stage 2c): CC-off videos never let the player
+  // request timedtext, so every POT-less direct fetch is empty; the helper
+  // drives the player's own caption module so its authorized request flows
+  // through the interceptor, then restores the user's CC state.
+  function withPlayerDom(player, windowExtras, fn) {
+    const savedDoc = globalThis.document;
+    const savedWin = globalThis.window;
+    globalThis.document = { getElementById: (id) => (id === 'movie_player' ? player : null) };
+    globalThis.window = { __browsaTranscriptCache: {}, ...windowExtras };
+    return Promise.resolve()
+      .then(fn)
+      .finally(() => {
+        if (savedDoc === undefined) delete globalThis.document; else globalThis.document = savedDoc;
+        if (savedWin === undefined) delete globalThis.window; else globalThis.window = savedWin;
+      });
+  }
+
+  test('youtube: triggerCaptionTranscript no-ops without a DOM', async () => {
+    assert.equal(await triggerCaptionTranscript('abc123'), null);
+  });
+
+  test('youtube: trigger drives the caption module, captures via the cache, restores CC-off state', async () => {
+    const lines = [{ tStartMs: 0, segs: [{ utf8: 'hi' }] }];
+    const calls = [];
+    const track = { languageCode: 'en' };
+    const player = {
+      getOption(_m, k) {
+        if (k === 'tracklist') return [track];
+        if (k === 'track') return this._track || null;
+        return null;
+      },
+      loadModule(m) { calls.push(`load:${m}`); },
+      unloadModule(m) { calls.push(`unload:${m}`); },
+      setOption(_m, k, v) {
+        if (k !== 'track') return;
+        this._track = v;
+        calls.push(`set:${v ? v.languageCode : 'off'}`);
+        if (v) setTimeout(() => { globalThis.window.__browsaTranscriptCache.abc123 = lines; }, 15);
+      }
+    };
+    await withPlayerDom(player, {}, async () => {
+      const out = await triggerCaptionTranscript('abc123', 1500, 500);
+      assert.deepEqual(out, lines, 'must return the captured transcript lines');
+      assert.deepEqual(calls, ['load:captions', 'set:en', 'set:off', 'unload:captions'],
+        'must restore CC-off state (track null + unloadModule) right after capture');
+    });
+  });
+
+  test('youtube: trigger gives up within the timeout and still restores state', async () => {
+    const calls = [];
+    const player = {
+      getOption(_m, k) {
+        if (k === 'tracklist') return [{ languageCode: 'zh' }];
+        if (k === 'track') return null;
+        return null;
+      },
+      loadModule(m) { calls.push(`load:${m}`); },
+      unloadModule(m) { calls.push(`unload:${m}`); },
+      setOption(_m, k, v) { if (k === 'track') calls.push(`set:${v ? v.languageCode : 'off'}`); }
+    };
+    await withPlayerDom(player, {}, async () => {
+      const out = await triggerCaptionTranscript('abc123', 130, 60);
+      assert.equal(out, null, 'no capture within the timeout must yield null');
+      assert.deepEqual(calls, ['load:captions', 'set:zh', 'set:off', 'unload:captions'],
+        'give-up path must also restore CC-off state');
+    });
+  });
+
+  test('youtube: empty tracklist on an initialized player negative-caches the videoId', async () => {
+    const calls = [];
+    const player = {
+      getOption(_m, k) { return k === 'tracklist' ? [] : null; },
+      getVideoData() { return { video_id: 'xyz' }; },
+      loadModule(m) { calls.push(`load:${m}`); },
+      unloadModule(m) { calls.push(`unload:${m}`); },
+      setOption(_m, k, v) { if (k === 'track') calls.push('set'); }
+    };
+    await withPlayerDom(player, {}, async () => {
+      assert.equal(await triggerCaptionTranscript('xyz', 130, 60), null);
+      assert.equal(globalThis.window.__browsaCaptionTriggerEmpty.xyz, true, 'empty tracklist + matching videoData must mark the negative cache');
+      const callsAfterFirst = calls.length;
+      assert.equal(await triggerCaptionTranscript('xyz', 130, 60), null);
+      assert.equal(calls.length, callsAfterFirst, 'second trigger must bail on the negative cache without touching the player');
+    });
+  });
+
+  test('youtube: empty tracklist on an UNinitialized player must not poison the negative cache', async () => {
+    const player = {
+      getOption(_m, k) { return k === 'tracklist' ? [] : null; },
+      getVideoData() { return { video_id: 'other-video' }; },
+      loadModule() {}, unloadModule() {}, setOption() {}
+    };
+    await withPlayerDom(player, {}, async () => {
+      assert.equal(await triggerCaptionTranscript('xyz', 130, 60), null);
+      assert.equal(globalThis.window.__browsaCaptionTriggerEmpty, undefined,
+        'a player still holding a previous video must not mark this videoId captionless');
+    });
   });
 
   test('youtube: fetchTranscript falls back to auto English, then any manual, then first available', async () => {
