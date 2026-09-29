@@ -256,6 +256,75 @@ const RAW_COPIES = [
   }
 ];
 
+// MV3 CSP patches (2026-09-30 field report): the extension page CSP
+// (script-src 'self' 'wasm-unsafe-eval') blocks `new Function`. Emscripten
+// embind glues evaluate invoker factories through the Function constructor, so
+// both molstar.js and RDKit_minimal.js need non-eval equivalents. Regexes
+// anchor on STABLE string literals / emscripten-source-level identifiers (not
+// webpack-minified names) wherever possible, and every patch REFUSES the build
+// loudly if its pattern stops matching after a vendor upgrade.
+function patchMolstar(src) {
+  // Site 1 — embind createNamedFunction (fires at h264 embind init): the
+  // eval'd body is just `function NAME() { "use strict"; return
+  // body.apply(this, arguments); }`; the computed property gives .name ===
+  // NAME without eval.
+  const before1 = (src.match(/new Function/g) || []).length;
+  const re1 = /new Function\("body","return function "\+(\w+)\+`[^`]*`\)\((\w+)\)/g;
+  src = src.replace(re1, (_m, nameVar, bodyVar) => `{[${nameVar}]:function(){return ${bodyVar}.apply(this,arguments)}}[${nameVar}]`);
+  // Site 2 — dynCall wrapper factory (only exercised by snapshot VIDEO export,
+  // never browsa; patched for defense).
+  const re2 = /new Function\("dynCall","rawFunction",\w+\+`[^`]*`\)\((\w+),(\w+)\)/g;
+  src = src.replace(re2, (_m, dynCallVar, rawFnVar) => `function(${dynCallVar},${rawFnVar}){return function(){return ${dynCallVar}(${rawFnVar},arguments)}}(${dynCallVar},${rawFnVar})`);
+  if ((src.match(/new Function/g) || []).length !== 0 || before1 !== 2) {
+    throw new Error(`molstar.js patch failed: expected 2 new Function sites, found ${before1}, left ${(src.match(/new Function/g) || []).length} — update patterns for the new molstar build`);
+  }
+  // Site 3 — embind craftInvokerFunction builds an invoker through
+  // `new_(Function, [params..., body])` (Function.apply — an eval the two
+  // regexes above can't see). It only fires while the h264 module's embind
+  // classes register, and the h264 wrapper module initializes EAGERLY at
+  // bundle evaluation (a webpack module does `i=req(m)()` right away). browsa
+  // never invokes the h264 encoder (snapshot VIDEO export), so the ROOT fix is
+  // making that module LAZY: no eager init → no embind registration → no
+  // site-3 eval (and no data:-URL wasm fetch, which MV3 also blocks). The
+  // module's only consumer is its `s` getter, which already awaits readiness.
+  const eager = /let (\w+)=(\w+)\.n\((\w+)\)\(\)\(\),(\w+)=new Promise\((\w+)=>\{\1\.then\(\(\)=>\{\5\(\)\}\)\}\),/;
+  const m3 = src.match(eager);
+  if (!m3) throw new Error('molstar.js patch failed: eager h264 init pattern not found — update the lazy-init patch for the new molstar build');
+  const [, h264Var, reqVar, modVar, readyVar] = m3;
+  src = src.replace(eager, `let ${h264Var},${readyVar}=null,`);
+  const yieldStmt = `yield ${readyVar};`;
+  if ((src.split(yieldStmt).length - 1) !== 1) throw new Error(`molstar.js patch failed: expected exactly one "${yieldStmt}" in the h264 getter`);
+  src = src.replace(yieldStmt, `if(!${h264Var}){${h264Var}=${reqVar}.n(${modVar})()}yield new Promise(${readyVar}=>{${h264Var}.then(()=>{${readyVar}()})});`);
+  return src;
+}
+
+function patchRdkit(src) {
+  // RDKit MUST run (```smiles), so its createJsInvoker gets a semantics-
+  // preserving non-eval replacement: same wired-arg order (fn, [thisWired,]
+  // argWired...), same arity check, both destructor strategies (stack vs
+  // per-arg), same return conversion. argCount/needsDestructorStack/
+  // isClassMethodFunc/returns are createJsInvoker's own closures; the
+  // trailing ...wires are toArg0Wire..toArgNWire then per-arg destructors, in
+  // exactly the order args1 pushes them. Verified in Node against the real
+  // wasm chemistry API (test/lib-rdkit-render.test.mjs).
+  const marker = 'return new Function(args1,invokerFnBody)';
+  if ((src.split(marker).length - 1) !== 1) {
+    throw new Error('RDKit_minimal.js patch failed: createJsInvoker eval site not found — update the patch for the new RDKit build');
+  }
+  return src.replace(marker, `return function(humanName,throwBindingError,invoker,fn,runDestructors,fromRetWire,toClassParamWire,...wires){
+var toArgWireFns=wires.slice(0,argCount),dtorFns=needsDestructorStack?null:wires.slice(argCount);
+return function(){
+if(arguments.length!==argCount)throwBindingError("function "+humanName+" called with "+arguments.length+" arguments, expected "+argCount+" args!");
+var destructors=[],dtorStack=needsDestructorStack?destructors:null,wiredArgs=[];
+if(isClassMethodFunc)wiredArgs.push(toClassParamWire(dtorStack,this));
+for(var i=0;i<argCount;++i)wiredArgs.push(toArgWireFns[i](dtorStack,arguments[i]));
+var rv=invoker.apply(null,[fn].concat(wiredArgs));
+if(needsDestructorStack)runDestructors(destructors);
+else for(var i=0;i<wiredArgs.length;++i){var d=dtorFns[i];if(d)d(wiredArgs[i]);}
+if(returns){var ret=fromRetWire(rv);return ret}
+}}`);
+}
+
 async function copyRaw({ srcDir, files }) {
   for (const file of files) {
     const srcPath = join(srcDir, file);
@@ -264,6 +333,13 @@ async function copyRaw({ srcDir, files }) {
       continue;
     }
     const outPath = join(VENDOR, file);
+    if (file === 'molstar.js' || file === 'RDKit_minimal.js') {
+      let src = await fs.readFile(srcPath, 'utf8');
+      src = file === 'molstar.js' ? patchMolstar(src) : patchRdkit(src);
+      await fs.writeFile(outPath, src);
+      console.log(`  ✓ lib/vendor/${file} (${src.length.toLocaleString()} bytes, CSP-patched)`);
+      continue;
+    }
     await fs.copyFile(srcPath, outPath);
     const size = (await fs.stat(outPath)).size;
     console.log(`  ✓ lib/vendor/${file} (${size.toLocaleString()} bytes)`);
