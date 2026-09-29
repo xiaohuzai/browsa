@@ -1064,6 +1064,13 @@ math[display="block"] {
   background: var(--bg-2);
   border-radius: var(--radius);
   padding: 4px 4px 0;
+  /* 宽高可拖拽（右下角原生手柄）；renderEcharts 已有容器 ResizeObserver
+     → chart.resize()，内层容器撑满 wrapper 即可跟随 */
+  resize: both;
+  overflow: hidden;
+  height: 388px;
+  min-height: 260px;
+  max-height: 85vh;
 }
 .mermaid-btn {
   /* --text/--bg-hover were never theme tokens — their dark fallbacks made the
@@ -2979,22 +2986,52 @@ dialog.lightbox-overlay:not([open]) {
 }
 
 /* ─── 化学结构 / 生物大分子渲染（render.js renderSmiles/renderPdb） ─────────── */
-/* 2D 结构式：RDKit 画的内联 SVG（分子与反应式同路径），透明底随主题 */
+/* 2D 结构式：RDKit 画的内联 SVG（分子与反应式同路径），透明底随主题。
+   宽度可拖拽（右下角原生手柄，横向），svg 按 viewBox 随宽缩放 */
 .smiles-block {
   position: relative;  /* hover 工具条的定位锚（此前缺省时锚到 .msg 右上角） */
   margin: 8px 0;
   text-align: center;
+  width: min(100%, 460px);
+  resize: horizontal;
+  overflow: hidden;
 }
-/* RDKit writes a content-fit viewBox itself — cap it to the bubble width and
-   let height follow proportionally. */
+/* RDKit writes a content-fit viewBox itself — fill the (user-resizable)
+   wrapper and let height follow the viewBox proportionally. */
 .smiles-block svg.smiles-svg {
-  max-width: 100%;
+  width: 100%;
   height: auto;
 }
 /* 3D 蛋白质查看器（Mol*，```pdb fence）：molstar 插件填满容器（上方序列条
-   + 下方视口），定高按 300px 视口 + ~40px 序列条预留 */
+   + 下方视口）。高度可拖拽（右下角原生手柄），render.js 的 ResizeObserver
+   把新尺寸推给 molstar 的 requestResize */
 .pdb-block {
   margin: 8px 0;
+}
+.pdb-viewer {
+  position: relative;
+  width: 100%;
+  height: 340px;
+  min-height: 260px;
+  max-height: 85vh;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+/* Live-render blocks are percentage-sized with no intrinsic width — a reply
+   that is ONLY a fence (no lead-in text) collapses the fit-content bubble to
+   the block's min-width and the viewer renders into a sliver (user report:
+   bare ```pdb → 185px Mol* column). Give the bubble a definite width so the
+   viewer has something to fill. :has re-evaluates when the fence swaps in. */
+.msg.assistant:has(.pdb-block),
+.msg.assistant:has(.smiles-block),
+.msg.assistant:has(.echarts-diagram),
+.msg.assistant:has(.markmap-diagram),
+.msg.assistant:has(.mermaid-diagram),
+.msg.assistant:has(.dot-diagram) {
+  width: 100%;
+  max-width: 100%;
 }
 /* Graphviz DOT（render.js renderDot，```dot fence）：wrapper 复用 .mermaid-diagram
    规则，工具条/缩放复用 mermaid 的；渲染失败时错误条插在原代码块前（代码保留） */
@@ -3003,14 +3040,6 @@ dialog.lightbox-overlay:not([open]) {
   font-size: 12.5px;
   color: var(--error);
   font-family: var(--mono);
-}
-.pdb-viewer {
-  position: relative;
-  width: 100%;
-  height: 340px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
 }
 .pdb-status,
 .pdb-error {
