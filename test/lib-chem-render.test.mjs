@@ -25,6 +25,18 @@ globalThis.XMLSerializer = dom.window.XMLSerializer;
 globalThis.location = dom.window.location;
 dom.window.matchMedia = () => ({ matches: false, addListener() {}, addEventListener() {} });
 
+// jsdom has no ResizeObserver — renderPdb now creates one per viewer (drag
+// resize → molstar requestResize). This recorder lets tests fire the callback
+// and assert the wiring.
+const roRecord = [];
+globalThis.ResizeObserver = class {
+  constructor(cb) { this.cb = cb; this.observed = []; roRecord.push(this); }
+  observe(el) { this.observed.push(el); }
+  disconnect() { this.disconnected = true; }
+  unobserve() {}
+  fire() { this.cb(); }
+};
+
 const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, getMolstar, disposeMolstarViewers } = await import('../lib/sidepanel/render.js');
 
 // getMolstar caches its promise module-level (correct in the browser — one
@@ -43,6 +55,7 @@ dom.window.molstar = {
         disposed: false,
         dispose() { viewer.disposed = true; stubState.calls.push(['dispose']); },
         plugin: {
+          canvas3d: { requestResize: () => stubState.calls.push(['requestResize']) },
           builders: {
             data: { rawData: async ({ data, label }) => { stubState.calls.push(['rawData', data, label]); return 'data-cell'; } },
             structure: {
@@ -146,8 +159,10 @@ test('renderSmiles: chemically invalid SMILES → explicit error note, raw block
   const bad = 'BAD(C)(C)(C)O';
   const pre = makeFence('smiles', bad);
   await renderSmiles(document.body);
+  await renderSmiles(document.body); // DONE + 历史升级会各跑一次
 
   assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no viewer block');
+  assert.equal(document.querySelectorAll('.smiles-error').length, 1, 'the note is inserted exactly once across double renders');
   const note = document.querySelector('.smiles-error');
   assert.ok(note, 'the invalid-structure note is shown');
   assert.ok(note.textContent.length > 0);
@@ -270,6 +285,22 @@ test('disposeMolstarViewers: disposes every live viewer from prior renders', asy
   assert.equal(before, false, 'the viewer was live after a successful render');
   assert.ok(stubState.lastViewer.disposed, 'disposeMolstarViewers disposed it');
   delete globalThis.fetch;
+});
+
+test('renderPdb: viewer container resize fires molstar requestResize (drag-resize wiring)', async () => {
+  document.body.innerHTML = '';
+  const calls = stubState.calls; calls.length = 0;
+  globalThis.fetch = async () => ({ ok: true, text: async () => 'ATOM      1  N   ALA A   1\n' });
+
+  makeFence('pdb', '1UBQ');
+  await renderPdb(document.body);
+  delete globalThis.fetch;
+
+  const observers = roRecord.filter((ro) => ro.observed.some((el) => el.classList.contains('pdb-viewer')));
+  assert.ok(observers.length >= 1, 'a ResizeObserver must watch the .pdb-viewer container');
+  calls.length = 0;
+  observers[observers.length - 1].fire();
+  assert.ok(calls.some((c) => c[0] === 'requestResize'), 'container resize must drive canvas3d.requestResize (molstar ignores its own container)');
 });
 
 test('renderPdb: unrecognized content is left untouched and never fetched', async () => {
