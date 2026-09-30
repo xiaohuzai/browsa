@@ -577,3 +577,100 @@ test('clearBridgeSessionId(provider) wipes the legacy key AND every endpoint key
   assert.equal(await storage.getBridgeSessionId('bridge', 'http://127.0.0.1:3949'), null);
   assert.equal(await storage.getBridgeSessionId('opencode-x'), 'unrelated');
 });
+
+// --------------- saved sessions: split-key layout (2026-09-30 批E) -------------
+// `savedSessions` 是轻量索引 [{id,name,createdAt,pinned,textDigest}]，每个会话
+// 的 history 逐字住进自己的 `session_<id>` 键——列表/置顶/改名只碰索引，搜索
+// 只碰 textDigest，任何路径都不再为一次小操作反序列化/重写全部会话的图片字节。
+
+test('批E: save writes a light index entry + a per-session body key (no history in the index)', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'split layout probe' }]);
+  const s = await storage.saveCurrentSession('Split');
+  const dump = localArea._dump();
+  const index = dump.savedSessions;
+  assert.equal(index.length, 1);
+  assert.ok(!('history' in index[0]), 'index entries must NOT carry the history payload');
+  assert.ok(typeof index[0].textDigest === 'string' && index[0].textDigest.includes('split layout probe'),
+    'the index carries a searchable text digest');
+  assert.deepEqual(dump[`session_${s.id}`], [{ role: 'user', content: 'split layout probe' }],
+    'the body key holds the snapshot verbatim');
+});
+
+test('批E: legacy single-key snapshots migrate on first access (bodies split out, index rewritten, data intact)', async () => {
+  reset();
+  const legacy = [
+    { id: 'old-1', name: 'Legacy One', createdAt: 111, history: [{ role: 'user', content: 'legacy content A' }] },
+    { id: 'old-2', name: 'Legacy Two', createdAt: 222, pinned: true, history: [{ role: 'assistant', content: [{ type: 'text', text: 'legacy B' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,PIXELS' } }] }] },
+  ];
+  await chrome.storage.local.set({ savedSessions: legacy });
+
+  const list = await storage.getSavedSessions();
+  assert.equal(list.length, 2, 'both legacy sessions survive the migration');
+  const dump = localArea._dump();
+  assert.ok(!dump.savedSessions.some(s => 'history' in s), 'the index no longer carries bodies');
+  assert.deepEqual(dump['session_old-1'], legacy[0].history, 'body migrated verbatim');
+  assert.deepEqual(dump['session_old-2'], legacy[1].history, 'image pixels migrate VERBATIM (pixel-fidelity decision untouched)');
+
+  // Search + full read + load all work post-migration:
+  assert.equal((await storage.getSavedSessions('legacy content A')).length, 1);
+  assert.equal((await storage.getSavedSessions('legacy b')).length, 1, 'digest lowercases (content match is case-insensitive)');
+  const full = await storage.getSessionFull('old-2');
+  assert.equal(full.pinned, true, 'pinned flag survives');
+  assert.deepEqual(full.history, legacy[1].history);
+  assert.equal(await storage.loadSession('old-1'), 1);
+  assert.deepEqual(await storage.getHistory(), legacy[0].history);
+});
+
+test('批E: pin and rename are index-only writes — the body key is never touched', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'body stays put' }]);
+  const s = await storage.saveCurrentSession('Before');
+  const bodyBefore = localArea._dump()[`session_${s.id}`];
+  await storage.pinSession(s.id, true);
+  await storage.renameSession(s.id, 'After');
+  const dump = localArea._dump();
+  assert.deepEqual(dump[`session_${s.id}`], bodyBefore, 'body key byte-identical after pin+rename');
+  const meta = dump.savedSessions[0];
+  assert.equal(meta.pinned, true);
+  assert.equal(meta.name, 'After');
+});
+
+test('批E: delete and clear-all remove the body keys too (no orphaned snapshots)', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'one' }]);
+  const s1 = await storage.saveCurrentSession('One');
+  await storage.setHistory([{ role: 'user', content: 'two' }]);
+  const s2 = await storage.saveCurrentSession('Two');
+  await storage.deleteSession(s1.id);
+  assert.ok(!(`session_${s1.id}` in localArea._dump()), 'deleted session body key is gone');
+  assert.ok(`session_${s2.id}` in localArea._dump(), 'the other body is untouched');
+  await storage.clearAllSessions();
+  const dump = localArea._dump();
+  assert.deepEqual(dump.savedSessions, []);
+  assert.ok(!(`session_${s2.id}` in dump), 'clear-all removes every body key');
+});
+
+test('批E: cap eviction deletes the evicted bodies and never evicts pinned ones', async () => {
+  reset();
+  const ids = [];
+  for (let i = 0; i < 51; i++) {
+    await storage.setHistory([{ role: 'user', content: `conv ${i}` }]);
+    const s = await storage.saveCurrentSession(`S${i}`);
+    ids.push(s.id);
+    if (i === 0) await storage.pinSession(s.id, true); // oldest but pinned — must survive
+  }
+  const dump = localArea._dump();
+  assert.equal(dump.savedSessions.length, 50, 'cap holds at MAX_SESSIONS');
+  assert.ok(`session_${ids[0]}` in dump, 'the pinned oldest session survives with its body');
+  assert.ok(!(`session_${ids[1]}` in dump), 'the evicted unpinned oldest body key is deleted');
+});
+
+test('批E: getSessionFull returns the snapshot with image pixels intact (pixel fidelity)', async () => {
+  reset();
+  const history = [{ role: 'user', content: [{ type: 'text', text: 'look' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } }] }];
+  await storage.setHistory(history);
+  const s = await storage.saveCurrentSession();
+  const full = await storage.getSessionFull(s.id);
+  assert.deepEqual(full.history, history, 'bytes in, bytes out — the split changes WHERE they live, never WHAT they are');
+});

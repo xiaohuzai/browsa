@@ -24,6 +24,7 @@ let serverSessions = [
 // 之外的键)；history 走上面的 storageHistory 变量，测试用例直接改写它。
 let localStore = {};
 let loadSessionOk = true; // B5 用例用：模拟 LOAD_SESSION 未命中（内层 ok:false）
+let saveSessionFails = false; // 空-origin 用例：模拟 SAVE_SESSION 没能保存（无 data.session）
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
@@ -41,6 +42,16 @@ globalThis.chrome = {
       if (msg.type === 'GET_SESSION_FULL') {
         const s = serverSessions.find(s => s.id === msg.id);
         return cb({ data: { session: s ? { ...s, history: storageHistory } : null } });
+      }
+      if (msg.type === 'SAVE_SESSION') {
+        // 真实 handler 形状：成功回 data.session（带 id——原地写回时即传入的
+        // id），失败无 data。loadSession 的 savedId 从这里取。
+        if (saveSessionFails) return cb({ ok: true });
+        return cb({ ok: true, data: { session: { id: msg.id || 'saved-new', name: 'Saved' } } });
+      }
+      if (msg.type === 'REASSIGN_STREAM_SESSION') {
+        // 真实 background 契约（2026-09-30 批A）：空 origin 拒绝转后台。
+        return cb({ ok: true, data: { reassigned: !!msg.sessionId } });
       }
       if (msg.type === 'LOAD_SESSION') {
         // 真实 envelope：外层 ok 恒 true，判据在内层 data.ok（B5 修复后的唯一读法）。
@@ -74,11 +85,13 @@ const deps = {
   imagesCleared: false,
   streaming: false,
   stoppedWatching: false,
+  cancelledDrop: false,
   resumed: false,
 };
 initSessionsUI({
   isStreaming: () => deps.streaming,
   stopWatchingStream: () => { deps.stoppedWatching = true; },
+  cancelStreamDrop: () => { deps.cancelledDrop = true; },
   getTabId: () => 7,
   resumeInFlight: () => { deps.resumed = true; },
   renderHistory: async () => { deps.renderHistoryCalled++; },
@@ -89,8 +102,10 @@ initSessionsUI({
 function setupDom() {
   sentMessages.length = 0;
   deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
-  deps.streaming = false; deps.stoppedWatching = false; deps.resumed = false;
+  deps.streaming = false; deps.stoppedWatching = false; deps.cancelledDrop = false; deps.resumed = false;
   localStore = {}; // 归属指针等 local 键随用例复位
+  loadSessionOk = true;
+  saveSessionFails = false;
   serverSessions = [
     { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
     { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
@@ -243,6 +258,21 @@ test('loadSession keeps an in-flight reply running in the background, saves, loa
   assert.equal(deps.imagesCleared, true);
   assert.equal(deps.resumed, true, 'reattach hooks run after the swap (switch-back resumes rendering)');
   assert.equal(getSessionsDrawer().hidden, true, 'drawer must close after loading');
+});
+
+test('loadSession cancels (does NOT background) an in-flight reply when its origin session could not be saved', async () => {
+  // 空-origin 拒绝（2026-09-30 批A）：REASSIGN 转后台按 originSessionId 键控
+  // 写回；SAVE_SESSION 失败且无归属指针 → savedId 为空 → 后台会拒绝接管
+  //（reassigned:false），若仍旧 detach，DONE 将落回 live history——孤儿回复
+  // 漏进刚切入的会话。宁可显式弃置（salvage 也会被 LOAD_SESSION 覆盖）。
+  storageHistory = [{ role: 'user', content: 'hi' }];
+  saveSessionFails = true;
+  deps.streaming = true;
+  await loadSession('s2', 'Second session');
+  assert.equal(deps.cancelledDrop, true, 'the turn is cancelled (dropped), not detached');
+  assert.equal(deps.stoppedWatching, false, 'stop-watching alone would leave the reply to leak into the loaded session');
+  assert.ok(!sentMessages.some(m => m.type === 'REASSIGN_STREAM_SESSION'), 'no REASSIGN without an origin');
+  assert.ok(sentMessages.some(m => m.type === 'LOAD_SESSION' && m.id === 's2'), 'the switch itself still proceeds');
 });
 
 test('loadSession does not SAVE_SESSION when there is no existing conversation to save', async () => {

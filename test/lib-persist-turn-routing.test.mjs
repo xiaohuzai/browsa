@@ -35,16 +35,22 @@ const { initStreamState, clearStreamState, streamState, pushChunk, streamPorts }
 function reset(tabId, extra) {
   stored.history = [];
   stored.savedSessions = [];
+  for (const k of Object.keys(stored)) if (k.startsWith('session_')) delete stored[k];
   clearStreamState(tabId);
   if (extra) initStreamState(tabId, extra);
 }
 
 test('persistTurnEntry: a watched stream writes the LIVE history', async () => {
   reset('t1', { originSessionId: 's1' });
-  stored.savedSessions = [{ id: 's1', name: 'A', history: [{ role: 'user', content: 'q' }] }];
+  // Seed the NEW split-key layout directly (light index + body key): the
+  // watched path never touches sessions at all, so nothing migrates here.
+  stored.savedSessions = [{ id: 's1', name: 'A', createdAt: 1, pinned: false, textDigest: 'q' }];
+  stored['session_s1'] = [{ role: 'user', content: 'q' }];
   await persistTurnEntry('t1', { role: 'assistant', content: 'reply' });
   assert.deepEqual(stored.history.map((m) => m.content), ['reply']);
-  assert.equal(stored.savedSessions[0].history.length, 1, 'the snapshot must not grow while the panel watches');
+  // 批E split-key layout: the snapshot body lives in its own session_<id> key
+  // (the seeded legacy index entry migrates on first access).
+  assert.equal(stored['session_s1'].length, 1, 'the snapshot must not grow while the panel watches');
 });
 
 test('persistTurnEntry: a backgrounded stream writes its ORIGIN session snapshot', async () => {
@@ -53,7 +59,7 @@ test('persistTurnEntry: a backgrounded stream writes its ORIGIN session snapshot
   stored.savedSessions = [{ id: 's1', name: 'A', history: [{ role: 'user', content: 'q' }] }];
   stored.history = [{ role: 'user', content: 'the OTHER conversation' }];
   await persistTurnEntry('t2', { role: 'assistant', content: 'bg reply' });
-  assert.deepEqual(stored.savedSessions[0].history.map((m) => m.content), ['q', 'bg reply'], 'the reply joins its own session');
+  assert.deepEqual(stored['session_s1'].map((m) => m.content), ['q', 'bg reply'], 'the reply joins its own session');
   assert.deepEqual(stored.history.map((m) => m.content), ['the OTHER conversation'], 'the switched-to conversation is untouched');
 });
 
@@ -87,5 +93,5 @@ test('interrupted-turn salvage shape persists via the same writer (interrupted f
   streamState.get('t5').bg = true;
   stored.savedSessions = [{ id: 's1', name: 'A', history: [] }];
   await persistTurnEntry('t5', { role: 'assistant', content: 'half a thought', interrupted: true });
-  assert.equal(stored.savedSessions[0].history[0].interrupted, true);
+  assert.equal(stored['session_s1'][0].interrupted, true);
 });

@@ -65,6 +65,11 @@ const messagesEl = document.getElementById('messages');
 test('resumeInFlightStream(): pre-renders the STREAM_PEEK accumulated text and opens a browsa-chat port', () => {
   assert.ok(lastChatPort, 'resumeInFlightStream() must open its own browsa-chat port');
   assert.ok(lastChatPort.sent.some((m) => m.type === 'STREAM_HELLO'));
+  // resume:true 是墓碑重放的门（PEEK→HELLO 竞态修复，2026-09-30 批A）：
+  // 只有 resume 握手的 HELLO 才允许后台重放终态墓碑——全新发送的 HELLO
+  // 发生在自己的 CHAT 之前，绝不能捡到上一轮的陈旧 DONE。
+  assert.ok(lastChatPort.sent.some((m) => m.type === 'STREAM_HELLO' && m.resume === true),
+    'the resume handshake must carry resume:true');
   const assistantEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
   assert.ok(assistantEl, 'an assistant bubble must exist to hold the resumed content');
 });

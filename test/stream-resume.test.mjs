@@ -88,7 +88,8 @@ Object.defineProperty(globalThis, 'chrome', {
 // --------------- import ------------------------------------------------------
 // Dynamic import so the mock is in place before background.js evaluates.
 const bg = await import('../background.js');
-const { handle, streamState, streamPorts, initStreamState, appendToStreamState, clearStreamState, pushChunk } = bg;
+const { handle, streamState, streamPorts, initStreamState, appendToStreamState, clearStreamState } = bg;
+const { pushChunk } = await import('../lib/state.js'); // same module instance bg uses (not re-exported)
 
 // --------------- tests -------------------------------------------------------
 
@@ -240,4 +241,121 @@ test('handle accepts new STREAM_PEEK and STREAM_RELEASE case labels', async () =
   const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
   assert.match(src, /case 'STREAM_PEEK'/, 'handle() must handle STREAM_PEEK');
   assert.match(src, /case 'STREAM_RELEASE'/, 'handle() must handle STREAM_RELEASE');
+});
+
+// ─── PEEK→HELLO resume race (2026-09-30 批A) ─────────────────────────────────
+// The resume handshake is two steps (PEEK snapshot, then connect+HELLO). A
+// turn finishing INSIDE that window pushes its DONE to the old/absent port —
+// lost — and streamState is already cleared by HELLO time, so the resuming
+// panel used to spin forever. pushChunk now tombstones terminal events and
+// the HELLO handler replays them for resume-flagged hellos only.
+
+function fakeChatPort(received) {
+  const msgListeners = [];
+  return {
+    port: {
+      name: 'browsa-chat',
+      postMessage: (m) => received.push(m),
+      disconnect: () => {},
+      onMessage: { addListener: (cb) => msgListeners.push(cb) },
+      onDisconnect: { addListener: () => {} },
+    },
+    deliver: (m) => { for (const cb of msgListeners) cb(m); },
+  };
+}
+
+test('resume HELLO replays the tombstoned DONE when the turn finished inside the PEEK→HELLO window', async () => {
+  streamState.clear();
+  streamPorts.clear();
+
+  // Stream in flight; the panel PEEKs it (inFlight:true).
+  initStreamState(7);
+  appendToStreamState(7, 'partial');
+  const peek = await handle({ type: 'STREAM_PEEK', tabId: 7 });
+  assert.equal(peek.inFlight, true, 'sanity: PEEK sees the stream');
+
+  // The turn completes before the panel's HELLO registers: DONE goes to no
+  // port (the old one is gone) and streamState is cleared right after.
+  pushChunk(7, { type: 'DONE', full: 'final text', usage: { completion_tokens: 3 }, providerLabel: 'test' });
+  clearStreamState(7);
+
+  // The resuming panel connects and HELLOs with resume:true.
+  const received = [];
+  const { port, deliver } = fakeChatPort(received);
+  chromeMock.runtime._onConnect(port);
+  deliver({ type: 'STREAM_HELLO', tabId: 7, resume: true });
+
+  assert.equal(received[0]?.type, 'STREAM_HELLO_ACK', 'ACK still comes first');
+  assert.equal(received[1]?.type, 'DONE', 'the lost terminal event is replayed onto the new port');
+  assert.equal(received[1].full, 'final text', 'replay carries the FULL payload, not a synthetic stub');
+  assert.deepEqual(received[1].usage, { completion_tokens: 3 });
+  assert.equal(received[1].providerLabel, 'test');
+
+  // Read-once: a second resume HELLO must not replay the same DONE twice —
+  // it falls to the synthetic safety net (stream truly gone, nothing to replay).
+  received.length = 0;
+  deliver({ type: 'STREAM_HELLO', tabId: 7, resume: true });
+  assert.equal(received[1]?.type, 'DONE');
+  assert.equal(received[1]?.full, null, 'synthetic net: panel finalizes with its PEEK-seeded acc');
+  assert.equal(received[1]?.synthetic, true);
+});
+
+test('a fresh-send HELLO (no resume flag) NEVER picks up a stale tombstone', async () => {
+  streamState.clear();
+  streamPorts.clear();
+
+  // A previous turn's DONE left a tombstone…
+  initStreamState(7);
+  pushChunk(7, { type: 'DONE', full: 'previous turn' });
+  clearStreamState(7);
+
+  // …then the user sends a NEW message: onSend's HELLO arrives BEFORE its
+  // CHAT even started (no streamState). Replaying the stale DONE here would
+  // finalize the fresh empty bubble with the previous turn's text.
+  const received = [];
+  const { port, deliver } = fakeChatPort(received);
+  chromeMock.runtime._onConnect(port);
+  deliver({ type: 'STREAM_HELLO', tabId: 7 });
+
+  assert.equal(received.length, 1, 'only the ACK — no tombstone replay without resume:true');
+  assert.equal(received[0].type, 'STREAM_HELLO_ACK');
+});
+
+test('a resume HELLO while the stream is still live does NOT replay anything', async () => {
+  streamState.clear();
+  streamPorts.clear();
+  initStreamState(7);
+  appendToStreamState(7, 'still going');
+  // Seed a tombstone from an OLDER turn to prove liveness wins over it.
+  const received = [];
+  const { port, deliver } = fakeChatPort(received);
+  chromeMock.runtime._onConnect(port);
+  deliver({ type: 'STREAM_HELLO', tabId: 7, resume: true });
+  assert.equal(received.length, 1, 'live stream → ACK only, normal chunk flow continues');
+  assert.equal(received[0].type, 'STREAM_HELLO_ACK');
+  clearStreamState(7);
+});
+
+// ─── REASSIGN empty-origin refusal (2026-09-30 批A) ──────────────────────────
+
+test('REASSIGN_STREAM_SESSION refuses an empty origin (no cross-session leak)', async () => {
+  streamState.clear();
+  initStreamState(7);
+
+  const refused = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 7, sessionId: '' });
+  assert.equal(refused.reassigned, false, 'no origin session → refuse to background');
+  assert.equal(streamState.get(7).bg, false,
+    'bg without origin would make persistTurnEntry fall through to LIVE history — the reply would land in the session the user switched TO');
+
+  const ok = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 7, sessionId: 's1' });
+  assert.equal(ok.reassigned, true);
+  assert.equal(streamState.get(7).bg, true);
+  assert.equal(streamState.get(7).originSessionId, 's1');
+  clearStreamState(7);
+});
+
+test('REASSIGN_STREAM_SESSION for an unknown tab reports reassigned:false', async () => {
+  streamState.clear();
+  const r = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 9999, sessionId: 's1' });
+  assert.equal(r.reassigned, false);
 });

@@ -64,13 +64,20 @@ test('imageRejectReason mirrors pickTurnImages exactly — attach-time gate cann
 });
 
 test('the composer enforces the gate at attach time (paste / drop / picker all funnel through it)', async () => {
+  // 2026-09-30 批D：ingest 管线抽到共享的 lib/sidepanel/image-drop.js（主
+  // composer 与追问卡同一实现）——pin 随之分两层：composer 必须把 `images`
+  // 数组经 ingestImageFiles 漏斗 + 拒绝必须可见（compact appendError）；
+  // 门控与拒绝文案本体锁在共享模块里。
   const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
   const fn = src.slice(src.indexOf('async function handleDroppedFiles'), src.indexOf('function removeImage'));
-  assert.match(fn, /imageRejectReason\(images\.map/, 'handleDroppedFiles must consult the shared gate');
-  assert.match(fn, /appendError\(imageNotAttachedText\(/, 'and tell the user, visibly, when it refuses');
-  // Both refusal wordings must have a dict entry in both locales.
+  assert.match(fn, /ingestImageFiles\(fileList, images/, 'handleDroppedFiles must funnel through the shared ingest pipeline');
+  assert.match(fn, /appendError\(text, \{ compact: true \}\)/, 'and tell the user, visibly, when it refuses');
+  const mod = await readFile(new URL('../lib/sidepanel/image-drop.js', import.meta.url), 'utf8');
+  assert.match(mod, /imageRejectReason\(store\.map/, 'the shared pipeline must consult the image-budget gate');
+  // Both refusal wordings must be used by the pipeline and have a dict entry
+  // in both locales.
   for (const key of ['imageBudgetExceeded', 'imageCountExceeded']) {
-    assert.ok(src.includes(`'${key}'`), `sidepanel must call tSub('${key}', …)`);
+    assert.ok(mod.includes(`'${key}'`), `image-drop must call tSub('${key}', …)`);
   }
   const en = JSON.parse(await readFile(new URL('../_locales/en/messages.json', import.meta.url), 'utf8'));
   const zh = JSON.parse(await readFile(new URL('../_locales/zh_CN/messages.json', import.meta.url), 'utf8'));

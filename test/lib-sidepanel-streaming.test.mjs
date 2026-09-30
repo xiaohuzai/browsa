@@ -220,3 +220,114 @@ test('TS_STATUS (auto timestamp-rewrite) shows a transient status before the bub
   assert.doesNotMatch(assistantEl.innerHTML, /正在补充时间戳/,
     'TS_STATUS must not leak into the bubble as rendered tool history');
 });
+
+// ─── 收尸记账（P0 wrong-delete fix, 2026-09-30 批A）─────────────────────────────
+// Stop/中止时后台把已流出的部分文本以 interrupted 条目落库（chat-handler 的
+// AbortError catch）。那个条目在 UI 上的化身就是被取消的气泡——气泡必须盖
+// data-hidx，否则存储比镜像长 1（负漂移，reconcile 旧行为判 none 永不修复），
+// 之后每个气泡的戳都低一位，删除/编辑重发全部打中隔壁条目。
+
+test('Stop-with-salvage stamps the cancelled bubble so the hidx mirror stays in sync', async () => {
+  inputEl.value = 'will be stopped mid-reply';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  const userEl = [...messagesEl.querySelectorAll('.msg.user')].pop();
+  const userH = parseInt(userEl.dataset.hidx, 10);
+  assert.ok(Number.isInteger(userH), 'sanity: the user bubble is stamped');
+
+  lastChatPort.emit({ type: 'CHUNK', delta: 'partial text worth salvaging' });
+  await new Promise((r) => setTimeout(r, 30));
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // Stop
+  await new Promise((r) => setTimeout(r, 20));
+
+  const cancelledEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.equal(cancelledEl.dataset.hidx, String(userH + 1),
+    'the salvaged partial reply is a real storage entry — its visible twin must carry the matching hidx');
+
+  // The NEXT send must continue from there — the actual regression: before
+  // the fix this bubble stamped userH+1 (one too low) and deleting it hit
+  // the invisible salvage entry instead of its own.
+  inputEl.value = 'next message after the stop';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  const nextUserEl = [...messagesEl.querySelectorAll('.msg.user')].pop();
+  assert.equal(nextUserEl.dataset.hidx, String(userH + 2),
+    'subsequent sends stamp sequentially — no off-by-one after a salvaged cancel');
+  lastChatPort.emit({ type: 'DONE', full: 'reply after stop' });
+  await new Promise((r) => setTimeout(r, 50));
+});
+
+test('Stop before any chunk leaves the empty bubble UNSTAMPED (mirrors the background\'s `partial` salvage gate)', async () => {
+  inputEl.value = 'stopped before anything streamed';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // Stop, zero chunks
+  await new Promise((r) => setTimeout(r, 20));
+  const cancelledEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.equal(cancelledEl.dataset.hidx, undefined,
+    'nothing streamed → background salvages nothing (its `partial` gate) → no storage twin → no stamp');
+});
+
+test('a background-initiated abort (ERROR ABORTED, salvaged:true) stamps the finalized bubble', async () => {
+  inputEl.value = 'idle-timeout victim';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  const userEl = [...messagesEl.querySelectorAll('.msg.user')].pop();
+  const userH = parseInt(userEl.dataset.hidx, 10);
+  lastChatPort.emit({ type: 'CHUNK', delta: 'some text before the timeout' });
+  await new Promise((r) => setTimeout(r, 30));
+  // 后台发起的中止（空闲超时/网络断）：端口还连着，ERROR ABORTED 真的会送达。
+  lastChatPort.emit({ type: 'ERROR', error: 'cancelled', code: 'ABORTED', salvaged: true });
+  await new Promise((r) => setTimeout(r, 60));
+  const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.match(el.textContent, /cancelled/, 'the bubble finalizes with the cancelled marker');
+  assert.equal(el.dataset.hidx, String(userH + 1), 'the salvage entry has a visible twin — stamp it');
+});
+
+test('ERROR ABORTED without salvaged leaves the bubble unstamped (nothing was stored)', async () => {
+  inputEl.value = 'aborted with nothing to salvage';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  lastChatPort.emit({ type: 'ERROR', error: 'cancelled', code: 'ABORTED' });
+  await new Promise((r) => setTimeout(r, 60));
+  const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  assert.equal(el.dataset.hidx, undefined, 'no salvage → no storage entry → no stamp');
+});
+
+// ─── 流的 tabId 归属（cancel/REASSIGN 打错键修复）──────────────────────────────
+
+test('cancel aborts the stream\'s OWN tab: STREAM_ABORT carries the same tabId as CHAT', async () => {
+  const sent = [];
+  const prev = sendMessageHandler;
+  sendMessageHandler = async (msg) => { sent.push(msg); return prev(msg); };
+  try {
+    inputEl.value = 'abort tab consistency';
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 50));
+    lastChatPort.emit({ type: 'CHUNK', delta: 'x' });
+    await new Promise((r) => setTimeout(r, 20));
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // Stop
+    await new Promise((r) => setTimeout(r, 20));
+    const chat = sent.find((m) => m.type === 'CHAT');
+    const abort = sent.find((m) => m.type === 'STREAM_ABORT');
+    assert.ok(chat, 'sanity: CHAT was sent');
+    assert.ok(abort, 'sanity: STREAM_ABORT was sent');
+    assert.equal(abort.tabId, chat.tabId,
+      'the abort must target the tab the stream is keyed by — aborting the LIVE currentTabId no-ops after a tab switch (server keeps burning tokens)');
+    assert.equal(abort.salvage, true, 'default cancel salvages the partial');
+  } finally {
+    sendMessageHandler = prev;
+  }
+});
+
+test('source pin: stream-addressing sites use the stream\'s tabId, never bare currentTabId', async () => {
+  const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
+  assert.match(src, /const streamTabId = activeController\.tabId \?\? currentTabId;/,
+    'cancelStream resolves the stream tab off the controller');
+  assert.match(src, /sendMessage\(\{ type: 'STREAM_ABORT', tabId: streamTabId, salvage \}\)/);
+  assert.match(src, /function streamTabIdOf\(\) \{ return activeController\?\.tabId \?\? currentTabId; \}/,
+    'REASSIGN callers share one resolver');
+  assert.match(src, /type: 'REASSIGN_STREAM_SESSION', tabId: streamTabIdOf\(\)/);
+  assert.doesNotMatch(src, /type: 'STREAM_ABORT', tabId: currentTabId/,
+    'the bare-currentTabId abort shape must never come back');
+});

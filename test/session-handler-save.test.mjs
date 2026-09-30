@@ -24,6 +24,10 @@ function makeStorageArea() {
     async set(obj) {
       store = { ...store, ...obj };
     },
+    async remove(keys) {
+      const list = Array.isArray(keys) ? keys : [keys];
+      for (const k of list) delete store[k];
+    },
     _reset() { store = {}; },
     _dump() { return store; }
   };

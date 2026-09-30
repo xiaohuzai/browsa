@@ -24,7 +24,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
 <p align="center">
-  <img src="docs/assets/readme/demo-v7.gif" alt="browsa 演示：附页提问、选中一句就地追问、划词即答、视频可点击时间线，图表与蛋白质 3D 结构直接长在回复里" width="720" />
+  <img src="docs/assets/readme/demo-v8.gif" alt="browsa 演示：附页提问、选中一句就地追问、划词即答、视频可点击时间线，图表与蛋白质 3D 结构直接长在回复里" width="720" />
 </p>
 <p align="center">
   <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 观看 60 秒完整演示</strong></a> · <a href="https://www.youtube.com/watch?v=rDBK2Xxvf2I">YouTube</a> — 附页问答 · 追问线程 · 划词工具条 · 视频时间线 · 图表与 3D · Agent 审批
@@ -279,7 +279,7 @@ opensquilla gateway start
 | **Markdown 渲染与高亮** | 完整 GFM（表格、代码块、列表）；40+ 种语言（highlight.js）；`diff` 代码块 `+` 标绿 / `-` 标红 |
 | **你输入的代码也会渲染** | 在输入框贴一段 ``` 围栏代码，你自己的气泡里就是带高亮和复制按钮的代码块；不写语言标签也能自动检测。消息里的其他文字逐字保持原样——你写的内容不会被再解释一遍 |
 | **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿 |
-| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` 代码块内联渲染，各带缩放/复制/导出 SVG 工具栏；直接说要一张图表或思维导图——模型懂这个格式。Mermaid 解析失败时，一键让 AI 修复重绘——修复后的图先经本地解析校验再替换 |
+| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` 代码块内联渲染，各带缩放/复制/导出 PNG 工具栏；直接说要一张图表或思维导图——模型懂这个格式。Mermaid 解析失败时，一键让 AI 修复重绘——修复后的图先经本地解析校验再替换 |
 | **分子式 · 蛋白质 · 关系图** | ` ```smiles ` / ` ```pdb ` / ` ```dot ` 代码块同样内联实时渲染——2D 结构式与化学反应式由 RDKit 绘制并附分子性质条（分子量、logP、TPSA、氢键供体/受体；化学上不成立的结构直接判废、保留原文），按 PDB ID 或 AlphaFold ID 交互查看蛋白质 3D 结构（Mol* 查看器：悬停即出残基信息、自带序列条、AlphaFold 模型按 pLDDT 置信度着色）、Graphviz DOT 架构图（神经网络、数据流、依赖关系）；各带复制/导出工具栏 |
 | **追问（Follow-up）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调；可直接粘贴图片，与主输入框一致；输入框 ↑/↓ 只召回追问里发过的问题；引用里的公式照常渲染成公式 |
 | **大纲导航** | 对话满 4 轮后出现刻度导航条——点击跳转、悬停预览 |

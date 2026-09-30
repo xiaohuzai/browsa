@@ -220,6 +220,25 @@ test('transcribeAudio: POSTs stream:true with input_audio.file_id and accumulate
   delete globalThis.fetch;
 });
 
+test('transcribeAudio: a delta JSON split across multiple data: lines survives (SSE spec join)', async () => {
+  // SSE 规范：一个事件的多条 data: 行 = 同一负载按 \n 连接。旧的逐行
+  // JSON.parse 对每个片段单独解析、各自失败 → 整个事件被静默丢掉 → 少的
+  // 正是一句字幕。收敛到 llm-client 的共享 sseDataPayload 后先连再 parse。
+  const SPLIT_DELTA = 'data: {"type":"response.output_text.delta",\ndata: "delta":"[00:01] 第二句。"}\n\n';
+  globalThis.fetch = async () => makeSseResponse(SSE_DELTA_1, SPLIT_DELTA);
+  const res = await transcribeAudio({
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKey: 'k',
+    fileId: 'file-abc',
+    model: 'doubao-seed-2-1-lite-260915',
+    language: 'auto',
+    idleTimeoutMs: 1000,
+  });
+  assert.ok(res.text.includes('你好'), 'the normal single-line delta still lands');
+  assert.ok(res.text.includes('第二句'), 'the multi-data-line delta must NOT be dropped');
+  delete globalThis.fetch;
+});
+
 test('transcribeAudio: language "auto" omits the concrete hint and asks the model to auto-detect', async () => {
   let body;
   globalThis.fetch = async (url, init) => {
