@@ -189,10 +189,18 @@ Run the gateway **either** as the desktop app **or** from the command line — b
 **Way A — Desktop app (no terminal)**
 
 1. **Install & launch** the OpenSquilla desktop app, v0.5.5 or newer (older builds bundle a gateway whose origin guard doesn't accept extensions). The app starts its own gateway automatically — open the app's settings and note the **gateway URL** it shows (typically `http://127.0.0.1:18791`; it takes the first free port in 18791–18830).
-2. **Let the extension in** — the desktop app does **not** read `~/.opensquilla/config.toml`; it reads a config in its own app-data directory. macOS official package: `~/Library/Application Support/OpenSquilla/opensquilla/config.toml` (a self-built package uses `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml` instead — the two data directories are fully separate). The path contains spaces, so quote it in a terminal, e.g. `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"` — an unquoted path quietly edits a different file. Add:
+2. **Let the extension in** — the desktop app does **not** read `~/.opensquilla/config.toml`; it reads a config in its own app-data directory. The most accurate source is the app itself: **Settings → Advanced → Config file** shows the exact path (with a copy button). Common defaults: macOS official package `~/Library/Application Support/OpenSquilla/opensquilla/config.toml`; self-built package `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml` (the two data directories are fully separate). The path contains spaces — escape them in a terminal (wrap the whole path in quotes, or backslash-escape each space), or the shell splits it at the space and you edit the wrong file:
+
+```bash
+open -e "<paste the path copied from Settings → Advanced → Config file>"   # opens in macOS TextEdit
+```
+
+Add:
 
 ```toml
 [cors]
+# The value below covers the Chrome Web Store build. A sideloaded build
+# (zip / repo folder) has a DIFFERENT extension ID — see the fine print below.
 allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 ```
 
@@ -222,7 +230,7 @@ opensquilla gateway start
 
 **Ping** to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.
 
-Origin-guard fine print (both ways): the listing is an exact string match (`*` does nothing); verify the ID at `chrome://extensions` → browsa → **ID** and use whatever value is shown there if you run an unpacked build. Since v0.5.5 the guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
+Origin-guard fine print (both ways): the listing is an exact string match (`*` does nothing). The snippet value covers the **Chrome Web Store build**; a **sideloaded build has a different ID** — loading the repo folder directly always shows `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn` (pinned by the repo manifest's key), while a build unpacked from the release zip gets an ID derived from its folder path on your machine. Either way, read the live value at `chrome://extensions` → browsa → **ID** and append that origin to the list (multiple entries are fine). Since v0.5.5 the guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
 
 Notes: each browsa conversation maps to one gateway session (gateway-assigned key, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); a huge page (over 60k chars) is uploaded as a `page-context.md` document the agent reads with its own tools. Page figures ride along as image attachments (a text-only router model degrades to text automatically). Pasted screenshots stay in browsa's own history and are not forwarded yet. The reply-language preference is prepended to the message since this protocol has no system-prompt field.
 

@@ -189,10 +189,18 @@ hermes gateway
 **方式 A：桌面版（无需终端）**
 
 1. **安装并启动** OpenSquilla 桌面应用，v0.5.5 或更新（更旧的包内嵌的网关来源守卫不认扩展）。应用会自动拉起自己的网关——打开应用设置，记下它显示的**网关地址**（通常是 `http://127.0.0.1:18791`；自动取 18791–18830 里第一个空闲端口）。
-2. **放行扩展**——桌面版**不读** `~/.opensquilla/config.toml`，读的是自己应用数据目录里的配置。macOS 官方包：`~/Library/Application Support/OpenSquilla/opensquilla/config.toml`（源码自建包则是 `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml`——两套数据完全隔离）。路径里有空格，终端里必须加引号，例如 `vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"`——不加引号会静默编辑到另一个文件去。写入：
+2. **放行扩展**——桌面版**不读** `~/.opensquilla/config.toml`，读的是自己应用数据目录里的配置。最准的入口在应用自己这里：**设置 → 高级 → 配置文件**，直接显示本机 config.toml 的完整路径（带一键复制）。常见默认值：macOS 官方包 `~/Library/Application Support/OpenSquilla/opensquilla/config.toml`；源码自建包 `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml`（两套数据完全隔离）。路径里有空格——终端里必须转义（整条路径包进引号，或每个空格前加反斜杠），否则 shell 会在空格处把路径截断，编辑到错误的文件：
+
+```bash
+open -e "<粘贴 设置 → 高级 → 配置文件 里复制的完整路径>"   # 用 macOS「文本编辑」打开
+```
+
+写入：
 
 ```toml
 [cors]
+# 下面这个值对应 Chrome 商店安装版。解包加载的版本（zip / 仓库目录）扩展 ID
+# 不同——见下方「来源守卫细则」。
 allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 ```
 
@@ -222,7 +230,7 @@ opensquilla gateway start
 
 **点击 Ping 验证**——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。
 
-来源守卫细则（两种方式通用）：白名单是**逐字精确匹配**（`*` 无效）；可在 `chrome://extensions` → browsa → **ID** 核对实际 ID，解包加载请填那里实际显示的值。v0.5.5 起，守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
+来源守卫细则（两种方式通用）：白名单是**逐字精确匹配**（`*` 无效）。上面片段的值对应**商店安装版**；**解包加载的版本 ID 不同**——直接以「加载已解压的扩展程序」加载仓库目录时恒为 `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn`（由仓库 manifest 的 key 字段锁定），从发行 zip 解包加载则按本机解压根目录路径派生（每台机器不同）。无论哪种，以 `chrome://extensions` → browsa → **ID** 实际显示的值为准，把它追加进白名单即可（可并列多条）。v0.5.5 起，守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
 
 说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次，之后就住在网关自己的对话记录里）；超大页面（超过 6 万字符）会作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读。页面插图会以图片附件随行（路由器若选到纯文字模型会自动降级为纯文字）。粘贴的截图保留在 browsa 自己的历史里，暂不转发。此协议没有系统提示词字段，语言偏好以普通指令拼在消息开头。
 

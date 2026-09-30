@@ -133,7 +133,10 @@ agent:
       <p><strong>方式 A：桌面版（无需终端）</strong></p>
       <ol>
         <li><strong>安装并启动</strong> OpenSquilla 桌面应用，v0.5.5 或更新（更旧的包内嵌的网关来源守卫不认扩展）。应用会自动拉起自己的网关——打开应用设置，记下它显示的<strong>网关地址</strong>（通常是 <code>http://127.0.0.1:18791</code>；自动取 18791–18830 里第一个空闲端口）。</li>
-        <li><strong>放行扩展</strong>——桌面版<strong>不读</strong> <code>~/.opensquilla/config.toml</code>，读的是自己应用数据目录里的配置。macOS 官方包：<code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code>（源码自建包则是 <code>~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml</code>——两套数据完全隔离）。路径里有空格，终端里必须加引号（如 <code>vim "$HOME/Library/Application Support/OpenSquilla/opensquilla/config.toml"</code>），否则会静默编辑到另一个文件去。写入：
+        <li><strong>放行扩展</strong>——先找到桌面版实际读的配置文件（桌面版<strong>不读</strong>命令行网关的 <code>~/.opensquilla/config.toml</code>，改错文件是「配了却连不上」的最常见原因）。最准的入口在应用自己这里：<strong>设置 → 高级 → 配置文件</strong>，它直接显示本机 <code>config.toml</code> 的完整路径（带一键复制），以它显示的为准。两个常见默认值：macOS 官方包 <code>~/Library/Application Support/OpenSquilla/opensquilla/config.toml</code>；源码自建包 <code>~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml</code>（两套数据完全隔离）。路径里有空格，终端里必须转义：把整条路径包进引号，或给每个空格前加反斜杠——什么都不加，shell 会在空格处把路径截断（<code>cd</code> 直接报 No such file or directory，<code>vim</code> 会静默打开一个错误的空文件）：
+<pre class="doc-code">open -e "<粘贴 设置 → 高级 → 配置文件 里复制的完整路径>"   # 用 macOS「文本编辑」打开并修改
+cd ~/Library/Application\ Support/    # 不想加引号的进目录写法：空格前加反斜杠（Tab 补全也会自动加）</pre>
+文件不存在就新建一个纯文本文件，写入：
 <pre class="doc-code">[cors]
 allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]</pre></li>
         <li><strong>完全退出并重新打开应用</strong>（只关窗口不算）——网关只在启动时读一次配置。模型 / API key 在应用内配置（引导设置窗口），不读 shell 环境变量。进阶：桌面应用也能挂外部命令行网关——设 <code>OPENSQUILLA_DESKTOP_GATEWAY_URL</code>。</li>
