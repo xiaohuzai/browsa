@@ -72,6 +72,8 @@ flowchart LR
     Y -->|"streamed reply · tool progress · approvals"| B
 ```
 
+A developer-level tour of the codebase — message flow, the rendering pipeline, storage model, providers and agents, ASR, and the security model — lives in the [project wiki](https://github.com/xiaohuzai/browsa/wiki) (bilingual).
+
 ## Install
 
 Choose one installation method:
@@ -377,6 +379,8 @@ Type `/` in the composer to see autocomplete. All commands accept extra instruct
 - **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
 - **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, follow-up each live in `lib/sidepanel/`.
 - **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming clients (`/v1/chat/completions`, Hermes `/v1/runs`, the opencode / agent-bridge agent clients), `chrome.storage.local` wrapper, content scripts.
+
+The [wiki](https://github.com/xiaohuzai/browsa/wiki) expands each of these into a full chapter — Architecture, Rendering Pipeline, Storage Model, Providers and Agents, ASR, Security Model, Design Decisions, Contributing.
 
 </details>
 

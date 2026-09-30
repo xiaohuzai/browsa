@@ -72,6 +72,8 @@ flowchart LR
     Y -->|"流式回复 · 工具进度 · 审批"| B
 ```
 
+面向开发者的代码库导览——消息流、渲染管线、存储模型、Provider 层与 Agent 接入、ASR、安全模型——在[项目 Wiki](https://github.com/xiaohuzai/browsa/wiki)（双语）。
+
 ## 安装
 
 选择一种安装方式即可：
@@ -377,6 +379,8 @@ opensquilla gateway start
 - **`background.js`**——MV3 服务工作线程，单一消息路由器；通过每轮端口流式传输，超大附件自动总结。
 - **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、追问各在 `lib/sidepanel/` 下。
 - **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions`、Hermes `/v1/runs`、opencode / agent-bridge agent 客户端）、`chrome.storage.local` 封装、内容脚本。
+
+[Wiki](https://github.com/xiaohuzai/browsa/wiki) 把每一行展开成整章——架构总览、渲染管线、存储模型、Provider 层与 Agent 接入、ASR 与视听精读、安全模型、设计决策、参与开发。
 
 </details>
 
