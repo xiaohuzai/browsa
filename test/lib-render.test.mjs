@@ -78,6 +78,16 @@ test('fixBoldSpans: trims internal padding models sometimes add ("** text **")',
   assert.equal(fixBoldSpans('**hello **'), '**hello**');
 });
 
+test('fixBoldSpans: \\\\p{S} symbols ($, ×) count as punctuation and ASCII letters/digits count as neighbors (2026-09-30 ∗∗、∗∗ report)', () => {
+  // The report shape: 从**$8K**、**$20K** — plain \\p{P} missed $ (\\p{Sc}) and
+  // the CJK-only neighbor test missed ASCII, so the opener stayed unparseable.
+  assert.equal(fixBoldSpans('从**$8K**涨到**$20K**'), '从 **$8K**涨到 **$20K**');
+  assert.equal(fixBoldSpans('MRR**$8K**'), 'MRR **$8K**');
+  assert.equal(fixBoldSpans('**2.5×**涨到**6×**'), '**2.5×** 涨到**6×**');
+  // Plain-text inners still get no pad, whatever the neighbor alphabet is.
+  assert.equal(fixBoldSpans('MRR**增长**了'), 'MRR**增长**了');
+});
+
 test('fixCjkEmphasisSpacing: never touches ** inside fenced code blocks or inline code', () => {
   const input = '这是 `x**2` 的说明\n\n```python\nx**2  # power\n```\n用一个**"x"**因子';
   const out = fixCjkEmphasisSpacing(input);
@@ -149,6 +159,74 @@ test('renderSafe/renderStreamingSafe still strip javascript: URIs from real href
 test('renderSafe renders $...$ LaTeX via KaTeX', async () => {
   const html = await renderSafe('inline $x^2$ math');
   assert.match(html, /<math/, 'must produce MathML output, not a literal dollar-sign string');
+});
+
+test('renderSafe: bare-dollar bold spans survive intact (2026-09-30 ∗∗、∗∗ report — the $s must not pair into a formula)', async () => {
+  // Model output: 中位 MRR 从**$8K**、**$20K**. The two bare $ used to pair
+  // across the ** and 、, KaTeX rendered the *s as ∗ (U+2217) math glyphs and
+  // the bubble showed "8K∗∗、∗∗8K**、**20K". Pandoc's digit-after-closer rule
+  // rejects the pairing; fixBoldSpans then makes both bolds parse.
+  const html = await renderSafe('中位 MRR 从**$8K**、**$20K**');
+  assert.doesNotMatch(html, /katex-error/);
+  assert.ok(!html.includes('∗'), 'no math-mode asterisk glyphs (U+2217) may appear');
+  assert.doesNotMatch(html, /\*\*/, 'no literal ** may remain');
+  assert.equal((html.match(/<strong>/g) || []).length, 2, 'both spans render as bold');
+  assert.ok(html.includes('$8K') && html.includes('$20K'));
+});
+
+test('renderSafe: "$5 and $10" money prose never becomes math (Pandoc tightness + digit rules)', async () => {
+  // "5 and " has a space before the closer → rejected; "$10" would also trip
+  // the digit-after-closer rule. Either way both $s stay literal text.
+  const html = await renderSafe('花了 $5 and $10 买材料');
+  assert.doesNotMatch(html, /<math/);
+  assert.doesNotMatch(html, /katex-error/);
+  assert.ok(html.includes('$5 and $10'));
+});
+
+test('renderSafe: spaced formula "$ x^2 $" renders literal (Pandoc tight-opening rule)', async () => {
+  // Deliberate contract change (2026-09-30): loose inline $ delimiters are no
+  // longer math — Pandoc and every prose-heavy pipeline reject them because
+  // they collide with dollar amounts. Tight $...$ is unaffected.
+  const html = await renderSafe('loose $ x^2 $ stays text');
+  assert.doesNotMatch(html, /<math/);
+  assert.ok(html.includes('$ x^2 $'));
+});
+
+test('renderSafe: symbol-punctuation bold adjacent to CJK still parses (**2.5×**涨到)', async () => {
+  const html = await renderSafe('硬科技占比从**2.5×**涨到**6×**');
+  assert.doesNotMatch(html, /\*\*/, 'no literal ** may remain');
+  assert.equal((html.match(/<strong>/g) || []).length, 2);
+});
+
+test('renderSafe: markdown-escaped dollars (\\$) are literal currency, never math delimiters (2026-09-30 MRR table report)', async () => {
+  // Verbatim shape from the field report: \$8K and \$20K share one table row,
+  // so their two $ used to pair into the invalid formula "8K | \" — KaTeX
+  // throwOnError:false echoed it as a red .katex-error and the leftover \
+  // + 20K rendered around it ("\8K | \20K").
+  const md = [
+    '| 指标 | 过去 | 现在 | 变化 |',
+    '|---|---|---|---|',
+    '| 批次结束时中位 MRR | \\$8K | \\$20K | $2.5\\times$ |',
+    '| 从 0 到七位数年收入 | 约 18 个月 | 约 3 个月（批次内） | 约 $6\\times$ 更快 |',
+  ].join('\n');
+  const html = await renderSafe(md);
+  assert.doesNotMatch(html, /katex-error/, 'escaped dollars must not pair into a broken formula');
+  assert.ok(html.includes('$8K'), `literal $8K must survive, got: ${html}`);
+  assert.ok(html.includes('$20K'), 'literal $20K must survive');
+  assert.match(html, /<math/, 'the real $2.5\\times$ formula must still render as math');
+  assert.match(html, /<math/, 'the $6\\times$ formula must still render as math');
+});
+
+test('renderSafe: \\\\ before a real delimiter is an escaped backslash, the $ after it still opens math', async () => {
+  const html = await renderSafe('\\\\$x^2$');
+  assert.doesNotMatch(html, /katex-error/);
+  assert.match(html, /<math/);
+});
+
+test('renderSafe: \\\\ inside $...$ (matrix row separator) stays part of the formula', async () => {
+  const html = await renderSafe('$\\begin{matrix}1\\\\2\\end{matrix}$');
+  assert.doesNotMatch(html, /katex-error/, 'the \\\\ guard must not split a formula containing \\\\');
+  assert.match(html, /<math/);
 });
 
 test('renderSafe extracts <think> blocks into a collapsible <details class="think-block">', async () => {
