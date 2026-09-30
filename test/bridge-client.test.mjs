@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { bridgeStream, pingBridge, respondBridgeApproval, normalizeBridgeUrl } = await import('../lib/bridge-client.js');
+const { bridgeStream, pingBridge, respondBridgeApproval, renameBridgeSession, normalizeBridgeUrl } = await import('../lib/bridge-client.js');
 
 function sseResponse(chunks, { status = 200 } = {}) {
   const encoder = new TextEncoder();
@@ -205,4 +205,33 @@ test('bridgeStream: images ride in the POST body; junk filtered; >8 sliced; omit
   await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 'q', images: [] });
   body = JSON.parse(calls[0].opts.body);
   assert.deepEqual(body, { text: 'q' });
+});
+
+// ─── 跨入口接力：renameBridgeSession（2026-10-01） ──────────────────────────────
+
+test('renameBridgeSession: POSTs /threads/:id/title with the bearer key, returns {ok,status}', async () => {
+  let calls;
+  calls = captureFetch((url, opts) => new Response('{}', { status: 200 }));
+  const r = await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', apiKey: 'sk-b', sessionId: 'thr-1', title: 'browsa：你好' });
+  assert.deepEqual(r, { ok: true, status: 200 });
+  assert.equal(calls[0].url, 'http://127.0.0.1:3948/threads/thr-1/title');
+  assert.equal(calls[0].opts.method, 'POST');
+  assert.equal(calls[0].opts.headers.Authorization, 'Bearer sk-b');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { title: 'browsa：你好' });
+});
+
+test('renameBridgeSession: 501 (agent without a rename channel) is a PERMANENT answer, not a throw', async () => {
+  captureFetch(() => new Response('unsupported', { status: 501 }));
+  const r = await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: 'thr-1', title: 'x' });
+  assert.deepEqual(r, { ok: false, status: 501 });
+});
+
+test('renameBridgeSession: transport failure → status 0 (caller retries next turn); missing args → no call', async () => {
+  captureFetch(() => { throw new Error('down'); });
+  assert.deepEqual(await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: 't', title: 'x' }), { ok: false, status: 0 });
+  let calls;
+  calls = captureFetch(() => new Response('{}', { status: 200 }));
+  await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: '', title: 'x' });
+  await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: 't', title: '' });
+  assert.equal(calls.length, 0, 'no fetch without sessionId AND title');
 });

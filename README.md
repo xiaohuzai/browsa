@@ -116,6 +116,8 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 - **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
+Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer.
+
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>…)</summary>
 

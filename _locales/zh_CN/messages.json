@@ -660,7 +660,7 @@
     "description": "Options: OpenSquilla gateway setup tip"
   },
   "bridgeTip": {
-    "message": "本地桥的安装与启动见 <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge 文档</a>。一行填一个桥地址。",
+    "message": "本地桥的安装与启动见 <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge 文档</a>。一行填一个桥地址。API Key 仅当桥配置了 apiKey 时才需要——本机回环地址上的无钥桥会忽略此栏（填错也能连通）。",
     "description": "Options: agent-bridge setup tip"
   },
   "bridgeKeyPlaceholder": {
@@ -1573,5 +1573,17 @@
   "chipAttachedAsr": {
     "message": "📎 已附加 $1：\"$2\"（$3）",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "Agent 会话",
+    "description": "会话抽屉里的 agent 侧会话行"
+  },
+  "agentSessionCopy": {
+    "message": "复制会话 ID",
+    "description": "复制 agent 侧会话 ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "复制失败",
+    "description": "剪贴板失败提示"
   }
 }

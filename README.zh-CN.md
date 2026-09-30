@@ -116,6 +116,8 @@ npm run package      # → browsa-v<version>.zip
 - **Agent Provider（智能体）**——完整的智能体后端，在服务端执行工具（bash、文件操作、联网搜索……）。AI 真的能*做事*。
 - **LLM Provider（纯语言模型）**——仅用于对话的聊天端点。需填写模型 ID。
 
+与智能体的对话本体保存在智能体一侧：browsa 会自动给会话命名（「browsa：」+ 你的第一条消息），在智能体自己的界面里按名字就能找到它接着聊；会话 ID 在会话抽屉顶部随时可查、可复制。
+
 <details>
 <summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>…）</summary>
 

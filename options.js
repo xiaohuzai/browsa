@@ -23,6 +23,10 @@ const statusEl = $('status');
 // Stroke-style SVG (matches sidepanel.js's ICONS.close) used instead of the
 // "✕" emoji-range glyph so it renders identically across OS/font.
 const ICON_CLOSE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+// 14px twin for the bridge-row remove button: at 11px the stroke all but
+// vanishes next to the ⟳ text glyph (2026-10-01 user report — the ✕ was
+// effectively invisible on the bridge card rows).
+const ICON_CLOSE_14 = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 
 // Template for a freshly-added LLM provider card (user fills in url/key/
 // model/alias and picks the protocol, then hits Save).
@@ -432,7 +436,7 @@ function bridgeRowHtml(url, alias, apiKey, state = '') {
         <input data-bridge-url type="text" value="${escapeAttr(url)}" placeholder="http://127.0.0.1:3948" />
         <span class="bridge-dot${state ? ' ' + state : ''}" data-bridge-dot title="${dotTitle}"></span>
         <button type="button" class="bridge-row-ping" data-act="bridge-row-ping" title="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}" aria-label="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}">⟳</button>
-        <button type="button" class="bridge-row-x" data-act="bridge-remove" title="${_t('bridgeRemoveTitle', '移除此地址')}" aria-label="${_t('bridgeRemoveTitle', '移除此地址')}">${ICON_CLOSE}</button>
+        <button type="button" class="bridge-row-x" data-act="bridge-remove" title="${_t('bridgeRemoveTitle', '移除此地址')}" aria-label="${_t('bridgeRemoveTitle', '移除此地址')}">${ICON_CLOSE_14}</button>
       </div>
       <div class="bridge-row-sub">
         <input data-bridge-alias type="text" value="${escapeAttr(alias)}" placeholder="${_t('bridgeAliasPlaceholder', '别名（留空，Ping 后自动发现）')}" />
@@ -540,7 +544,7 @@ function buildProviderCard(name, cfg, opts = {}) {
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
   const agentBaseUrlTip = !isAgent ? '' : cfg.isBridge
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。')}</span></span>`
+    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。API Key 仅当桥配置了 apiKey 时才需要——本机回环地址上的无钥桥会忽略此栏（填错也能连通）。')}</span></span>`
     : cfg.isOpencode
     ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : cfg.isSquilla

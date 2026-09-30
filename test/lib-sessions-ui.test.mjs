@@ -76,7 +76,7 @@ globalThis.chrome = {
 
 const {
   initSessionsUI, getSessionsDrawer, openSessionsDrawer, closeSessionsDrawer,
-  onSessionSearch, clearAllSessions, loadSession
+  onSessionSearch, clearAllSessions, loadSession, renderSessionsList
 } = await import('../lib/sidepanel/sessions-ui.js');
 
 const deps = {
@@ -87,6 +87,7 @@ const deps = {
   stoppedWatching: false,
   cancelledDrop: false,
   resumed: false,
+  agentSessionInfo: null,
 };
 initSessionsUI({
   isStreaming: () => deps.streaming,
@@ -97,12 +98,14 @@ initSessionsUI({
   renderHistory: async () => { deps.renderHistoryCalled++; },
   scrollToBottom: (force) => { deps.scrollForced = force; },
   clearPendingImages: () => { deps.imagesCleared = true; },
+  getAgentSessionInfo: async () => deps.agentSessionInfo,
 });
 
 function setupDom() {
   sentMessages.length = 0;
   deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
   deps.streaming = false; deps.stoppedWatching = false; deps.cancelledDrop = false; deps.resumed = false;
+  deps.agentSessionInfo = null;
   localStore = {}; // 归属指针等 local 键随用例复位
   loadSessionOk = true;
   saveSessionFails = false;
@@ -113,6 +116,7 @@ function setupDom() {
   document.body.innerHTML = `
     <div id="sessions-drawer" hidden>
       <input class="sessions-search" />
+      <div id="agent-session-line" class="agent-session-line" hidden></div>
       <div id="sessions-list"></div>
     </div>`;
 }
@@ -318,4 +322,24 @@ test('loadSession surfaces a missing session instead of faking success (B5)', as
   assert.equal(localStore.activeSessionId, 's1', 'identity pointer must not move');
   assert.equal(getSessionsDrawer().hidden, false, 'drawer must stay open so the user can pick another');
   loadSessionOk = true;
+});
+
+// ─── 跨入口接力：会话抽屉的「Agent 会话」行（2026-10-01） ──────────────────────
+
+test('agent-session line: shows the current provider session id with a copy button when one exists', async () => {
+  deps.agentSessionInfo = { id: 'abcd1234-5678-90ab-cdef-ghijklmnop', label: 'Hermes Agent' };
+  await renderSessionsList();
+  const line = document.getElementById('agent-session-line');
+  assert.equal(line.hidden, false, 'the line must be visible when the active provider has an agent session');
+  assert.ok(line.querySelector('.agent-session-id'), 'session id element rendered');
+  assert.ok(line.querySelector('.agent-session-copy'), 'copy button rendered');
+  assert.ok(line.querySelector('.agent-session-id').getAttribute('title').includes('abcd1234'), 'full id rides the title attribute');
+});
+
+test('agent-session line: hidden when there is no agent session (LLM provider / fresh install)', async () => {
+  deps.agentSessionInfo = null;
+  await renderSessionsList();
+  const line = document.getElementById('agent-session-line');
+  assert.equal(line.hidden, true, 'the line must hide when the active provider has no agent session');
+  assert.equal(line.innerHTML, '');
 });

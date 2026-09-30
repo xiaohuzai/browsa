@@ -545,6 +545,7 @@ details.provider-group[open] > .provider-group-header::before {
   justify-content: center;
   width: 28px;
   height: 32px;
+  padding: 0; /* global button 6px 14px + border-box zeroes the 28px content box — svgs layout-shrink to w=0 (the invisible ✕), text glyphs merely overflow */
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -583,6 +584,7 @@ details.provider-group[open] > .provider-group-header::before {
   justify-content: center;
   width: 28px;
   height: 32px;
+  padding: 0; /* same zero-content-box trap as .bridge-row-ping */
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -590,6 +592,7 @@ details.provider-group[open] > .provider-group-header::before {
   color: var(--muted);
   transition: border-color 0.15s, color 0.15s;
 }
+.bridge-row .bridge-row-x { color: var(--fg-2, var(--muted)); }
 .bridge-row .bridge-row-x:hover { color: var(--err); border-color: var(--border); }
 .bridge-key-eye {
   background: none;

@@ -748,3 +748,23 @@ test('isContextOverflowError: recognizes the real overflow wordings', async () =
   ];
   for (const msg of no) assert.equal(isContextOverflowError(msg), false, JSON.stringify(msg));
 });
+
+// ─── 跨入口接力（2026-10-01）：hermes 成功路径的会话命名接线 ────────────────────
+test('chat-handler.js wires the agent-session naming into the hermes success path (stay in lockstep)', async () => {
+  const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
+  assert.ok(src.includes("import { titleAgentSessionOnce } from './agent-session-title.js'"),
+    'chat-handler must import the title helper');
+  assert.ok(src.includes('import { runsApiStream, patchHermesSession }'),
+    'patchHermesSession rides the llm-client import');
+  assert.ok(/kind === 'hermes' && turn\.hermesSessionId\) \|\| \(kind === 'bridge' && turn\.bridgeSessionId\)/.test(src),
+    'the naming call must cover hermes AND bridge/codex, gated on a session id');
+  assert.ok(src.includes('renameBridgeSession'),
+    'bridge naming must ride bridge-client renameBridgeSession (daemon /threads/:id/title)');
+  assert.ok(src.includes('resolveBridgeApiKey(provider, endpoint)'),
+    'bridge naming must authenticate with the PER-ENDPOINT key (never another bridge\'s token)');
+  assert.ok(src.includes('userText: msg.userText'),
+    'the title derives from the CURRENT turn user text (first text turn names the session)');
+  assert.ok(src.includes('stampGet: storage.getAgentSessionTitleStamp') && src.includes('stampSet: storage.setAgentSessionTitleStamp'),
+    'stamping must ride the generic storage.session helpers (same lifecycle as the session id)');
+  assert.ok(src.includes('Promise.race'), 'the PATCH await must be raced with a cap so DONE is never hung on a slow endpoint');
+});

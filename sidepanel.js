@@ -199,7 +199,18 @@ async function init() {
     resumeInFlight: () => { resumeInFlightStream(); },
     renderHistory,
     scrollToBottom,
-    clearPendingImages: () => { images.length = 0; refreshImageStrip(); }
+    clearPendingImages: () => { images.length = 0; refreshImageStrip(); },
+    // 跨入口接力（2026-10-01）：会话抽屉的「Agent 会话」行数据源——当前
+    // provider 在 agent 侧的服务端会话 ID（storage.session，键形状由
+    // storage.getAgentSessionInfo 单点持有）。
+    getAgentSessionInfo: async () => {
+      const cfg = await storage.getAll();
+      const name = cfg.activeProvider;
+      const info = await storage.getAgentSessionInfo(name, cfg.providers?.[name]);
+      if (!info) return null;
+      const alias = cfg.providers?.[name]?.alias || name;
+      return { ...info, label: alias };
+    }
   });
   initMultiselect({
     // 批量删除与单条删除共用同一把锁，避免两边的 hidx 平移互相踩。
