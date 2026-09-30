@@ -660,7 +660,7 @@
     "description": "Options: OpenSquilla gateway setup tip"
   },
   "bridgeTip": {
-    "message": "See the <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge docs</a> for installing and running the local bridge. One bridge address per row.",
+    "message": "Install & start the bridge per the <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge docs</a>. One bridge address per row. An API key is only needed when the bridge was configured with one — a keyless bridge on a loopback address ignores this field (a wrong key still pings reachable).",
     "description": "Options: agent-bridge setup tip"
   },
   "bridgeKeyPlaceholder": {
@@ -1573,5 +1573,17 @@
   "chipAttachedAsr": {
     "message": "📎 $1 attached: \"$2\" ($3)",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "Agent session",
+    "description": "Agent-side session line in the sessions drawer"
+  },
+  "agentSessionCopy": {
+    "message": "Copy session ID",
+    "description": "Copy the agent-side session ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "Copy failed",
+    "description": "Clipboard failure notice"
   }
 }
