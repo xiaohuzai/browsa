@@ -50,14 +50,18 @@ test('renderMarkmap regression: a render failure must replace the wrapper actual
   // happens before their own replaceWith. A naive catch block that calls
   // pre.replaceWith(errDiv) here would be a no-op (pre is already detached),
   // silently leaving a broken/empty diagram visible instead of the error UI.
-  assert.match(src, /wrapper\.replaceWith\(errDiv\)/,
+  assert.match(src, /wrapper\.replaceWith\(_diagramErrorCard\('Markmap'/,
     'the catch block must replace the wrapper, not the stale pre reference');
 });
 
-test('renderMarkmap error UI mirrors mermaid\'s: message + copy button + collapsible raw source', () => {
-  assert.match(src, /errDiv\.className = 'markmap-error'/);
-  assert.match(src, /markmap-err-copy/);
-  assert.match(src, /markmap-err-src/);
+test('renderMarkmap error UI is the SHARED diagram error card: message + copy button + collapsible raw source', () => {
+  // 2026-09-30 批B：markmap 手搓的 .markmap-error 卡（硬编码中文按钮）换成
+  // 与 echarts 共享的 _diagramErrorCard（.mermaid-error 样式族 + i18n 的
+  // mermaidCopyCode/mermaidViewSource 键）——错误卡与 mermaid 同构且不再
+  // 在英文界面漏中文。
+  assert.match(src, /_diagramErrorCard\('Markmap', source, e\)/);
+  assert.match(src, /function _diagramErrorCard\(/);
+  assert.match(src, /errDiv\.className = 'mermaid-error'/, 'shared card rides the styled .mermaid-error family');
 });
 
 test('addCodeCopyButtons excludes markmap (alongside our renderer languages) from highlight.js syntax highlighting', () => {
@@ -122,9 +126,12 @@ test('_markmapZoomBy calls mm.rescale() with the RELATIVE factor needed to reach
   assert.doesNotMatch(fnMatch[0], /rescale\(Math/, 'must not call rescale(Math.min/max...) directly — that was the bug');
 });
 
-test('_markmapToolbar reuses _mermaidExportSvg (no duplicate export function) for the export button, passed the wrapper', () => {
+test('_markmapToolbar exports PNG via the shared _exportSvgWrapAsPng (one ↓ = one PNG on all six renderers)', () => {
+  // 2026-09-30 批B 导出统一：mermaid/dot/markmap 的 ↓ 从 SVG 换成带主题
+  // 底色的 PNG（_exportSvgWrapAsPng），与 echarts/smiles/pdb 同一契约。
   const fnMatch = src.match(/function _markmapToolbar\([^)]*\)\s*\{[\s\S]*?\n\}/);
-  assert.match(fnMatch[0], /_mermaidExportSvg\(wrapper\)/);
+  assert.match(fnMatch[0], /_exportSvgWrapAsPng\(wrapper, 'mindmap\.png'\)/);
+  assert.doesNotMatch(fnMatch[0], /_mermaidExportSvg/, 'the SVG-export path is gone');
 });
 
 test('renderMarkmap wires a ResizeObserver to re-fit the mind map on container size changes', () => {

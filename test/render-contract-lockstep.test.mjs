@@ -73,8 +73,12 @@ test('lockstep: pdb viewer is height-resizable and echarts/smiles are resizable'
 });
 
 test('lockstep: renderPdb wires a ResizeObserver to molstar requestResize', () => {
-  assert.match(renderJs, /new ResizeObserver\([\s\S]{0,200}requestResize/, 'the pdb RO must drive canvas3d.requestResize (molstar does not observe its own container)');
-  assert.match(renderJs, /_chartObservers\.add\(ro\)/, 'the pdb RO must ride _chartObservers so renderHistory disposes it');
+  // 2026-09-30 批C：RO 改走共享的 _observeResize（同一注册表 + 每元素
+  // disposer），定向 dispose（删气泡时的 disposeRenderInstancesIn）由此覆盖
+  // pdb viewer。契约不变：molstar 不观察自己的容器，RO 必须驱动
+  // canvas3d.requestResize；全局清扫仍走 _chartObservers。
+  assert.match(renderJs, /_observeResize\(viewerEl,[\s\S]{0,140}requestResize/, 'the pdb RO must drive canvas3d.requestResize (molstar does not observe its own container)');
+  assert.match(renderJs, /_chartObservers\.add\(ro\)/, 'observers must ride _chartObservers so renderHistory disposes them');
 });
 
 // ─── 3. prompt-side contract clauses (each paid for by a field report)

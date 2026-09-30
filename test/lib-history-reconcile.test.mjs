@@ -16,10 +16,15 @@ test('no drift → none', () => {
   );
 });
 
-test('negative drift (storage longer than counter) → none', () => {
+test('negative drift (storage longer than counter) → reset backstop', () => {
+  // 存储比镜像长 = 有条目在面板背后落了库（历史成因：中断收尸的 interrupted
+  // 条目没被盖章——P0 删错条目 bug；源头已由 cancelStream/ERROR-ABORTED 的
+  // 收尸记账修掉）。均匀平移在这里是错的（隐形追加之前盖的戳仍然正确，之后
+  // 的偏低——没有单一偏移量同时适配），所以只重置计数器止血：后续发送的戳
+  // 恢复正确，已错位的戳（若有）经 data.ok 校验退化为 no-op 删除。
   assert.deepEqual(
     planHistoryReconcile({ entries: entries(['a', 'b', 'c']), nextHistoryIdx: 2, anchorH: 0, anchorRaw: 'a' }),
-    { action: 'none' },
+    { action: 'reset', actualLen: 3 },
   );
 });
 

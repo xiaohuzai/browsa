@@ -14,6 +14,7 @@ import {
   activeRunIds, pendingApprovals, pendingClarifications,
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState,
+  recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone,
   STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
@@ -36,7 +37,8 @@ export {
   streamPorts, streamState, chatControllers,
   activeRunIds, pendingApprovals, pendingClarifications,
   subChatControllers, subChatPorts,
-  initStreamState, appendToStreamState, clearStreamState
+  initStreamState, appendToStreamState, clearStreamState,
+  recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone
 };
 import { extractActiveTab } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
@@ -144,6 +146,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!action) return;
 
   selectionCache.set(tab.id, text);
+  syncTabPurgeListener(); // 菜单路径不走 handle()，selectionCache 增长要自己武装 purge 监听
   await relaySelectionAction(tab.id, action, text);
 });
 
@@ -224,7 +227,7 @@ async function runInVideoTab(tabId, url, func, args) {
 
 // 抽取参数里的站点缓存二件套（ATTACH_PAGE 与 GET_PAGE_CONTEXT 各写一份）。
 async function siteCacheCtx(t) {
-  await siteCacheReady; // ensure session-storage restore finished
+  await siteCacheRestorePromise(); // ensure session-storage restore finished (lazy, shared)
   if (typeof t !== 'number') return { xhsXhrNote: null, siteCache: null };
   return { xhsXhrNote: xhsXhrCache.get(t) || null, siteCache: getSiteCache(t) };
 }
@@ -250,6 +253,20 @@ chrome.runtime.onConnect.addListener((port) => {
         // prevents a race where the first LLM chunk arrives before we have
         // the port in our Map.
         try { port.postMessage({ type: 'STREAM_HELLO_ACK' }); } catch (_) {}
+        // PEEK→HELLO resume race (msg.resume is set ONLY by
+        // resumeInFlightStream's HELLO — a fresh-send HELLO arrives BEFORE
+        // its CHAT even started and must never pick up a stale tombstone):
+        // the turn finished inside the handshake window, its DONE/ERROR went
+        // to the old/absent port, and streamState is already cleared. Replay
+        // the tombstoned terminal event so the resuming panel finalizes
+        // instead of spinning forever. The synthetic-DONE net (tombstone
+        // expired — unreachable in practice, the TTL dwarfs the window)
+        // finalizes with the panel's PEEK-seeded acc; the turn is persisted
+        // by then, so the DONE branch's hidxAssign stays correct.
+        if (msg.resume && !streamState.has(claimedTabId)) {
+          const terminal = takeTerminalTombstone(claimedTabId) || { type: 'DONE', full: null, synthetic: true };
+          try { port.postMessage(terminal); } catch (_) {}
+        }
         // NOTE: we deliberately do NOT push a synthetic drain CHUNK
         // from HELLO. The side panel already has the accumulated text
         // from the STREAM_PEEK it called before opening the port —
@@ -400,10 +417,21 @@ function gcStreamState() {
   syncGcAlarm();
 }
 
-// Restore site caches from session storage on every SW startup so that
-// content-script data captured before the SW went to sleep is not lost.
-// Store the promise so message handlers can await it before checking caches.
-const siteCacheReady = restoreSiteCachesFromSession();
+// Restore site caches from session storage LAZILY on first need (2026-09-30
+// 批C): the eager top-level restore ran chrome.storage.session.get(null) —
+// deserializing EVERY cached site payload (video data, articles; hundreds of
+// KB per tab) — on every SW cold start, including wakes for messages that
+// never touch site caches. The first siteCacheCtx() call pays it once; the
+// promise is shared. restoreSiteCachesFromSession also validates tab liveness
+// and prunes dead tabs' sc_* keys (see site-cache-store.js) — that durable
+// cleanup is what lets tabs.onRemoved below be registered on demand.
+let _siteCacheRestore = null;
+function siteCacheRestorePromise() {
+  if (!_siteCacheRestore) {
+    _siteCacheRestore = restoreSiteCachesFromSession().then(() => { syncTabPurgeListener(); });
+  }
+  return _siteCacheRestore;
+}
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === GC_ALARM_NAME) gcStreamState();
   // Fires every 30s while a chat stream is in flight. Waking the service
@@ -434,8 +462,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Every handler is async; return true to keep the channel open.
   (async () => {
     try {
-      const result = await handle(msg, sender);
-      sendResponse({ ok: true, data: result });
+      try {
+        const result = await handle(msg, sender);
+        sendResponse({ ok: true, data: result });
+      } finally {
+        // Any tab-scoped cache this message populated (selectionCache,
+        // SITE_CACHES via recordSiteMessage, xhsXhrCache) must arm the
+        // on-demand tab-purge listener — see syncTabPurgeListener.
+        syncTabPurgeListener();
+      }
     } catch (e) {
       console.error('browsa: handler error', msg?.type, e);
       const code = e?.name || 'Error';
@@ -917,11 +952,17 @@ async function handle(msg, sender) {
       // the conversation the user switched to. The panel detaches its port
       // separately (stop-watching, not cancelling).
       const st = streamState.get(msg.tabId);
-      if (st) {
-        if (msg.sessionId) st.originSessionId = msg.sessionId;
+      // Refuse to background without an origin session: bg routing keys
+      // persistTurnEntry on originSessionId, and an empty origin falls
+      // through to LIVE history — the finished reply would land in whatever
+      // conversation the user just switched TO (the exact cross-conversation
+      // leak bg-gating exists to prevent). reassigned:false tells the caller
+      // to cancel the turn instead of detaching it.
+      if (st && msg.sessionId) {
+        st.originSessionId = msg.sessionId;
         st.bg = true;
       }
-      return { reassigned: !!st };
+      return { reassigned: !!(st && msg.sessionId) };
     }
 
     case 'STREAM_RELEASE': {
@@ -1156,6 +1197,9 @@ function onNavBeforeNavigate(details) {
 
 let navListenersActive = false;
 function syncNavListeners() {
+  // navPorts is also the tab-purge listener's gate input — piggyback the sync
+  // here so all four navPorts mutation sites stay covered without edits.
+  syncTabPurgeListener();
   // Count actual ports, not keys: NAV_FOLLOW can leave an empty Set behind
   // under the tab a panel moved away from.
   let want = false;
@@ -1189,7 +1233,7 @@ const xhsXhrCache    = new Map(); // tabId -> XHS note summary (has special push
 // and onRemoved all iterate this registry automatically.
 // 站点缓存 registry 外迁 lib/handlers/site-cache-store.js（C7）——handle() 的
 // 站点 case 从此只剩路由。
-import { recordSiteMessage, getSiteCache, purgeTab, restoreSiteCachesFromSession } from './lib/handlers/site-cache-store.js';
+import { recordSiteMessage, getSiteCache, purgeTab, restoreSiteCachesFromSession, siteCacheCount } from './lib/handlers/site-cache-store.js';
 
 
 function pushXhsNote(tabId, note) {
@@ -1203,7 +1247,16 @@ function pushXhsNote(tabId, note) {
   console.log(`browsa[bg]: xhs XHR note cached for tab=${tabId} noteId=${note.noteId}`);
 }
 
-chrome.tabs.onRemoved.addListener((tabId) => {
+// tabs.onRemoved is REGISTERED ON DEMAND (2026-09-30 批C, same pattern as
+// syncNavListeners above): a statically registered listener cold-started the
+// SW (644KB module parse) on EVERY tab close in EVERY window just to delete a
+// few Map entries — and after an SW sleep those Maps are empty anyway, so the
+// wake was pure cost. The DURABLE half of the old purge (dead tabs' sc_*
+// session keys) moved into restoreSiteCachesFromSession's liveness validation,
+// which also closed the old purge-vs-restore race: a tab closing while the
+// eager startup restore was in flight used to get its cache RESURRECTED by
+// the restore resolving after the purge.
+function _tabPurgeHandler(tabId) {
   lastNavBroadcast.delete(tabId);
   selectionCache.delete(tabId);
   xhsXhrCache.delete(tabId);
@@ -1220,7 +1273,22 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // without syncNavListeners having run — leaving the webNavigation listeners
   // registered to no-op on every navigation (the exact cost they gate).
   syncNavListeners();
-});
+  syncTabPurgeListener();
+}
+let tabPurgeListenerActive = false;
+function syncTabPurgeListener() {
+  // Needed exactly while any tab-scoped in-memory state exists to purge.
+  // Registration can never lag a growth site by more than one event: every
+  // mutation path (runtime messages, context-menu selections, nav ports,
+  // the lazy site-cache restore) calls this right after writing.
+  const want = navPorts.size > 0 || lastNavBroadcast.size > 0 ||
+    selectionCache.size > 0 || xhsXhrCache.size > 0 || siteCacheCount() > 0;
+  if (want === tabPurgeListenerActive) return;
+  tabPurgeListenerActive = want;
+  try {
+    chrome.tabs.onRemoved[want ? 'addListener' : 'removeListener'](_tabPurgeHandler);
+  } catch (_) { /* test mocks may lack removeListener; real Chrome has both */ }
+}
 
 // Exported for testing. handle() is the switch-based message dispatcher.
 export { handle, withSiteInstructions, withVideoNote };

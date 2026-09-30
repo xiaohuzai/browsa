@@ -7,49 +7,17 @@
     "message": "AI sidebar that chats with the page you're on — articles, videos, PDFs — using your own model or agent. Open source, no account.",
     "description": "Extension description"
   },
-  "openSidebar": {
-    "message": "Open browsa sidebar",
-    "description": "Action button tooltip"
-  },
   "settingsTooltip": {
     "message": "Settings (provider / API key)",
     "description": "Settings button tooltip"
-  },
-  "contextLabel": {
-    "message": "Context:",
-    "description": "Context mode label"
-  },
-  "contextReader": {
-    "message": "Reader",
-    "description": "Mozilla Readability mode"
-  },
-  "contextFull": {
-    "message": "Full",
-    "description": "Full body innerText mode"
-  },
-  "contextSelected": {
-    "message": "Selection",
-    "description": "Selected text mode"
   },
   "contextScreenshot": {
     "message": "Screenshot",
     "description": "Screenshot mode"
   },
-  "autoAttach": {
-    "message": "Auto-attach",
-    "description": "Auto-attach checkbox"
-  },
   "inputPlaceholder": {
     "message": "Ask anything…",
     "description": "Composer placeholder"
-  },
-  "sendButton": {
-    "message": "Send",
-    "description": "Send button"
-  },
-  "noChunks": {
-    "message": "(no chunks received — check Service Worker DevTools)",
-    "description": "Hint when no streaming chunks arrive"
   },
   "quickSummarize": {
     "message": "Summarize",
@@ -252,7 +220,7 @@
     "description": "Error card headline: unknown model class"
   },
   "errTimeout": {
-    "message": "The request timed out.",
+    "message": "The request timed out — try again; if the conversation is very long, start a new one.",
     "description": "Error card headline: timeout class"
   },
   "errNetwork": {
@@ -346,10 +314,6 @@
   "followPlayback": {
     "message": "Jump to playback",
     "description": "Transcript drawer floating pill after manual scroll"
-  },
-  "transcriptEmpty": {
-    "message": "No video timeline in this conversation.",
-    "description": "Transcript drawer empty state"
   },
   "thinkDoneTitle": {
     "message": "Thought process",
@@ -779,10 +743,6 @@
     "message": "disabled",
     "description": "Options: ASR disabled state word"
   },
-  "statusNotSet": {
-    "message": "not set",
-    "description": "Sidepanel: provider dropdown status"
-  },
   "statusReachable": {
     "message": "● reachable",
     "description": "Sidepanel: provider dropdown status"
@@ -822,6 +782,10 @@
   "pdfAttachFailed": {
     "message": "PDF attach failed",
     "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "Screenshot attach failed",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
   },
   "officeAttachFailed": {
     "message": "Document attach failed",
@@ -872,7 +836,7 @@
     "description": "Sidepanel: no active tab error"
   },
   "videoSourceGone": {
-    "message": "Video source is gone — cannot jump.",
+    "message": "The video source is gone — can't seek to it.",
     "description": "Sidepanel: video source gone toast"
   },
   "noTranscriptPosition": {
@@ -900,7 +864,7 @@
     "description": "Sidepanel: reply send failed ($1 = error)"
   },
   "bgStateLost": {
-    "message": "background state lost",
+    "message": "the extension's background page reset — try again",
     "description": "Sidepanel: background state lost fallback"
   },
   "asrModeVideo": {
@@ -1030,10 +994,6 @@
   "mermaidReset": {
     "message": "Reset",
     "description": "Sidepanel: diagram reset title"
-  },
-  "mermaidExportSvg": {
-    "message": "Export SVG",
-    "description": "Sidepanel: mermaid export svg title"
   },
   "mermaidExportPng": {
     "message": "Export PNG",
@@ -1231,6 +1191,10 @@
     "message": "Reply continues in the background and will be saved to its original session",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamCancelledNoOrigin": {
+    "message": "In-progress reply cancelled — its session could not be saved",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
   "sessionActiveDot": {
     "message": "In flight",
     "description": "Sessions drawer: in-flight turn marker on a session row"
@@ -1341,5 +1305,273 @@
   "bridgeRowPingTitle": {
     "message": "Ping just this agent (/health) and update its status dot",
     "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "Failed to load the mind-map module (check the console)",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "Jump to $1",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "Figure $1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "No results",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "Rendering history…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "Downloading video… ($1s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "Downloading video… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "Downloading video… ($1MB downloaded, $2s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "Video download failed: $1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "Uploading $1… (0%)",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "Uploading $1… ($2%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "Uploading $1… ($2MB uploaded, $3s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "$1 upload failed: $2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "video",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "audio",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "Processing",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "Analyzing video",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "Transcribing",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1… ($2s elapsed)",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "Video file processing failed: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "Audio file processing failed: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "Video-analysis output was truncated by the model's cap ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "Video analysis incomplete (last timestamp $1s of a $2s video)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "Video analysis incomplete ($1-minute gap in the timeline: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "Video analysis returned no output",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "~$1MB download",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "This video has no captions. Choose how to parse it:",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "Audio transcription (captions)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "Video analysis (frames + speech)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "fast",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "slow",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "low token use",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "high token use",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "Downloading audio… ($1s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "Downloading audio… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "Downloading audio… ($1MB downloaded, $2s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "Transcoding audio… ($1s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "Uploading audio… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "Uploading audio… ($1MB uploaded, $2s elapsed)",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "ASR transcript was truncated by the model's output cap ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "ASR transcript is incomplete ($1-minute gap in the timeline: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": ", $1 chars",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": ", empty content",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 Attached: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 Screenshot attached: \"$1\"",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": ", $1 pages",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": ", $1 pages may need OCR",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": ", $1 figure$2",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": ", text may have encoding issues",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": ", tables on $1 pages",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 PDF attached: \"$1\" (pdf-text$2)",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 Document attached: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "Bilibili",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "The $1 playback URL expired and auto-refresh failed ($2) — reload the video page, then attach again",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "Choose parse mode…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "Transcribing audio…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "$1 video",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "captions",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "video analysis",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": ", $1MB video",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": ", $1MB audio",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": ", $1 lines of analysis",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": ", $1 caption lines",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": ", $1 screenshots",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "(parsing failed — original captions kept)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "(no captions — video info attached instead)",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 $1 attached: \"$2\" ($3)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
   }
 }

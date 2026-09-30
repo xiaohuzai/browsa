@@ -37,7 +37,7 @@ globalThis.ResizeObserver = class {
   fire() { this.cb(); }
 };
 
-const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, getMolstar, disposeMolstarViewers } = await import('../lib/sidepanel/render.js');
+const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, getMolstar, disposeMolstarViewers, disposeRenderInstancesIn } = await import('../lib/sidepanel/render.js');
 
 // getMolstar caches its promise module-level (correct in the browser — one
 // lib), so the molstar stub must be installed ONCE and shared by every
@@ -426,4 +426,34 @@ test('renderSmiles: chemically invalid reaction → error note, raw block kept',
   assert.equal(document.querySelectorAll('.smiles-block').length, 0, 'no viewer block');
   assert.ok(document.querySelector('.smiles-error'), 'the invalid-structure note is shown');
   assert.ok(document.body.contains(pre), 'the raw source stays readable');
+});
+
+test('disposeRenderInstancesIn: deleting a bubble frees its Mol* viewer without touching the sibling (批C 定向 dispose)', async () => {
+  // 单删/多选/重生成/追问卡关闭都是裸 el.remove()——此前 dispose 只挂在
+  // renderHistory 的全局清扫上，删掉一个 ```pdb 气泡会留下一个持续 rAF 渲染
+  // 的离屏 WebGL context（浏览器上限 ~16 个）。
+  document.body.innerHTML = '';
+  stubState.calls.length = 0;
+  globalThis.fetch = async () => ({ ok: true, text: async () => 'ATOM      1  N   ALA A   1\n' });
+
+  const bubbleA = document.createElement('div'); bubbleA.className = 'msg assistant';
+  const bubbleB = document.createElement('div'); bubbleB.className = 'msg assistant';
+  document.body.append(bubbleA, bubbleB);
+  bubbleA.appendChild(makeFence('pdb', '1UBQ'));
+  await renderPdb(document.body);
+  const viewerA = stubState.lastViewer;
+  bubbleB.appendChild(makeFence('pdb', '1UBQ'));
+  await renderPdb(document.body);
+  const viewerB = stubState.lastViewer;
+  assert.notEqual(viewerA, viewerB, 'two renders create two distinct viewers');
+
+  disposeRenderInstancesIn(bubbleA);
+  bubbleA.remove();
+  assert.ok(viewerA.disposed, "bubble A's viewer is freed the moment its bubble is deleted");
+  assert.equal(viewerB.disposed, false, "the sibling bubble's viewer keeps running");
+
+  // 幂等 + 空作用域安全
+  disposeRenderInstancesIn(bubbleA);
+  disposeRenderInstancesIn(null);
+  delete globalThis.fetch;
 });

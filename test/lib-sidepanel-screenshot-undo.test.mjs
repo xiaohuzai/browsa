@@ -61,6 +61,7 @@ dom.window.HTMLCanvasElement.prototype.getContext = () => fake2dContext;
 
 const sentMessages = [];
 let undoShouldSucceed = true;
+let screenshotConfirmOk = true; // 批A 用例：模拟 ATTACH_SCREENSHOT_CONFIRM 存储失败
 
 globalThis.chrome = {
   tabs: {
@@ -85,7 +86,11 @@ globalThis.chrome = {
       if (msg.type === 'ATTACH_PAGE' && msg.mode === 'screenshot') {
         res = { ok: true, data: { ok: true, ctx: { imageDataUrl: 'data:image/png;base64,fake', meta: { url: 'https://example.com/', title: 'Example Page' } } } };
       }
-      if (msg.type === 'ATTACH_SCREENSHOT_CONFIRM') res = { ok: true };
+      // Real bridge envelope: the handler's { ok, attachId } lives under .data
+      // (attach-confirm-handler returns {ok:true, attachId} / {ok:false, error}).
+      if (msg.type === 'ATTACH_SCREENSHOT_CONFIRM') res = screenshotConfirmOk
+        ? { ok: true, data: { ok: true, attachId: 'shot-1' } }
+        : { ok: true, data: { ok: false, error: 'no imageDataUrl' } };
       // Real bridge envelope: handler's { ok, removedIdx } lives under .data.
       if (msg.type === 'UNDO_ATTACH') res = undoShouldSucceed
         ? { ok: true, data: { ok: true, removedIdx: 0 } }
@@ -155,4 +160,26 @@ test('a failed UNDO_ATTACH leaves both the label and the screenshot preview inta
 
   assert.ok(preview.isConnected, 'a failed undo must not remove the screenshot preview');
   assert.equal(undoBtn.disabled, false, 'the undo button must be re-enabled after a failed attempt');
+});
+
+test('a FAILED ATTACH_SCREENSHOT_CONFIRM shows an error instead of a phantom "已附加截图" chip (批A)', async () => {
+  // 此前 confirm 失败（空 imageDataUrl / storeAttachment 抛 → 内层 ok:false）
+  // 时 UI 仍然无条件挂「📎 已附加截图」chip + 预览——模型上下文里其实什么
+  // 都没有，reload 后气泡消失，attachId undefined 让撤销也失效。PDF/office/
+  // ASR 三个兄弟分支都有 else appendError，截图现在对齐。
+  screenshotConfirmOk = false;
+  try {
+    const before = messagesEl.querySelectorAll('.attach-msg').length;
+    const previewsBefore = messagesEl.querySelectorAll('.screenshot-preview').length;
+    await attachScreenshotAndConfirmFull();
+    assert.equal(messagesEl.querySelectorAll('.attach-msg').length, before,
+      'no phantom attach chip when the storage write failed');
+    assert.equal(messagesEl.querySelectorAll('.screenshot-preview').length, previewsBefore,
+      'no preview bubble for a failed attach');
+    const err = [...messagesEl.querySelectorAll('.msg')].pop();
+    assert.match(err.textContent, /截图附加失败|Screenshot attach failed/i,
+      'the failure must surface as an honest error card');
+  } finally {
+    screenshotConfirmOk = true;
+  }
 });

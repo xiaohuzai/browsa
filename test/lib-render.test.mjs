@@ -539,6 +539,54 @@ test('sanitizeEchartsText leaves plain text (no tags) completely unchanged', () 
   assert.deepEqual(sanitizeEchartsText(option), option);
 });
 
+// ─── 宽表格滚动包裹（2026-09-30 批B）────────────────────────────────────────
+// marked 层的 table renderer 把 <table> 包进 .table-scroll——`pre`/块级公式
+// 早有 overflow-x 容器而表格没有，6+ 列对比表在侧栏宽度下会拖着整个消息区
+// 横向滚动。包在 marked 层 = 流式 commit 与最终渲染两条路都覆盖。
+
+test('renderSafe wraps markdown tables in a .table-scroll container', async () => {
+  const html = await renderSafe('| a | b |\n|---|---|\n| 1 | 2 |');
+  assert.match(html, /<div class="table-scroll"><table/, 'the table must sit inside the scroll wrapper');
+});
+
+test('renderStreamingSafe wraps tables too (streaming commits get the same containment)', () => {
+  const html = renderStreamingSafe('| a | b |\n|---|---|\n| 1 | 2 |');
+  assert.match(html, /<div class="table-scroll"><table/);
+});
+
+// ─── 暗色主题与导出统一（2026-09-30 批B，源码 pin）─────────────────────────────
+
+test('renderEcharts inits with the built-in dark theme and a transparent canvas by default', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
+  assert.match(src, /echartsModule\.init\(container, isDark \? 'dark' : undefined\)/,
+    'dark mode must use echarts\' built-in dark theme — default-theme #333 text is ~2:1 on the dark wrapper');
+  assert.match(src, /!\('backgroundColor' in option\)\) option\.backgroundColor = 'transparent'/,
+    'the canvas stays transparent (wrapper --bg-2 shows through) unless the model picked its own bg');
+  assert.match(src, /_diagramErrorCard\('ECharts', source, e\)/,
+    'a failed chart keeps its raw JSON via the shared error card (was: source destroyed, unstyled message)');
+});
+
+test('renderMarkmap activates the vendor markmap-dark palette in dark mode', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
+  assert.match(src, /wrapper\.classList\.add\('markmap-dark'\)/,
+    'the vendor ships a .markmap-dark override set — without the class, node text is #333-on-dark (~1.7:1)');
+});
+
+test('one ↓ = one themed-backdrop PNG across every SVG renderer; the SVG export path is gone', async () => {
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /_mermaidExportSvg/, 'the SVG-download helper must be fully removed');
+  assert.doesNotMatch(src, /mermaidExportSvg'/, 'no toolbar may reference the dead i18n key');
+  const mermaidTb = src.match(/function _mermaidToolbar\([^)]*\)\s*\{[\s\S]*?\n\}/)[0];
+  assert.match(mermaidTb, /_exportSvgWrapAsPng\(svgWrap, 'diagram\.png'\)/);
+  const pngHelper = src.match(/async function _exportSvgWrapAsPng\([^)]*\)\s*\{[\s\S]*?\n\}/)[0];
+  assert.match(pngHelper, /_rasterizeSvg\(svgEl, \{ bg: dark \? '#16181d' : '#ffffff' \}\)/,
+    'exports bake the CURRENT theme backdrop (same constants as the smiles export)');
+  assert.doesNotMatch(src, /text: 'SVG'/, 'smiles\' extra SVG button is gone — six renderers, one export contract');
+});
+
 test('render.js sanitizes the parsed ECharts option before chart.setOption(), but keeps the raw source for the toolbar', async () => {
   const fs = await import('node:fs/promises');
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');

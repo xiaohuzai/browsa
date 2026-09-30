@@ -312,6 +312,16 @@ body {
   opacity: 1;
   pointer-events: auto;
 }
+/* Touch fallback (2026-09-30): (hover: none) devices have no hover to reveal
+   the actions — Chrome's tap-to-emulate-hover makes them a near-undiscoverable
+   double-tap. Keep them persistently visible there; the occlusion tradeoff
+   documented above only applies to pointer devices. */
+@media (hover: none) {
+  .msg-actions .msg-action-icon {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .msg-action-icon {
   display: flex;
   align-items: center;
@@ -902,6 +912,16 @@ body {
   }
 }
 .msg.assistant pre code { background: transparent; padding: 0; border-radius: 0; color: inherit; border: none; }
+/* Wide tables scroll WITHIN the bubble, never the whole panel: `pre` and
+   block math already had overflow-x containment, tables didn't — a 6+ column
+   comparison table at panel width dragged the entire messages area sideways.
+   The wrapper is emitted by render.js's marked table renderer, so streaming
+   commits and final renders both get it. Narrow tables are visually
+   unchanged (the table keeps width:100% of the wrapper). */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
 .msg.assistant table {
   border-collapse: collapse;
   margin: 0.4em 0;
@@ -1137,14 +1157,6 @@ math[display="block"] {
   height: 380px;
 }
 .markmap-svg { width: 100%; height: 100%; display: block; }
-.markmap-error {
-  color: var(--error);
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
-  border-radius: var(--radius-sm);
-  margin: 4px 0;
-}
 
 /* ─── Code copy button ──────────────────────────────────────────────────────── */
 .code-copy-btn {
@@ -2279,12 +2291,6 @@ code.language-patch .hljs-addition { color: #7ee787; }
   outline-offset: -1px;
   border-radius: var(--radius-sm);
 }
-.transcript-empty {
-  padding: 24px 14px;
-  color: var(--fg-2);
-  font-size: 12px;
-  text-align: center;
-}
 .transcript-follow-pill {
   position: absolute;
   bottom: 14px;
@@ -3041,8 +3047,7 @@ dialog.lightbox-overlay:not([open]) {
   color: var(--error);
   font-family: var(--mono);
 }
-.pdb-status,
-.pdb-error {
+.pdb-status {
   position: absolute;
   inset: auto 0 0 0;
   padding: 4px 8px;
@@ -3051,7 +3056,6 @@ dialog.lightbox-overlay:not([open]) {
   text-align: left;
   pointer-events: none;
 }
-.pdb-error { color: var(--error); }
 /* AlphaFold pLDDT 置信度图例（render.js _plddtLegend）与分子性质条
    （render.js _smilesCaption，RDKit descriptors）：同一 chip 视觉 */
 .pdb-legend,

@@ -163,7 +163,7 @@ test('_findCard finds a card of the given class within the next 4 siblings', () 
 test('_insertCard always inserts directly after the bubble — tool-progress lives before the bubble now, not after', () => {
   const bubble = document.createElement('div');
   // A tool-progress element positioned BEFORE the bubble (its actual position
-  // now — see sidepanel.js's showToolProgress) must not affect where the
+  // now — see turn-chrome.js's showToolProgress) must not affect where the
   // card lands relative to the bubble.
   const tp = document.createElement('div'); tp.className = 'tool-progress';
   const parent = document.createElement('div');

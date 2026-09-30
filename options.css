@@ -355,7 +355,6 @@ details.provider-group[open] > .provider-group-header::before {
   letter-spacing: 0.02em;
   color: var(--muted);
 }
-.row .small { max-width: 180px; }
 
 .row input[type="text"],
 .row input[type="password"],
@@ -386,44 +385,6 @@ details.provider-group[open] > .provider-group-header::before {
 .range-row { display: flex; align-items: center; gap: 10px; }
 .range-row input[type="range"] { flex: 1; }
 .range-val { font-size: 12px; color: var(--muted); width: 36px; }
-
-/* ── Options grid (provider checkboxes) ──────────────────────────────────── */
-.options-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 20px;
-  padding: 4px 0 2px 8px;
-}
-.opt-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  cursor: pointer;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
-  transition: background 0.1s;
-}
-.opt-check:hover { background: var(--border); }
-.opt-check input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin-top: 2px;
-  accent-color: var(--accent);
-  flex-shrink: 0;
-  cursor: pointer;
-}
-.opt-check span {
-  display: flex;
-  flex-direction: column;
-  font-size: 13px;
-  line-height: 1.3;
-  color: var(--fg);
-}
-.opt-check small {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 1px;
-}
 
 /* ── Compact 2-col fields grid (provider cards + ASR card) ─────────────── */
 .fields {
@@ -663,20 +624,6 @@ details.provider-group[open] > .provider-group-header::before {
   align-items: center;
   flex-wrap: wrap;
 }
-.bridge-setup-copy {
-  align-self: flex-start;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
-  transition: border-color 0.15s, color 0.15s;
-}
-.bridge-setup-copy:hover { border-color: var(--border-strong); color: var(--fg); }
-.bridge-setup-copy:disabled { cursor: default; border-color: var(--border-strong); color: var(--fg); }
 
 /* ── API style select (compact) ─────────────────────────────────────────── */
 .provider .row .api-style-select {
@@ -782,43 +729,6 @@ input[type="radio"] { accent-color: var(--accent); }
    slider was the one control left on browser default, clashing with the
    red/gold palette. */
 input[type="range"] { accent-color: var(--accent); }
-
-/* ── Radio group ─────────────────────────────────────────────────────────── */
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.radio-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 11px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.radio-card:hover { border-color: var(--border-strong); }
-.radio-card:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-.radio-card input[type="radio"] {
-  margin-top: 3px;
-  flex-shrink: 0;
-}
-.radio-card strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg);
-}
-.radio-card span {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.45;
-}
 
 /* ── Toggle row ──────────────────────────────────────────────────────────── */
 .toggle-row {

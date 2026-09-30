@@ -7,49 +7,17 @@
     "message": "在侧边栏与当前页面对话——文章、视频、PDF，接你自己的模型或智能体。开源、无账号。",
     "description": "Extension description"
   },
-  "openSidebar": {
-    "message": "打开 browsa 侧边栏",
-    "description": "Action button tooltip"
-  },
   "settingsTooltip": {
     "message": "设置（Provider / API Key）",
     "description": "Settings button tooltip"
-  },
-  "contextLabel": {
-    "message": "上下文：",
-    "description": "Context mode label"
-  },
-  "contextReader": {
-    "message": "正文",
-    "description": "Mozilla Readability mode"
-  },
-  "contextFull": {
-    "message": "全文",
-    "description": "Full body innerText mode"
-  },
-  "contextSelected": {
-    "message": "选中文本",
-    "description": "Selected text mode"
   },
   "contextScreenshot": {
     "message": "截图",
     "description": "Screenshot mode"
   },
-  "autoAttach": {
-    "message": "自动附加",
-    "description": "Auto-attach checkbox"
-  },
   "inputPlaceholder": {
     "message": "问点什么…",
     "description": "Composer placeholder"
-  },
-  "sendButton": {
-    "message": "发送",
-    "description": "Send button"
-  },
-  "noChunks": {
-    "message": "（未收到任何流式数据——请检查 Service Worker DevTools）",
-    "description": "Hint when no streaming chunks arrive"
   },
   "quickSummarize": {
     "message": "总结",
@@ -252,7 +220,7 @@
     "description": "Error card headline: unknown model class"
   },
   "errTimeout": {
-    "message": "请求超时了。",
+    "message": "请求超时了——请重试；对话过长时可新建会话。",
     "description": "Error card headline: timeout class"
   },
   "errNetwork": {
@@ -346,10 +314,6 @@
   "followPlayback": {
     "message": "回到播放位置",
     "description": "Transcript drawer floating pill after manual scroll"
-  },
-  "transcriptEmpty": {
-    "message": "当前会话没有视频时间线。",
-    "description": "Transcript drawer empty state"
   },
   "thinkDoneTitle": {
     "message": "思考过程",
@@ -779,10 +743,6 @@
     "message": "已停用",
     "description": "Options: ASR disabled state word"
   },
-  "statusNotSet": {
-    "message": "未配置",
-    "description": "Sidepanel: provider dropdown status"
-  },
   "statusReachable": {
     "message": "● 可连通",
     "description": "Sidepanel: provider dropdown status"
@@ -822,6 +782,10 @@
   "pdfAttachFailed": {
     "message": "PDF 附加失败",
     "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "截图附加失败",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
   },
   "officeAttachFailed": {
     "message": "文档附加失败",
@@ -900,7 +864,7 @@
     "description": "Sidepanel: reply send failed ($1 = error)"
   },
   "bgStateLost": {
-    "message": "后台状态已丢失",
+    "message": "扩展后台已重置，请重试",
     "description": "Sidepanel: background state lost fallback"
   },
   "asrModeVideo": {
@@ -1030,10 +994,6 @@
   "mermaidReset": {
     "message": "重置",
     "description": "Sidepanel: diagram reset title"
-  },
-  "mermaidExportSvg": {
-    "message": "导出 SVG",
-    "description": "Sidepanel: mermaid export svg title"
   },
   "mermaidExportPng": {
     "message": "导出 PNG",
@@ -1231,6 +1191,10 @@
     "message": "进行中的回复已转入后台，完成后写入原会话",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamCancelledNoOrigin": {
+    "message": "进行中的回复已取消（原会话保存失败）",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
   "sessionActiveDot": {
     "message": "进行中",
     "description": "Sessions drawer: in-flight turn marker on a session row"
@@ -1341,5 +1305,273 @@
   "bridgeRowPingTitle": {
     "message": "只 Ping 这一个 Agent（/health）并更新它的状态点",
     "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "markmap 模块加载失败，请检查控制台",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "跳转到 $1",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "图$1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "无结果",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "正在渲染历史消息…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "下载视频中…（已等待 $1s）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "下载视频中…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "下载视频中…（已下载 $1MB，已等待 $2s）",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "视频下载失败: $1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "上传$1中…（0%）",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "上传$1中…（$2%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "上传$1中…（已上传 $2MB，已等待 $3s）",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "$1上传失败: $2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "视频",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "音频",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "识别处理",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "视听精读",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "转写",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1中…（已等待 $2s）",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "视频文件处理失败: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "音频文件处理失败: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "精读输出被模型上限截断（$1）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "精读不完整（最后时间戳 $1s / 视频 $2s）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "精读不完整（时间轴存在 $1 分钟空窗：$2 → $3）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "精读输出为空",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "下载约 $1MB",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "该视频无字幕。选择解析方式：",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "音频转写（字幕）",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "视频精读（画面＋语音）",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "快",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "慢",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "token 消耗少",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "token 消耗高",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "下载音频中…（已等待 $1s）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "下载音频中…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "下载音频中…（已下载 $1MB，已等待 $2s）",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "转码音频中…（已等待 $1s）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "上传音频中…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "上传音频中…（已上传 $1MB，已等待 $2s）",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "ASR 转写被模型输出上限截断（$1）",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "ASR 转写不完整（时间轴存在 $1 分钟空窗：$2 → $3）",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": "，$1 字符",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": "，内容为空",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 已附加：\"$1\"（$2）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 已附加截图：\"$1\"",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": "，$1 页",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": "，$1 页可能需要 OCR",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": "，$1 张插图",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": "，文本可能存在编码问题",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": "，$1 页含表格",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 已附加 PDF：\"$1\"（pdf-text$2）",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 已附加文档：\"$1\"（$2）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "B站",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "$1播放地址已过期且自动刷新失败（$2）——请刷新视频页面后重新附加",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "选择解析方式…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "转写音频中…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "$1视频",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "字幕",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "视听精读",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": "，$1MB 视频",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": "，$1MB 音频",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": "，$1 行精读",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": "，$1 行字幕",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": "，$1 张截图",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "（解析失败，已保留原字幕）",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "（无字幕，已用视频信息代替）",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 已附加 $1：\"$2\"（$3）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
   }
 }

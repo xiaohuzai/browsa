@@ -180,6 +180,11 @@ test('incremental streaming: a committed prefix is never re-parsed when later te
     assert.equal(p1Parses, p1ParsesAtCommit,
       'committed paragraph 1 must never be re-parsed while paragraph 2 streams');
     assert.ok(!el.textContent.includes('already complete. already complete.'), 'no duplicated content');
+    // Teardown: this test ends MID-STREAM with a large reveal backlog — an
+    // undestroyed pacer keeps revealing (and parsing) into the detached el
+    // during LATER tests, polluting their parse counters (same hygiene rule
+    // as the detail-thread port-teardown gotcha).
+    render.destroy();
     el.remove();
   } finally {
     marked.parse = origParse;
@@ -242,4 +247,81 @@ test('incremental streaming: destroy() mid-stream leaves the revealed text in pl
   render.destroy();
   assert.ok(el.textContent.includes('partial text'), 'destroy does not wipe already-revealed text (caller re-renders)');
   el.remove();
+});
+
+// ─── 开放围栏快路径（2026-09-30 批C）──────────────────────────────────────────
+// 围栏是唯一无界的 tail 块：块级提交期间 committed 钉死在围栏开头，旧实现每帧
+// 把整个围栏重新过 marked+DOMPurify（300 行代码块 ≈ 300KB/s 重解析）——块级
+// 增量化要消灭的 O(n²) 恰好在「流式代码块」这个核心场景复活。快路径把开放
+// 围栏 tail 直接 paint 成 <pre><code>（textContent 构造上免疫 XSS），每帧
+// 成本降为一次字符串赋值；DONE 的全量 renderSafe 仍是最终权威。
+
+test('open-fence tail: painted directly as pre>code with ZERO marked.parse calls per delta', async () => {
+  let parseCalls = 0;
+  const origParse = marked.parse;
+  marked.parse = (s, ...a) => { parseCalls++; return origParse.call(marked, s, ...a); };
+  try {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const render = makeStreamRenderer(el, {});
+    render('intro para\n\n', false);
+    await until(() => el.querySelector('p'), 30000);
+    // intro 已提交；从这里开始的每一个 delta 都是围栏内容——快路径必须 0 parse。
+    render('```js\n', false);
+    // Baseline AFTER the opener is revealed and the fast path is live: the
+    // 1-2 char transition states ('`', '``', trailing '\\n') legitimately
+    // take the normal path — the invariant that matters is the UNBOUNDED
+    // fence BODY streaming with zero re-parse.
+    await until(() => el.querySelector('pre code'), 30000);
+    await tick(60);
+    const baseline = parseCalls;
+    const lines = ['const a = 1;\n', 'const b = <script>alert(1)</script>;\n', 'if (a < b) { go(); }\n', 'const s = "x`y";\n', 'end();\n'];
+    for (const l of lines) {
+      render(l, false);
+      await tick(60);
+    }
+    await until(() => el.querySelector('pre code') && el.querySelector('pre code').textContent.includes('end();'), 30000);
+    assert.equal(parseCalls, baseline, 'every reveal frame while the open fence BODY streams must skip marked.parse entirely');
+    const code = el.querySelector('pre code');
+    assert.equal(code.className, 'language-js', 'info string becomes the language class (marked convention)');
+    assert.ok(code.textContent.includes('const a = 1;'), 'body line 1 present verbatim');
+    assert.ok(code.textContent.includes('<script>alert(1)</script>'), 'raw text via textContent — inert by construction, never parsed as HTML');
+    assert.equal(el.querySelectorAll('script').length, 0, 'no script element may exist');
+    // 可见文本与整段 renderStreamingSafe 一致（尾随空白除外）
+    const whole = renderStreamingSafe('intro para\n\n```js\n' + lines.join(''));
+    const strip = (h) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    assert.equal(strip(el.innerHTML), strip(whole), 'mid-stream text equals a whole-text streaming parse');
+    render.destroy(); // ends mid-stream — never leave a pacer revealing into later tests
+    el.remove();
+  } finally {
+    marked.parse = origParse;
+  }
+});
+
+test('closing the fence hands the block back to the normal commit path (parse resumes, paragraph after fence commits)', async () => {
+  let parseCalls = 0;
+  const origParse = marked.parse;
+  marked.parse = (s, ...a) => { parseCalls++; return origParse.call(marked, s, ...a); };
+  try {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const render = makeStreamRenderer(el, {});
+    render('```py\nprint(1)\n', false);
+    await tick(60);
+    const duringFence = parseCalls;
+    render('```\n\nafter the fence\n', false);
+    await until(() => el.textContent.includes('after the fence'), 30000);
+    assert.ok(parseCalls > duringFence, 'the closed fence + following paragraph commit through marked');
+    assert.ok(el.querySelector('pre code'), 'the code block is in the committed DOM');
+    const p = [...el.querySelectorAll('p')].find((p) => p.textContent.includes('after the fence'));
+    assert.ok(p, 'the paragraph after the fence renders as its own block');
+    // DONE: full renderSafe replaces everything with the definitive render.
+    await render('```py\nprint(1)\n```\n\nafter the fence\n', true);
+    await tick(20);
+    assert.ok(el.classList.contains('done'));
+    assert.ok(el.querySelector('pre code'));
+    el.remove();
+  } finally {
+    marked.parse = origParse;
+  }
 });
