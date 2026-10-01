@@ -100,8 +100,8 @@
     "description": "Multiselect toggle tooltip"
   },
   "newChatTitle": {
-    "message": "新建对话 (Ctrl+K)",
-    "description": "Clear/new chat button tooltip"
+    "message": "清空消息 (Ctrl+K)",
+    "description": "Clear messages button tooltip"
   },
   "attachTitle": {
     "message": "把当前页面附加进对话",

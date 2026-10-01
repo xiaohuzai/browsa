@@ -100,8 +100,8 @@
     "description": "Multiselect toggle tooltip"
   },
   "newChatTitle": {
-    "message": "新しい会話 (Ctrl+K)",
-    "description": "Clear/new chat button tooltip"
+    "message": "メッセージを消去 (Ctrl+K)",
+    "description": "Clear messages button tooltip"
   },
   "attachTitle": {
     "message": "現在のページを会話に添付",

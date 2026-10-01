@@ -100,8 +100,8 @@
     "description": "Multiselect toggle tooltip"
   },
   "newChatTitle": {
-    "message": "Новый диалог (Ctrl+K)",
-    "description": "Clear/new chat button tooltip"
+    "message": "Очистить сообщения (Ctrl+K)",
+    "description": "Clear messages button tooltip"
   },
   "attachTitle": {
     "message": "Прикрепить текущую страницу к диалогу",

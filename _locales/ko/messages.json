@@ -100,8 +100,8 @@
     "description": "Multiselect toggle tooltip"
   },
   "newChatTitle": {
-    "message": "새 대화 (Ctrl+K)",
-    "description": "Clear/new chat button tooltip"
+    "message": "메시지 지우기 (Ctrl+K)",
+    "description": "Clear messages button tooltip"
   },
   "attachTitle": {
     "message": "현재 페이지를 대화에 첨부",

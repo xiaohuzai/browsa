@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>会话与整理 · browsa 指南</title>
-<meta name="description" content="保存与恢复命名会话、置顶与重命名、导出 Markdown、全文搜索、批量删除与可撤销清空；输入历史与草稿。">
+<meta name="description" content="保存与恢复命名会话、置顶与重命名、导出 Markdown、全文搜索、批量删除与清空确认；输入历史与草稿。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <link rel="stylesheet" href="../docs.css">
@@ -86,7 +86,7 @@
         <li>消息支持<strong>多选批量删除</strong>；</li>
         <li>会话删除是<strong>两步确认</strong>：点一下进入待删状态，再点一下才真删（Ctrl/Cmd+点击可跳过）；</li>
         <li>置顶、重命名或删除失败时会显示原因，保留原状态，方便重试；</li>
-        <li><kbd>Ctrl+K</kbd> 清空当前历史，<strong>5 秒内可撤销</strong>。</li>
+        <li>输入区的<strong>垃圾桶按钮</strong>或 <kbd>Ctrl+K</kbd> 清空当前消息，<strong>确认后才会执行，执行后不可撤销</strong>。</li>
       </ul>
 
       <h2>输入也讲效率</h2>

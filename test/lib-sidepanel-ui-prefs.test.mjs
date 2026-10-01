@@ -30,11 +30,13 @@ globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
 let lastChatPort = null;
 const storageSetCalls = [];
+const runtimeCalls = [];
 
 globalThis.chrome = makeSidepanelChromeMock({
   onConnect: (name, port) => { if (name === 'browsa-chat') lastChatPort = port; },
   storageLocalSet: async (obj) => { storageSetCalls.push(obj); },
   sendMessage: wireSendMessage((msg) => {
+    runtimeCalls.push(msg);
     if (msg.type === 'GET_CONFIG') return { data: { quickbarCollapsed: true } };
     if (msg.type === 'STREAM_PEEK') return { inFlight: false };
     return { ok: true };
@@ -132,4 +134,73 @@ test('message copy fallback (no dataset.raw) must not carry panel chrome like th
   assert.ok(!clipboardText.includes('Copy') && !clipboardText.includes('复制'), 'code-copy button label must not leak');
   assert.ok(!/\d{1,2}:\d{2}/.test(clipboardText.replace(/const x = 1;/, '')), 'no timestamp chip text');
   assert.ok(!clipboardText.includes('t/s'), 'no token-usage chip text');
+});
+
+// A small reviewed artwork baseline is intentional here: behavioral tests
+// cannot tell that a chat-plus silhouette falsely promises a new conversation.
+// Ignore size so legitimate scaling doesn't require replacing the baseline.
+test('clear messages keeps the approved trash artwork, not a new-conversation icon', async () => {
+  const expected = await readFile(new URL('./fixtures/clear-messages.svg', import.meta.url), 'utf8');
+  const template = document.createElement('template');
+  template.innerHTML = expected;
+  const signature = (svg) => {
+    const copy = svg.cloneNode(true);
+    copy.removeAttribute('width');
+    copy.removeAttribute('height');
+    return copy.outerHTML;
+  };
+  const svg = document.querySelector('#clear svg');
+  assert.ok(svg, 'clear messages has a visible icon');
+  assert.equal(svg.getAttribute('aria-hidden'), 'true');
+  assert.equal(signature(svg), signature(template.content.querySelector('svg')),
+    'changing this reviewed destructive-action artwork requires a semantic design review');
+});
+
+test('clear messages exposes a clear-action name in every supported language', async () => {
+  const { applyI18n } = await import('../lib/i18n.js');
+  const expected = {
+    en: 'Clear messages (Ctrl+K)', zh_CN: '清空消息 (Ctrl+K)',
+    ja: 'メッセージを消去 (Ctrl+K)', ko: '메시지 지우기 (Ctrl+K)',
+    es: 'Borrar mensajes (Ctrl+K)', pt_BR: 'Limpar mensagens (Ctrl+K)',
+    ru: 'Очистить сообщения (Ctrl+K)',
+  };
+  const button = document.getElementById('clear');
+  const previous = chrome.i18n;
+  try {
+    for (const [dir, label] of Object.entries(expected)) {
+      const dict = JSON.parse(await readFile(new URL(`../_locales/${dir}/messages.json`, import.meta.url), 'utf8'));
+      chrome.i18n = { getMessage: (key) => dict[key]?.message || '' };
+      button.removeAttribute('title');
+      button.removeAttribute('aria-label');
+      applyI18n(document);
+      assert.equal(button.title, label, `${dir}: tooltip must describe clearing`);
+      assert.equal(button.getAttribute('aria-label'), label, `${dir}: accessible name must describe clearing`);
+    }
+  } finally {
+    chrome.i18n = previous;
+  }
+});
+
+test('clear messages preserves the conversation until explicit confirmation', async () => {
+  const button = document.getElementById('clear');
+  const before = messagesEl.innerHTML;
+  assert.ok(messagesEl.querySelector('.msg'), 'use a real rendered conversation');
+  runtimeCalls.length = 0;
+  button.click();
+  const first = document.querySelector('.confirm-modal');
+  assert.ok(first, 'click opens a destructive-action confirmation');
+  assert.equal(first.querySelector('.confirm-title').textContent, 'Clear conversation');
+  assert.equal(first.querySelector('.confirm-msg').textContent, 'Delete all messages? This cannot be undone.');
+  assert.equal(runtimeCalls.filter((m) => m.type === 'CLEAR_HISTORY').length, 0);
+  assert.equal(messagesEl.innerHTML, before);
+  first.querySelector('.confirm-cancel').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(runtimeCalls.filter((m) => m.type === 'CLEAR_HISTORY').length, 0);
+  assert.equal(messagesEl.innerHTML, before, 'cancelling leaves all messages intact');
+
+  button.click();
+  document.querySelector('.confirm-ok').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(runtimeCalls.filter((m) => m.type === 'CLEAR_HISTORY'), [{ type: 'CLEAR_HISTORY' }]);
+  assert.equal(messagesEl.childElementCount, 0, 'confirming clears the rendered conversation');
 });

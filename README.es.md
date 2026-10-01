@@ -309,7 +309,7 @@ Cambiar de sesión a mitad de una respuesta nunca la mata: sigue ejecutándose e
 | **Sesiones** | guarda la conversación como una sesión con nombre; explora y restaura desde el cajón 🕐; fija las favoritas encima de la lista |
 | **Búsqueda en todas partes** | `Ctrl+F` en todos los mensajes de una conversación; el cajón filtra sesiones por título **y** por contenido de los mensajes (las coincidencias solo de contenido van marcadas) |
 | **Exportación** | cualquier sesión como archivo Markdown |
-| **Borrado seguro** | borrado en dos pasos para sesiones; multiselección de mensajes para el borrado por lotes; limpiar el historial se puede deshacer durante 5 segundos |
+| **Borrado seguro** | borrado en dos pasos para sesiones; multiselección de mensajes para el borrado por lotes; borrar todos los mensajes requiere confirmación |
 
 </details>
 
@@ -366,7 +366,7 @@ Escribe `/` en el cuadro de mensaje para ver el autocompletado. Todos los comand
 | `Ctrl+Shift+H` | Abrir / cerrar el panel lateral |
 | `Enter` | Enviar mensaje (configurable en Ajustes) |
 | `Shift+Enter` | Nueva línea |
-| `Ctrl+K` | Limpiar historial (con deshacer) |
+| `Ctrl+K` | Borrar mensajes (con confirmación) |
 | `Ctrl+/` | Alternar el modo de contexto (Automático ↔ Captura de pantalla) |
 | `Ctrl+F` | Abrir la búsqueda en la conversación |
 | `Esc` | Cancelar el streaming / cerrar la búsqueda / cerrar el cajón |
