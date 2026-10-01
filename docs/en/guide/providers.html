@@ -69,7 +69,7 @@
             <li><strong>Hermes Agent</strong> — a self-hosted agent, built into browsa; just point it at your server.</li>
             <li><strong>OpenCode Agent</strong> — the <a href="https://opencode.ai">opencode</a> CLI agent with its first-party headless server. Also built in: one command starts the server, browsa connects directly.</li>
             <li><strong>OpenSquilla Agent</strong> — <a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a>, a local desktop agent (gateway + web UI + desktop app) with a token-efficient microkernel design, model routing, and skills; browsa talks to its gateway WebSocket, with session memory living server-side.</li>
-            <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude, pi…): a standalone daemon turns local CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
+            <li><strong>Agent Bridge</strong> — a bridge to local CLI agents (codex, claude, pi, gemini…): a standalone daemon turns local CLI agents into one unified-protocol backend, and a single card connects to several agents at once.</li>
           </ul>
         </li>
       </ul>
@@ -159,8 +159,8 @@ opensquilla gateway start
       <p>Notes: each browsa conversation maps to one gateway session (reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message); a huge page (over 60k chars) is uploaded as a <code>page-context.md</code> document the agent reads with its own tools. Pasted screenshots stay in browsa's own history and are not forwarded yet.</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude, pi</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as the model source — no separate model-API purchase needed; pi runs on whatever model providers you configure inside it.</p>
-      <p><strong>Prerequisites</strong>: <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+ on the machine, plus the agent CLI you want to bridge, logged in (codex: <code>npm i -g @openai/codex</code> then <code>codex login</code> with your ChatGPT subscription account; claude: <code>npm i -g @anthropic-ai/claude-code</code>, run it once to log in, then <code>npm i -g @agentclientprotocol/claude-agent-acp</code>; pi: <code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>, run <code>pi</code> once to pick its model providers (Node 22+ required)).</p>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> is a tiny standalone local daemon: it adapts CLI agents — <strong>codex, claude, pi, gemini</strong> — to one unified local HTTP protocol. A ChatGPT Plus / Claude Pro <strong>subscription login</strong> works as the model source — no separate model-API purchase needed; the Gemini CLI signs in with your Google account (or <code>GEMINI_API_KEY</code>); pi runs on whatever model providers you configure inside it.</p>
+      <p><strong>Prerequisites</strong>: <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+ on the machine, plus the agent CLI you want to bridge, logged in (codex: <code>npm i -g @openai/codex</code> then <code>codex login</code> with your ChatGPT subscription account; claude: <code>npm i -g @anthropic-ai/claude-code</code>, run it once to log in, then <code>npm i -g @agentclientprotocol/claude-agent-acp</code>; gemini: <code>npm i -g @google/gemini-cli</code>, run <code>gemini</code> once to sign in with your Google account (or set <code>GEMINI_API_KEY</code>); pi: <code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>, run <code>pi</code> once to pick its model providers (Node 22+ required)).</p>
       <ol>
         <li>Install the bridge (published on npm):
 <pre class="doc-code">npm i -g @xiaohuzai/agent-bridge      # or try without installing: npx @xiaohuzai/agent-bridge serve</pre></li>
@@ -172,6 +172,7 @@ chmod 600 agents.json</pre>
     { "name": "codex",  "port": 3948, "apiKey": "", "sandbox": "workspace-write", "approval": "on-request" },
     { "name": "claude", "port": 3949, "apiKey": "" },
     { "name": "pi",     "port": 3950, "apiKey": "" }
+    { "name": "gemini", "port": 3951, "apiKey": "" }
   ]
 }</pre></li>
         <li>Start it (from the directory holding <code>agents.json</code>):
@@ -179,7 +180,7 @@ chmod 600 agents.json</pre>
 agent-bridge serve --config /path/to/agents.json  # explicit config path
 #  add --bind 0.0.0.0 to expose it beyond this machine (then every entry needs an apiKey)</pre></li>
         <li>In browsa ⚙ settings, select the <strong>Agent Bridge</strong> card and click <strong>＋ Add agent</strong> to add bridge addresses one per row (one agent per address, e.g. <code>http://127.0.0.1:3948</code>). Each row also takes an optional <strong>alias</strong> and that bridge's own <strong>API key</strong> — that key is the <em>bridge's own access token</em> (<code>apiKey</code> in <code>agents.json</code>), not a model-service key; leave both empty for purely local use;</li>
-        <li>Hit <strong>Ping</strong> — every address is probed; rows with an empty alias are auto-filled from the agent name returned by /health, and everything shows in the status (e.g. <code>×3/3 healthy (codex, claude, pi)</code>). Each row carries its own status dot (gray = untested, green = reachable, red = down) and a <code>⟳</code> button to re-probe just that agent anytime;</li>
+        <li>Hit <strong>Ping</strong> — every address is probed; rows with an empty alias are auto-filled from the agent name returned by /health, and everything shows in the status (e.g. <code>×4/4 healthy (codex, claude, pi, gemini)</code>). Each row carries its own status dot (gray = untested, green = reachable, red = down) and a <code>⟳</code> button to re-probe just that agent anytime;</li>
         <li>Back in the sidebar, the top dropdown lists them as "Agent Bridge · codex", each with its own ping status. Each agent keeps its own independent session thread; when you switch mid-conversation, browsa asks whether to <strong>carry the conversation over</strong> or <strong>start a new session</strong>.</li>
       </ol>
       <p>Don't feel like running steps 1–3 by hand? Paste the whole block below to <strong>your CLI agent</strong> and let it do the install, config, and launch — then just fill the bridge URL it reports into step 4:</p>
