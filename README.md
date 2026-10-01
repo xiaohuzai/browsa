@@ -311,7 +311,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 | **Sessions** | save the conversation as a named session; browse and restore from the 🕐 drawer; pin favorites above the list |
 | **Search everywhere** | `Ctrl+F` across all messages in a conversation; the drawer filters sessions by title **and** message content (content-only hits flagged) |
 | **Export** | any session as a Markdown file |
-| **Safe deletion** | two-step armed delete for sessions; multi-select messages for batch deletion; clearing history is undoable for 5 seconds |
+| **Safe deletion** | two-step armed delete for sessions; multi-select messages for batch deletion; clearing all messages requires confirmation |
 
 </details>
 
@@ -368,7 +368,7 @@ Type `/` in the composer to see autocomplete. All commands accept extra instruct
 | `Ctrl+Shift+H` | Open / close side panel |
 | `Enter` | Send message (configurable in Settings) |
 | `Shift+Enter` | New line |
-| `Ctrl+K` | Clear history (with undo) |
+| `Ctrl+K` | Clear messages (with confirmation) |
 | `Ctrl+/` | Cycle context mode (Auto ↔ Screenshot) |
 | `Ctrl+F` | Open in-conversation search |
 | `Esc` | Cancel stream / close search / close drawer |

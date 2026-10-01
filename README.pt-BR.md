@@ -309,7 +309,7 @@ Trocar de sessão no meio de uma resposta nunca mata a resposta: ela continua ro
 | **Sessões** | salve a conversa como uma sessão nomeada; navegue e restaure pela gaveta 🕐; fixe as favoritas acima da lista |
 | **Busca em todo lugar** | `Ctrl+F` em todas as mensagens de uma conversa; a gaveta filtra as sessões por título **e** por conteúdo da mensagem (acertos só de conteúdo são sinalizados) |
 | **Exportação** | qualquer sessão como um arquivo Markdown |
-| **Exclusão segura** | exclusão em dois passos para sessões; selecione várias mensagens para exclusão em lote; limpar o histórico pode ser desfeito por 5 segundos |
+| **Exclusão segura** | exclusão em dois passos para sessões; selecione várias mensagens para exclusão em lote; limpar todas as mensagens exige confirmação |
 
 </details>
 
@@ -366,7 +366,7 @@ Digite `/` no campo de mensagem para ver o autocompletar. Todos os comandos acei
 | `Ctrl+Shift+H` | Abrir / fechar o painel lateral |
 | `Enter` | Enviar mensagem (configurável nas Configurações) |
 | `Shift+Enter` | Nova linha |
-| `Ctrl+K` | Limpar o histórico (com desfazer) |
+| `Ctrl+K` | Limpar mensagens (com confirmação) |
 | `Ctrl+/` | Alternar o modo de contexto (Auto ↔ Captura de tela) |
 | `Ctrl+F` | Abrir a busca dentro da conversa |
 | `Esc` | Cancelar a transmissão / fechar a busca / fechar a gaveta |

@@ -100,8 +100,8 @@
     "description": "Multiselect toggle tooltip"
   },
   "newChatTitle": {
-    "message": "Nova conversa (Ctrl+K)",
-    "description": "Clear/new chat button tooltip"
+    "message": "Limpar mensagens (Ctrl+K)",
+    "description": "Clear messages button tooltip"
   },
   "attachTitle": {
     "message": "Anexar a página atual à conversa",

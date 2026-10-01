@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>Sessions &amp; organizing · browsa guide</title>
-<meta name="description" content="Saving and restoring named sessions, pinning and renaming, Markdown export, full-text search, batch deletion and undoable clearing; input history and drafts.">
+<meta name="description" content="Saving and restoring named sessions, pinning and renaming, Markdown export, full-text search, batch deletion and confirmation before clearing; input history and drafts.">
 <link rel="icon" type="image/png" href="../../icon48.png">
 <link rel="stylesheet" href="../../site.css">
 <link rel="stylesheet" href="../../docs.css">
@@ -87,7 +87,7 @@
         <li>Messages support <strong>multi-select batch deletion</strong>;</li>
         <li>Session deletion is <strong>two-step</strong>: the first click arms the button, the second commits (Ctrl/Cmd+click skips the arming);</li>
         <li>Failed pin, rename or delete operations show the reason and keep the original state available for retry;</li>
-        <li><kbd>Ctrl+K</kbd> clears the current history and is <strong>undoable for 5 seconds</strong>.</li>
+        <li>The composer’s <strong>trash button</strong> or <kbd>Ctrl+K</kbd> clears the current messages. <strong>Confirmation is required; clearing cannot be undone.</strong></li>
       </ul>
 
       <h2>Input that keeps up</h2>
