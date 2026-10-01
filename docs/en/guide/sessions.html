@@ -63,9 +63,10 @@
       <h2>Saving &amp; restoring sessions</h2>
       <p>The 🕐 button in the top bar opens the sessions drawer: <strong>save the current conversation</strong> under a name and restore it anytime. The list groups by age (Today / Yesterday / This week / Earlier), and favorites can be <strong>pinned</strong> to the top.</p>
       <ul>
-        <li>Restoring a session brings the whole history back into the panel, ready to continue;</li>
+        <li>Restoring a session brings the whole history back into the panel, together with its Agent thread IDs for each provider and bridge address;</li>
         <li>Any session can be <strong>exported as a Markdown file</strong>;</li>
         <li>Sessions can be renamed;</li>
+        <li>Older snapshots without recorded Agent IDs start a fresh Agent thread on the first message, carrying their existing text history once.</li>
         <li><strong>Switching sessions mid-reply never kills the reply</strong> — it keeps running in the background and lands in the session it started in (marked with an in-flight dot in the drawer). Stopping a reply yourself keeps whatever already streamed, marked as interrupted.</li>
       </ul>
       <figure class="shot slim">

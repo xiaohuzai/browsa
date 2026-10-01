@@ -145,3 +145,21 @@ test('无 chrome 环境：全程退化到 fallback，applyI18n no-op', async () 
   applyI18n();
   assert.equal(document.querySelector('[data-i18n]').textContent, 'untouched');
 });
+
+test('UI locale uses all seven explicit languages and resolves auto from the browser', async () => {
+  for (const [lang, locale] of Object.entries({ en: 'en', zh: 'zh-CN', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt-BR', ru: 'ru' })) {
+    mockChrome({ storage: { uiLang: lang } });
+    const mod = await freshModule();
+    await mod.initI18n();
+    assert.equal(mod.uiLocale(), locale);
+  }
+  mockChrome();
+  chrome.i18n.getUILanguage = () => 'pt-BR';
+  const mod = await freshModule();
+  await mod.initI18n();
+  assert.equal(mod.uiLocale(), 'pt-BR');
+  chrome.i18n.getUILanguage = () => 'fr-FR';
+  assert.equal(mod.uiLocale(), 'en', 'unsupported browser UI languages use the extension default dictionary');
+  chrome.i18n.getUILanguage = () => 'invalid_locale';
+  assert.doesNotThrow(() => new Intl.RelativeTimeFormat(mod.uiLocale()));
+});

@@ -264,3 +264,47 @@ test('handleExplainPort: opencode provider creates a throwaway session per call'
   port.disconnect();
   await flush();
 });
+
+test('selection explanations and translations support all seven language targets', () => {
+  for (const [lang, target] of [['ja', 'Japanese'], ['ko', 'Korean'], ['es', 'Spanish'], ['pt', 'Brazilian Portuguese'], ['ru', 'Russian']]) {
+    assert.ok(buildExplainRequest('some selected words', lang).system.includes(`Reply in ${target}`));
+    assert.ok(buildExplainRequest('some selected words', lang, 'translate').system.includes(`Translate the selected text into ${target}`));
+  }
+});
+
+test('explicit reply language overrides the floatbar locale and is not reversed by translation', async () => {
+  const port = makeFakePort();
+  const { calls, streams } = makeStreams();
+  handleExplainPort(port, { getAll: async () => ({ ...CFG, replyLanguage: 'ja' }), streams });
+  port.emit({ type: 'EXPLAIN_REQUEST', text: '日本語の文章', lang: 'en', mode: 'translate' });
+  await flush();
+  assert.ok(calls[0].args.messages[0].content.includes('Translate the selected text into Japanese'));
+});
+
+test('saved UI preference takes precedence over a stale content-script language', async () => {
+  const port = makeFakePort();
+  const { calls, streams } = makeStreams();
+  handleExplainPort(port, { getAll: async () => CFG, getUiLang: async () => 'ko', streams });
+  port.emit({ type: 'EXPLAIN_REQUEST', text: 'documentation', lang: 'en' });
+  await flush();
+  assert.ok(calls[0].args.messages[0].content.includes('Reply in Korean'));
+});
+
+test('right-click action prompts follow reply settings and seven UI languages', async () => {
+  const { buildSelectionActionPrompt } = await import('../lib/selection-language.js');
+  for (const [tag, target] of [['en', 'English'], ['zh-CN', 'Simplified Chinese'], ['ja', 'Japanese'], ['ko', 'Korean'], ['es', 'Spanish'], ['pt-BR', 'Brazilian Portuguese'], ['ru', 'Russian']]) {
+    assert.ok(buildSelectionActionPrompt('explain', 'quoted words', '', tag).includes(`Reply in ${target}`));
+    assert.ok(buildSelectionActionPrompt('summarize', 'quoted words', '', tag).includes(`Reply in ${target}`));
+    assert.ok(buildSelectionActionPrompt('translate', 'quoted words', tag, 'en').includes(`into ${target}`));
+  }
+  assert.ok(buildSelectionActionPrompt('translate', '日本語', 'ja', 'en').includes('into Japanese'));
+  assert.ok(buildSelectionActionPrompt('explain', 'quote', 'ru', 'zh').includes('Reply in Russian'));
+});
+
+test('selection actions preserve German and French reply settings offered by Settings', async () => {
+  const { buildSelectionActionPrompt } = await import('../lib/selection-language.js');
+  for (const [lang, name] of [['de', 'German'], ['fr', 'French']]) {
+    assert.ok(buildExplainRequest('text', lang).system.includes(`Reply in ${name}`));
+    assert.ok(buildSelectionActionPrompt('translate', 'text', lang, 'zh').includes(`into ${name}`));
+  }
+});

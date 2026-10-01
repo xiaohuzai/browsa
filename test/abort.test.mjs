@@ -231,7 +231,7 @@ test('CHAT handler clears chatControllers in finally (no leaks)', async () => {
 
   // chatControllers.delete(tabId) must appear inside a finally block
   // to avoid leaks when the LLM throws a real error.
-  const deleteIdx = src.indexOf('chatControllers.delete(tabId)');
+  const deleteIdx = src.lastIndexOf('chatControllers.delete(tabId)');
   assert.ok(deleteIdx > 0, 'chatControllers must be deleted');
   // Verify it's inside a finally: find the nearest `finally {` opening
   // brace BEFORE deleteIdx.

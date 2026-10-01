@@ -116,7 +116,7 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 - **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
-Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer.
+Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer. Saved browsa conversations retain their own Agent thread IDs, separately for each provider and bridge address; restoring a conversation restores those IDs too. Older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message.
 
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>…)</summary>
@@ -324,7 +324,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 | **Input history & drafts** | ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel |
 | **Slash commands** | type `/` for completions — see the table below |
 | **Quick actions** | one-click Summarize / Key Points / Explain / → 中文 / Outline above the composer |
-| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · → 中文 · Summarize — Explain / Translate answer inline (streaming, in place); Ask / Summarize and the right-click menu go to the panel |
+| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · Translate · Summarize — Explain / Translate answer inline (streaming, in place); Ask / Summarize and the right-click menu go to the panel |
 
 </details>
 
@@ -336,8 +336,8 @@ Everyday settings are shown directly: interface language, providers, system prom
 | Setting | What it does |
 |---|---|
 | **System prompt** | prepended to every conversation as `role: system` — set reply language, tone, and format rules here |
-| **Reply language** | force replies in a specific language regardless of page language |
-| **UI language** | English, 中文, 日本語, 한국어, Español, Português, Русский, or Auto (follows the browser) — applies immediately, no reload |
+| **Reply language** | force replies in a specific language regardless of page language. Selection actions also follow this preference; in Auto they use the UI language. |
+| **UI language** | English, 中文, 日本語, 한국어, Español, Português, Русский, or Auto (follows the browser) — applies immediately to the panel, floating toolbar and right-click menu, no page reload |
 | **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
 | **Thinking level** | per-model reasoning depth (`auto` sends nothing; then the model's own ladder — GLM/Qwen-class is an on/off toggle, GPT/Claude-class is low→max effort). The choices follow the model id you filled in, and the request fields adapt to each API dialect (`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`…) automatically |
 | **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
