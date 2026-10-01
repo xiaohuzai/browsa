@@ -1633,5 +1633,17 @@
   "agentSessionCopyFailed": {
     "message": "Copy failed",
     "description": "Clipboard failure notice"
+  },
+  "bridgePingOk": {
+    "message": "agent-bridge ×$1/$2 healthy ($3)",
+    "description": "Bridge ping summary, $1=ok $2=total $3=alias list"
+  },
+  "bridgePingDown": {
+    "message": "$1 down",
+    "description": "Bridge ping down count suffix, $1=count"
+  },
+  "saveFailedContext": {
+    "message": "Save failed — the extension was reloaded. Refresh this page and try again.",
+    "description": "Shown when storage.set rejects (extension reloaded)"
   }
 }

@@ -1633,5 +1633,17 @@
   "agentSessionCopyFailed": {
     "message": "コピーに失敗しました",
     "description": "Clipboard failure notice"
+  },
+  "bridgePingOk": {
+    "message": "agent-bridge ×$1/$2 オンライン（$3）",
+    "description": "Bridge ping summary, $1=ok $2=total $3=alias list"
+  },
+  "bridgePingDown": {
+    "message": "$1 件オフライン",
+    "description": "Bridge ping down count suffix, $1=count"
+  },
+  "saveFailedContext": {
+    "message": "保存に失敗しました。拡張機能が再読み込みされました。このページを更新して再試行してください",
+    "description": "Shown when storage.set rejects (extension reloaded)"
   }
 }

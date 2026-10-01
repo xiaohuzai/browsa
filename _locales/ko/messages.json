@@ -1633,5 +1633,17 @@
   "agentSessionCopyFailed": {
     "message": "복사 실패",
     "description": "Clipboard failure notice"
+  },
+  "bridgePingOk": {
+    "message": "agent-bridge ×$1/$2 온라인 ($3)",
+    "description": "Bridge ping summary, $1=ok $2=total $3=alias list"
+  },
+  "bridgePingDown": {
+    "message": "$1개 오프라인",
+    "description": "Bridge ping down count suffix, $1=count"
+  },
+  "saveFailedContext": {
+    "message": "저장 실패 — 확장 프로그램이 다시 로드되었습니다. 이 페이지를 새로고침한 후 다시 시도하세요",
+    "description": "Shown when storage.set rejects (extension reloaded)"
   }
 }

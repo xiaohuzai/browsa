@@ -1633,5 +1633,17 @@
   "agentSessionCopyFailed": {
     "message": "复制失败",
     "description": "剪贴板失败提示"
+  },
+  "bridgePingOk": {
+    "message": "agent-bridge ×$1/$2 在线（$3）",
+    "description": "Bridge ping summary, $1=ok $2=total $3=alias list"
+  },
+  "bridgePingDown": {
+    "message": "$1 离线",
+    "description": "Bridge ping down count suffix, $1=count"
+  },
+  "saveFailedContext": {
+    "message": "保存失败：扩展已重载，请刷新本页后重试",
+    "description": "Shown when storage.set rejects (extension reloaded)"
   }
 }
