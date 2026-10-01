@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "version": "v7",
+  "productionDate": "2026-10-01",
+  "playlist": {
+    "id": "PLYaVrglnBn1Y",
+    "title": "browsa",
+    "url": "https://www.youtube.com/playlist?list=PLYaVrglnBn1Y",
+    "policy": "latest-seven",
+    "archivePlaylistId": null,
+    "archiveSuggestedTitle": "browsa 历史演示"
+  },
+  "channel": {
+    "observedName": "黄言",
+    "handleUrl": "https://www.youtube.com/@%E9%BB%84%E8%A8%80",
+    "channelId": null
+  },
+  "observedDate": "2026-10-01",
+  "evidenceSource": "User confirmed upload completed; seven IDs and titles observed in supplied public YouTube playlist through browser UI.",
+  "limitations": "Studio login, visibility settings, channel ID and remote file equivalence were not verified. No uploads or playlist modifications were performed by the agent.",
+  "videos": [
+    {
+      "language": "pt-br",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-pt-br.mp4",
+      "localSha256": null,
+      "videoId": "AeXEyqvzcDA",
+      "watchUrl": "https://www.youtube.com/watch?v=AeXEyqvzcDA",
+      "studioUrl": "https://studio.youtube.com/video/AeXEyqvzcDA/edit",
+      "observedTitle": "browsa: Sua IA ao lado da página | Extensão para Chrome e Edge（Português BR）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 1
+    },
+    {
+      "language": "ru",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-ru.mp4",
+      "localSha256": null,
+      "videoId": "kOq_3iK2XF0",
+      "watchUrl": "https://www.youtube.com/watch?v=kOq_3iK2XF0",
+      "studioUrl": "https://studio.youtube.com/video/kOq_3iK2XF0/edit",
+      "observedTitle": "browsa: Ваш ИИ рядом с веб-страницей | Расширение для Chrome и Edge（Русский）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 2
+    },
+    {
+      "language": "es",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-es.mp4",
+      "localSha256": null,
+      "videoId": "Q3ySghDuKog",
+      "watchUrl": "https://www.youtube.com/watch?v=Q3ySghDuKog",
+      "studioUrl": "https://studio.youtube.com/video/Q3ySghDuKog/edit",
+      "observedTitle": "browsa: Tu IA junto a la web | Extensión para Chrome y Edge（Español）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 3
+    },
+    {
+      "language": "ko",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-ko.mp4",
+      "localSha256": null,
+      "videoId": "km0joAMt0Ow",
+      "watchUrl": "https://www.youtube.com/watch?v=km0joAMt0Ow",
+      "studioUrl": "https://studio.youtube.com/video/km0joAMt0Ow/edit",
+      "observedTitle": "browsa | 내 AI로 웹페이지·영상 읽기 — Chrome·Edge 확장 프로그램（한국어）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 4
+    },
+    {
+      "language": "ja",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-ja.mp4",
+      "localSha256": null,
+      "videoId": "umnWxVXfmjg",
+      "watchUrl": "https://www.youtube.com/watch?v=umnWxVXfmjg",
+      "studioUrl": "https://studio.youtube.com/video/umnWxVXfmjg/edit",
+      "observedTitle": "browsa｜自分のAIで記事・動画を読み解く Chrome・Edge拡張機能（日本語）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 5
+    },
+    {
+      "language": "en",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-en.mp4",
+      "localSha256": null,
+      "videoId": "YOZ5cs0W1og",
+      "watchUrl": "https://www.youtube.com/watch?v=YOZ5cs0W1og",
+      "studioUrl": "https://studio.youtube.com/video/YOZ5cs0W1og/edit",
+      "observedTitle": "browsa: Your AI beside the page | Chrome & Edge extension（en）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 6
+    },
+    {
+      "language": "zh",
+      "revision": 1,
+      "localFile": "docs/assets/promo/browsa-promo-v7-zh.mp4",
+      "localSha256": null,
+      "videoId": "b5DiTpR7VMk",
+      "watchUrl": "https://www.youtube.com/watch?v=b5DiTpR7VMk",
+      "studioUrl": "https://studio.youtube.com/video/b5DiTpR7VMk/edit",
+      "observedTitle": "browsa｜用自己的 AI 读网页、看视频：浏览器插件演示（zh）",
+      "status": "existing-upload-observed-in-playlist",
+      "visibility": null,
+      "playlistId": "PLYaVrglnBn1Y",
+      "observedPlaylistPosition": 7
+    }
+  ]
+}

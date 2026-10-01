@@ -1,6 +1,6 @@
 ---
 name: promo-video
-description: Use when browsa 需要宣传片、演示视频、demo GIF、随产品迭代更新素材、重拍分镜、调整运镜或字幕、导出七语素材、生成或更新 YouTube 标题与说明，或排查拍摄与编码问题。
+description: Use when browsa 需要宣传片、演示视频、demo GIF、随产品迭代更新素材、重拍分镜、调整运镜或字幕、导出七语素材、生成或更新 YouTube 标题与说明、上传 YouTube 或维护新旧版播放列表，或排查拍摄与编码问题。
 ---
 
 # browsa 宣传素材
@@ -12,6 +12,7 @@ description: Use when browsa 需要宣传片、演示视频、demo GIF、随产�
 - 完整重拍、产品 UI/交互变化：读 [production-v7.md](references/production-v7.md)，核对变更涉及哪些截图和动作，再采集、冻结、渲染、验收。
 - 只改字幕/章标题、运镜、音效或局部画面：读 [maintenance.md](references/maintenance.md)，先判断能否复用截图与音轨。局部修改仍须交付实际更新的 MP4，不能只改 JSON。
 - YouTube 上传标题/说明，或新片更新发布文案：读 [youtube-metadata.md](references/youtube-metadata.md)。按当前成片输出七语可粘贴文案；只改发布文案无需重渲视频。
+- 批量上传 YouTube、补填已有视频或维护新旧版播放列表：读 [youtube-upload.md](references/youtube-upload.md)。主列表仅保留最新七语，旧版归档；先核对既有记录，避免重复上传。仅要求完善 skill 时不操作线上账号。
 - 当前工程 `.agents/skills/promo-video/video-v7`；主片镜头与音效以 `src/timeline.ts` 为唯一权威，不能按旧文档帧号执行。历史 [v4](references/v4.md) / [v3](references/v3.md) 仅用于明确要求的回溯。
 
 ## 已认可的产品故事
