@@ -1,0 +1,1589 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "閲覧中のページ——記事・動画・PDF——と、自分のモデルまたはエージェントでチャットする AI サイドバー。オープンソース、アカウント不要。",
+    "description": "Extension description"
+  },
+  "settingsTooltip": {
+    "message": "設定（プロバイダ / API キー）",
+    "description": "Settings button tooltip"
+  },
+  "contextScreenshot": {
+    "message": "スクリーンショット",
+    "description": "Screenshot mode"
+  },
+  "inputPlaceholder": {
+    "message": "何でも聞いてください…",
+    "description": "Composer placeholder"
+  },
+  "quickSummarize": {
+    "message": "要約",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "要点",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "解説",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "翻訳",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "アウトライン",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "クイック操作の表示/非表示",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "セッション履歴",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ 新しいセッション",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "タイトルと内容を検索…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "保存されたセッションはまだありません。",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "新しいセッションを開始すると、この会話がアーカイブされます。",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "検索に一致するセッションはありません。",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "すべてのセッションを消去",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "閉じる",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "メッセージを検索…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "前へ (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "次へ (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "閉じる (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "メッセージを検索 (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "メッセージを選択",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "新しい会話 (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "現在のページを会話に添付",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "AI プロバイダ",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "生成を停止",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "自動",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "コンテキストモード",
+    "description": "Context mode group aria-label"
+  },
+  "toolbarHide": {
+    "message": "このページでは非表示",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "このページでツールバーを非表示にしますか？",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "ページを再読み込みするまで表示されません。",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "キャンセル",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "非表示",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "質問",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "解説",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "翻訳",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "要約",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "browsa クイック操作",
+    "description": "Selection toolbar aria-label"
+  },
+  "inlineExplainAria": {
+    "message": "解説",
+    "description": "Inline explain popover aria-label"
+  },
+  "inlineExplainWaiting": {
+    "message": "解説中…",
+    "description": "Inline explain popover: waiting for the model"
+  },
+  "inlineTranslateWaiting": {
+    "message": "翻訳中…",
+    "description": "Inline translate popover: waiting for the model"
+  },
+  "inlineTranslateError": {
+    "message": "翻訳に失敗しました",
+    "description": "Inline translate popover: error prefix"
+  },
+  "inlineExplainCopy": {
+    "message": "コピー",
+    "description": "Inline explain popover: copy the answer"
+  },
+  "inlineExplainCopied": {
+    "message": "コピーしました",
+    "description": "Inline explain popover: copied feedback"
+  },
+  "inlineExplainRetry": {
+    "message": "再試行",
+    "description": "Inline explain popover: retry the request"
+  },
+  "inlineExplainSide": {
+    "message": "サイドバーで続けて質問",
+    "description": "Inline explain popover: continue in the side panel"
+  },
+  "inlineExplainClose": {
+    "message": "閉じる",
+    "description": "Inline explain popover: close button aria-label"
+  },
+  "inlineExplainError": {
+    "message": "解説に失敗しました",
+    "description": "Inline explain popover: error prefix"
+  },
+  "regenTitle": {
+    "message": "返信を再生成",
+    "description": "Assistant message action: regenerate"
+  },
+  "errAuth": {
+    "message": "認証に失敗しました — API キーと権限を確認してください。",
+    "description": "Error card headline: 401/403 class"
+  },
+  "errRateLimit": {
+    "message": "レート制限またはクォータ超過です — しばらく待つか、請求状況を確認してください。",
+    "description": "Error card headline: 429/quota class"
+  },
+  "errModel": {
+    "message": "このプロバイダにそのモデルが見つかりません — 設定でモデル ID を確認してください。",
+    "description": "Error card headline: unknown model class"
+  },
+  "errTimeout": {
+    "message": "リクエストがタイムアウトしました — 再試行してください。会話が非常に長い場合は、新しい会話を始めてください。",
+    "description": "Error card headline: timeout class"
+  },
+  "errNetwork": {
+    "message": "ネットワークエラー — このデバイスからエンドポイントに接続できません。",
+    "description": "Error card headline: network/DNS class"
+  },
+  "errServer": {
+    "message": "プロバイダのサーバーエラー — しばらくしてからもう一度お試しください。",
+    "description": "Error card headline: 5xx class"
+  },
+  "errGeneric": {
+    "message": "問題が発生しました。",
+    "description": "Error card headline fallback"
+  },
+  "errRawToggle": {
+    "message": "エラーの原文",
+    "description": "Error card raw-text disclosure label"
+  },
+  "copyLabel": {
+    "message": "コピー",
+    "description": "Generic copy button label"
+  },
+  "queuedLabel": {
+    "message": "待機中",
+    "description": "Follow-up queue dock label"
+  },
+  "queuedSendNow": {
+    "message": "このメッセージを今すぐ送信",
+    "description": "Follow-up queue chip: send immediately"
+  },
+  "queuedRemove": {
+    "message": "キューから削除",
+    "description": "Follow-up queue chip: remove"
+  },
+  "pinnedGroupLabel": {
+    "message": "ピン留め",
+    "description": "Sessions drawer pinned group header"
+  },
+  "pinSession": {
+    "message": "ピン留め",
+    "description": "Session row pin action tooltip"
+  },
+  "unpinSession": {
+    "message": "ピン留め解除",
+    "description": "Session row unpin action tooltip"
+  },
+  "deleteSession": {
+    "message": "セッションを削除",
+    "description": "Session row delete tooltip"
+  },
+  "deleteArmedHint": {
+    "message": "もう一度クリックで削除",
+    "description": "Two-step delete armed state tooltip"
+  },
+  "contentMatchHint": {
+    "message": "メッセージ本文で一致",
+    "description": "Content-only search hit dot tooltip"
+  },
+  "sessionsToday": {
+    "message": "今日",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsYesterday": {
+    "message": "昨日",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsWeek": {
+    "message": "今週",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsEarlier": {
+    "message": "それ以前",
+    "description": "Sessions drawer time bucket"
+  },
+  "transcriptBtnTitle": {
+    "message": "動画タイムライン",
+    "description": "Topbar button: open the video timeline drawer"
+  },
+  "transcriptTitle": {
+    "message": "動画タイムライン",
+    "description": "Video timeline drawer header title"
+  },
+  "transcriptSearchPlaceholder": {
+    "message": "タイムラインを検索…",
+    "description": "Video timeline drawer search input"
+  },
+  "transcriptNote": {
+    "message": "再生位置にメモを挿入",
+    "description": "Transcript drawer note-capture button tooltip"
+  },
+  "followPlayback": {
+    "message": "再生位置へ戻る",
+    "description": "Transcript drawer floating pill after manual scroll"
+  },
+  "thinkDoneTitle": {
+    "message": "思考プロセス",
+    "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "会話のアウトライン",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "（空のメッセージ）",
+    "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "UI 言語",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "言語",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "インターフェースの言語を切り替えます。デフォルトはブラウザの設定に従います。",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "自動（ブラウザに従う）",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "設定",
+    "description": "Options page subtitle"
+  },
+  "guideLinkText": {
+    "message": "ユーザーガイド",
+    "description": "Settings header: link to the usage-guide website"
+  },
+  "rateLinkText": {
+    "message": "⭐ browsa をレビュー",
+    "description": "Settings header: neutral link to the Chrome Web Store reviews tab (no incentive wording)"
+  },
+  "providersHeading": {
+    "message": "AI プロバイダ",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "AI プロバイダを設定します。",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">設定ガイドを開く：AI プロバイダ</a>",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "システムプロンプト",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "毎回の会話の前に <code>role: system</code> として先頭に挿入されます。アシスタントの言語・トーン・書式ルールの指定に使えます。",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "例：あなたは有能なアシスタントです。インライン数式は $...$、ディスプレイ数式は $$...$$ を使用してください。",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "保存",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "デフォルトに戻す",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "返信言語",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "自動（システムプロンプトに従う）",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ 詳細設定",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "フローティング選択ツールバー",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "テキストを選択すると上にミニツールバーが現れ、クイック操作（質問・解説・翻訳・要約）が使えます。",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "テキスト選択時にフローティングツールバーを表示",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "ページ添付（📎）時にサイトの <code>llms.txt</code> 説明を含める",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "チャット設定",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "メッセージのフォントサイズ",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "送信ショートカット",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter（Shift+Enter で改行）",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter（Enter で改行）",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "思考ブロックを自動で折りたたむ",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "ASR 字幕と動画",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "ASR を有効にする",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "動画ページを添付すると自動で文字起こし・解析します。対応プラットフォーム：YouTube と Bilibili。",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "プロバイダ",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "字幕ソース",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "内蔵字幕を優先",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "ASR 文字起こしを優先",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "言語",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "自動検出",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "モデル ID（音声文字起こし）",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "動画モデル ID（動画解析用。空欄 = 上のモデルを使用）",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "空欄 = 文字起こしモデルと同じ",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "ドキュメント",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 ドキュメント",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": "（推奨）",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "Volcengine Ark",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "Ark API キー（UUID または ark- 接頭辞）",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "標準の <code>…/api/v3</code> エンドポイントを使用してください。検証の結果、Agent Plan の <code>…/api/plan/v3</code> はファイルアップロード（Files API）に対応していません。",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "なぜこの設定？ → Ark 音声理解ドキュメント",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 エージェントプロバイダ",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "フルエージェントバックエンド — ツール実行、ファイルアクセス、マルチステップタスク",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 LLM プロバイダ",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "言語モデルのエンドポイント — 何個でも追加でき、それぞれが独自の通信プロトコルを使います",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ プロバイダを追加",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "予約済みの空スロット — 設定して保存すると確定します",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "クリックしてアクティブなプロバイダに設定",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "このプロバイダを削除",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "エイリアス",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "例：My OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "Base URL",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "API キー",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "キーの表示 / 非表示",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "API キーの表示を切り替え",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "モデル ID",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "モデルを削除",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "削除",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "モデル ID を追加 — Enter",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "モデル ID を追加",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "モデルを追加",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "モデル ID を追加",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● 接続可能",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● 接続不可",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ 未 Ping",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ 未設定",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "空きスロット — 設定して保存",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ LLM プロバイダにはモデル ID が必要です",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Ping 中…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " — アクティブなプロバイダに設定しました",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ 保存しました",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "リセット",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Hermes API Server のセットアップと設定ドキュメント",
+    "description": "Options: Hermes docs link text"
+  },
+  "opencodeTip": {
+    "message": "ターミナルで <code>opencode serve --port 4096</code> を起動し、表示されたアドレスを入力してください（ポートの固定を推奨 — 固定しないと再起動のたびに変わります）。<a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode Server ドキュメント</a>",
+    "description": "Options: opencode server setup tip"
+  },
+  "squillaTip": {
+    "message": "OpenSquilla ゲートウェイの WebSocket アドレス — デフォルトは ws://127.0.0.1:18791/ws。ゲートウェイ側の cors.allowed_origins にこの拡張機能の origin を登録する必要があります — CLI ゲートウェイなら ~/.opensquilla/config.toml、デスクトップアプリならアプリ固有のプロファイル設定（macOS: ~/Library/Application Support/OpenSquilla/opensquilla/config.toml）に記述します — v0.5.5 からネイティブ対応。<a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla ドキュメント</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
+  "bridgeTip": {
+    "message": "<a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge ドキュメント</a>に従ってブリッジをインストール・起動してください。1 行に 1 つのブリッジアドレスを入力します。API キーは、ブリッジ側でキーが設定されている場合のみ必要です — ループバックアドレス上のキーなしブリッジはこの欄を無視します（誤ったキーでも Ping は通ります）。",
+    "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "API キー（任意）",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "未設定",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "「$1」は未設定のため、「$2」に切り替えました",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ エージェントを追加",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "エイリアス（空欄可 — Ping が自動入力します）",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "このアドレスを削除",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "Ping する前に、ブリッジアドレスを 1 つ以上追加してください。",
+    "description": "Options: bridge ping with zero endpoints"
+  },
+  "systemPromptSaved": {
+    "message": "システムプロンプトを保存しました。",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "システムプロンプトをデフォルトに戻しました。",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "返信言語を「$1」に設定しました。",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "返信言語：自動。",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "フローティングツールバーを有効にしました。",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "フローティングツールバーを無効にしました。",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "ページの添付時に llms.txt を含めます。",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt を無効にしました。",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "ASR を有効にするには API キーが必要です。",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "Base URL を Agent Plan エンドポイントから標準の $1 に自動修正しました（api/plan/v3 にはファイルアップロードがありません）。",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1（$2、モデル $3）。",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "有効",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "無効",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusReachable": {
+    "message": "● 接続可能",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ 接続不可",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "未 Ping",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "テキストが選択されていません — もう一度選択してください。",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "ページを読み取っています…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "ページの読み取りに失敗しました",
+    "description": "Sidepanel: read page failed"
+  },
+  "pageNavigatedDuringRead": {
+    "message": "読み取り中にページが移動しました — もう一度添付してください",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
+  "progressParsingPdf": {
+    "message": "PDF を解析しています…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressParsingDoc": {
+    "message": "ドキュメントを解析しています…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
+  "pdfAttachFailed": {
+    "message": "PDF の添付に失敗しました",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "スクリーンショットの添付に失敗しました",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
+  },
+  "officeAttachFailed": {
+    "message": "ドキュメントの添付に失敗しました",
+    "description": "Sidepanel: Office document attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "ASR の添付に失敗しました",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "ページの添付に失敗しました：$1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "セッションを保存しました：「$1」",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "cannotOpenSettings": {
+    "message": "設定を開けません：$1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "$1 に切り替えました",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "画像が大きすぎます：$1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "imageBudgetExceeded": {
+    "message": "画像を添付できませんでした（$1）— 送信には大きすぎます。1 つのメッセージに入れられるのは約 $2 MB の画像までです。",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "画像を添付できませんでした（$1）— 1 つのメッセージに添付できるのは最大 $2 枚です。",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
+  "outputTruncatedToast": {
+    "message": "返信がモデルの出力上限に達しました —「→ 続きを生成」をクリックするか、「続き」と返信してください。",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ 続きを生成",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "アクティブなタブがありません。",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "動画ソースが無効になったため、ジャンプできません",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "利用可能な再生位置や字幕行がまだありません",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "コピーしました",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "履歴の切り詰めに失敗したため、再生成を中止しました",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "履歴の切り詰めに失敗したため、編集は保存されませんでした",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "承認の送信に失敗しました：$1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "返信の送信に失敗しました：$1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "拡張機能のバックグラウンドがリセットされました — もう一度お試しください",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "動画解析",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "ASR 文字起こし",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": "に失敗：",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "不明なエラー",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "— ASR の API キーは Agent Plan 用キーのようです。これは標準の Ark プラットフォームキーと互換性がありません。設定 → ASR でプラットフォーム用 API キー（UUID または ark- 接頭辞）に変更してください。",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "内蔵字幕へフォールバックしました（YouTube が音声ダウンロードをブロック）",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "動画メタデータへフォールバックしました（YouTube が音声ダウンロードをブロック）",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "動画メタデータへフォールバックしました",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ この動画には字幕がありません — 現状のまま保持します（動画メタデータのみ）。自動文字起こしするには、設定で ASR を有効にしてから再度添付してください。",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "以前アップロードした音声を再利用しています（30 日間有効）— ダウンロードとアップロードをスキップ…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "音声をダウンロードしています…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "以前アップロードした動画を再利用しています（30 日間有効）— アップロードをスキップ…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "キーフレームをキャプチャしています…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "音声をトランスコードしています…（WAV に変換）",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "音声をアップロードしています…（0%）",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "音声をダウンロードして文字起こししています…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "入力欄へスキップ",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "メッセージ",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "選択項目を削除",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "キャンセル",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "$1 件を選択中",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "文字",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "トークン",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "Mermaid モジュールの読み込みに失敗しました — コンソールを確認してください。",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "コードをコピー",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "pdbPlddtLegend": {
+    "message": "pLDDT 信頼度",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
+  "smilesInvalid": {
+    "message": "有効な化学構造ではありません — ソースはそのまま保持されます",
+    "description": "Sidepanel: RDKit rejected the SMILES block as chemically invalid"
+  },
+  "mathCopyLatex": {
+    "message": "LaTeX をコピー",
+    "description": "Sidepanel: formula hover copy-LaTeX button"
+  },
+  "mermaidViewSource": {
+    "message": "ソースを表示",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "拡大",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "縮小",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "リセット",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportPng": {
+    "message": "PNG をエクスポート",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "📎 をクリックして現在のページを添付",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "AI で修正",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "修正中…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "修正に失敗しました：$1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "$1 行目に構文エラー：$2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "ページの内容が不完全そうな場合、添付（📎）の前に自動的に展開とページ送りを行う",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "不完全なページの自動展開・ページ送りを有効にしました。",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "自動展開・ページ送りを無効にしました。",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "ページが不完全なようです — 自動的に展開とページ送りを行っています…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "内容を自動展開しています（$1/$2）…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "$1 ページ目を読み取っています…",
+    "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "思考中… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "$1 に切り替えました。現在の会話はどうしますか？"
+  },
+  "providerSwitchCarry": {
+    "message": "会話を引き継ぐ"
+  },
+  "providerSwitchCarrySub": {
+    "message": "会話の記録が最初のメッセージとして送られます"
+  },
+  "providerSwitchCarryToast": {
+    "message": "次のメッセージとともに、会話が $1 に送られます"
+  },
+  "providerSwitchFresh": {
+    "message": "新しいセッション"
+  },
+  "providerSwitchFreshSub": {
+    "message": "現在の会話をアーカイブして、新しく始めます"
+  },
+  "providerSwitchDirectHint": {
+    "message": "選択せずに送信すると、コンテキストなしで続行します"
+  },
+  "providerNeedsConfig": {
+    "message": "保存する前に、少なくとも Base URL かエイリアスを入力してください。"
+  },
+  "confirmRemoveProvider": {
+    "message": "プロバイダ「$1」とその設定を削除しますか？この操作は取り消せません。"
+  },
+  "confirmResetProvider": {
+    "message": "プロバイダ「$1」をリセットしますか？この操作は取り消せません。"
+  },
+  "confirmResetSystemPrompt": {
+    "message": "デフォルトのシステムプロンプトに戻しますか？現在のテキストは置き換えられます。"
+  },
+  "approvalAllowOnce": {
+    "message": "今回のみ許可"
+  },
+  "approvalAllowSession": {
+    "message": "このセッションでは許可"
+  },
+  "approvalAlwaysAllow": {
+    "message": "常に許可"
+  },
+  "approvalDeny": {
+    "message": "拒否"
+  },
+  "approvalRequired": {
+    "message": "承認が必要："
+  },
+  "clarifyDefault": {
+    "message": "詳しく教えてください："
+  },
+  "clarifyPlaceholder": {
+    "message": "回答を入力…"
+  },
+  "clarifySend": {
+    "message": "送信"
+  },
+  "closeLabel": {
+    "message": "閉じる"
+  },
+  "detailThreadPlaceholder": {
+    "message": "この部分について質問…"
+  },
+  "detailThreadSend": {
+    "message": "送信"
+  },
+  "detailThreadStop": {
+    "message": "停止"
+  },
+  "detailThreadResize": {
+    "message": "ドラッグでサイズを変更"
+  },
+  "inspectCtx": {
+    "message": "確認"
+  },
+  "inspectCtxTitle": {
+    "message": "モデルに送信された完全なコンテキストを表示"
+  },
+  "ctxInspectorTitle": {
+    "message": "コンテキストプレビュー"
+  },
+  "copy": {
+    "message": "コピー"
+  },
+  "undoAttach": {
+    "message": "取り消す"
+  },
+  "undoAttachTitle": {
+    "message": "添付したこのページを会話から取り除きます"
+  },
+  "removeImage": {
+    "message": "画像を削除"
+  },
+  "screenshotFailed": {
+    "message": "スクリーンショットの読み込みに失敗しました — 再試行してください"
+  },
+  "cropCanvasLabel": {
+    "message": "ドラッグまたは方向キーで範囲を選択してください"
+  },
+  "detailThreadLabel": {
+    "message": "続けて質問"
+  },
+  "detailThreadTruncated": {
+    "message": "返信が出力上限に達しました —「続き」と送信すると続けられます。"
+  },
+  "chemExportPng": {
+    "message": "PNG をエクスポート"
+  },
+  "localAgentTabBridge": {
+    "message": "Agent Bridge",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "このタイプには保存済みの設定があります（クリックで表示）",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "思考レベル",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "auto（送信しない）",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "追加 reasoning フィールド（JSON）",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "返信はバックグラウンドで続行され、元のセッションに保存されます",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "streamCancelledNoOrigin": {
+    "message": "進行中の返信をキャンセルしました — 元のセッションを保存できませんでした",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
+  "sessionActiveDot": {
+    "message": "実行中",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
+  },
+  "slashPromptDesc": {
+    "message": "現在アクティブなシステムプロンプトを表示",
+    "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "もう一度クリックで削除"
+  },
+  "deleteTitle": {
+    "message": "メッセージを削除"
+  },
+  "deleteFailed": {
+    "message": "削除に失敗しました — メッセージは保持されています"
+  },
+  "sessionLoadFailed": {
+    "message": "セッションの読み込みに失敗しました"
+  },
+  "quickbarAria": {
+    "message": "クイック操作"
+  },
+  "continueMaxTurns": {
+    "message": "→ 続き"
+  },
+  "retryAction": {
+    "message": "再試行"
+  },
+  "quoteTitle": {
+    "message": "引用"
+  },
+  "editResendTitle": {
+    "message": "編集して再送信"
+  },
+  "copyResponseTitle": {
+    "message": "返信をコピー"
+  },
+  "collapseExpandTitle": {
+    "message": "折りたたみ/展開"
+  },
+  "editSendBtn": {
+    "message": "送信"
+  },
+  "editCancelBtn": {
+    "message": "キャンセル"
+  },
+  "clearChatTitle": {
+    "message": "会話を消去"
+  },
+  "clearChatMsg": {
+    "message": "すべてのメッセージを削除しますか？この操作は取り消せません。"
+  },
+  "clearChatConfirm": {
+    "message": "消去"
+  },
+  "clearAllTitle": {
+    "message": "すべてのセッションを消去"
+  },
+  "clearAllMsg": {
+    "message": "保存されたすべてのセッションを削除しますか？この操作は取り消せません。"
+  },
+  "clearAllConfirm": {
+    "message": "すべて消去"
+  },
+  "sessionDeleted": {
+    "message": "セッションを削除しました"
+  },
+  "sessionRenamed": {
+    "message": "セッション名を変更しました"
+  },
+  "sessionsCleared": {
+    "message": "すべてのセッションを消去しました"
+  },
+  "sessionLoaded": {
+    "message": "読み込みました"
+  },
+  "dblClickRename": {
+    "message": "ダブルクリックで名前を変更"
+  },
+  "exportMarkdown": {
+    "message": "Markdown でエクスポート"
+  },
+  "relJustNow": {
+    "message": "たった今"
+  },
+  "copyThinkingTitle": {
+    "message": "思考内容をコピー"
+  },
+  "multiDeletedOk": {
+    "message": "$1 件のメッセージを削除しました"
+  },
+  "multiDeletedPartial": {
+    "message": "$1 件を削除、$2 件は失敗（インデックスを再調整しました）"
+  },
+  "composerAria": {
+    "message": "メッセージ — Enter で送信、Shift+Enter で改行"
+  },
+  "slashAria": {
+    "message": "スラッシュコマンド"
+  },
+  "sessionExportFailed": {
+    "message": "セッションを読み込めませんでした"
+  },
+  "sessionExported": {
+    "message": "セッションをエクスポートしました"
+  },
+  "bridgeRowPingTitle": {
+    "message": "このエージェントだけを Ping し（/health）、ステータスドットを更新します",
+    "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "マインドマップモジュールの読み込みに失敗しました（コンソールを確認してください）",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "$1 へジャンプ",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "図 $1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "結果なし",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "履歴を描画しています…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "動画をダウンロードしています…（$1s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "動画をダウンロードしています…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "動画をダウンロードしています…（$1MB ダウンロード済み、$2s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "動画のダウンロードに失敗しました：$1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "$1をアップロードしています…（0%）",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "$1をアップロードしています…（$2%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "$1をアップロードしています…（$2MB アップロード済み、$3s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "$1のアップロードに失敗しました：$2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "動画",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "音声",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "処理中",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "動画を解析中",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "文字起こし中",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1…（$2s 経過）",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "動画ファイルの処理に失敗しました：$1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "音声ファイルの処理に失敗しました：$1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "動画解析の出力がモデルの上限で切り詰められました（$1）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "動画解析が不完全です（最終タイムスタンプ $1s / 動画は $2s）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "動画解析が不完全です（タイムラインに $1 分の欠落：$2 → $3）",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "動画解析の出力が空でした",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "ダウンロード約 $1MB",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "この動画には字幕がありません。解析方法を選択してください：",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "音声文字起こし（字幕）",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "動画解析（フレーム＋音声）",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "高速",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "低速",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "トークン消費は少なめ",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "トークン消費は多め",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "音声をダウンロードしています…（$1s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "音声をダウンロードしています…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "音声をダウンロードしています…（$1MB ダウンロード済み、$2s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "音声をトランスコードしています…（$1s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "音声をアップロードしています…（$1%）",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "音声をアップロードしています…（$1MB アップロード済み、$2s 経過）",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "ASR 文字起こしがモデルの出力上限で切り詰められました（$1）",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "ASR 文字起こしが不完全です（タイムラインに $1 分の欠落：$2 → $3）",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": "、$1 文字",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": "、内容は空",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 添付済み：「$1」（$2）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 スクリーンショットを添付：「$1」",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": "、$1 ページ",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": "、$1 ページは OCR が必要な可能性",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": "、$1 個の図",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": "、テキストにエンコーディングの問題がある可能性",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": "、$1 ページに表",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 PDF を添付：「$1」（pdf-text$2）",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 ドキュメントを添付：「$1」（$2）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "Bilibili",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "$1の再生 URL の有効期限が切れ、自動更新に失敗しました（$2）— 動画ページを再読み込みしてから、もう一度添付してください",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "解析方法を選択…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "音声を文字起こししています…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "$1の動画",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "字幕",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "動画解析",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": "、$1MB の動画",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": "、$1MB の音声",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": "、解析 $1 行",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": "、字幕 $1 行",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": "、スクリーンショット $1 枚",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "（解析に失敗 — 元の字幕を保持）",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "（字幕なし — 代わりに動画情報を添付）",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 $1を添付：「$2」（$3）",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "エージェントセッション",
+    "description": "Agent-side session line in the sessions drawer"
+  },
+  "agentSessionCopy": {
+    "message": "セッション ID をコピー",
+    "description": "Copy the agent-side session ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "コピーに失敗しました",
+    "description": "Clipboard failure notice"
+  }
+}

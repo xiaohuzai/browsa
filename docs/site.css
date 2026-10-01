@@ -205,6 +205,14 @@ html[data-md-color-scheme="slate"] .landing .prov-board{background:var(--md-bg)}
   transition:border-color .15s ease,color .15s ease;
 }
 .md-header__lang:hover{border-color:var(--md-link);color:var(--md-link)}
+.md-header__langs{display:inline-flex;gap:6px;align-items:center}
+.md-header__langs a,.md-header__langs strong{
+  font-family:var(--mono);font-size:12.5px;font-weight:600;
+  color:var(--md-header-fg);text-decoration:none;
+  border:1px solid var(--md-hairline);border-radius:6px;padding:3px 10px;
+  transition:border-color .15s ease,color .15s ease}
+.md-header__langs a:hover{border-color:var(--md-link);color:var(--md-link)}
+.md-header__langs strong{background:var(--md-fg-lightest)}
 /* 主题切换：两种图标随 scheme 显隐 */
 .md-header__icon .i-sun{display:none}
 .md-header__icon .i-moon{display:block}

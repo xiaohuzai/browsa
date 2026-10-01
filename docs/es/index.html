@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
+<title>browsa — IA en panel lateral para tu navegador</title>
+<meta name="description" content="browsa es una extensión de panel lateral para Chrome / Edge: lleva la página actual a la conversación — artículos, subtítulos, PDF — y recibe las respuestas en streaming justo al lado. Cualquier API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla, o tu Codex / Claude Code / pi / Gemini CLI vía agent-bridge.">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<meta property="og:title" content="browsa — IA en panel lateral para tu navegador">
+<meta property="og:description" content="Lleva la página actual a la conversación — artículos, vídeos, PDF. Tus propios modelos o agente: código abierto, sin suscripción, sin recargos.">
+<meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
+<meta property="og:url" content="https://xiaohuzai.github.io/browsa/es/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://xiaohuzai.github.io/browsa/es/">
+<link rel="alternate" hreflang="zh-CN" href="https://xiaohuzai.github.io/browsa/">
+<link rel="alternate" hreflang="en" href="https://xiaohuzai.github.io/browsa/en/">
+<link rel="alternate" hreflang="ja" href="https://xiaohuzai.github.io/browsa/ja/">
+<link rel="alternate" hreflang="ko" href="https://xiaohuzai.github.io/browsa/ko/">
+<link rel="alternate" hreflang="es" href="https://xiaohuzai.github.io/browsa/es/">
+<link rel="alternate" hreflang="pt-BR" href="https://xiaohuzai.github.io/browsa/pt-br/">
+<link rel="alternate" hreflang="ru" href="https://xiaohuzai.github.io/browsa/ru/">
+</head>
+<body class="landing">
+<a class="skip-link" href="#main">Saltar al contenido</a>
+
+<header class="md-header">
+  <div class="md-header__inner">
+    <a class="md-header__brand" href="#top" aria-label="Inicio de browsa">
+      <img src="../icon48.png" alt="" width="26" height="26">
+      <span class="md-header__topic"><span class="t">browsa</span><span class="sub">IA en panel lateral para el navegador</span></span>
+    </a>
+    <nav class="md-header__links" aria-label="Navegación de la página">
+      <a href="../en/guide/">Guía</a>
+      <a href="#demo">Demo</a>
+      <a href="#how">Cómo funciona</a>
+      <a href="#features">Funciones</a>
+      <a href="#sites" class="hide-m">Sitios</a>
+      <a href="#install">Instalar</a>
+    </nav>
+    <span class="md-header__spacer"></span>
+    <div class="md-header__actions">
+      <a class="md-header__icon" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+        <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+      </a>
+      <button class="md-header__icon md-scheme-toggle" type="button" aria-label="Cambiar el esquema de color" title="Cambiar el esquema de color">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3z"/></svg>
+      </button>
+      <span class="md-header__langs"><a href="../" lang="zh-CN">中文</a><a href="../en/" lang="en">EN</a><a href="../ja/" lang="ja">日本語</a><a href="../ko/" lang="ko">한국어</a><strong lang="es">ES</strong><a href="../pt-br/" lang="pt-BR">PT</a><a href="../ru/" lang="ru">RU</a></span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" id="top">
+    <div class="container">
+      <div class="hero-copy">
+        <p class="eyebrow">browsa / IA en panel lateral para el navegador</p>
+        <h1>Quédate en la página.<span class="mark">Pregunta a su lado.</span></h1>
+        <p class="lead">
+          ¿Un artículo largo? ¿Un paper denso? ¿Un vídeo que avanza rápido? Lleva la página a una conversación con <strong>tu propia IA</strong>. Recibe la explicación sin copiar y pegar — ni dejar lo que estás leyendo.
+        </p>
+        <div class="cta-group">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
+            Añadir a Chrome ↗
+          </a>
+          <a class="btn btn-secondary" href="../en/guide/quickstart.html">
+            Primeros pasos →
+          </a>
+        </div>
+        <p class="hero-note">Chrome / Edge · <a href="#install">Instalación desde el código fuente disponible</a><br>Extensión gratuita. Conecta tu propio modelo o agente.</p>
+        <div class="hero-meta">
+          <a class="chip" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener"><b>MIT</b> código abierto ↗</a>
+          <span class="chip">El modelo lo eliges tú</span>
+          <span class="chip">Configuración local</span>
+        </div>
+      </div>
+
+      <!-- Scenario switcher -->
+      <div class="scenarios">
+        <div class="scn-tabs" role="radiogroup" aria-label="Ejemplos de uso">
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-article" checked><span class="dot"></span><span>Artículos</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-video"><span class="dot"></span><span>Vídeos</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>Papers</span></label>
+        </div>
+
+        <!-- Scenario 1: Watch video (YouTube) -->
+        <figure class="window w-video" role="img" aria-label="Panel de browsa junto a una página de vídeo de YouTube">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">youtube.com</span>/watch?v=8jPQjjsBbIc</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-video">
+              <div class="yt-nav">
+                <span class="yt-logo"><i>▶</i>YouTube</span>
+                <span class="yt-search">Buscar…</span>
+                <span class="yt-avatar"></span>
+              </div>
+              <div class="yt-main">
+                <div class="yt-col">
+                  <div class="yt-player">
+                    <span class="badge">4K</span>
+                    <span class="play"></span>
+                    <div class="timeline"><div class="track"><div class="fill"></div></div></div>
+                  </div>
+                  <div class="yt-title">Blue Planet II · Episodio 1 – Un océano (documental completo)</div>
+                  <div class="yt-meta">
+                    <span class="yt-avatar2"></span>
+                    <span class="yt-channel">BBC Earth</span>
+                    <span class="yt-sub">Suscribirse</span>
+                    <span>· 12 M de visualizaciones · hace 5 días</span>
+                  </div>
+                  <div class="yt-desc">
+                    Desde los mares poco profundos hasta el abismo, explora los rincones más ocultos del océano:
+                    criaturas bioluminiscentes, la caza cooperativa de las yubartas y la vida en la oscuridad total.
+                    Sabemos menos de nuestro océano que de la superficie de la Luna.
+                  </div>
+                </div>
+                <div class="yt-side">
+                  <div class="yt-thumb"><span class="v">18:42</span><span class="t">Blue Planet II · Ep.2 – Las profundidades</span></div>
+                  <div class="yt-caption">Las profundidades · 4,1 M de visualizaciones</div>
+                  <div class="yt-thumb"><span class="v">21:07</span><span class="t">La bioluminiscencia oceánica, explicada</span></div>
+                  <div class="yt-caption">Bioluminiscencia · 890 K de visualizaciones</div>
+                  <div class="yt-thumb"><span class="v">15:30</span><span class="t">Cómo cazan las yubartas con redes de burbujas</span></div>
+                  <div class="yt-caption">Caza con redes de burbujas · 2,3 M de visualizaciones</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · accesible</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Adjuntado: 《Blue Planet II》Ep.1 – Un océano</div>
+                <div class="p-user"><span class="cmd">/summarize</span> puntos clave, con marcas de tiempo</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Leyendo los subtítulos…</div>
+                  <div class="p-body">
+                    <div class="p-h">Un océano · momentos clave</div>
+                    <p>🌊 Introducción a la escala del océano — lo conocemos menos que la Luna<span class="p-ts">[00:12]</span></p>
+                    <p>✨ La bioluminiscencia abunda en las profundidades, para atraer presas y camuflarse<span class="p-ts">[03:40]</span></p>
+                    <p>🐋 Las yubartas cazan de forma cooperativa con redes de burbujas<span class="p-ts">[08:15]</span></p>
+                    <p>🐙 La vida abisal evolucionó adaptaciones extremas a la presión y la oscuridad<span class="p-ts">[11:48]</span></p>
+                    <p>🌍 Cierre: la actividad humana está transformando los ecosistemas oceánicos<span class="p-ts">[15:02]</span><span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Pregunta lo que quieras… usa 📎 para adjuntar la página actual</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">Notas de vídeo: las respuestas llevan marcas de tiempo <code>[mm:ss]</code> clicables — haz clic para saltar a ese momento.</p>
+        </figure>
+
+        <!-- Scenario 2: Read article -->
+        <figure class="window w-article" role="img" aria-label="Panel de browsa junto a un artículo de un blog">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">dev.to</span>/sidepanel-ai/read-anywhere-ask-anywhere</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-article">
+              <div class="art-nav">
+                <span class="art-logo" style="color:#0f0f0f">DEV</span>
+                <a>Publicaciones</a><a>Pódcast</a><a>Vídeos</a><a>Etiquetas</a>
+                <span class="art-search">Buscar artículos…</span>
+              </div>
+              <div class="art-main">
+                <span class="art-tag" style="color:#57534e;background:rgba(87,83,78,.08)">IA · Navegadores</span>
+                <div class="art-title">Un copiloto de IA al lado de cada página que lees</div>
+                <div class="art-meta"><span class="art-avatar" style="background:#0f0f0f"></span><span>Sarah Dev · 12 min de lectura</span></div>
+                <p class="art-p">Darle a un LLM el texto de una página es fácil; lograr que «entienda» de verdad la página es lo difícil. Usamos una cascada de tres capas: primero Readability para obtener un texto limpio del artículo, después un árbol DOM que conserva la estructura y, como último recurso, el texto completo. En los sitios principales leemos los datos estructurados que la página ya cargó — subtítulos, comentarios, fuente del artículo.</p>
+                <div class="art-code"><span class="ac-line hl"></span><span class="ac-line"></span><span class="ac-line short"></span><span class="ac-line mid"></span></div>
+                <p class="art-p">Sin reautenticación, sin subidas a terceros — los datos fluyen solo entre tu navegador y tu propio backend.</p>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · accesible</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Adjuntado: Un copiloto de IA en cada página que lees</div>
+                <div class="p-user"><span class="cmd">/keypoints</span> ¿cuáles son las ideas principales?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Leyendo el artículo…</div>
+                  <div class="p-body">
+                    <div class="p-h">Ideas principales</div>
+                    <p>🧠 Cascada de tres capas: Readability → árbol DOM → texto completo</p>
+                    <p>🕵️ Los sitios principales leen sus propios datos cargados — sin reautenticación</p>
+                    <p>🔒 Los datos se quedan entre tu navegador y tu backend</p>
+                    <p>⚡ Artículos, subtítulos y PDF, todo cubierto<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Pregunta lo que quieras… usa 📎 para adjuntar la página actual</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">Artículos: <code>/keypoints</code> extrae lo esencial; el cuerpo se adjunta mediante la cascada de Readability.</p>
+        </figure>
+
+        <!-- Scenario 3: Open PDF -->
+        <figure class="window w-pdf" role="img" aria-label="Panel de browsa junto a un visor de PDF">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">arxiv.org</span>/pdf/1706.03762</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-pdf">
+              <div class="pdf-bar">
+                <span class="pdf-name">attention-is-all-you-need.pdf</span>
+                <span class="pdf-page">Página 1 / 15</span>
+                <span>100%</span>
+              </div>
+              <div class="pdf-paper">
+                <div class="pdf-title">Attention Is All You Need</div>
+                <div class="pdf-meta">Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, et al.</div>
+                <div class="pdf-abstract"><b>Abstract</b> — Los modelos dominantes de transducción de secuencias se basan en redes neuronales recurrentes o convolucionales complejas… Proponemos una arquitectura de red nueva y simple, el Transformer, basada únicamente en mecanismos de atención.</div>
+                <div class="pdf-p">El Transformer prescinde de la recurrencia y permite un paralelismo mucho mayor, reduciendo el tiempo de entrenamiento.</div>
+                <div class="pdf-figure">
+                  <div class="fig-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="fig-cap">Figura 1: The Transformer – arquitectura del modelo</div>
+                </div>
+                <div class="pdf-p">Alcanza el estado del arte en WMT 2014 de inglés a alemán y de inglés a francés con una fracción del coste de entrenamiento.</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · accesible</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 Adjuntado: PDF 《Attention Is All You Need》(15 páginas · 6 figuras)</div>
+                <div class="p-user">¿Cuál es la contribución principal?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> Analizando el PDF…</div>
+                  <div class="p-body">
+                    <div class="p-h">Contribución principal</div>
+                    <p>⚙️ Transformer — solo atención, sin recurrencia ni convolución</p>
+                    <p>⚡ Muy paralelo, entrena mucho más rápido que una RNN/LSTM</p>
+                    <p>📊 La fig. 1 muestra la arquitectura; las figs. 2–4, el entrenamiento y los resultados BLEU<span class="p-ts">Fig.1</span></p>
+                    <p>🏆 SOTA en ambas tareas de WMT 2014 con un menor coste de entrenamiento<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">Pregunta lo que quieras… usa 📎 para adjuntar la página actual</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">PDF: el WASM local reconstruye tablas / encabezados / diseño; las regiones de las figuras se recortan y llevan pie automáticamente.</p>
+        </figure>
+        <p class="scenario-note">Interfaz ilustrativa · Cambia de escena para ver cómo trabaja browsa con la página.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo video -->
+  <section id="demo">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">demo</p>
+        <h2>browsa en 60 segundos</h2>
+        <p>Captura de pantalla real: adjunta una página y pregunta, lanza preguntas sobre una frase seleccionada, explica una selección en su sitio, una cronología de vídeo clicable — con diagramas y una estructura 3D de una proteína renderizados dentro de la respuesta, y las llamadas a herramientas de un agente que acaban en una tarjeta de aprobación.</p>
+      </div>
+      <figure class="demo-video">
+        <video controls preload="none" poster="../assets/promo/poster.jpg" width="960">
+          <source src="../assets/promo/browsa-promo-v3.mp4" type="video/mp4" />
+          Tu navegador no admite vídeo incrustado — <a href="../assets/promo/browsa-promo-v3.mp4">descárgalo aquí</a>.
+        </video>
+        <figcaption>Diseñado para verse sin sonido: subtítulos bilingües de principio a fin, se entiende por completo incluso en silencio. También en <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a>.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">cómo funciona</p>
+        <h2>Tres pasos para hablar con una página web</h2>
+        <p>Sin cambiar de ventana, sin copiar y pegar. browsa permanece en silencio junto a la página que estás leyendo — como una nota al margen.</p>
+      </div>
+      <div class="how-list">
+        <div class="how">
+          <span class="no">01</span>
+          <h3>Abre el panel lateral <span class="tag">Ctrl+Shift+H</span></h3>
+          <p>Pulsa el atajo o haz clic en el icono de la barra de herramientas en cualquier página. El panel de browsa aparece a la derecha.</p>
+        </div>
+        <div class="how">
+          <span class="no">02</span>
+          <h3>Adjunta la página <span class="tag">📎</span></h3>
+          <p>Haz clic en 📎 y el contenido de la página fluye a la conversación — artículos, subtítulos, PDF. El texto seleccionado se puede preguntar directamente.</p>
+        </div>
+        <div class="how">
+          <span class="no">03</span>
+          <h3>Respuestas en streaming <span class="tag">cualquier backend</span></h3>
+          <p>Las respuestas llegan en streaming palabra a palabra, con Markdown, matemáticas y gráficos. Conecta tu propia API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla — tu Codex / Claude Code con la sesión de tu suscripción, el Gemini CLI con login de Google vía agent-bridge, o pi con sus propios modelos configurados. La interfaz sigue el idioma de tu navegador — English, 中文, 日本語, 한국어, Español, Português, Русский — y se puede cambiar en Ajustes.</p>
+        </div>
+      </div>
+      <p class="site-note">¿Ya lo tienes instalado? La <a href="../en/guide/quickstart.html">guía rápida</a> te acompaña hasta tu primera pregunta; la <a href="../en/guide/">guía completa</a> cubre lectura, vídeo, renderizado, sesiones, backends y ajustes.</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">funciones</p>
+        <h2>Más que un cuadro de chat</h2>
+        <p>browsa pone «leer» y «preguntar» en el mismo sitio: artículos largos, vídeos, PDF — la IA está justo ahí.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature">
+          <span class="f-tag">attach</span>
+          <h3>Adjuntar la página</h3>
+          <p>Lleva la página actual a la conversación con un clic — los modos se eligen solos:</p>
+          <ul>
+            <li>Cascada automática: cuerpo Readability → árbol DOM → texto completo</li>
+            <li>📷 Modo captura de pantalla, para modelos multimodales</li>
+            <li>PDF analizado localmente: el WASM reconstruye tablas / encabezados / diseño, figuras recortadas automáticamente</li>
+            <li>Las páginas de archivos de GitHub obtienen el código fuente directamente, saltándose la limpieza de la página</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">select</span>
+          <h3>Preguntas sobre la selección</h3>
+          <p>Selecciona cualquier texto en cualquier página y pregunta directamente:</p>
+          <ul>
+            <li>Barra flotante: Preguntar · Explicar · Traducir · Resumir</li>
+            <li>Explicar / Traducir responden en línea — en streaming, en el propio sitio, sin panel</li>
+            <li>Preguntar / Resumir: la selección viaja al panel — sin necesidad de 📎 antes</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">render</span>
+          <h3>Renderizado enriquecido</h3>
+          <p>Las respuestas son más que texto plano — fórmulas y diagramas se renderizan en tu navegador:</p>
+          <ul>
+            <li>Markdown GFM + resaltado de sintaxis para más de 40 lenguajes</li>
+            <li>Matemáticas LaTeX (KaTeX, acelerado con Web Worker)</li>
+            <li>Diagramas Mermaid, ECharts, mapas mentales Markmap</li>
+            <li>¿Un bloque Mermaid que no se puede analizar? Pide a tu IA configurada que lo corrija y lo vuelva a renderizar</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">video</span>
+          <h3>Notas de vídeo</h3>
+          <p>Un flujo de trabajo completo para el vídeo — subtítulos estructurados de YouTube y Bilibili:</p>
+          <ul>
+            <li>Las respuestas llevan marcas de tiempo <code>[mm:ss]</code> clicables que saltan al momento del vídeo</li>
+            <li>Los vídeos de Bilibili sin subtítulos también se pueden resumir — transcripción ASR automática</li>
+            <li>Las transcripciones largas se comprimen automáticamente en puntos, conservando las marcas de tiempo</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">provider</span>
+          <h3>Cualquier backend</h3>
+          <p>Sin dependencia de ningún proveedor — conecta tus propios modelos:</p>
+          <ul>
+            <li>Agente Hermes: ejecución de herramientas, aprobación de acciones de riesgo, progreso visible</li>
+            <li>Agente OpenCode: línea directa con el agente CLI de opencode — el mismo flujo completo de herramientas y aprobaciones</li>
+            <li>Agente OpenSquilla: agente de escritorio local vía su gateway WebSocket — memoria de sesión en el servidor, salida del razonamiento, cancelación en el servidor</li>
+            <li>Agent Bridge: conecta agentes CLI locales — Codex / Claude Code con la sesión de tu suscripción (el lado del modelo funciona con tu suscripción), el Gemini CLI con login de Google, o pi con el modelo que le configures; una sola tarjeta conecta varios agentes a la vez, cada uno con su propia sesión y estado de Ping</li>
+            <li>Las conversaciones con agentes viven en el lado del agente: browsa nombra la sesión automáticamente («browsa:» + tu primer mensaje) para que puedas retomarla en la propia interfaz del agente; el ID de sesión se muestra y se puede copiar en el historial de sesiones</li>
+            <li>Cualquier API compatible con OpenAI: OpenAI, Ollama, LiteLLM…</li>
+            <li>Añade varios modelos por tarjeta — cambia mediante «Alias · modelo» en la barra lateral</li>
+            <li>Nivel de razonamiento por modelo: las opciones siguen a la familia del modelo y los campos de la petición se adaptan a cada dialecto de API</li>
+            <li>Ping para verificar la conectividad y las capacidades</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">privacy</span>
+          <h3>Privacidad primero</h3>
+          <p>Sin cuenta de browsa. El servicio de modelos lo eliges tú:</p>
+          <ul>
+            <li>Las claves de API se guardan localmente y solo se usan para autenticarte con tu proveedor configurado</li>
+            <li>Las URL del contexto de la página se enmascaran localmente antes de enviarlas — tokens, contraseñas y firmas eliminados</li>
+            <li>Los PDF se analizan en el dispositivo; el texto y las imágenes extraídas se pueden adjuntar a las peticiones del modelo</li>
+            <li>Los documentos de Office (docx/pptx/xlsx/…) también se convierten a Markdown en el dispositivo — los archivos nunca salen de la máquina</li>
+            <li>El contenido va únicamente al backend que tú configuras</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">input</span>
+          <h3>Entrada rápida</h3>
+          <p>Di más sin escribir más:</p>
+          <ul>
+            <li>Acciones rápidas: Resumir / Puntos clave / Explicar / Esquema</li>
+            <li>Comandos de barra diagonal + historial de entrada ↑/↓; los borradores sobreviven al cerrar el panel</li>
+            <li>Sigue escribiendo mientras llega la respuesta — los mensajes se ponen en cola y se envían en orden</li>
+            <li>Pega código en el compositor — tu propia burbuja lo renderiza como un bloque resaltado (botón de copiar, lenguaje detectado automáticamente); todo lo demás se conserva byte a byte</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">session</span>
+          <h3>Sesiones</h3>
+          <p>Las conversaciones largas se mantienen ordenadas:</p>
+          <ul>
+            <li>Guarda / restaura sesiones con nombre, exporta como Markdown</li>
+            <li>Cambiar de sesión a mitad de respuesta nunca la interrumpe — termina en segundo plano y queda en la sesión donde empezó</li>
+            <li>Búsqueda de texto completo en la conversación (<code>Ctrl+F</code>)</li>
+            <li>«Preguntar más» sobre cualquier texto de una respuesta sin tocar el historial principal; pega imágenes directamente; el ↑/↓ del cuadro de entrada recupera solo las preguntas de seguimiento; las fórmulas citadas se muestran como matemáticas</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sites -->
+  <section id="sites">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">sitios compatibles</p>
+        <h2>Lee tus páginas web</h2>
+        <p>En estos sitios browsa lee los datos estructurados que la página ya cargó — subtítulos, comentarios, fuente del artículo, cotizaciones — en lugar de adivinar.</p>
+      </div>
+      <div class="site-strip">
+        <span class="site-chip">YouTube<span class="en">subtítulos/capítulos</span></span>
+        <span class="site-chip">Bilibili<span class="en">subtítulos/ASR/estadísticas</span></span>
+        <span class="site-chip">Xiaohongshu<span class="en">notas/comentarios</span></span>
+        <span class="site-chip">Juejin<span class="en">fuente del artículo</span></span>
+        <span class="site-chip">Zhihu<span class="en">artículos/respuestas</span></span>
+        <span class="site-chip">X / Twitter<span class="en">tuits/respuestas</span></span>
+        <span class="site-chip">Reddit<span class="en">publicaciones/comentarios</span></span>
+        <span class="site-chip">Xueqiu<span class="en">cotizaciones/publicaciones</span></span>
+        <span class="site-chip">Xiaoyuzhou<span class="en">pódcast</span></span>
+        <span class="site-chip">Dedao<span class="en">artículos</span></span>
+        <span class="site-chip">GeekTime<span class="en">artículos</span></span>
+      </div>
+      <p class="site-note">
+        <b>Observa, nunca secuestra:</b> la extracción funciona observando las propias peticiones del navegador — sin reautenticación,
+        y nada se sube a terceros. Cualquier otra página web también funciona, solo que con menos profundidad.
+      </p>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <!-- Your Keys -->
+  <section id="keys">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">tus claves, tu agente</p>
+        <h2>Tus claves. Tus modelos. <em>Tu agente.</em></h2>
+        <p>browsa no vende suscripciones, no pide cuenta, no cobra recargos. Simplemente lleva tus propios endpoints de modelos al panel lateral — en la nube, local o autoalojado.</p>
+      </div>
+      <div class="keys-grid">
+        <ul class="keys-list">
+          <li><span class="tick">›</span><span><b>Sin cuenta ni telemetría.</b> Instala y usa — nada pasa nunca por nosotros.</span></li>
+          <li><span class="tick">›</span><span><b>Las claves de API se quedan en local</b>, enviadas solo a los endpoints que configures.</span></li>
+          <li><span class="tick">›</span><span><b>Modelos locales con Ollama / LM Studio</b> — también funciona totalmente sin conexión.</span></li>
+          <li><span class="tick">›</span><span><b>Agentes de verdad</b>: ejecución de herramientas, progreso en vivo, aprobación antes de las acciones de riesgo.</span></li>
+        </ul>
+        <div class="prov-board" data-label="Ejemplos de conexión" role="img" aria-label="Ejemplos de conexión: API de modelos, modelos locales, Hermes, OpenCode, OpenSquilla y Agent Bridge">
+          <div class="prov-card">
+            <span class="prov-ava pa-openai">O</span>
+            <span class="prov-info"><span class="prov-name">Mi OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
+            <span class="prov-badge pb-ok">accesible</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-claude">C</span>
+            <span class="prov-info"><span class="prov-name">Claude</span><span class="prov-model">claude-sonnet · /v1/messages</span></span>
+            <span class="prov-badge pb-idle">sin Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-ollama">L</span>
+            <span class="prov-info"><span class="prov-name">Ollama (local)</span><span class="prov-model">localhost:11434 · qwen3:32b</span></span>
+            <span class="prov-badge pb-ok">ok sin conexión</span>
+          </div>
+          <div class="prov-card active">
+            <span class="prov-ava pa-hermes">H</span>
+            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approvals</span></span>
+            <span class="prov-badge pb-ok">accesible</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-opencode">oc</span>
+            <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">sin Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-squilla">Sq</span>
+            <span class="prov-info"><span class="prov-name">OpenSquilla Agent</span><span class="prov-model">gateway /ws · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">sin Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-bridge">↔</span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini · conecta agentes CLI locales</span></span>
+            <span class="prov-badge pb-idle">puente</span>
+          </div>
+        </div>
+      </div>
+      <p class="site-note">¿No sabes cuál elegir? <a href="../en/guide/providers.html">Lee la guía de configuración de modelos y agentes →</a></p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">instalación</p>
+        <h2>Empieza con tu próxima lectura.</h2>
+        <p>Elige un método de instalación y después conecta tu modelo o agente. La extensión browsa es gratuita.</p>
+      </div>
+      <div class="install-options">
+        <article class="install-option recommended">
+          <p class="install-label">Recomendada · Actualizaciones automáticas</p>
+          <h3>Instalar desde la tienda</h3>
+          <p>La forma más sencilla de empezar. Añade la extensión y conecta tu modelo en Ajustes. La revisión de la tienda puede ir por detrás de las versiones de GitHub.</p>
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Añadir a Chrome ↗</a>
+        </article>
+        <article class="install-option">
+          <p class="install-label">Alternativa · Actualizaciones manuales</p>
+          <h3>Cargar desde GitHub</h3>
+          <p>Descarga y descomprime una versión. Activa el modo de desarrollador en el gestor de extensiones de tu navegador, elige «Cargar sin empaquetar» y selecciona la carpeta que contenga <code>manifest.json</code>.</p>
+          <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Descargar una versión ↗</a>
+        </article>
+      </div>
+      <div class="install-next">
+        <div><h3>¿Instalado? Conecta todo.</h3><p>Configura una API de modelo o un agente local en Ajustes y haz Ping para verificar. Abre un artículo, adjúntalo con 📎 y lanza tu primera pregunta.</p></div>
+        <a class="btn btn-secondary" href="../en/guide/quickstart.html">Sigue la guía de configuración →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="md-footer">
+  <div class="md-footer__inner">
+    <div class="md-footer__copy">
+      <div class="brandline"><img src="../icon48.png" alt="" width="18" height="18"><span class="wordmark">browsa</span></div>
+      <div class="maintained">Mantenido por <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">xiaohuzai</a>.</div>
+    </div>
+    <nav class="md-footer__links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">Versiones</a>
+      <a href="../en/guide/">Guía</a>
+      <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="../en/privacy.html">Privacidad</a>
+    </nav>
+    <div class="md-footer__meta"><span>IA en panel lateral para el navegador · lee en cualquier parte, pregunta en cualquier parte</span><span>browsa · Licencia MIT</span></div>
+  </div>
+</footer>
+
+<script src="../site.js"></script>
+</body>
+</html>

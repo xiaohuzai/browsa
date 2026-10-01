@@ -1,0 +1,1589 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "ИИ-боковая панель: общайтесь с открытой страницей —статьи, видео, PDF— через свою модель или агента. Открытый код, без аккаунта.",
+    "description": "Extension description"
+  },
+  "settingsTooltip": {
+    "message": "Настройки (провайдер / API-ключ)",
+    "description": "Settings button tooltip"
+  },
+  "contextScreenshot": {
+    "message": "Скриншот",
+    "description": "Screenshot mode"
+  },
+  "inputPlaceholder": {
+    "message": "Спросите о чём угодно…",
+    "description": "Composer placeholder"
+  },
+  "quickSummarize": {
+    "message": "Обобщить",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "Тезисы",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "Объяснить",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "Перевести",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "Структура",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "Показать/скрыть быстрые действия",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "История сессий",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ Новая сессия",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "Поиск по названиям и содержимому…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "Сохранённых сессий пока нет.",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "Начните новую сессию — текущий диалог будет заархивирован.",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "Нет сессий по вашему запросу.",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "Очистить все сессии",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "Закрыть",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "Поиск по сообщениям…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "Предыдущее (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "Следующее (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "Закрыть (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "Поиск по сообщениям (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "Выбрать сообщения",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "Новый диалог (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "Прикрепить текущую страницу к диалогу",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "ИИ-провайдер",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "Остановить генерацию",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "Авто",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "Режим контекста",
+    "description": "Context mode group aria-label"
+  },
+  "toolbarHide": {
+    "message": "Скрыть на этой странице",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "Скрыть панель на этой странице?",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "До перезагрузки страницы она больше не появится.",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "Отмена",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "Скрыть",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "Спросить",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "Объяснить",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "Перевести",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "Обобщить",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "Быстрые действия browsa",
+    "description": "Selection toolbar aria-label"
+  },
+  "inlineExplainAria": {
+    "message": "Объяснение",
+    "description": "Inline explain popover aria-label"
+  },
+  "inlineExplainWaiting": {
+    "message": "Объясняем…",
+    "description": "Inline explain popover: waiting for the model"
+  },
+  "inlineTranslateWaiting": {
+    "message": "Переводим…",
+    "description": "Inline translate popover: waiting for the model"
+  },
+  "inlineTranslateError": {
+    "message": "Не удалось перевести",
+    "description": "Inline translate popover: error prefix"
+  },
+  "inlineExplainCopy": {
+    "message": "Копировать",
+    "description": "Inline explain popover: copy the answer"
+  },
+  "inlineExplainCopied": {
+    "message": "Скопировано",
+    "description": "Inline explain popover: copied feedback"
+  },
+  "inlineExplainRetry": {
+    "message": "Повторить",
+    "description": "Inline explain popover: retry the request"
+  },
+  "inlineExplainSide": {
+    "message": "Продолжить в боковой панели",
+    "description": "Inline explain popover: continue in the side panel"
+  },
+  "inlineExplainClose": {
+    "message": "Закрыть",
+    "description": "Inline explain popover: close button aria-label"
+  },
+  "inlineExplainError": {
+    "message": "Не удалось объяснить",
+    "description": "Inline explain popover: error prefix"
+  },
+  "regenTitle": {
+    "message": "Сгенерировать ответ заново",
+    "description": "Assistant message action: regenerate"
+  },
+  "errAuth": {
+    "message": "Ошибка аутентификации — проверьте API-ключ и права доступа.",
+    "description": "Error card headline: 401/403 class"
+  },
+  "errRateLimit": {
+    "message": "Лимит запросов или квота исчерпаны — подождите немного или проверьте биллинг.",
+    "description": "Error card headline: 429/quota class"
+  },
+  "errModel": {
+    "message": "Модель не найдена у этого провайдера — проверьте ID модели в настройках.",
+    "description": "Error card headline: unknown model class"
+  },
+  "errTimeout": {
+    "message": "Истекло время ожидания запроса — попробуйте снова; если диалог очень длинный, начните новый.",
+    "description": "Error card headline: timeout class"
+  },
+  "errNetwork": {
+    "message": "Сетевая ошибка — устройство не может подключиться к эндпоинту.",
+    "description": "Error card headline: network/DNS class"
+  },
+  "errServer": {
+    "message": "Ошибка сервера провайдера — попробуйте ещё раз чуть позже.",
+    "description": "Error card headline: 5xx class"
+  },
+  "errGeneric": {
+    "message": "Что-то пошло не так.",
+    "description": "Error card headline fallback"
+  },
+  "errRawToggle": {
+    "message": "Исходный текст ошибки",
+    "description": "Error card raw-text disclosure label"
+  },
+  "copyLabel": {
+    "message": "Копировать",
+    "description": "Generic copy button label"
+  },
+  "queuedLabel": {
+    "message": "В очереди",
+    "description": "Follow-up queue dock label"
+  },
+  "queuedSendNow": {
+    "message": "Отправить сейчас",
+    "description": "Follow-up queue chip: send immediately"
+  },
+  "queuedRemove": {
+    "message": "Убрать из очереди",
+    "description": "Follow-up queue chip: remove"
+  },
+  "pinnedGroupLabel": {
+    "message": "Закреплённые",
+    "description": "Sessions drawer pinned group header"
+  },
+  "pinSession": {
+    "message": "Закрепить",
+    "description": "Session row pin action tooltip"
+  },
+  "unpinSession": {
+    "message": "Открепить",
+    "description": "Session row unpin action tooltip"
+  },
+  "deleteSession": {
+    "message": "Удалить сессию",
+    "description": "Session row delete tooltip"
+  },
+  "deleteArmedHint": {
+    "message": "Нажмите ещё раз для удаления",
+    "description": "Two-step delete armed state tooltip"
+  },
+  "contentMatchHint": {
+    "message": "совпадение в содержимом сообщений",
+    "description": "Content-only search hit dot tooltip"
+  },
+  "sessionsToday": {
+    "message": "Сегодня",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsYesterday": {
+    "message": "Вчера",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsWeek": {
+    "message": "На этой неделе",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsEarlier": {
+    "message": "Ранее",
+    "description": "Sessions drawer time bucket"
+  },
+  "transcriptBtnTitle": {
+    "message": "Таймлайн видео",
+    "description": "Topbar button: open the video timeline drawer"
+  },
+  "transcriptTitle": {
+    "message": "Таймлайн видео",
+    "description": "Video timeline drawer header title"
+  },
+  "transcriptSearchPlaceholder": {
+    "message": "Поиск по таймлайну…",
+    "description": "Video timeline drawer search input"
+  },
+  "transcriptNote": {
+    "message": "Добавить заметку на позиции воспроизведения",
+    "description": "Transcript drawer note-capture button tooltip"
+  },
+  "followPlayback": {
+    "message": "К позиции воспроизведения",
+    "description": "Transcript drawer floating pill after manual scroll"
+  },
+  "thinkDoneTitle": {
+    "message": "Процесс размышления",
+    "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "Структура диалога",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "(пустое сообщение)",
+    "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "Язык интерфейса",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "Язык",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "Переключение языка интерфейса. По умолчанию используется язык браузера.",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "Авто (как в браузере)",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "Настройки",
+    "description": "Options page subtitle"
+  },
+  "guideLinkText": {
+    "message": "Руководство пользователя",
+    "description": "Settings header: link to the usage-guide website"
+  },
+  "rateLinkText": {
+    "message": "⭐ Оценить browsa",
+    "description": "Settings header: neutral link to the Chrome Web Store reviews tab (no incentive wording)"
+  },
+  "providersHeading": {
+    "message": "ИИ-провайдеры",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "Настройте своих ИИ-провайдеров.",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">Открыть руководство: ИИ-провайдеры</a>",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "Системный промпт",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "Добавляется как <code>role: system</code> перед каждым диалогом. Задайте здесь язык, тон и правила оформления ответов ассистента.",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "Например: Вы — полезный ассистент. Строчные формулы — $...$, выносные — $$...$$.",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "Сохранить",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "Восстановить по умолчанию",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "Язык ответов",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "Авто (по системному промпту)",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ Дополнительно",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "Плавающая панель выделения",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "Над выделенным текстом появляется мини-панель быстрых действий: Спросить, Объяснить, Перевести, Обобщить.",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "Показывать плавающую панель при выделении текста",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "Прикрепляя страницу (📎), учитывать инструкции сайта из <code>llms.txt</code>",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "Настройки чата",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "Размер шрифта сообщений",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "Сочетание клавиш для отправки",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter (Shift+Enter — новая строка)",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter (Enter — новая строка)",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "Автоматически сворачивать блоки размышлений",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "ASR-субтитры и видео",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "Включить ASR",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "Прикрепите страницу с видео — транскрибация/анализ запустятся автоматически. Поддерживаемые платформы: YouTube и Bilibili.",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "Провайдер",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "Источник субтитров",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "Предпочитать встроенные субтитры",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "Предпочитать ASR-транскрипцию",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "Язык",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "Определять автоматически",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "ID модели (транскрипция аудио)",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "ID модели для видео (анализ видео; пусто = использовать модель выше)",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "Оставьте пустым = как у модели транскрипции",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "Документация",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 Документация",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": " (рекомендуется)",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "Volcengine Ark",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "API-ключ Ark (UUID или с префиксом ark-)",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "Используйте стандартный эндпоинт <code>…/api/v3</code>: у Agent Plan эндпоинт <code>…/api/plan/v3</code> не поддерживает загрузку файлов (Files API), как показала проверка.",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "Зачем такая конфигурация? → документация Ark по пониманию аудио",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 Агентные провайдеры",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "Полноценный агентный бэкенд — исполнение инструментов, доступ к файлам, многошаговые задачи",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 LLM-провайдеры",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "Эндпоинт языковой модели — добавляйте сколько хотите; каждый выбирает свой протокол",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ Добавить провайдера",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "Зарезервированный пустой слот — заполните и сохраните, чтобы закрепить его",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "Нажмите, чтобы сделать активным провайдером",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "Удалить этого провайдера",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "Псевдоним",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "например, My OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "Базовый URL",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "API-ключ",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "Показать / скрыть ключ",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "Показать или скрыть API-ключ",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "ID модели",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "Удалить модель",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "Удалить",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "добавить ID модели — Enter",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "Добавить ID модели",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "Добавить модель",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "Добавить ID модели",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● доступен",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● недоступен",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ не проверялся",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ не задано",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "Пустой слот — заполните и сохраните",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ Для LLM-провайдеров требуется ID модели",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Ping…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " — назначен активным провайдером",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ Сохранено",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "Сбросить",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Документация по установке и настройке Hermes API Server",
+    "description": "Options: Hermes docs link text"
+  },
+  "opencodeTip": {
+    "message": "Запустите <code>opencode serve --port 4096</code> в терминале и впишите адрес из его вывода (порт лучше зафиксировать — иначе он меняется при каждом перезапуске). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">документация opencode Server</a>",
+    "description": "Options: opencode server setup tip"
+  },
+  "squillaTip": {
+    "message": "WebSocket-адрес шлюза OpenSquilla — по умолчанию ws://127.0.0.1:18791/ws. Шлюз должен видеть origin этого расширения в cors.allowed_origins — в ~/.opensquilla/config.toml для CLI-шлюза или в profile config самого десктоп-приложения (macOS: ~/Library/Application Support/OpenSquilla/opensquilla/config.toml); нативная поддержка с версии v0.5.5. <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">документация OpenSquilla</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
+  "bridgeTip": {
+    "message": "Установите и запустите мост согласно <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">документации agent-bridge</a>. Один адрес моста на строку. API-ключ нужен, только если мост настроен с ключом, — мост без ключа на loopback-адресе игнорирует это поле (даже неверный ключ всё равно покажет доступность при ping).",
+    "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "API-ключ (необязательно)",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "Не задано",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "«$1» не настроен — выполнено переключение на «$2»",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ Добавить агента",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "Псевдоним (оставьте пустым — подставится автоматически после Ping)",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "Удалить этот адрес",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "Прежде чем выполнять ping, добавьте хотя бы один адрес моста.",
+    "description": "Options: bridge ping with zero endpoints"
+  },
+  "systemPromptSaved": {
+    "message": "Системный промпт сохранён.",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "Системный промпт сброшен к значению по умолчанию.",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "Язык ответов: «$1».",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "Язык ответов: авто.",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "Плавающая панель включена.",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "Плавающая панель отключена.",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "llms.txt будет учитываться при прикреплении страниц.",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt отключён.",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "Для включения ASR нужен API-ключ.",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "Базовый URL автоматически исправлен с эндпоинта Agent Plan на стандартный $1 (в api/plan/v3 нет загрузки файлов).",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1 ($2, модель $3).",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "включён",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "выключен",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusReachable": {
+    "message": "● доступен",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ недоступен",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "не проверялся",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "Текст не выделен — выделите его заново.",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "Читаем страницу…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "Не удалось прочитать страницу",
+    "description": "Sidepanel: read page failed"
+  },
+  "pageNavigatedDuringRead": {
+    "message": "Страница перешла на другой адрес во время чтения — прикрепите заново",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
+  "progressParsingPdf": {
+    "message": "Разбираем PDF…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressParsingDoc": {
+    "message": "Разбираем документ…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
+  "pdfAttachFailed": {
+    "message": "Не удалось прикрепить PDF",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "Не удалось прикрепить скриншот",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
+  },
+  "officeAttachFailed": {
+    "message": "Не удалось прикрепить документ",
+    "description": "Sidepanel: Office document attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "Не удалось прикрепить ASR",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "Не удалось прикрепить страницу: $1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "Сессия сохранена: «$1»",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "cannotOpenSettings": {
+    "message": "Не удалось открыть настройки: $1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "Переключено на $1",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "Изображение слишком велико: $1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "imageBudgetExceeded": {
+    "message": "Изображение не прикреплено ($1) — слишком велико для отправки; в одно сообщение помещается около $2 МБ изображений.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "Изображение не прикреплено ($1) — не более $2 изображений на сообщение.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
+  "outputTruncatedToast": {
+    "message": "Ответ снова упёрся в лимит вывода модели — нажмите «Продолжить» или ответьте 继续.",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ Продолжить",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "Нет активной вкладки.",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "Источник видео недоступен — переход к таймкоду невозможен.",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "Позиция воспроизведения или строка субтитров пока недоступны.",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "Скопировано",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "Не удалось усечь историю — повторная генерация отменена.",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "Не удалось усечь историю — правка не сохранена.",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "Не удалось отправить подтверждение: $1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "Не удалось отправить ответ: $1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "фоновая страница расширения перезапустилась — попробуйте снова",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "Анализ видео",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "ASR-транскрипция",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": ": ",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "неизвестная ошибка",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "— API-ключ ASR похож на ключ Agent Plan, который не взаимозаменяем со стандартным ключом платформы Ark. Замените его на ключ платформы (UUID или с префиксом ark-) в «Настройки → ASR».",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "Использованы встроенные субтитры (YouTube заблокировал скачивание аудио)",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "Использованы метаданные видео (YouTube заблокировал скачивание аудио)",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "Использованы метаданные видео",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ У этого видео нет субтитров — оставлено как есть (только метаданные видео). Чтобы транскрибировать автоматически, включите ASR в настройках и прикрепите заново.",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "Используем ранее загруженное аудио (действительно 30 дней) — скачивание и загрузка пропускаются…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "Скачиваем аудио…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "Используем ранее загруженное видео (действительно 30 дней) — загрузка пропускается…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "Снимаем ключевые кадры…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "Перекодируем аудио… (в WAV)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "Загружаем аудио… (0%)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "Скачиваем и транскрибируем аудио…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "Перейти к полю ввода",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "Сообщение",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "Удалить выбранные",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "Отмена",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "Выбрано: $1",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "символов",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "токенов",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "Не удалось загрузить модуль Mermaid — проверьте консоль.",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "Копировать код",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "pdbPlddtLegend": {
+    "message": "Уверенность pLDDT",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
+  "smilesInvalid": {
+    "message": "Некорректная химическая структура — исходник оставлен без изменений",
+    "description": "Sidepanel: RDKit rejected the SMILES block as chemically invalid"
+  },
+  "mathCopyLatex": {
+    "message": "Копировать LaTeX",
+    "description": "Sidepanel: formula hover copy-LaTeX button"
+  },
+  "mermaidViewSource": {
+    "message": "Показать исходник",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "Приблизить",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "Отдалить",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "Сбросить",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportPng": {
+    "message": "Экспорт в PNG",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "Нажмите 📎, чтобы прикрепить текущую страницу",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "Исправить с помощью ИИ",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "Исправляем…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "Не удалось исправить: $1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "Синтаксическая ошибка в строке $1: $2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "Если страница выглядит неполной, автоматически разворачивать и пролистывать её перед прикреплением (📎)",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "Автоматическое разворачивание и пролистывание неполных страниц включено.",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "Автоматическое разворачивание и пролистывание отключено.",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "Страница выглядит неполной — автоматически разворачиваем и пролистываем…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "Автоматически разворачиваем содержимое ($1/$2)…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "Читаем страницу $1…",
+    "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "Думаем… $1 с",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "Переключено на $1. Что делать с текущим диалогом?"
+  },
+  "providerSwitchCarry": {
+    "message": "Перенести диалог"
+  },
+  "providerSwitchCarrySub": {
+    "message": "транскрипт диалога станет его первым сообщением"
+  },
+  "providerSwitchCarryToast": {
+    "message": "Диалог будет отправлен $1 вместе с вашим следующим сообщением"
+  },
+  "providerSwitchFresh": {
+    "message": "Новая сессия"
+  },
+  "providerSwitchFreshSub": {
+    "message": "текущий диалог будет заархивирован, начнём с нуля"
+  },
+  "providerSwitchDirectHint": {
+    "message": "Отправить без выбора = продолжить без контекста"
+  },
+  "providerNeedsConfig": {
+    "message": "Перед сохранением заполните хотя бы базовый URL или псевдоним."
+  },
+  "confirmRemoveProvider": {
+    "message": "Удалить провайдера «$1» и его конфигурацию? Это действие нельзя отменить."
+  },
+  "confirmResetProvider": {
+    "message": "Сбросить провайдера «$1»? Это действие нельзя отменить."
+  },
+  "confirmResetSystemPrompt": {
+    "message": "Восстановить системный промпт по умолчанию? Текущий текст будет заменён."
+  },
+  "approvalAllowOnce": {
+    "message": "Разрешить один раз"
+  },
+  "approvalAllowSession": {
+    "message": "Разрешить до конца сессии"
+  },
+  "approvalAlwaysAllow": {
+    "message": "Разрешать всегда"
+  },
+  "approvalDeny": {
+    "message": "Отклонить"
+  },
+  "approvalRequired": {
+    "message": "Требуется подтверждение:"
+  },
+  "clarifyDefault": {
+    "message": "Уточните, пожалуйста:"
+  },
+  "clarifyPlaceholder": {
+    "message": "Ваш ответ…"
+  },
+  "clarifySend": {
+    "message": "Отправить"
+  },
+  "closeLabel": {
+    "message": "Закрыть"
+  },
+  "detailThreadPlaceholder": {
+    "message": "Задайте уточняющий вопрос об этом…"
+  },
+  "detailThreadSend": {
+    "message": "Отправить"
+  },
+  "detailThreadStop": {
+    "message": "Остановить"
+  },
+  "detailThreadResize": {
+    "message": "Потяните, чтобы изменить размер"
+  },
+  "inspectCtx": {
+    "message": "Просмотр"
+  },
+  "inspectCtxTitle": {
+    "message": "Посмотреть полный контекст, отправленный модели"
+  },
+  "ctxInspectorTitle": {
+    "message": "Предпросмотр контекста"
+  },
+  "copy": {
+    "message": "Копировать"
+  },
+  "undoAttach": {
+    "message": "Отменить"
+  },
+  "undoAttachTitle": {
+    "message": "Убрать эту прикреплённую страницу из диалога"
+  },
+  "removeImage": {
+    "message": "Убрать изображение"
+  },
+  "screenshotFailed": {
+    "message": "Не удалось загрузить скриншот — попробуйте снова"
+  },
+  "cropCanvasLabel": {
+    "message": "Выделите область перетаскиванием или с помощью стрелок"
+  },
+  "detailThreadLabel": {
+    "message": "Уточняющий вопрос"
+  },
+  "detailThreadTruncated": {
+    "message": "Ответ достиг лимита вывода — отправьте «продолжить», чтобы его продлить."
+  },
+  "chemExportPng": {
+    "message": "Экспорт в PNG"
+  },
+  "localAgentTabBridge": {
+    "message": "Agent Bridge",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "У этого типа есть сохранённая конфигурация (нажмите, чтобы открыть)",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "Уровень размышлений",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "авто (ничего не отправлять)",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "Дополнительные поля reasoning (JSON)",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "Ответ продолжается в фоне и будет сохранён в исходную сессию",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "streamCancelledNoOrigin": {
+    "message": "Незавершённый ответ отменён — его сессию не удалось сохранить",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
+  "sessionActiveDot": {
+    "message": "Выполняется",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
+  },
+  "slashPromptDesc": {
+    "message": "Показать текущий действующий системный промпт",
+    "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "Нажмите ещё раз для подтверждения удаления"
+  },
+  "deleteTitle": {
+    "message": "Удалить сообщение"
+  },
+  "deleteFailed": {
+    "message": "Не удалось удалить — сообщение оставлено"
+  },
+  "sessionLoadFailed": {
+    "message": "Не удалось загрузить сессию"
+  },
+  "quickbarAria": {
+    "message": "Быстрые действия"
+  },
+  "continueMaxTurns": {
+    "message": "→ Продолжить"
+  },
+  "retryAction": {
+    "message": "Повторить"
+  },
+  "quoteTitle": {
+    "message": "Цитировать"
+  },
+  "editResendTitle": {
+    "message": "Изменить и отправить заново"
+  },
+  "copyResponseTitle": {
+    "message": "Копировать ответ"
+  },
+  "collapseExpandTitle": {
+    "message": "Свернуть/развернуть"
+  },
+  "editSendBtn": {
+    "message": "Отправить"
+  },
+  "editCancelBtn": {
+    "message": "Отмена"
+  },
+  "clearChatTitle": {
+    "message": "Очистить диалог"
+  },
+  "clearChatMsg": {
+    "message": "Удалить все сообщения? Это действие нельзя отменить."
+  },
+  "clearChatConfirm": {
+    "message": "Очистить"
+  },
+  "clearAllTitle": {
+    "message": "Очистить все сессии"
+  },
+  "clearAllMsg": {
+    "message": "Удалить все сохранённые сессии? Это действие нельзя отменить."
+  },
+  "clearAllConfirm": {
+    "message": "Очистить всё"
+  },
+  "sessionDeleted": {
+    "message": "Сессия удалена"
+  },
+  "sessionRenamed": {
+    "message": "Сессия переименована"
+  },
+  "sessionsCleared": {
+    "message": "Все сессии очищены"
+  },
+  "sessionLoaded": {
+    "message": "Загружено"
+  },
+  "dblClickRename": {
+    "message": "Дважды щёлкните, чтобы переименовать"
+  },
+  "exportMarkdown": {
+    "message": "Экспорт в Markdown"
+  },
+  "relJustNow": {
+    "message": "только что"
+  },
+  "copyThinkingTitle": {
+    "message": "Копировать размышления"
+  },
+  "multiDeletedOk": {
+    "message": "Удалено сообщений: $1"
+  },
+  "multiDeletedPartial": {
+    "message": "Удалено: $1, не удалось: $2 (индексы перекалиброваны)"
+  },
+  "composerAria": {
+    "message": "Сообщение — Enter отправляет, Shift+Enter — новая строка"
+  },
+  "slashAria": {
+    "message": "Слэш-команды"
+  },
+  "sessionExportFailed": {
+    "message": "Не удалось загрузить сессию"
+  },
+  "sessionExported": {
+    "message": "Сессия экспортирована"
+  },
+  "bridgeRowPingTitle": {
+    "message": "Проверить ping только этого агента (/health) и обновить его индикатор состояния",
+    "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "Не удалось загрузить модуль майнд-карт (проверьте консоль)",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "Перейти к $1",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "Рисунок $1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "Нет результатов",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "Отрисовываем историю…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "Скачиваем видео… (прошло $1 с)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "Скачиваем видео… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "Скачиваем видео… (скачано $1 МБ, прошло $2 с)",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "Не удалось скачать видео: $1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "Загружаем $1… (0%)",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "Загружаем $1… ($2%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "Загружаем $1… (загружено $2 МБ, прошло $3 с)",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "Не удалось загрузить $1: $2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "видео",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "аудио",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "Обработка",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "Анализ видео",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "Транскрибация",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1… (прошло $2 с)",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "Не удалось обработать видеофайл: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "Не удалось обработать аудиофайл: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "Вывод анализа видео обрезан лимитом модели ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "Анализ видео неполный (последний таймкод $1 с при длительности видео $2 с)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "Анализ видео неполный (разрыв $1 мин в таймлайне: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "Анализ видео не дал результатов",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "скачивание ~$1 МБ",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "У этого видео нет субтитров. Выберите способ разбора:",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "Транскрипция аудио (субтитры)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "Анализ видео (кадры + речь)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "быстро",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "медленно",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "мало токенов",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "много токенов",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "Скачиваем аудио… (прошло $1 с)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "Скачиваем аудио… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "Скачиваем аудио… (скачано $1 МБ, прошло $2 с)",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "Перекодируем аудио… (прошло $1 с)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "Загружаем аудио… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "Загружаем аудио… (загружено $1 МБ, прошло $2 с)",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "Транскрипт ASR был обрезан лимитом вывода модели ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "Транскрипт ASR неполный (разрыв $1 мин в таймлайне: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": ", символов: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": ", содержимое пусто",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 Прикреплено: «$1» ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 Прикреплён скриншот: «$1»",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": ", страниц: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": ", страниц (возможен OCR): $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": ", иллюстраций: $1",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": ", возможны проблемы с кодировкой текста",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": ", страниц с таблицами: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 Прикреплён PDF: «$1» (pdf-text$2)",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 Прикреплён документ: «$1» ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "Bilibili",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "Ссылка на воспроизведение $1 истекла, автоматическое обновление не удалось ($2) — обновите страницу с видео и прикрепите заново",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "Выбрать способ разбора…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "Транскрибируем аудио…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "видео $1",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "субтитры",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "анализ видео",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": ", видео $1 МБ",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": ", аудио $1 МБ",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": ", строк анализа: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": ", строк субтитров: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": ", скриншотов: $1",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "(не удалось разобрать — оставлены исходные субтитры)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "(нет субтитров — вместо них прикреплена информация о видео)",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 Прикреплено: $1 — «$2» ($3)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "Сессия агента",
+    "description": "Agent-side session line in the sessions drawer"
+  },
+  "agentSessionCopy": {
+    "message": "Копировать ID сессии",
+    "description": "Copy the agent-side session ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "Не удалось скопировать",
+    "description": "Clipboard failure notice"
+  }
+}

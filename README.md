@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a>
+  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a>
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@ flowchart LR
     Y -->|"streamed reply · tool progress · approvals"| B
 ```
 
-A developer-level tour of the codebase — message flow, the rendering pipeline, storage model, providers and agents, ASR, and the security model — lives in the [project wiki](https://github.com/xiaohuzai/browsa/wiki) (bilingual).
+A developer-level tour of the codebase — message flow, the rendering pipeline, storage model, providers and agents, ASR, and the security model — lives in the [project wiki](https://github.com/xiaohuzai/browsa/wiki) (7 languages).
 
 ## Install
 
@@ -338,7 +338,7 @@ Everyday settings are shown directly: interface language, providers, system prom
 |---|---|
 | **System prompt** | prepended to every conversation as `role: system` — set reply language, tone, and format rules here |
 | **Reply language** | force replies in a specific language regardless of page language |
-| **UI language** | English, 中文, or Auto (follows the browser) — applies immediately, no reload |
+| **UI language** | English, 中文, 日本語, 한국어, Español, Português, Русский, or Auto (follows the browser) — applies immediately, no reload |
 | **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
 | **Thinking level** | per-model reasoning depth (`auto` sends nothing; then the model's own ladder — GLM/Qwen-class is an on/off toggle, GPT/Claude-class is low→max effort). The choices follow the model id you filled in, and the request fields adapt to each API dialect (`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`…) automatically |
 | **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |

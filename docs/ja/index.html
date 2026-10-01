@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
+<title>browsa — ブラウザサイドパネル AI</title>
+<meta name="description" content="browsa は Chrome / Edge のサイドパネル拡張機能：現在のページ — 記事・字幕・PDF — を会話に取り込み、そのそばで返信をストリーミング表示します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント、agent-bridge 経由であなたの Codex / Claude Code / pi / Gemini CLI に対応。">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<meta property="og:title" content="browsa — ブラウザサイドパネル AI">
+<meta property="og:description" content="現在のページを会話に取り込みましょう — 記事も動画も PDF も。モデルもエージェントも自分のもの：オープンソース、サブスクリプションなし、上乗せ料金なし。">
+<meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
+<meta property="og:url" content="https://xiaohuzai.github.io/browsa/ja/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://xiaohuzai.github.io/browsa/ja/">
+<link rel="alternate" hreflang="zh-CN" href="https://xiaohuzai.github.io/browsa/">
+<link rel="alternate" hreflang="en" href="https://xiaohuzai.github.io/browsa/en/">
+<link rel="alternate" hreflang="ja" href="https://xiaohuzai.github.io/browsa/ja/">
+<link rel="alternate" hreflang="ko" href="https://xiaohuzai.github.io/browsa/ko/">
+<link rel="alternate" hreflang="es" href="https://xiaohuzai.github.io/browsa/es/">
+<link rel="alternate" hreflang="pt-BR" href="https://xiaohuzai.github.io/browsa/pt-br/">
+<link rel="alternate" hreflang="ru" href="https://xiaohuzai.github.io/browsa/ru/">
+</head>
+<body class="landing">
+<a class="skip-link" href="#main">本文へスキップ</a>
+
+<header class="md-header">
+  <div class="md-header__inner">
+    <a class="md-header__brand" href="#top" aria-label="browsa ホーム">
+      <img src="../icon48.png" alt="" width="26" height="26">
+      <span class="md-header__topic"><span class="t">browsa</span><span class="sub">ブラウザサイドパネル AI</span></span>
+    </a>
+    <nav class="md-header__links" aria-label="ページ内ナビゲーション">
+      <a href="../en/guide/">ガイド</a>
+      <a href="#demo">デモ</a>
+      <a href="#how">使い方</a>
+      <a href="#features">機能</a>
+      <a href="#sites" class="hide-m">対応サイト</a>
+      <a href="#install">インストール</a>
+    </nav>
+    <span class="md-header__spacer"></span>
+    <div class="md-header__actions">
+      <a class="md-header__icon" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+        <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+      </a>
+      <button class="md-header__icon md-scheme-toggle" type="button" aria-label="カラースキームを切り替える" title="カラースキームを切り替える">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3z"/></svg>
+      </button>
+      <span class="md-header__langs"><a href="../" lang="zh-CN">中文</a><a href="../en/" lang="en">EN</a><strong lang="ja">日本語</strong><a href="../ko/" lang="ko">한국어</a><a href="../es/" lang="es">ES</a><a href="../pt-br/" lang="pt-BR">PT</a><a href="../ru/" lang="ru">RU</a></span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" id="top">
+    <div class="container">
+      <div class="hero-copy">
+        <p class="eyebrow">browsa / ブラウザサイドパネル AI</p>
+        <h1>ページはそのまま。<span class="mark">質問はそのそばで。</span></h1>
+        <p class="lead">
+          長い記事？難解な論文？テンポの速い動画？ページごと<strong>自分の AI</strong> との会話に取り込みましょう。コピペも、読んでいるページから離れることもなく、解説が得られます。
+        </p>
+        <div class="cta-group">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
+            Chrome に追加 ↗
+          </a>
+          <a class="btn btn-secondary" href="../en/guide/quickstart.html">
+            はじめる →
+          </a>
+        </div>
+        <p class="hero-note">Chrome / Edge · <a href="#install">ソースからのインストールも可能</a><br>無料の拡張機能。モデルもエージェントもご自身のものを。</p>
+        <div class="hero-meta">
+          <a class="chip" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener"><b>MIT</b> オープンソース ↗</a>
+          <span class="chip">モデルは自由に選択</span>
+          <span class="chip">設定はローカル</span>
+        </div>
+      </div>
+
+      <!-- Scenario switcher -->
+      <div class="scenarios">
+        <div class="scn-tabs" role="radiogroup" aria-label="使用例">
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-article" checked><span class="dot"></span><span>記事</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-video"><span class="dot"></span><span>動画</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>論文</span></label>
+        </div>
+
+        <!-- Scenario 1: Watch video (YouTube) -->
+        <figure class="window w-video" role="img" aria-label="YouTube 動画ページの横に表示された browsa パネル">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">youtube.com</span>/watch?v=8jPQjjsBbIc</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-video">
+              <div class="yt-nav">
+                <span class="yt-logo"><i>▶</i>YouTube</span>
+                <span class="yt-search">検索…</span>
+                <span class="yt-avatar"></span>
+              </div>
+              <div class="yt-main">
+                <div class="yt-col">
+                  <div class="yt-player">
+                    <span class="badge">4K</span>
+                    <span class="play"></span>
+                    <div class="timeline"><div class="track"><div class="fill"></div></div></div>
+                  </div>
+                  <div class="yt-title">ブループラネット II · 第1話「ひとつの海」(完全版ドキュメンタリー)</div>
+                  <div class="yt-meta">
+                    <span class="yt-avatar2"></span>
+                    <span class="yt-channel">BBC Earth</span>
+                    <span class="yt-sub">チャンネル登録</span>
+                    <span>· 再生回数 1200万回 · 5日前</span>
+                  </div>
+                  <div class="yt-desc">
+                    浅い海から深海底まで、海のまだ見ぬ隅々を探検します：発光する生物、泡の網で連携して狩りをするザトウクジラ、そして完全な闇の中の生命。月の表面よりも、私たちの海の方が未知なのです。
+                  </div>
+                </div>
+                <div class="yt-side">
+                  <div class="yt-thumb"><span class="v">18:42</span><span class="t">ブループラネット II · 第2話「深 海」</span></div>
+                  <div class="yt-caption">深 海 · 再生回数 410万回</div>
+                  <div class="yt-thumb"><span class="v">21:07</span><span class="t">海の生物発光のしくみ</span></div>
+                  <div class="yt-caption">生物発光 · 再生回数 89万回</div>
+                  <div class="yt-thumb"><span class="v">15:30</span><span class="t">ザトウクジラは泡の網でどう狩るか</span></div>
+                  <div class="yt-caption">泡の網での狩り · 再生回数 230万回</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 接続可能</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 添付済み：「ブループラネット II」第1話 – ひとつの海</div>
+                <div class="p-user"><span class="cmd">/summarize</span> 要点を、タイムスタンプ付きで</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> 字幕を読み込み中…</div>
+                  <div class="p-body">
+                    <div class="p-h">ひとつの海 · 主な場面</div>
+                    <p>🌊 冒頭：海のスケール — 月よりも未知の世界<span class="p-ts">[00:12]</span></p>
+                    <p>✨ 深海では発光が広く見られ、獲物を誘う・身を隠すのに使われる<span class="p-ts">[03:40]</span></p>
+                    <p>🐋 ザトウクジラは泡の網で協力して狩りをする<span class="p-ts">[08:15]</span></p>
+                    <p>🐙 深海底の生命は、水圧と闇に極限まで適応して進化した<span class="p-ts">[11:48]</span></p>
+                    <p>🌍 結び：人間の活動が海洋の生態系を変えつつある<span class="p-ts">[15:02]</span><span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">何でも聞いてください… 📎 で現在のページを添付</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">動画ノート：返信にはクリックできる <code>[mm:ss]</code> タイムスタンプが付きます — クリックするとその場面へジャンプ。</p>
+        </figure>
+
+        <!-- Scenario 2: Read article -->
+        <figure class="window w-article" role="img" aria-label="ブログ記事の横に表示された browsa パネル">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">dev.to</span>/sidepanel-ai/read-anywhere-ask-anywhere</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-article">
+              <div class="art-nav">
+                <span class="art-logo" style="color:#0f0f0f">DEV</span>
+                <a>記事</a><a>ポッドキャスト</a><a>動画</a><a>タグ</a>
+                <span class="art-search">記事を検索…</span>
+              </div>
+              <div class="art-main">
+                <span class="art-tag" style="color:#57534e;background:rgba(87,83,78,.08)">AI · ブラウザ</span>
+                <div class="art-title">読むページのそばに、いつも AI コパイロットを</div>
+                <div class="art-meta"><span class="art-avatar" style="background:#0f0f0f"></span><span>Sarah Dev · 12分で読める</span></div>
+                <p class="art-p">ページのテキストを LLM に渡すのは簡単です。難しいのは、ページを本当に「理解」させること。私たちは 3 層のカスケードを使います：まず Readability で 本文を整え、次に構造を保つ DOM ツリー、そしてフォールバックとして全文。主要サイトでは、ページがすでに読み込んでいる構造化データ — 字幕・コメント・記事ソース — をそのまま読み取ります。</p>
+                <div class="art-code"><span class="ac-line hl"></span><span class="ac-line"></span><span class="ac-line short"></span><span class="ac-line mid"></span></div>
+                <p class="art-p">再認証もサードパーティーへのアップロードもなし — データはブラウザと自分のバックエンドの間だけを流れます。</p>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 接続可能</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 添付済み：「読むページに AI コパイロットを」</div>
+                <div class="p-user"><span class="cmd">/keypoints</span> 要点を教えて</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> 記事を読み込み中…</div>
+                  <div class="p-body">
+                    <div class="p-h">要点</div>
+                    <p>🧠 3 層カスケード：Readability → DOM ツリー → 全文</p>
+                    <p>🕵️ 主要サイトは読み込み済みのデータをそのまま読取 — 再認証なし</p>
+                    <p>🔒 データはブラウザと自分のバックエンドの間だけ</p>
+                    <p>⚡ 記事も字幕も PDF もこれひとつで<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">何でも聞いてください… 📎 で現在のページを添付</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">記事：<code>/keypoints</code> で要点を抽出。本文は Readability カスケードで添付されます。</p>
+        </figure>
+
+        <!-- Scenario 3: Open PDF -->
+        <figure class="window w-pdf" role="img" aria-label="PDF ビューアの横に表示された browsa パネル">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">arxiv.org</span>/pdf/1706.03762</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-pdf">
+              <div class="pdf-bar">
+                <span class="pdf-name">attention-is-all-you-need.pdf</span>
+                <span class="pdf-page">1 / 15 ページ</span>
+                <span>100%</span>
+              </div>
+              <div class="pdf-paper">
+                <div class="pdf-title">Attention Is All You Need</div>
+                <div class="pdf-meta">Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, et al.</div>
+                <div class="pdf-abstract"><b>要旨</b> — 逐次変換の主流モデルは、複雑なリカレントニューラルネットワークや畳み込みニューラルネットワークに基づいています… 我々は注意機構のみに基づく、新しいシンプルなネットワークアーキテクチャ「Transformer」を提案します。</div>
+                <div class="pdf-p">Transformer はリカレンスを排し、並列化を大幅に進めることで学習時間を短縮します。</div>
+                <div class="pdf-figure">
+                  <div class="fig-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="fig-cap">図 1：Transformer — モデルアーキテクチャ</div>
+                </div>
+                <div class="pdf-p">WMT 2014 英独・英仏翻訳で、学習コストのごく一部で当時の最高精度を達成しました。</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 接続可能</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 添付済み：PDF「Attention Is All You Need」（15 ページ · 図 6 点）</div>
+                <div class="p-user">中心的な貢献は何ですか？</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> PDF を解析中…</div>
+                  <div class="p-body">
+                    <div class="p-h">中心的な貢献</div>
+                    <p>⚙️ Transformer — 注意機構のみで、リカレンスも畳み込みも使わない</p>
+                    <p>⚡ 高い並列性により、RNN/LSTM よりはるかに速く学習できる</p>
+                    <p>📊 図 1 がアーキテクチャ、図 2–4 が学習と BLEU の結果<span class="p-ts">Fig.1</span></p>
+                    <p>🏆 WMT 2014 の両タスクで、低い学習コストのまま最高精度<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">何でも聞いてください… 📎 で現在のページを添付</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">PDF：WASM がローカルで表・見出し・レイアウトを再構築。図の領域は自動で切り抜き、キャプションを付けます。</p>
+        </figure>
+        <p class="scenario-note">インターフェースはイメージです · シーンを切り替えると、browsa とページの連携のようすがわかります。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo video -->
+  <section id="demo">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">デモ</p>
+        <h2>60 秒でわかる browsa</h2>
+        <p>実際の画面録画：ページを添付して質問、選択した語句についての追質問、選択範囲をその場で解説、クリックできる動画タイムライン — 図や 3D タンパク質構造が返信内に描画され、最後はエージェントのツール呼び出しが承認カードで締めくくられます。</p>
+      </div>
+      <figure class="demo-video">
+        <video controls preload="none" poster="../assets/promo/poster.jpg" width="960">
+          <source src="../assets/promo/browsa-promo-v3.mp4" type="video/mp4" />
+          お使いのブラウザは埋め込み動画に対応していません — <a href="../assets/promo/browsa-promo-v3.mp4">こちらからダウンロード</a>できます。
+        </video>
+        <figcaption>音がなくても伝わる設計：全体に 2 言語字幕が付き、ミュートのままでも内容を完全に理解できます。<a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a> でも公開しています。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">使い方</p>
+        <h2>3 ステップで Web ページと会話</h2>
+        <p>ウィンドウの切り替えも、コピペも不要。browsa は読んでいるページのそばに静かに寄り添います — 余白の注釈のように。</p>
+      </div>
+      <div class="how-list">
+        <div class="how">
+          <span class="no">01</span>
+          <h3>サイドパネルを開く <span class="tag">Ctrl+Shift+H</span></h3>
+          <p>ショートカットを押すか、どのページでもツールバーアイコンをクリック。browsa のパネルが右側に現れます。</p>
+        </div>
+        <div class="how">
+          <span class="no">02</span>
+          <h3>ページを添付 <span class="tag">📎</span></h3>
+          <p>📎 をクリックすると、ページの内容がそのまま会話に流れ込みます — 記事も字幕も PDF も。選択したテキストにはそのまま質問できます。</p>
+        </div>
+        <div class="how">
+          <span class="no">03</span>
+          <h3>返信をストリーミング表示 <span class="tag">どのバックエンドでも</span></h3>
+          <p>返信は単語ごとにストリーミング表示され、Markdown・数式・チャートに対応します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント — サブスクリプションでログイン済みの Codex / Claude Code、Google ログインの Gemini CLI（agent-bridge 経由）、自分でモデルを設定した pi を接続できます。UI はブラウザの言語に追従 — English・中文・日本語・한국어・Español・Português・Русский — 設定で切り替えられます。</p>
+        </div>
+      </div>
+      <p class="site-note">インストール済みですか？<a href="../en/guide/quickstart.html">クイックスタート</a>で最初の質問まで案内します。<a href="../en/guide/">完全ガイド</a>では、読み取り・動画・レンダリング・セッション・バックエンド・設定を解説しています。</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">機能</p>
+        <h2>ただのチャットボックスではありません</h2>
+        <p>browsa は「読む」と「聞く」を同じ場所に置きます：長い記事も、動画も、PDF も — AI はすぐそばにいます。</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature">
+          <span class="f-tag">attach</span>
+          <h3>ページを添付</h3>
+          <p>クリック 1 つで現在のページを会話に取り込みます — モードは自動で選択：</p>
+          <ul>
+            <li>自動カスケード：Readability 本文 → DOM ツリー → 全文</li>
+            <li>📷 スクリーンショットモード（マルチモーダルモデル向け）</li>
+            <li>PDF はローカルで解析：WASM が表・見出し・レイアウトを再構築し、図は自動切り抜き</li>
+            <li>GitHub のファイルページは生ソースを直接取得し、ページのクリーンアップをスキップ</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">select</span>
+          <h3>選択して質問</h3>
+          <p>どのページでもテキストを選択して、そのまま質問：</p>
+          <ul>
+            <li>フローティングツールバー：質問 · 解説 · 翻訳 · 要約</li>
+            <li>解説 / 翻訳はインラインで回答 — ストリーミング、その場で、パネル不要</li>
+            <li>質問 / 要約：選択範囲がパネルに持ち込まれます — 先に 📎 は不要</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">render</span>
+          <h3>リッチなレンダリング</h3>
+          <p>返信はただのテキストではありません — 数式も図もブラウザ内で描画：</p>
+          <ul>
+            <li>Markdown GFM + 40 以上の言語のシンタックスハイライト</li>
+            <li>LaTeX 数式（KaTeX、Web Worker で高速化）</li>
+            <li>Mermaid 図、ECharts、Markmap マインドマップ</li>
+            <li>パースできない Mermaid ブロック？設定した AI に修正と再描画を依頼できます</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">video</span>
+          <h3>動画ノート</h3>
+          <p>動画のための完全なワークフロー — YouTube とビリビリから構造化された字幕を取得：</p>
+          <ul>
+            <li>返信にはクリックできる <code>[mm:ss]</code> タイムスタンプが付き、動画をシーク</li>
+            <li>字幕のないビリビリ動画も要約できます — 自動 ASR 文字起こし</li>
+            <li>長い字幕は自動で要点に圧縮。タイムスタンプは保持されます</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">provider</span>
+          <h3>どのバックエンドでも</h3>
+          <p>ベンダーロックインなし — 自分のモデルを接続：</p>
+          <ul>
+            <li>Hermes エージェント：ツール実行、危険な操作の承認、進捗表示</li>
+            <li>OpenCode エージェント：opencode CLI エージェントへの直通 — 同じツール実行と承認フロー</li>
+            <li>OpenSquilla エージェント：ゲートウェイ WebSocket 経由でローカルデスクトップエージェントと接続 — サーバー側セッションメモリ、思考出力、サーバー側キャンセル</li>
+            <li>Agent Bridge：ローカル CLI エージェントをブリッジ接続 — サブスクリプションでログイン済みの Codex / Claude Code（モデル側はあなたのサブスクリプションで動作）、Google ログインの Gemini CLI、任意のモデルを設定した pi。1 枚のカードで複数エージェントを同時接続し、それぞれが独自のセッションと Ping 状態を持ちます</li>
+            <li>エージェントとの会話はエージェント側に残ります：browsa がセッション名を自動で付け（「browsa:」+ 最初のメッセージ）、エージェント側のインターフェースで続きを行えます。セッション ID はセッションドロワーで表示・コピーできます</li>
+            <li>OpenAI 互換 API なら何でも：OpenAI、Ollama、LiteLLM…</li>
+            <li>カードに複数のモデルを追加 — サイドバーの「別名 · モデル」で切り替え</li>
+            <li>モデルごとの思考レベル：選択肢はモデルファミリーに追従し、リクエスト項目は各 API の方言に適応</li>
+            <li>Ping で接続と対応機能を確認</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">privacy</span>
+          <h3>プライバシー第一</h3>
+          <p>browsa のアカウントは不要。モデルサービスは自分で選択：</p>
+          <ul>
+            <li>API キーはローカルに保存され、設定したプロバイダの認証にだけ使われます</li>
+            <li>ページコンテキスト内の URL は送信前にローカルでマスク — トークン・パスワード・署名を除去</li>
+            <li>PDF はデバイス上で解析。取り出したテキストと画像はモデルへのリクエストに添付できます</li>
+            <li>Office 文書（docx/pptx/xlsx など）も同様にデバイス上で Markdown に変換 — ファイルがマシンの外に出ることはありません</li>
+            <li>内容が送られるのは、自分で設定したバックエンドだけ</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">input</span>
+          <h3>素早い入力</h3>
+          <p>打ち込まずに、より多くを伝えます：</p>
+          <ul>
+            <li>クイック操作：要約 / 要点 / 解説 / アウトライン</li>
+            <li>スラッシュコマンド + ↑/↓ の入力履歴。パネルを閉じても下書きは残ります</li>
+            <li>返信のストリーミング中も入力を続けられます — メッセージは順番にキューイングされ、送信されます</li>
+            <li>入力欄にコードを貼り付けると、あなたのバブルがハイライト付きブロックとして描画（コピーボタン、言語を自動判定）。それ以外の部分はバイト単位でそのまま</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">session</span>
+          <h3>セッション</h3>
+          <p>長い会話も整理されたまま：</p>
+          <ul>
+            <li>名前を付けたセッションの保存 / 復元、Markdown エクスポート</li>
+            <li>返信の途中でセッションを切り替えても返信は止まりません — バックグラウンドで完了し、開始したセッションに記録されます</li>
+            <li>会話内全文検索（<code>Ctrl+F</code>）</li>
+            <li>返信内のテキストを選んで、メインの履歴に触れずにスレッドで細かく質問。画像も直接貼り付け可能。入力の ↑/↓ で呼び出されるのは追質問だけ。引用した数式は数式として描画されます</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sites -->
+  <section id="sites">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">対応サイト</p>
+        <h2>あなたの Web ページを読み取ります</h2>
+        <p>これらのサイトでは、browsa は推測の代わりに、ページがすでに読み込んでいる構造化データ — 字幕・コメント・記事ソース・行情報 — を読み取ります。</p>
+      </div>
+      <div class="site-strip">
+        <span class="site-chip">YouTube<span class="en">字幕/チャプター</span></span>
+        <span class="site-chip">Bilibili<span class="en">字幕/ASR/統計</span></span>
+        <span class="site-chip">Xiaohongshu<span class="en">ノート/コメント</span></span>
+        <span class="site-chip">Juejin<span class="en">記事ソース</span></span>
+        <span class="site-chip">Zhihu<span class="en">記事/回答</span></span>
+        <span class="site-chip">X / Twitter<span class="en">ツイート/リプライ</span></span>
+        <span class="site-chip">Reddit<span class="en">投稿/コメント</span></span>
+        <span class="site-chip">Xueqiu<span class="en">行情報/投稿</span></span>
+        <span class="site-chip">Xiaoyuzhou<span class="en">ポッドキャスト</span></span>
+        <span class="site-chip">Dedao<span class="en">記事</span></span>
+        <span class="site-chip">GeekTime<span class="en">記事</span></span>
+      </div>
+      <p class="site-note">
+        <b>観測するだけで、乗っ取りはしません：</b>抽出はブラウザ自身のリクエストを監視する仕組みで動作します — 再認証は不要で、サードパーティーに何かをアップロードすることもありません。それ以外の Web ページもすべて動作します（対応サイトほど深くはありません）。
+      </p>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <!-- Your Keys -->
+  <section id="keys">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">あなたのキー、あなたのエージェント</p>
+        <h2>キーはあなたのもの。モデルも。<em>エージェントも。</em></h2>
+        <p>browsa はサブスクリプションを売らず、アカウントも求めず、上乗せ料金も取りません。あなた自身のモデルエンドポイントをサイドパネルに取り込むだけ — クラウドでも、ローカルでも、セルフホストでも。</p>
+      </div>
+      <div class="keys-grid">
+        <ul class="keys-list">
+          <li><span class="tick">›</span><span><b>アカウント不要、テレメトリもなし。</b>インストールしたらすぐ使える — データがこちらを経由することは一切ありません。</span></li>
+          <li><span class="tick">›</span><span><b>API キーはローカルに保存</b>され、設定したエンドポイントにだけ送信されます。</span></li>
+          <li><span class="tick">›</span><span><b>Ollama / LM Studio のローカルモデル</b> — 完全オフラインでも動作します。</span></li>
+          <li><span class="tick">›</span><span><b>本物のエージェント</b>：ツール実行、リアルタイム進捗、危険な操作の前の承認。</span></li>
+        </ul>
+        <div class="prov-board" data-label="接続例" role="img" aria-label="接続例：モデル API、ローカルモデル、Hermes、OpenCode、OpenSquilla、Agent Bridge">
+          <div class="prov-card">
+            <span class="prov-ava pa-openai">O</span>
+            <span class="prov-info"><span class="prov-name">My OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
+            <span class="prov-badge pb-ok">接続可能</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-claude">C</span>
+            <span class="prov-info"><span class="prov-name">Claude</span><span class="prov-model">claude-sonnet · /v1/messages</span></span>
+            <span class="prov-badge pb-idle">未 Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-ollama">L</span>
+            <span class="prov-info"><span class="prov-name">Ollama（ローカル）</span><span class="prov-model">localhost:11434 · qwen3:32b</span></span>
+            <span class="prov-badge pb-ok">オフライン OK</span>
+          </div>
+          <div class="prov-card active">
+            <span class="prov-ava pa-hermes">H</span>
+            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approvals</span></span>
+            <span class="prov-badge pb-ok">接続可能</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-opencode">oc</span>
+            <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">未 Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-squilla">Sq</span>
+            <span class="prov-info"><span class="prov-name">OpenSquilla Agent</span><span class="prov-model">gateway /ws · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">未 Ping</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-bridge">↔</span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini · ローカル CLI エージェントを接続</span></span>
+            <span class="prov-badge pb-idle">ブリッジ</span>
+          </div>
+        </div>
+      </div>
+      <p class="site-note">どれを選べばいいか分からないときは？<a href="../en/guide/providers.html">モデルとエージェントの設定ガイドを読む →</a></p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">インストール</p>
+        <h2>次に読むページから始めましょう。</h2>
+        <p>インストール方法をひとつ選び、モデルかエージェントを接続してください。browsa 拡張機能は無料です。</p>
+      </div>
+      <div class="install-options">
+        <article class="install-option recommended">
+          <p class="install-label">おすすめ · 自動アップデート</p>
+          <h3>ストアからインストール</h3>
+          <p>最も簡単な始め方です。拡張機能を追加し、設定でモデルを接続してください。ストアの審査は GitHub のリリースより遅れることがあります。</p>
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Chrome に追加 ↗</a>
+        </article>
+        <article class="install-option">
+          <p class="install-label">代替 · 手動アップデート</p>
+          <h3>GitHub から読み込む</h3>
+          <p>リリースをダウンロードして展開します。ブラウザの拡張機能マネージャーでデベロッパーモードを有効にし、「パッケージ化されていない拡張機能を読み込む」を選んで、<code>manifest.json</code> のあるフォルダーを指定してください。</p>
+          <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">リリースをダウンロード ↗</a>
+        </article>
+      </div>
+      <div class="install-next">
+        <div><h3>インストールしたら、接続しましょう。</h3><p>設定でモデル API かローカルエージェントを構成し、Ping で確認します。記事を開いて 📎 で添付し、最初の質問をしてみてください。</p></div>
+        <a class="btn btn-secondary" href="../en/guide/quickstart.html">設定ガイドに従う →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="md-footer">
+  <div class="md-footer__inner">
+    <div class="md-footer__copy">
+      <div class="brandline"><img src="../icon48.png" alt="" width="18" height="18"><span class="wordmark">browsa</span></div>
+      <div class="maintained">維持管理：<a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">xiaohuzai</a></div>
+    </div>
+    <nav class="md-footer__links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">リリース</a>
+      <a href="../en/guide/">ガイド</a>
+      <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="../en/privacy.html">プライバシー</a>
+    </nav>
+    <div class="md-footer__meta"><span>ブラウザサイドパネル AI · 読みながら、そのまま質問</span><span>browsa · MIT ライセンス</span></div>
+  </div>
+</footer>
+
+<script src="../site.js"></script>
+</body>
+</html>
