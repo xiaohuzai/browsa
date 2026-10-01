@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "ИИ-боковая панель: общайтесь с открытой страницей —статьи, видео, PDF— через свою модель или агента. Открытый код, без аккаунта.",
+    "description": "Extension description"
+  }
+}

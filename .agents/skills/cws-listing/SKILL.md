@@ -82,7 +82,8 @@ git log v<CODE_BASE>..HEAD --oneline --merges | grep -v 回灌
 - **新 locale 的名称走 zh 先例（描述式、无模型名单）**，不动 EN 名称的 `· ChatGPT · Claude · Ollama` 兼容声明惯例；75 字符内能同时放下「页面媒体段 + 自有模型段」的只有 CJK（ja/ko），拉丁语（es/pt/ru）只保留页面·媒体段——字符数是硬约束，别硬塞。
 - **「UI 语言仅英/中」必须如实写进每语详细说明末尾**（listing 语言 ≠ UI 语言；铁律 3 在多语言里的典型触点）。
 - SEO 检索词**自然织入正文**（動画要約 / 요약 / resumir / резюме / subtítulos…），绝不堆砌——被拒史红线在五语同样生效。
-- 加语言**不需要新包**：可搭任意一次版本审核（推荐，省一次审核）或单独提交纯 listing 变更。截图/宣传图块/宣传视频是 **item 级资源不分语言**，加语言零新素材。
+- **listing 语言 = 包内 `_locales/<code>/` 目录**（2026-10-01 Dashboard 实测 + 官方 cws-dashboard-listing 文档）：商品详情的语言下拉列出的就是包内 `_locales` 目录，**没有独立的「添加翻译」入口**（旧版 Dashboard 的任意加语行为已不存在）。**新增 listing 语言必须先发包**：最小实现 = 每语言一个含 `extensionName`/`extensionDescription` 两键的 `messages.json`（manifest 的 `__MSG_*` 引用缺键回退 `default_locale`，扩展行为零变化；browsa 2026-10-01 起带 ja/ko/es/pt_BR/ru 五目录，UI 本体仍仅中/英，语言目录码用下划线形 `pt_BR`）。带新目录的包版本必须高于线上版本——纯加语言也要占一个版本位，规划发版节奏时算进去。
+- 截图/宣传图块/宣传视频是 **item 级资源不分语言**；单语 screenshot/promo 视频位存在但非必需，留空回退默认资源。
 - **What's new 新 locale 不填**（回退展示主语言）；功能版更新 What's new 时**七语一起同步**；若 Dashboard 将 What's new 标为必填，粘 EN 版兜底（⚠ 以 Dashboard 实际为准）。
 - 字符数硬校验：改任何一语文案后跑 `node store-assets/locales-count-check.mjs`（名称 ≤75、简短说明 ≤132，按码点数，标注数与实际数必须一致，超限或标注不符即非零退出）。
 - **主 listing 的任何一处文案改动（含被拒整改）→ 七语全文扫同款模式一次改到位**，改完同步更新 locales 包对应五语段落——七语 listing 从此是连带修改面，不能只改 EN/zh。

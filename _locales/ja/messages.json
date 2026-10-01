@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "閲覧中のページ——記事・動画・PDF——と、自分のモデルまたはエージェントでチャットする AI サイドバー。オープンソース、アカウント不要。",
+    "description": "Extension description"
+  }
+}

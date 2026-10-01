@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "보고 있는 페이지——기사·동영상·PDF——와 내 모델 또는 에이전트로 대화하는 AI 사이드바. 오픈소스, 계정 불필요.",
+    "description": "Extension description"
+  }
+}

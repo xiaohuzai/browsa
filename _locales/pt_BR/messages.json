@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "browsa",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Barra lateral de IA que conversa com a página aberta —artigos, vídeos, PDFs— com seu próprio modelo ou agente. Código aberto, sem conta.",
+    "description": "Extension description"
+  }
+}
