@@ -87,7 +87,7 @@ Escolha um método de instalação:
 **Depois, em qualquer um dos casos:**
 
 1. Abra um artigo e clique no ícone da extensão na barra de ferramentas, ou pressione `Ctrl+Shift+H` (`Command+Shift+H` no macOS).
-2. Abra as **⋯ → Configurações**, configure um provedor de LLM ou de Agente e clique em **Ping** para verificar a conexão.
+2. Abra as **⚙ Configurações**, configure um provedor de LLM ou de Agente e clique em **Ping** para verificar a conexão.
 3. Selecione o modelo ou agente no menu suspenso do painel lateral, clique em **📎** para anexar a página e faça a sua primeira pergunta.
 
 Veja o [guia de início rápido](https://xiaohuzai.github.io/browsa/en/guide/quickstart.html) para o passo a passo completo. As configurações avançadas podem ficar nos valores padrão enquanto você estabelece a conexão.
@@ -109,7 +109,7 @@ Em máquinas com pouca memória, execute os testes em série: `node --test --tes
 
 ## Conecte um provedor
 
-Abra as ⋯ → Configurações, preencha o endereço, clique em **Ping** — a conectividade é verificada e as capacidades detectadas automaticamente; o primeiro provedor que você verificar se torna o ativo. Dois tipos de backends:
+Abra as ⚙ Configurações, preencha o endereço, clique em **Ping** — a conectividade é verificada e as capacidades detectadas automaticamente; o primeiro provedor que você verificar se torna o ativo. Dois tipos de backends:
 
 - **Provedores de agente** — backends de agente completos, com execução de ferramentas no servidor (bash, operações de arquivos, busca na web…). A IA pode realmente *fazer* coisas.
 - **Provedores de LLM** — endpoints de chat simples para conversar. O ID do modelo é obrigatório.
@@ -127,7 +127,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Abra as ⋯ → Configurações, selecione o cartão **Agent Bridge**, clique em **＋ Adicionar agente** e preencha os endereços das pontes, um por linha — um agente por endereço, com um apelido opcional (deixe vazio e o Ping descobre o nome do agente automaticamente) e a chave de API da própria ponte (as chaves podem diferir de ponte para ponte). O menu suspenso da barra lateral os lista como "Agent Bridge · codex", cada um com a sua própria thread de sessão independente e o seu próprio status de ping (o ⟳ na linha faz o ping apenas daquele agente). Os cartões de aprovação para ações perigosas aparecem direto no painel; capturas de tela, imagens coladas e figuras de PDF vão junto com a sua mensagem (≤8 por turno). O contexto de múltiplos turnos fica no próprio agente.
+Abra as ⚙ Configurações, selecione o cartão **Agent Bridge**, clique em **＋ Adicionar agente** e preencha os endereços das pontes, um por linha — um agente por endereço, com um apelido opcional (deixe vazio e o Ping descobre o nome do agente automaticamente) e a chave de API da própria ponte (as chaves podem diferir de ponte para ponte). O menu suspenso da barra lateral os lista como "Agent Bridge · codex", cada um com a sua própria thread de sessão independente e o seu próprio status de ping (o ⟳ na linha faz o ping apenas daquele agente). Os cartões de aprovação para ações perigosas aparecem direto no painel; capturas de tela, imagens coladas e figuras de PDF vão junto com a sua mensagem (≤8 por turno). O contexto de múltiplos turnos fica no próprio agente.
 
 
 </details>
@@ -141,7 +141,7 @@ O [opencode](https://opencode.ai) traz um servidor headless de primeira parte �
 opencode serve --port 4096
 ```
 
-Abra as ⋯ → Configurações, selecione o provedor **OpenCode Agent**, preencha a URL base `http://127.0.0.1:4096` (o placeholder já sugere), **Ping**, pronto. O contexto de múltiplos turnos fica na sessão do opencode; o browsa apenas envia os seus turnos. Quando o opencode pedir para executar um comando perigoso, o cartão de aprovação aparece direto no painel. Funciona a partir de qualquer diretório — inicie o servidor no projeto em que você quer que ele trabalhe.
+Abra as ⚙ Configurações, selecione o provedor **OpenCode Agent**, preencha a URL base `http://127.0.0.1:4096` (o placeholder já sugere), **Ping**, pronto. O contexto de múltiplos turnos fica na sessão do opencode; o browsa apenas envia os seus turnos. Quando o opencode pedir para executar um comando perigoso, o cartão de aprovação aparece direto no painel. Funciona a partir de qualquer diretório — inicie o servidor no projeto em que você quer que ele trabalhe.
 
 </details>
 
@@ -170,7 +170,7 @@ hermes gateway
 # → [API Server] API server listening on http://127.0.0.1:8642
 ```
 
-**4. Configure o browsa** — abra as ⋯ → Configurações e selecione o provedor **Hermes Agent**. Ele só precisa de uma URL base e de uma chave de API — o próprio protocolo `/v1/runs` dele é usado automaticamente (sem menu suspenso de tipo de API).
+**4. Configure o browsa** — abra as ⚙ Configurações e selecione o provedor **Hermes Agent**. Ele só precisa de uma URL base e de uma chave de API — o próprio protocolo `/v1/runs` dele é usado automaticamente (sem menu suspenso de tipo de API).
 
 | Campo | Valor |
 |---|---|
@@ -223,7 +223,7 @@ opensquilla gateway start
 3. **Reinicie o gateway** (`Ctrl+C` e depois `opensquilla gateway start` de novo) — a configuração é lida uma vez, na inicialização.
 4. Vá para **Configure o browsa**, abaixo.
 
-**Configure o browsa (igual para os dois)** — abra as ⋯ → Configurações e selecione a aba **OpenSquilla**:
+**Configure o browsa (igual para os dois)** — abra as ⚙ Configurações e selecione a aba **OpenSquilla**:
 
 | Campo | Valor |
 |---|---|
@@ -243,7 +243,7 @@ Notas: cada conversa do browsa corresponde a uma sessão do gateway (chave atrib
 
 Qualquer endpoint que fale OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`) ou **Anthropic Messages** (`/v1/messages`).
 
-Abra as ⋯ → Configurações → **Provedores de LLM**. Um slot vazio **LLM 1** está reservado para você — preencha-o e clique em **Salvar**. Os provedores vivem como abas em um único cartão; adicione mais a qualquer momento com a aba **＋** no fim da barra de abas:
+Abra as ⚙ Configurações → **Provedores de LLM**. Um slot vazio **LLM 1** está reservado para você — preencha-o e clique em **Salvar**. Os provedores vivem como abas em um único cartão; adicione mais a qualquer momento com a aba **＋** no fim da barra de abas:
 
 | Campo | Valor |
 |---|---|

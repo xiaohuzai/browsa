@@ -1,6 +1,6 @@
 # v7 制作与验收
 
-本页是 2026-10-01 已交付流程的可执行基线。后续产品迭代先核对当前源码、素材与时轴；用户新决定优先于此处的旧参数。局部更新另读 [maintenance.md](maintenance.md)。
+本页是 2026-10-01 已交付流程的可执行基线。后续产品迭代先按 [maintenance.md](maintenance.md) 判断是否需要更新媒体，再对需要更新的部分执行本页流程；保留视频/GIF 时无需采集或渲染。核对当前源码、素材与时轴；用户新决定优先于此处的旧参数。
 
 ## 文件与权威来源
 
@@ -18,7 +18,7 @@
 | store-assets/promo/native-live/actual-history.json | 已认可的真实 Codex 公式与彩色 DOT 回答，避免重新请求模型 |
 | store-assets/promo/v7/native/<lang>/ | 已加载真实扩展的完整侧栏、PNG 导出、capture.json、回答文本 |
 | video-v7/public/textures/<lang>/ | 冻结后的最终纹理；渲染中不得改动 |
-| video-v7/src/bounds.json / conversation.json | 点击/裁切用的采集边界；UI 变化后必须从新 capture 更新 |
+| video-v7/src/bounds.json / conversation.json | 点击/裁切用的采集边界；重摄的画面从新 capture 更新对应边界，保留画面沿用原边界 |
 | video-v7/public/audio/ + ATTRIBUTION.md | Cat Walk、click-fixed 音源及出处；保留许可证信息 |
 | docs/assets/promo/ + docs/assets/readme/ | 分发 MP4、海报与 GIF |
 | store-assets/promo/v7/growth/ | 本地待投放三类短片；不是自动发布目录 |
@@ -163,6 +163,6 @@ uv run --with numpy --with scipy python .agents/skills/promo-video/video-v7/veri
 
 4. **工作台**：使用已安装 video-shotcraft 的 workbench/scripts/open.mjs 打开此工程；当前清单 src/workbench.ts，revision 变化时更新。用其 parity.mjs 对当前章卡/动作/结尾采样（本轮 210/525/621/920/1260/1400/1520/1750），Python 需 Pillow；parity 输入为 `--frames 210,525,...`。公开说明这只是采样一致性。
 5. **独立终检**：派干净上下文子代理，输入实际 MP4、关键帧、当前简报/设计/镜头映射、准确卡片实现与可用参考，遵循 video-shotcraft 的 final-review。完整新片全片评审；局部修订写 addendum，不覆写旧哈希/旧评审。主观音乐/SFX 听感未试听就标无法验证。
-6. **四类素材和引用**：逐一判断 guide 截图、banner、GIF、视频；banner 的现有命令为 `node dev-preview/banners/render.mjs`。指南没有统一现役批处理脚本：读取原 PNG 的像素尺寸、对应 guide 场景与 preview DOM，用当前 UI 在同尺寸/语言下重拍，再核对指南正文与新图。同步七语 README/官网及 docs 的交付索引。商店/YouTube 链接未实际换源就保留旧版说明。
+6. **四类素材和引用**：按 maintenance.md 逐一判断 guide 截图、banner、GIF、视频的场景影响；不因 UI 有差异就自动更新全部素材。banner 的现有命令为 `node dev-preview/banners/render.mjs`。需要更新的指南截图没有统一现役批处理脚本：读取原 PNG 的像素尺寸、对应 guide 场景与 preview DOM，用当前 UI 在同尺寸/语言下重拍，再核对指南正文与新图。同步受影响语言的 README/官网引用及 docs 的交付索引；保留媒体不改其引用。商店/YouTube 链接未实际换源就保留旧版说明。
 
 当前结果索引为 docs/promo-v7-2026-10-01.md；本地 verification.json、analysis/final-beat-check.json、frame-scan-*.json 与独立报告保留在 store-assets/promo/v7。把未来结论写入新的当前记录，而不是不断往一个旧 spec 末尾堆互相冲突的时长。

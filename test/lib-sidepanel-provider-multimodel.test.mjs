@@ -261,7 +261,7 @@ test('toolbar tools close on Escape and return focus to their disclosure', () =>
   const tools = document.getElementById('toolbar-tools');
   assert.ok(tools, 'secondary actions need an accessible disclosure');
   tools.open = true;
-  document.getElementById('settings').focus();
+  document.getElementById('search-btn').focus();
   tools.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal(tools.open, false);
   assert.equal(document.activeElement, tools.querySelector('summary'));
