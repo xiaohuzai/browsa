@@ -68,7 +68,7 @@
             <li><strong>Hermes Agent</strong>——自托管智能体，内置在 browsa 里，填个地址就能用。</li>
             <li><strong>OpenCode Agent</strong>——<a href="https://opencode.ai">opencode</a> 命令行智能体，自带官方无头服务器，同样内置：一条命令起服务，直连即用。</li>
             <li><strong>OpenSquilla Agent</strong>——<a href="https://github.com/opensquilla/opensquilla">OpenSquilla</a> 本地桌面智能体（网关 + 网页界面 + 桌面应用），省 token 的微内核设计、模型路由与技能系统；browsa 走它的网关 WebSocket，会话记忆在服务端。</li>
-            <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
+            <li><strong>Agent Bridge</strong>——本地 CLI 智能体桥（codex、claude、pi、gemini…）：独立守护进程把本机 CLI agent 变成统一协议后端，一张卡可同时连多个 agent。</li>
           </ul>
         </li>
       </ul>
@@ -157,8 +157,8 @@ opensquilla gateway start
       <p>说明：每个 browsa 对话对应一个网关会话（清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次）；超大页面（超过 6 万字符）会作为 <code>page-context.md</code> 文档上传，由智能体用自己的工具分段阅读。粘贴的截图保留在 browsa 自己的历史里，暂不转发。</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi</strong> 等 CLI 智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；pi 则用你在它内部配置好的模型供应商。</p>
-      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>；pi：<code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>，首次运行 <code>pi</code> 配好模型供应商，要求 Node ≥ 22）。</p>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi、gemini</strong> 等 CLI 智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；Gemini CLI 用 Google 账号登录（也支持 <code>GEMINI_API_KEY</code>）；pi 则用你在它内部配置好的模型供应商。</p>
+      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>；gemini：<code>npm i -g @google/gemini-cli</code> 跑一次 <code>gemini</code> 登录 Google 账号（或设 <code>GEMINI_API_KEY</code>）；pi：<code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>，首次运行 <code>pi</code> 配好模型供应商，要求 Node ≥ 22）。</p>
       <ol>
         <li>安装桥（已发布到 npm）：
 <pre class="doc-code">npm i -g @xiaohuzai/agent-bridge      # 或免安装试用：npx @xiaohuzai/agent-bridge serve</pre></li>
@@ -170,6 +170,7 @@ chmod 600 agents.json</pre>
     { "name": "codex",  "port": 3948, "apiKey": "", "sandbox": "workspace-write", "approval": "on-request" },
     { "name": "claude", "port": 3949, "apiKey": "" },
     { "name": "pi",     "port": 3950, "apiKey": "" }
+    { "name": "gemini", "port": 3951, "apiKey": "" }
   ]
 }</pre></li>
         <li>启动（在 <code>agents.json</code> 所在目录）：
@@ -177,7 +178,7 @@ chmod 600 agents.json</pre>
 agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 #  加 --bind 0.0.0.0 可暴露到本机之外（此时每个 entry 必须设 apiKey）</pre></li>
         <li>在 browsa ⚙ 设置里选中 <strong>Agent Bridge</strong> 卡，点 <strong>＋ 添加 Agent</strong> 逐行填桥地址（一行一个 agent，如 <code>http://127.0.0.1:3948</code>）。每行还可以填<strong>别名</strong>和该桥自己的 <strong>API Key</strong>——这里的 key 是<em>桥自身的访问令牌</em>（<code>agents.json</code> 里的 <code>apiKey</code>），不是模型服务的 key；仅本机使用时两边都留空；</li>
-        <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×3/3 healthy (codex, claude, pi)</code>）。每行有自己的状态点（灰=未测、绿=可连通、红=不通），行上的 <code>⟳</code> 可随时单独重测某一个 agent；</li>
+        <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×4/4 healthy (codex, claude, pi, gemini)</code>）。每行有自己的状态点（灰=未测、绿=可连通、红=不通），行上的 <code>⟳</code> 可随时单独重测某一个 agent；</li>
         <li>回到侧边栏，顶部下拉按「Agent Bridge · codex」逐个选择，各自显示连通状态。每个 agent 有自己独立的会话线程，互不串线；中途切换时 browsa 会询问当前对话是<strong>带过去</strong>继续，还是<strong>新建会话</strong>从零开始。</li>
       </ol>
       <p>不想手动执行 1–3 步？把下面这段整段<strong>复制给你的 CLI agent</strong>，让它替你完成安装、配置与启动，最后把它报告的桥地址填进第 4 步即可：</p>

@@ -5,17 +5,21 @@ description: browsa 宣传片 / 演示 GIF 生成管线——真实 UI 逐帧驱
 
 # browsa 宣传片生成
 
-**核心思路：不录屏、不用 AI 生成视频（AI 画不对 UI 文字），而是把真实 UI 当作可编程演员**——dev-preview 预览环境跑真面板代码，Playwright 逐帧驱动交互，每帧 CDP 截图，ffmpeg 合成。时间线与采集速度解耦，任何一幕可单独重拍。
+**核心思路：不录屏、不用 AI 生成视频（AI 画不对 UI 文字），而是把真实 UI 当作可编程演员**——dev-preview 预览环境跑真面板代码，Playwright 逐帧驱动交互，每帧 CDP 截图。时间线与采集速度解耦，任何一幕可单独重拍。
 
-现役成片：62s 八幕（钩子 / 附页问答 / 追问卡 / 划词浮条 / 视频时间线 / 渲染蒙太奇 / Agent 审批 / 片尾），产物在 `store-assets/promo/`，分发在双语 README（GIF）与官网 `#demo` 区（mp4）。
+**现役管线 = v3（2026-10-01，Remotion 重制版）**：driver3.mjs 拍「干净内容板」（字幕不再烧进 wrapper），边拍边写 `timeline.json`（字幕事件/幕边界，绝对帧号）；Remotion 工程（`remotion/`）做合成层——片头品牌卡、动效字幕（弹性入位+渐变高亮，结束帧钳到下一条开始绝不叠字）、全程缓慢 ken-burns 漂移、片尾卡。**运镜在拍摄侧**：`panelZoom()` 用 `__layout` 真重排加宽面板（S2→640 / S5→820 / S6→940 / S7→820），比光栅放大清晰。v2（driver.mjs，字幕烧在 wrapper DOM）保留作回退。
+
+现役成片：v3 = 65.8s（60f 片头 + 1420f 板 + 100f 片尾），产物 `store-assets/promo/browsa-promo-v3-1080p.mp4`；v2 = 62s 八幕（钩子 / 附页问答 / 追问卡 / 划词浮条 / 视频时间线 / 渲染蒙太奇 / Agent 审批 / 片尾），产物在 `store-assets/promo/`，分发在双语 README（GIF）与官网 `#demo` 区（mp4）。
 
 ## 目录
 
 - `scripts/server.mjs` — 静态服务器（:8957）。`/repo/*` 映射仓库、`/fonts/*` 映射 Noto Sans SC、`article.html`/`wrapper.html`/`page-shim.js` 本地服务；**下发时动态注入**：seed 按 referer 的 `?scene=` 切换、chrome-shim 加可编程端口 + ATTACH_PAGE/APPROVAL_RESPOND/storage-Promise 补丁、selection-toolbar.js 暴露 shadow 引用。仓库文件零改动。
-- `scripts/wrapper.html` — 1920×1080 合成层：假浏览器窗（标题栏/URL 可驱动）+ 页面/面板双 iframe + 字幕 + 假光标 + 点击涟漪 + 内容区淡入淡出 + 片尾卡。
+- `scripts/wrapper.html` — 1920×1080 合成层：假浏览器窗（标题栏/URL 可驱动）+ 页面/面板双 iframe + 字幕 + 假光标 + 点击涟漪 + 内容区淡入淡出 + 片尾卡。（v3 起字幕/片尾卡 DOM 闲置不用，由 Remotion 承担）
 - `scripts/article.html` — 模拟网页（`?v=doc` 浅色文档 / `?v=video` B 站页），尾部加载 page-shim + **真实** selection-toolbar 内容脚本。
 - `scripts/page-shim.js` — 页面侧最小 chrome.* 桩（浮条的 storage/i18n/getURL/explain 端口）。
-- `scripts/driver.mjs` — 分镜驱动（8 幕，`only()` 支持单拍；逐帧 evaluate + `Page.captureScreenshot`）。
+- `scripts/driver.mjs` — v2 分镜驱动（8 幕，`only()` 支持单拍；逐帧 evaluate + `Page.captureScreenshot`）。
+- `scripts/driver3.mjs` — **v3 分镜驱动**：v2 同一套真机编排 + `cap(zh,en,dur)` 记字幕入 timeline + `mark(id)` 记幕边界 + `panelZoom(w)` 运镜 + 砍冗余等待帧；结束时写 `$PROMO_FRAMES/../timeline.json`。
+- `remotion/` — **v3 合成工程**（独立 package.json，`npm i` 装 remotion/@remotion/cli/react）：`src/Promo.tsx` 全部合成逻辑，`public/fonts/` Noto Sans SC woff2（无 PROMO_PUBLIC 时才生效，见下）。
 
 ## 操作流程
 
@@ -23,26 +27,36 @@ description: browsa 宣传片 / 演示 GIF 生成管线——真实 UI 逐帧驱
 cd <repo>/.agents/skills/promo-video/scripts
 npm i                      # playwright-core + @fontsource/noto-sans-sc（node_modules 已 gitignore）
 node server.mjs            # 常驻（ZCode 里用 run_in_background；`(cmd &)` 会被回收）
+
+# ── v3 全流程 ──
+xvfb-run -a node driver3.mjs                 # 连拍 1420 帧 → $TMPDIR/browsa-promo/frames + timeline.json（约 9 分钟）
+cd ../remotion && npm i                      # 首次
+mkdir -p $TMPDIR/browsa-promo/fonts && cp public/fonts/*.woff2 $TMPDIR/browsa-promo/fonts/   # 字体必须进 public 目录！
+PROMO_PUBLIC=$TMPDIR/browsa-promo npx remotion still src/index.ts promo /tmp/t.png --frame=200  # 冒烟（改代码后先删旧 png，still 对已存在文件显示 ○ 直接跳过）
+PROMO_PUBLIC=$TMPDIR/browsa-promo npx remotion render src/index.ts promo <out.mp4> --crf 17    # 全片 1580f ≈ 7 分钟（concurrency 2，4GB 内存实测可扛）
+
+# ── v2（回退/对比用）──
 node driver.mjs            # 全量 1480 帧 → $TMPDIR/browsa-promo/frames，约 8 分钟
-node driver.mjs s2         # 单拍某幕（s1|s2|s3|s4|s5|s6|s7|s8；全片必须一次连拍帧号才连续）
+node driver.mjs s2         # 单拍某幕（s1|s2|...|s8；全片必须一次连拍帧号才连续）
 # 合成（24fps）：
 ffmpeg -framerate 24 -i $(PROMO_FRAMES 或 $TMPDIR/browsa-promo/frames)/f%05d.png \
   -c:v libx264 -preset faster -crf 20 -pix_fmt yuv420p -movflags +faststart out.mp4
-# GIF（从第 72 帧起 329 帧 = 33s 循环版）。720px = README 实际显示宽度
-# （width=720），1:1 像素不再放大；sierra2_4a 比 bayer 网格纹更干净
-# （2026-09-22 用户反馈 640px+bayer 版「看着模糊」后实测定型）：
-ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
-  -vf "fps=10,scale=720:-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a" out.gif
+# GIF（v3.1 定型配方）：必须从 promosrc 变体（driftEnd=0）剪——漂移让 GIF 差分
+# 压缩失效（实测同剪法 13MB→2.1MB）。剪法 = 核心回路（板 72–624）+ 蛋白质短镜头
+# （板 1056–1134）两段硬切；720px = README 显示宽 1:1，sierra2_4a 抖动。
+# promosrc 用 --frames 只渲板区间（130-1200），comp帧=板帧+60：
+ffmpeg -ss 0.0833 -t 23.0 -i promosrc.mp4 -ss 41.0833 -t 3.25 -i promosrc.mp4 \
+  -filter_complex "[0:v][1:v]concat=n=2:v=1,fps=10,scale=720:-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a" demo-vN.gif
 ```
 
-环境变量：`BROWSA_ROOT`（仓库根，默认从脚本位置向上推三级）、`PROMO_PORT`、`PROMO_FRAMES`、`PROMO_CHROME`。浏览器默认从 `~/.cache/ms-playwright` 自动找最新 chromium；没有就先 `npx playwright-core install chromium`（或设 `PROMO_CHROME` 指向系统 Chrome）。改了 `sidepanel.html` 结构先 `node dev-preview/gen.mjs`。
+环境变量：`BROWSA_ROOT`（仓库根，默认从脚本位置向上推三级）、`PROMO_PORT`、`PROMO_FRAMES`、`PROMO_CHROME`。浏览器默认从 `~/.cache/ms-playwright` 自动找最新 chromium；没有就先 `npx playwright-core install chromium`（或设 `PROMO_CHROME` 指向系统 Chrome）。改了 `sidepanel.html` 结构先 `node dev-preview/gen.mjs`。Remotion 侧：`PROMO_PUBLIC`（= $TMPDIR/browsa-promo，帧+timeline+fonts 都从这出）、`PROMO_REMOTION_CHROME`（默认复用 playwright 缓存的 chrome-headless-shell，见 remotion.config.ts）。
 
 ## 改分镜的常规路径
 
-1. **改字幕文案**：`driver.mjs` 顶部 `Q1/A1/Q2/A2/EXPLAIN/Q3/A3` 常量 + 各幕 `__caption(zh, opacity, en)` 调用。字幕为中英双行（`wrapper.html` 里 `#capzh`/`#capen`，英文次行省略参数即隐藏）；两行都支持 `<span class="hl">` 高亮。**英文文案用 ASCII 直引号**——弯引号 ' 会被中文字体 Noto Sans SC 渲染成全角、出现空隙。
+1. **改字幕文案**（v3）：`driver3.mjs` 顶部 `Q1/A1/.../A3` 常量 + 各幕 `cap(zh, en, dur)` 调用（`<span class="hl">` 高亮，Remotion 侧渲染成渐变蓝；改完只需**重拍→重渲**；只改 `remotion/src` 的版式/动效则只需重渲）。**英文文案用 ASCII 直引号**——弯引号 ' 会被中文字体渲染成全角、出现空隙。
 2. **改节奏**：每幕由 `frames(count, step)` 段组成，count 即帧数（24 帧 = 1 秒）；步进函数里做逐帧插值。
-3. **加一幕**：仿照现有 `if (only('sN'))` 块写，注意承接上一幕的布局与光标位置；`swapWithFade(setup)` 做"切 tab"观感的幕间转场（窗口框不动）。
-4. **重拍范围**：单幕改动仍建议全量连拍（帧号全局连续）；只想预览就 `node driver.mjs sN` 后单独看帧。
+3. **加一幕**：仿照现有 `if (only('sN'))` 块写，注意承接上一幕的布局与光标位置；`swapWithFade(setup)` 做"切 tab"观感的幕间转场（窗口框不动）；新幕记得 `mark('sN')` + `cap(...)`。
+4. **重拍范围**：单幕改动仍建议全量连拍（帧号全局连续、timeline 才完整）；只想预览就 `node driver3.mjs sN` 后单独看帧。
 
 ## 坑清单（每一条都真翻过车）
 
@@ -56,6 +70,16 @@ ffmpeg -framerate 24 -start_number 72 -i .../f%05d.png -frames:v 329 \
 - **CDP 截图，不用 `page.screenshot()`**：dark 模式下后者有整页变浅色的伪影（详见记忆 browsa-dev-preview-harness）。
 - **全真驱动协议**（S2/S3/S4/S7 用）：面板走真 onSend/SUBCHAT/审批管线，server 注入的端口带 `__push`（STREAM_HELLO/SUBCHAT_HELLO 自动 ACK），驱动逐帧 `__push({type:'CHUNK',delta})`；APPROVAL_RESPOND 注入为 `{ok:true,data:{ok:true}}`（面板读 data.ok）。DONE 带 `usage`/`providerLabel` 出真铭牌与用量芯片。token 芯片的 t/s 按采帧墙钟计算，数值偏慢是已知如实呈现。
 - **长等待会拖慢帧率**：`page.waitForTimeout` 只用于等真实异步（浮条 220ms 去抖、DONE 渲染），能用帧插值表达的动效不要用等待。
+
+### v3 / Remotion 坑（2026-10-01 首跑实证）
+
+- **字体必须进「生效中的」public 目录**：设了 `PROMO_PUBLIC=$TMPDIR/browsa-promo` 后，woff2 要拷到 `$TMPDIR/browsa-promo/fonts/`，否则 404 且**静默回退系统字体**（VPS 上没有 CJK 字体就会豆腐块/衬线化）。
+- **`remotion still` 对已存在文件显示 ○ 直接跳过**（`--overwrite` 实测也没生效）——改代码后重渲静帧必须先 `rm` 旧 png，否则永远看旧产物（本次真翻车：看过一版「不存在的 bug」）。
+- **`<Composition>` 传 props 用 `defaultProps`**（remotion 4.0.531；`props` 属性名在类型里不存在）。
+- **浏览器复用 playwright 缓存的 chrome-headless-shell**（`Config.setBrowserExecutable`）：合成层全是 PNG + CSS，无 WebGL 需求，不必另下 Remotion 自带 shell。
+- **看片工具的预览缩略图会造「重影」**：Read/mp4 预览的抽帧样本出过整窗双重曝光的假象，ffmpeg `select` 逐帧抽同一位置全部干净——先抽帧核实再动手修，别信预览图。
+- **4GB 内存渲染**：1080p + concurrency 2 实测可扛（峰值 available ~900MB）；OOM 就降 concurrency=1（remotion.config.ts）。
+- **GIF 千万别从带漂移的成片剪**：ken-burns 让每帧全局亚像素移动，palettegen/stats_mode=diff 全部失效（实测 26s@720px 剪出 13MB）；用 `promosrc` 变体（driftEnd=0）+ `--frames` 只渲板区间。WebGL 蛋白质段单独剪也会爆体积（molstar 连续渲染整帧噪声），只留 3-4s 短镜头。
 
 ## 交付惯例
 
