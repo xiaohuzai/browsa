@@ -343,3 +343,31 @@ test('agent-session line: hidden when there is no agent session (LLM provider / 
   assert.equal(line.hidden, true, 'the line must hide when the active provider has no agent session');
   assert.equal(line.innerHTML, '');
 });
+
+test('loading a saved conversation refreshes the visible Agent ID before the drawer is closed', async () => {
+  const { getAgentSessionInfo } = await import('../lib/storage.js');
+  const oldSessionArea = chrome.storage.session;
+  chrome.storage.session = { get: async () => ({}), set: async () => {}, remove: async () => {} };
+  const key = 'bridgeSessionId_bridge__localhost_3948';
+  const a = { contextId: 'A', ids: { [key]: 'thread-A' } };
+  const b = { contextId: 'B', ids: { [key]: 'thread-B' } };
+  localStore.agentSessionState = a;
+  initSessionsUI({ getAgentSessionInfo: async () => getAgentSessionInfo('bridge', { isBridge: true, activeModel: 'http://localhost:3948' }) });
+  const send = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = (msg, cb) => {
+    if (msg.type === 'LOAD_SESSION') localStore.agentSessionState = msg.id === 's2' ? b : a;
+    return send(msg, cb);
+  };
+  try {
+    await renderSessionsList();
+    const line = document.getElementById('agent-session-line');
+    assert.equal(line.querySelector('.agent-session-id').title, 'thread-A');
+    await loadSession('s2', 'B');
+    assert.equal(line.querySelector('.agent-session-id').title, 'thread-B');
+    await loadSession('s1', 'A');
+    assert.equal(line.querySelector('.agent-session-id').title, 'thread-A');
+  } finally {
+    chrome.runtime.sendMessage = send;
+    chrome.storage.session = oldSessionArea;
+  }
+});

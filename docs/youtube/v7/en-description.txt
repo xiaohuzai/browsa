@@ -1,0 +1,26 @@
+Stay on the page. Ask beside it.
+browsa is a Chrome / Edge extension that brings the page you're reading to the AI you already use.
+
+Follow four connected workflows:
+• Read articles, blogs and technical docs: attach a Transformer article, ask a question, then select part of the answer to ask a follow-up. View LaTeX equations and Mermaid / Graphviz diagrams right in the side panel.
+• Watch YouTube / Bilibili videos: turn interview highlights into a timeline and click a timestamp to check the original moment.
+• Switch Agents: choose to carry the current conversation into another Agent and keep talking.
+• Continue in your Agent: copy messages, download images, save and restore conversations, then resume the same Agent session—with Codex as the example.
+
+The extension is free and open source (MIT). Connect your own model API, Ollama, or a supported Agent. Model/API costs depend on your provider.
+
+Install browsa:
+https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho
+Website:
+https://xiaohuzai.github.io/browsa/en/
+Quickstart:
+https://xiaohuzai.github.io/browsa/en/guide/quickstart.html
+GitHub:
+https://github.com/xiaohuzai/browsa
+
+Edited product demonstration with sample responses, an original interview scenario and an illustrative CLI continuation. Results depend on your configured model or Agent.
+
+Music: Cat Walk — Arulo / Mixkit
+https://mixkit.co/
+
+#browsa #AI #ChromeExtension

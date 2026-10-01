@@ -22,11 +22,14 @@ const storageData = {
   historyByTab: {}
 };
 
+const contextMenuTitles = new Map();
+let installedListener;
+const storageChangeListeners = [];
 const chromeMock = {
   runtime: {
     onMessage: { addListener: () => {} },
     onConnect: { addListener: () => {} },
-    onInstalled: { addListener: () => {} },
+    onInstalled: { addListener: fn => { installedListener = fn; } },
     sendMessage: () => {},
     connect: () => null,
     getURL: (p) => p,
@@ -51,7 +54,8 @@ const chromeMock = {
     executeScript: async () => [{ result: { text: '# Mock page\n\nMock content.', articleTitle: 'Mock', wasCapped: false, rawTextLength: 30 } }],
   },
   storage: {
-    onChanged: { addListener: () => {} },
+    onChanged: { addListener: fn => storageChangeListeners.push(fn) },
+    local: { get: async keys => Object.fromEntries([].concat(keys).map(k => [k, storageData[k]])) },
     // We don't mock the real chrome.storage.sync/local; the storage module
     // has its own inline mocks. If a test reaches real storage.* calls,
     // we rely on the storage module's defaults.
@@ -61,7 +65,9 @@ const chromeMock = {
     onAlarm: { addListener: () => {} },
   },
   contextMenus: {
-    create: () => {},
+    create: opts => { contextMenuTitles.set(opts.id, opts.title); },
+    update: async (id, opts) => { contextMenuTitles.set(id, opts.title); },
+    removeAll: async () => { contextMenuTitles.clear(); },
     onClicked: { addListener: () => {} },
   },
 };
@@ -175,4 +181,54 @@ test('SEEK_VIDEO swallows executeScript errors as {ok:false} (tab closed/gone)',
   globalThis.chrome.scripting.executeScript = async () => { throw new Error('No tab with id 99'); };
   const res = await handle({ type: 'SEEK_VIDEO', tabId: 99, seconds: 5 }, { tab: { id: 99 } });
   assert.equal(res.ok, false);
+});
+
+
+test('context menu titles follow the saved UI language and live changes across seven languages', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const dirs = { en: 'en', zh: 'zh_CN', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt_BR', ru: 'ru' };
+  const dictionaries = {};
+  for (const dir of Object.values(dirs)) dictionaries[dir] = JSON.parse(await readFile(new URL(`../_locales/${dir}/messages.json`, import.meta.url), 'utf8'));
+  const oldFetch = globalThis.fetch;
+  const oldI18n = chrome.i18n;
+  chrome.i18n = { getMessage: key => dictionaries.en[key]?.message || '' };
+  globalThis.fetch = async url => ({ json: async () => dictionaries[String(url).split('/').at(-2)] });
+  const flush = () => new Promise(r => setTimeout(r, 0));
+  try {
+    storageData.uiLang = 'ja';
+    await installedListener({ reason: 'test' });
+    await flush();
+    assert.equal(contextMenuTitles.get('browsa-explain'), dictionaries.ja.toolbarExplain.message);
+    for (const [lang, dir] of Object.entries(dirs)) {
+      storageData.uiLang = lang;
+      for (const fn of storageChangeListeners) fn({ uiLang: { newValue: lang } }, 'local');
+      await flush();
+      assert.equal(contextMenuTitles.get('browsa-ask'), dictionaries[dir].toolbarAsk.message);
+      assert.equal(contextMenuTitles.get('browsa-translate'), dictionaries[dir].toolbarTranslate.message);
+    }
+    storageData.uiLang = 'auto';
+    for (const fn of storageChangeListeners) fn({ uiLang: { newValue: 'auto' } }, 'local');
+    await flush();
+    assert.equal(contextMenuTitles.get('browsa-explain'), dictionaries.en.toolbarExplain.message);
+  } finally { globalThis.fetch = oldFetch; chrome.i18n = oldI18n; delete storageData.uiLang; }
+});
+
+test('menu language updates all actions with Chrome 116 callback-only contextMenus APIs', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const dict = JSON.parse(await readFile(new URL('../_locales/ko/messages.json', import.meta.url), 'utf8'));
+  const update = chrome.contextMenus.update, removeAll = chrome.contextMenus.removeAll, oldFetch = globalThis.fetch;
+  chrome.contextMenus.update = (id, opts, cb) => { setTimeout(() => { contextMenuTitles.set(id, opts.title); cb?.(); }, 0); };
+  chrome.contextMenus.removeAll = cb => { setTimeout(() => { contextMenuTitles.clear(); cb?.(); }, 0); };
+  globalThis.fetch = async () => ({ json: async () => dict });
+  storageData.uiLang = 'ko';
+  try {
+    installedListener({ reason: 'test' });
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(contextMenuTitles.get('browsa'), 'browsa');
+    assert.equal(contextMenuTitles.get('browsa-summarize'), dict.toolbarSummarize.message);
+    contextMenuTitles.clear();
+    for (const fn of storageChangeListeners) fn({ uiLang: { newValue: 'ko' } }, 'local');
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(contextMenuTitles.get('browsa-summarize'), dict.toolbarSummarize.message);
+  } finally { chrome.contextMenus.update = update; chrome.contextMenus.removeAll = removeAll; globalThis.fetch = oldFetch; delete storageData.uiLang; }
 });

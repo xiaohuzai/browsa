@@ -1,0 +1,26 @@
+读到哪里，问到哪里。
+browsa 是 Chrome / Edge 浏览器插件，让你在网页旁边，用自己已在使用的 AI 阅读、追问和继续工作。
+
+这支视频展示四个连贯的场景：
+• 读文章、博客和技术文档：附加 Transformer 文档，提问并选中回答追问；在侧栏直接查看公式、Mermaid 和 Graphviz 架构图。
+• 看 B 站 / YouTube 视频：把访谈要点整理成时间线，点击时间戳跳回原片核对。
+• 切换 Agent：选择带上当前对话，在另一个 Agent 中接着聊。
+• 回到 Agent 继续工作：拷贝消息、下载图片、保存和恢复会话，再用 Codex 演示在 Agent 端续接同一个会话。
+
+插件免费、开源（MIT）。需接入自己的模型 API、Ollama 或受支持的 Agent；模型服务费用取决于你的服务商。
+
+安装 browsa：
+https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho
+官网：
+https://xiaohuzai.github.io/browsa/
+首次配置指南：
+https://xiaohuzai.github.io/browsa/guide/quickstart.html
+GitHub：
+https://github.com/xiaohuzai/browsa
+
+视频为经过剪辑的产品演示，包含示例回答、原创访谈场景和命令行续接示例；实际结果取决于配置的模型或 Agent。
+
+Music: Cat Walk — Arulo / Mixkit
+https://mixkit.co/
+
+#browsa #浏览器插件 #AI

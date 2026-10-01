@@ -22,14 +22,17 @@ import { readFile } from 'node:fs/promises';
 
 const SRC = await readFile(new URL('../lib/content-scripts/selection-toolbar.js', import.meta.url), 'utf8');
 
-function setup() {
+function setup({ uiLang, dictionaries = {} } = {}) {
   const dom = new JSDOM(
     '<!doctype html><html><body><p id="p">Hello brave new world of toolbars</p></body></html>',
     { url: 'https://example.com/', runScripts: 'outside-only', pretendToBeVisual: true },
   );
   const sent = [];
-  let onChanged = null;
+  const listeners = [];
+  const roots = [];
   const w = dom.window;
+  const attach = w.Element.prototype.attachShadow;
+  w.Element.prototype.attachShadow = function (opts) { const root = attach.call(this, opts); roots.push(root); return root; };
   w.chrome = {
     runtime: {
       getURL: (p) => 'chrome-extension://test/' + p,
@@ -41,14 +44,14 @@ function setup() {
       lastError: null,
     },
     storage: {
-      local: { get: (k, cb) => { if (typeof cb === 'function') cb({}); }, set() {} },
-      onChanged: { addListener: (fn) => { onChanged = fn; } },
+      local: { get: (k, cb) => { if (typeof cb === 'function') cb({ uiLang }); }, set() {} },
+      onChanged: { addListener: (fn) => { listeners.push(fn); } },
     },
     i18n: { getMessage: () => '' },
   };
   // jsdom has no fetch; the script's async locale refresh calls it.
-  w.fetch = async () => ({ json: async () => ({}) });
-  return { dom, w, sent, getOnChanged: () => onChanged };
+  w.fetch = async url => ({ json: async () => dictionaries[String(url).split('/').at(-2)] || {} });
+  return { dom, w, sent, roots, getOnChanged: () => (changes, area) => listeners.forEach(fn => fn(changes, area)) };
 }
 
 function selectAll(w, text) {
@@ -143,4 +146,35 @@ test('selection toolbar: mouseup/keydown/scroll/resize handlers are wired withou
     w.dispatchEvent(new w.Event('resize'));
   });
   dom.window.close();
+});
+
+
+test('toolbar labels, confirmation and dynamic waiting text follow live UI language changes in all seven languages', async () => {
+  const dirs = { en: 'en', zh: 'zh_CN', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt_BR', ru: 'ru' };
+  const dictionaries = {};
+  for (const dir of Object.values(dirs)) dictionaries[dir] = JSON.parse(await readFile(new URL(`../_locales/${dir}/messages.json`, import.meta.url), 'utf8'));
+  const { dom, w, roots, getOnChanged } = setup({ uiLang: 'zh', dictionaries });
+  w.eval(SRC);
+  const flush = () => new Promise(r => setTimeout(r, 0));
+  try {
+    await flush();
+    const shadow = roots[0], pop = roots[1];
+    for (const [lang, dir] of Object.entries(dirs)) {
+      getOnChanged()({ uiLang: { newValue: lang } }, 'local');
+      await flush();
+      assert.equal(shadow.querySelector('[data-action="explain"]').title, dictionaries[dir].toolbarExplain.message);
+      assert.equal(shadow.querySelector('#confirm-cancel').textContent, dictionaries[dir].toolbarCancel.message);
+      selectAll(w);
+      const range = w.getSelection().getRangeAt(0);
+      range.getBoundingClientRect = () => ({ top: 100, bottom: 120, left: 100, right: 220, width: 120, height: 20 });
+      w.document.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 260));
+      shadow.querySelector('[data-action="explain"]').click();
+      assert.ok(pop.querySelector('#pop-body').textContent.includes(dictionaries[dir].inlineExplainWaiting.message));
+      pop.querySelector('#pop-close').click();
+    }
+    getOnChanged()({ uiLang: { newValue: 'auto' } }, 'local');
+    await flush();
+    assert.equal(shadow.querySelector('[data-action="explain"]').title, 'Explain');
+  } finally { dom.window.close(); }
 });

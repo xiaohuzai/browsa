@@ -163,7 +163,7 @@ test('activeRunIds/pendingApprovals/pendingClarifications are cleared in the CHA
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
-  const finallyIdx = src.lastIndexOf('finally {', src.indexOf('chatControllers.delete(tabId)'));
+  const finallyIdx = src.lastIndexOf('finally {', src.lastIndexOf('chatControllers.delete(tabId)'));
   assert.ok(finallyIdx > 0, 'must find the finally block that cleans up chatControllers');
   const finallyBlockEnd = src.indexOf('\n  }', finallyIdx);
   const finallyBlock = src.slice(finallyIdx, finallyBlockEnd);

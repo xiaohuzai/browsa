@@ -402,6 +402,65 @@ test('loadSession restores a saved session into the live history and returns its
   assert.deepEqual((await storage.getHistory()).map(m => m.content), ['a', 'b']);
 });
 
+test('switching saved conversations restores their own agent threads, including each bridge endpoint', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'conversation A' }]);
+  const hermesA = await storage.getOrCreateHermesSessionId('hermes');
+  await storage.setOpencodeSessionId('opencode', 'opencode-A');
+  await storage.setSquillaSessionKey('squilla', 'squilla-A');
+  await storage.setBridgeSessionId('bridge', 'codex-A', 'http://localhost:3948');
+  await storage.setBridgeSessionId('bridge', 'claude-A', 'http://localhost:3949');
+  const a = await storage.saveCurrentSession('A');
+  await storage.clearHistory();
+  await storage.clearAllAgentSessions({ hermes: { isHermes: true }, opencode: { isOpencode: true }, squilla: { isSquilla: true }, bridge: { isBridge: true } });
+  await storage.setHistory([{ role: 'user', content: 'conversation B' }]);
+  const hermesB = await storage.getOrCreateHermesSessionId('hermes');
+  await storage.setOpencodeSessionId('opencode', 'opencode-B');
+  await storage.setSquillaSessionKey('squilla', 'squilla-B');
+  await storage.setBridgeSessionId('bridge', 'codex-B', 'http://localhost:3948');
+  const b = await storage.saveCurrentSession('B');
+  assert.notEqual(hermesA, hermesB);
+
+  await storage.loadSession(a.id);
+  assert.equal(await storage.getOrCreateHermesSessionId('hermes'), hermesA);
+  assert.equal(await storage.getOpencodeSessionId('opencode'), 'opencode-A');
+  assert.equal(await storage.getSquillaSessionKey('squilla'), 'squilla-A');
+  assert.deepEqual(await storage.getAgentSessionInfo('bridge', { isBridge: true, activeModel: 'http://localhost:3948' }), { id: 'codex-A' });
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3949'), 'claude-A');
+
+  await storage.loadSession(b.id);
+  assert.equal(await storage.getOrCreateHermesSessionId('hermes'), hermesB);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'codex-B');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3949'), null, 'B must not inherit A\'s Claude thread');
+});
+
+test('loading a legacy snapshot cannot reuse the agent thread of the conversation being left', async () => {
+  reset();
+  await localArea.set({ savedSessions: [{ id: 'legacy', name: 'Legacy', createdAt: 1, history: [{ role: 'user', content: 'old' }] }] });
+  await storage.setBridgeSessionId('bridge', 'unrelated-current-thread', 'http://localhost:3948');
+  await sessionArea.set({ unrelatedPreference: 'keep' });
+  await storage.loadSession('legacy');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), null);
+  assert.equal(sessionArea._dump().unrelatedPreference, 'keep');
+});
+
+test('a late bridge session ID belongs to its archived conversation, not the newly loaded conversation', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'A still starting' }]);
+  const contextA = await storage.getAgentSessionContextId();
+  const a = await storage.saveCurrentSession('A');
+  await storage.clearHistory();
+  await storage.setHistory([{ role: 'user', content: 'B' }]);
+  await storage.setBridgeSessionId('bridge', 'thread-B', 'http://localhost:3948');
+  const b = await storage.saveCurrentSession('B');
+  await storage.setBridgeSessionId('bridge', 'late-thread-A', 'http://localhost:3948', contextA);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'thread-B');
+  await storage.loadSession(a.id);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'late-thread-A');
+  await storage.loadSession(b.id);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'thread-B');
+});
+
 test('loadSession returns -1 for an unknown session id and does not touch history (B5)', async () => {
   // -1 ≠ 0（0 是合法的空会话长度）——handleSession 的 ok: len >= 0 靠这个区分。
   reset();
@@ -673,4 +732,79 @@ test('批E: getSessionFull returns the snapshot with image pixels intact (pixel 
   const s = await storage.saveCurrentSession();
   const full = await storage.getSessionFull(s.id);
   assert.deepEqual(full.history, history, 'bytes in, bytes out — the split changes WHERE they live, never WHAT they are');
+});
+
+
+test('simultaneous first agent turns share one conversation identity', async () => {
+  reset();
+  const [a, b] = await Promise.all([storage.getAgentSessionContextId(), storage.getAgentSessionContextId()]);
+  assert.equal(a, b);
+  const [h1, h2] = await Promise.all([storage.getOrCreateHermesSessionId('hermes'), storage.getOrCreateHermesSessionId('hermes')]);
+  assert.equal(h1, h2);
+});
+
+test('an archived turn reads its own IDs and title stamps after the visible conversation changes', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'A' }]);
+  const origin = await storage.getAgentSessionContextId();
+  await storage.setBridgeSessionId('bridge', 'A', 'http://localhost:3948');
+  await storage.setAgentSessionTitleStamp('bridge', 'A');
+  await storage.saveCurrentSession('A');
+  await storage.clearHistory();
+  await storage.setBridgeSessionId('bridge', 'B', 'http://localhost:3948');
+  await storage.setAgentSessionTitleStamp('bridge', 'B');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948', origin), 'A');
+  assert.equal(await storage.getAgentSessionTitleStamp('bridge', origin), 'A');
+});
+
+test('browser restart preserves active agent IDs and clearing an endpoint removes its durable copy', async () => {
+  reset();
+  await storage.setBridgeSessionId('bridge', 'A', 'http://localhost:3948');
+  sessionArea._reset();
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'A');
+  await storage.clearBridgeSessionId('bridge');
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), null);
+});
+
+test('saving a continued conversation preserves its newly used endpoint and late archived title', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'A' }]);
+  const origin = await storage.getAgentSessionContextId();
+  await storage.setBridgeSessionId('bridge', 'A-codex', 'http://localhost:3948');
+  const a = await storage.saveCurrentSession('A');
+  await storage.setBridgeSessionId('bridge', 'A-claude', 'http://localhost:3949');
+  await storage.updateSessionHistory(a.id);
+  await storage.clearHistory();
+  await storage.setAgentSessionTitleStamp('bridge', 'A-codex', origin);
+  await storage.loadSession(a.id);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3949'), 'A-claude');
+  assert.equal(await storage.getAgentSessionTitleStamp('bridge'), 'A-codex');
+});
+
+test('an ID arriving between switch-away save and load is retained in the saved origin', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'B' }]);
+  const b = await storage.saveCurrentSession('B');
+  await storage.clearHistory();
+  await storage.setHistory([{ role: 'user', content: 'A' }]);
+  const origin = await storage.getAgentSessionContextId();
+  const a = await storage.saveCurrentSession('A');
+  await storage.setBridgeSessionId('bridge', 'A-late', 'http://localhost:3948', origin);
+  await storage.loadSession(b.id);
+  await storage.loadSession(a.id);
+  assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'A-late');
+});
+
+
+test('the sidepanel reading an Agent ID cannot initialize or replace the worker conversation identity', async () => {
+  reset();
+  const panelStorage = await import('../lib/storage.js?panel-read-test');
+  await sessionArea.set({ bridgeSessionId_bridge__localhost_3948: 'existing' });
+  const [workerContext, info] = await Promise.all([
+    storage.getAgentSessionContextId(),
+    panelStorage.getAgentSessionInfo('bridge', { isBridge: true, activeModel: 'http://localhost:3948' }),
+  ]);
+  assert.equal(info.id, 'existing');
+  assert.equal(await storage.getAgentSessionContextId(), workerContext);
+  assert.equal(await storage.appendToHistory({ role: 'user', content: 'valid turn' }, workerContext), 1);
 });

@@ -764,7 +764,7 @@ test('chat-handler.js wires the agent-session naming into the hermes success pat
     'bridge naming must authenticate with the PER-ENDPOINT key (never another bridge\'s token)');
   assert.ok(src.includes('userText: msg.userText'),
     'the title derives from the CURRENT turn user text (first text turn names the session)');
-  assert.ok(src.includes('stampGet: storage.getAgentSessionTitleStamp') && src.includes('stampSet: storage.setAgentSessionTitleStamp'),
-    'stamping must ride the generic storage.session helpers (same lifecycle as the session id)');
+  assert.ok(src.includes('storage.getAgentSessionTitleStamp(name, turn.agentContextId)') && src.includes('storage.setAgentSessionTitleStamp(name, sid, turn.agentContextId)'),
+    'stamping must use the originating conversation context (late writes are covered by chat-rebuild-channels)');
   assert.ok(src.includes('Promise.race'), 'the PATCH await must be raced with a cap so DONE is never hung on a slow endpoint');
 });

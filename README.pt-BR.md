@@ -114,7 +114,7 @@ Abra as ⚙ Configurações, preencha o endereço, clique em **Ping** — a cone
 - **Provedores de agente** — backends de agente completos, com execução de ferramentas no servidor (bash, operações de arquivos, busca na web…). A IA pode realmente *fazer* coisas.
 - **Provedores de LLM** — endpoints de chat simples para conversar. O ID do modelo é obrigatório.
 
-As conversas com agentes ficam do lado do agente: o browsa nomeia a sessão automaticamente ("browsa:" + a sua primeira mensagem) para que você possa retomá-la na própria interface do agente. O ID da sessão é exibido — e pode ser copiado — no topo da gaveta de sessões.
+As conversas com agentes ficam do lado do agente: o browsa nomeia a sessão automaticamente ("browsa:" + a sua primeira mensagem) para que você possa retomá-la na própria interface do agente. O ID da sessão é exibido — e pode ser copiado — no topo da gaveta de sessões. As conversas salvas do browsa preservam e restauram os IDs de sessão de cada Agent e endereço de conexão. Conversas antigas sem ID registrado criam uma nova sessão de Agent na primeira mensagem e levam o histórico de texto existente.
 
 <details>
 <summary><b>🔧 Agent Bridge</b> — ponte para agentes CLI locais (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>…)</summary>

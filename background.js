@@ -7,6 +7,7 @@
 
 import { stopHermesRun } from './lib/handlers/agent-stream-session.js';
 import * as storage from './lib/storage.js';
+import { initI18n, t } from './lib/i18n.js';
 import { ProviderConfigError } from './lib/llm-client.js';
 import { PAGE_CONTEXT_PREFIX, VIDEO_NOTE_HINT } from './lib/constants.js';
 import {
@@ -71,19 +72,47 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((e) => console.error('browsa: setPanelBehavior failed', e));
 
-// Right-click context menu — text selection + image contexts.
+// Menu titles follow the same saved UI language as the panel and toolbar.
+// Serialize initialization/update so a slow dictionary cannot overwrite a
+// newer settings change; read the latest preference when each job begins.
+const SELECTION_MENUS = [
+  ['browsa-ask', 'toolbarAsk', 'Ask'],
+  ['browsa-explain', 'toolbarExplain', 'Explain'],
+  ['browsa-translate', 'toolbarTranslate', 'Translate'],
+  ['browsa-summarize', 'toolbarSummarize', 'Summarize'],
+];
+// contextMenus Promise overloads arrived after our Chrome 116 minimum.
+// Use callbacks to preserve ordering on 116–122.
+function contextMenuOperation(method, ...args) {
+  return new Promise(resolve => {
+    try {
+      const result = chrome.contextMenus[method](...args, () => { void chrome.runtime.lastError; resolve(); });
+      if (result?.then) result.then(resolve, resolve);
+    } catch (_) { resolve(); }
+  });
+}
+let menuRefreshChain = Promise.resolve();
+function refreshSelectionMenus(create = false) {
+  menuRefreshChain = menuRefreshChain.catch(() => {}).then(async () => {
+    await initI18n();
+    if (create) {
+      if (chrome.contextMenus.removeAll) await contextMenuOperation('removeAll');
+      chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
+    }
+    for (const [id, key, fallback] of SELECTION_MENUS) {
+      if (create) chrome.contextMenus.create({ id, title: t(key, fallback), parentId: 'browsa', contexts: ['selection'] });
+      else if (chrome.contextMenus.update) await contextMenuOperation('update', id, { title: t(key, fallback) });
+    }
+  });
+  return menuRefreshChain;
+}
+chrome.storage.onChanged?.addListener((changes, area) => {
+  if (area === 'local' && changes.uiLang) refreshSelectionMenus().catch(() => {});
+});
+// Menus survive worker sleep; a fresh worker refreshes existing titles too.
+if (chrome.contextMenus.update) refreshSelectionMenus().catch(() => {});
 chrome.runtime.onInstalled.addListener((details) => {
-  // 菜单标题与浮动工具条（selection-toolbar）共用同一组 i18n 键——同一动作的
-  // 两个入口必须长一样（2026-08-31 用户反馈：右键菜单是英文+emoji、浮动条是
-  // 本地语言，观感割裂）。getMessage 在 SW 里可用；键缺失回退英文默认。
-  const menuTitle = (key, fallback) => {
-    try { return chrome.i18n.getMessage(key) || fallback; } catch (_) { return fallback; }
-  };
-  chrome.contextMenus.create({ id: 'browsa', title: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-ask',       title: menuTitle('toolbarAsk', 'Ask'),           parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-explain',   title: menuTitle('toolbarExplain', 'Explain'),   parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-translate', title: menuTitle('toolbarTranslate', 'Translate'), parentId: 'browsa', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'browsa-summarize', title: menuTitle('toolbarSummarize', 'Summarize'), parentId: 'browsa', contexts: ['selection'] });
+  refreshSelectionMenus(true).catch(() => {});
 
   if (details.reason === 'install' || details.reason === 'update') {
     // One-shot self-heal: history blobs bloated by parked images from

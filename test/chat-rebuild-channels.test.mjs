@@ -763,3 +763,150 @@ test('overflow rescue (hermes): rebuildFrom rebuilds conversation_history from t
     restore();
   }
 });
+
+const agentStorage = await import('../lib/storage.js');
+const BRIDGE_PROVIDER = { isBridge: true, alias: 'Bridge', baseUrl: 'http://localhost:3948', activeModel: 'http://localhost:3948', apiKey: 'test' };
+function bridgeLeg(sessionId) {
+  return sseResponse([
+    `data: ${JSON.stringify({ type: 'start', sessionId })}\n\n`,
+    `data: ${JSON.stringify({ type: 'delta', text: 'agent answer' })}\n\n`,
+    `data: ${JSON.stringify({ type: 'done' })}\n\n`,
+  ]);
+}
+
+test('legacy saved history reaches a fresh bridge thread once, then follows up on the restored ID', async () => {
+  await seedProvider(BRIDGE_PROVIDER);
+  await localArea.set({ savedSessions: [{ id: 'legacy', name: 'Old', history: [
+    { role: 'user', content: 'PRIOR-QUESTION' }, { role: 'assistant', content: 'PRIOR-ANSWER' },
+  ] }] });
+  await agentStorage.loadSession('legacy');
+  const { calls, restore } = installFetch(call => call.url.endsWith('/turns')
+    ? bridgeLeg('restored-thread') : { ok: true, status: 200, json: async () => ({}) });
+  try {
+    await handleChat({ tabId: 82, userText: 'follow up' }, HINTS, '');
+    await handleChat({ tabId: 82, userText: 'another follow up' }, HINTS, '');
+    const turns = calls.filter(c => c.url.endsWith('/turns'));
+    assert.equal(turns.length, 2);
+    assert.equal(turns[0].body.sessionId, undefined);
+    assert.ok(turns[0].body.text.includes('PRIOR-QUESTION'));
+    assert.ok(turns[0].body.text.includes('PRIOR-ANSWER'));
+    assert.equal(turns[1].body.sessionId, 'restored-thread');
+    assert.ok(!turns[1].body.text.includes('PRIOR-ANSWER'), 'existing server transcript must not be duplicated');
+  } finally { restore(); }
+});
+
+test('bridge ID and title assigned after a switch stay with the originating saved conversation', async () => {
+  await seedProvider(BRIDGE_PROVIDER);
+  await agentStorage.setHistory([{ role: 'user', content: 'A earlier' }]);
+  const a = await agentStorage.saveCurrentSession('A');
+  await agentStorage.clearHistory();
+  await agentStorage.setHistory([{ role: 'user', content: 'B earlier' }]);
+  await agentStorage.setBridgeSessionId('p1', 'B-thread', BRIDGE_PROVIDER.baseUrl);
+  await agentStorage.setAgentSessionTitleStamp('p1', 'B-thread');
+  const b = await agentStorage.saveCurrentSession('B');
+  await agentStorage.loadSession(a.id);
+  const { streamState } = await import('../lib/state.js');
+  const { calls, restore } = installFetch(async call => {
+    if (!call.url.endsWith('/turns')) return { ok: true, status: 200, json: async () => ({}) };
+    await agentStorage.updateSessionHistory(a.id);
+    streamState.get(83).bg = true;
+    await agentStorage.loadSession(b.id);
+    return bridgeLeg('A-thread');
+  });
+  try {
+    await handleChat({ tabId: 83, sessionId: a.id, userText: 'A next' }, HINTS, '');
+    assert.equal(await agentStorage.getBridgeSessionId('p1', BRIDGE_PROVIDER.baseUrl), 'B-thread');
+    assert.equal(await agentStorage.getAgentSessionTitleStamp('p1'), 'B-thread');
+    assert.deepEqual((await agentStorage.getHistory()).map(m => m.content), ['B earlier']);
+    await agentStorage.loadSession(a.id);
+    assert.equal(await agentStorage.getBridgeSessionId('p1', BRIDGE_PROVIDER.baseUrl), 'A-thread');
+    assert.equal(await agentStorage.getAgentSessionTitleStamp('p1'), 'A-thread');
+    assert.ok((await agentStorage.getHistory()).some(m => m.content === 'agent answer'));
+    assert.ok(calls.some(c => c.url.endsWith('/threads/A-thread/title')));
+  } finally { restore(); }
+});
+
+test('preparing a captured agent turn after a switch never reads the new conversation thread', async () => {
+  await seedProvider(BRIDGE_PROVIDER);
+  await agentStorage.setHistory([{ role: 'user', content: 'A' }]);
+  await agentStorage.setBridgeSessionId('p1', 'A-thread', BRIDGE_PROVIDER.baseUrl);
+  const context = await agentStorage.getAgentSessionContextId();
+  await agentStorage.saveCurrentSession('A');
+  await agentStorage.clearHistory();
+  await agentStorage.setBridgeSessionId('p1', 'B-thread', BRIDGE_PROVIDER.baseUrl);
+  const turn = createTurnRequest({ provider: BRIDGE_PROVIDER, activeProvider: 'p1', all: {}, msg: { userText: 'A next' }, sendHistory: [], agentContextId: context });
+  await turn.prepare();
+  assert.equal(turn.bridgeSessionId, 'A-thread');
+});
+
+test('switching while an Agent session is being created cannot append or send the old turn in the new conversation', async () => {
+  const provider = { isOpencode: true, baseUrl: 'http://localhost:4096', apiKey: 'test' };
+  await seedProvider(provider);
+  await agentStorage.setHistory([{ role: 'user', content: 'A earlier' }]);
+  const a = await agentStorage.saveCurrentSession('A');
+  await agentStorage.clearHistory();
+  await agentStorage.setHistory([{ role: 'user', content: 'B only' }]);
+  const b = await agentStorage.saveCurrentSession('B');
+  await agentStorage.loadSession(a.id);
+  const { chatControllers } = await import('../lib/state.js');
+  const { calls, restore } = installFetch(async call => {
+    if (call.url.endsWith('/api/session')) {
+      await agentStorage.loadSession(b.id);
+      return { ok: true, status: 200, text: async () => JSON.stringify({ data: { id: 'A-created' } }) };
+    }
+    throw new Error('Old turn reached Agent after the conversation changed');
+  });
+  try {
+    const result = await handleChat({ tabId: 84, sessionId: a.id, userText: 'A next' }, HINTS, '');
+    assert.equal(result.cancelled, true);
+    assert.equal(chatControllers.has(84), false);
+    assert.equal(calls.length, 1, 'only the session-creation request may run');
+    assert.deepEqual((await agentStorage.getHistory()).map(m => m.content), ['B only']);
+    await agentStorage.loadSession(a.id);
+    assert.equal(await agentStorage.getOpencodeSessionId('p1'), 'A-created');
+  } finally { restore(); }
+});
+
+test('legacy history remains pending when an Agent thread was created but its first turn never ran', async () => {
+  const provider = { isOpencode: true, baseUrl: 'http://localhost:4096', apiKey: 'test' };
+  await seedProvider(provider);
+  await localArea.set({ savedSessions: [{ id: 'old', name: 'Old', history: [{ role: 'assistant', content: 'IMPORTANT-OLD-HISTORY' }] }] });
+  await agentStorage.loadSession('old');
+  const mk = () => createTurnRequest({ provider, activeProvider: 'p1', all: {}, msg: { userText: 'next' }, sendHistory: [{ role: 'assistant', content: 'IMPORTANT-OLD-HISTORY' }] });
+  const { calls, restore } = installFetch(() => ({ ok: true, status: 200, text: async () => JSON.stringify({ data: { id: 'empty-thread' } }) }));
+  try {
+    const first = mk();
+    await first.prepare();
+    await agentStorage.clearHistory();
+    await agentStorage.loadSession('old');
+    const retry = mk();
+    await retry.prepare();
+    assert.equal(calls.length, 1);
+    assert.equal(retry.opencodeSessionId, 'empty-thread');
+    assert.ok(retry.opencodeTurn.includes('IMPORTANT-OLD-HISTORY'));
+  } finally { restore(); }
+});
+
+test('long legacy Squilla history uses document upload instead of exceeding the inline context cap', async () => {
+  const provider = { isSquilla: true, baseUrl: 'http://localhost:3456', apiKey: 'test' };
+  await seedProvider(provider);
+  const history = [{ role: 'user', content: 'LONG-LEGACY-START ' + '文'.repeat(65_000) }, { role: 'assistant', content: 'LONG-LEGACY-END' }];
+  await localArea.set({ savedSessions: [{ id: 'old', name: 'Old', history }] });
+  await agentStorage.loadSession('old');
+  await agentStorage.setSquillaSessionKey('p1', 'empty-squilla-thread');
+  const previousFetch = globalThis.fetch;
+  let uploadedText = '';
+  globalThis.fetch = async (url, opts) => {
+    assert.ok(String(url).endsWith('/api/v1/files/upload'));
+    uploadedText = await opts.body.get('file').text();
+    return { ok: true, json: async () => ({ file_uuid: 'history-doc' }) };
+  };
+  try {
+    const turn = createTurnRequest({ provider, activeProvider: 'p1', all: {}, msg: { userText: 'next' }, sendHistory: history });
+    await turn.prepare();
+    assert.ok(uploadedText.includes('LONG-LEGACY-START'));
+    assert.ok(uploadedText.includes('LONG-LEGACY-END'));
+    assert.ok(turn.squillaMessage.length < 60_000);
+    assert.equal(turn.squillaAttachments[0].file_uuid, 'history-doc');
+  } finally { globalThis.fetch = previousFetch; }
+});

@@ -2,6 +2,7 @@
 // Talks to background.js via chrome.runtime messages. Streaming responses come back
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
+import { buildSelectionActionPrompt } from './lib/selection-language.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import * as storage from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
@@ -44,7 +45,7 @@ import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orc
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
-import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
+import { applyI18n, initI18n, watchUiLang, currentUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
@@ -782,14 +783,8 @@ async function handleSelectionAction(action, text) {
     return;
   }
 
-  const preview = text.length > 400 ? text.slice(0, 400) + '…' : text;
-  const quoted = `"${preview}"`;
-  const prompts = {
-    explain:   `Explain the following:\n\n${quoted}`,
-    translate: `Translate the following to Chinese:\n\n${quoted}`,
-    summarize: `Summarize the following:\n\n${quoted}`
-  };
-  const prompt = prompts[action];
+  const replyLanguage = await storage.get('replyLanguage');
+  const prompt = buildSelectionActionPrompt(action, text, replyLanguage, uiLocale());
   if (!prompt) return;
 
   inputEl.value = prompt;

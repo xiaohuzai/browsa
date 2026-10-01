@@ -1,0 +1,26 @@
+ページから離れず、その隣で尋ねる。
+browsa は Chrome / Edge の拡張機能。普段使っている AI と、ウェブページの横で読み、質問し、作業を続けられます。
+
+動画では、4つのつながった使い方を紹介します。
+• 記事・ブログ・技術文書を読む：Transformer の記事を添付して質問し、回答の一部を選んでさらに質問。数式や Mermaid / Graphviz の構成図をサイドパネルで表示できます。
+• YouTube / Bilibili の動画を見る：インタビューの要点をタイムラインに整理し、時刻をクリックして元の場面を確認できます。
+• Agent を切り替える：現在の会話を引き継ぐことを選び、別の Agent と対話を続けます。
+• Agent に戻って作業を続ける：メッセージのコピー、画像のダウンロード、会話の保存・復元から、同じ Agent セッションの再開へ。Codex を例に紹介します。
+
+拡張機能は無料・オープンソース（MIT）です。自分のモデル API、Ollama、または対応 Agent の接続が必要です。モデル利用料は接続先のサービスによって異なります。
+
+インストール：
+https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho
+公式サイト：
+https://xiaohuzai.github.io/browsa/ja/
+初期設定ガイド（英語）：
+https://xiaohuzai.github.io/browsa/en/guide/quickstart.html
+GitHub：
+https://github.com/xiaohuzai/browsa
+
+編集済みの製品デモです。回答、オリジナルのインタビュー場面、CLI での継続操作にはデモ用の例を使用しています。実際の結果は接続したモデルや Agent によって異なります。
+
+Music: Cat Walk — Arulo / Mixkit
+https://mixkit.co/
+
+#browsa #AI #Chrome拡張機能
