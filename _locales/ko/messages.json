@@ -255,54 +255,6 @@
     "message": "대기열에서 제거",
     "description": "Follow-up queue chip: remove"
   },
-  "followupQueueFull": {
-    "message": "대기열이 가득 찼습니다(최대 5개) — 현재 답변이 끝날 때까지 기다려 주세요",
-    "description": "Toast when a mid-stream message can't be queued"
-  },
-  "ctxOverflowRetry": {
-    "message": "⚠️ 첨부 파일이 모델의 컨텍스트 창을 초과했습니다 — 자동으로 잘라내고 다시 시도했습니다…",
-    "description": "Background push: overflow self-rescue"
-  },
-  "tsOutputContinuing": {
-    "message": "✍️ 답변이 출력 한도에 도달했습니다 — 자동으로 이어서 작성합니다…",
-    "description": "Background push: output-cap continuation"
-  },
-  "tsSeeking": {
-    "message": "⏱ 타임스탬프를 추가하는 중…",
-    "description": "Background push: timestamp rewrite pass"
-  },
-  "toolHistorySteps": {
-    "message": "$1단계",
-    "description": "Tool-history fold summary, $1 = event count"
-  },
-  "tabClosed": {
-    "message": "(탭 닫힘)",
-    "description": "Page-meta line when the watched tab closes"
-  },
-  "updatedNotice": {
-    "message": "🔄 browsa가 v$1로 업데이트되었습니다 — 페이지에서 플로팅 툴바가 반응하지 않으면 한 번 새로고침하세요.",
-    "description": "One-time system notice after an extension update, $1 = version"
-  },
-  "chipAttachedQuote": {
-    "message": "📎 첨부됨: \"$1\"",
-    "description": "Selection-attach chip, $1 = preview"
-  },
-  "xhsDegradeBanner": {
-    "message": "샤오홍슈 콘텐츠는 불완전할 수 있습니다($1). 이 브라우저에서 <code>xiaohongshu.com</code>에 로그인하지 않으면 XHR이 다른 노트나 빈 골격을 반환하는 경우가 많습니다. 해당 사이트에 로그인한 뒤 이 페이지를 새로고침하고 다시 보내세요. <em>전송된 내용에는 실제로 읽은 부분이 그대로 포함되어 있습니다. 이것은 미리 알려두는 안내일 뿐입니다.</em>",
-    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
-  },
-  "streamCancelled": {
-    "message": "⚠ 답변이 취소되었습니다",
-    "description": "System line after a user cancel"
-  },
-  "stoppedWatchingResumed": {
-    "message": "⚠ 백그라운드 답변 추적을 중지했습니다",
-    "description": "System line after cancelling a resumed (background) stream"
-  },
-  "imagesAttachedCount": {
-    "message": "이미지 +$1장",
-    "description": "Composer image-strip counter, $1 = image count"
-  },
   "pinnedGroupLabel": {
     "message": "고정됨",
     "description": "Sessions drawer pinned group header"

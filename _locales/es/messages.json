@@ -255,54 +255,6 @@
     "message": "Quitar de la cola",
     "description": "Follow-up queue chip: remove"
   },
-  "followupQueueFull": {
-    "message": "La cola está llena (máx. 5) — espera a que termine la respuesta actual",
-    "description": "Toast when a mid-stream message can't be queued"
-  },
-  "ctxOverflowRetry": {
-    "message": "⚠️ El adjunto superó la ventana de contexto del modelo — se recortó y se reintentó automáticamente…",
-    "description": "Background push: overflow self-rescue"
-  },
-  "tsOutputContinuing": {
-    "message": "✍️ La respuesta alcanzó el límite de salida — continuando automáticamente…",
-    "description": "Background push: output-cap continuation"
-  },
-  "tsSeeking": {
-    "message": "⏱ Añadiendo marcas de tiempo…",
-    "description": "Background push: timestamp rewrite pass"
-  },
-  "toolHistorySteps": {
-    "message": "$1 paso(s)",
-    "description": "Tool-history fold summary, $1 = event count"
-  },
-  "tabClosed": {
-    "message": "(pestaña cerrada)",
-    "description": "Page-meta line when the watched tab closes"
-  },
-  "updatedNotice": {
-    "message": "🔄 browsa se actualizó a la v$1 — si la barra flotante no responde en una página, recárgala una vez.",
-    "description": "One-time system notice after an extension update, $1 = version"
-  },
-  "chipAttachedQuote": {
-    "message": "📎 Adjuntado: «$1»",
-    "description": "Selection-attach chip, $1 = preview"
-  },
-  "xhsDegradeBanner": {
-    "message": "El contenido de Xiaohongshu puede estar incompleto ($1). Si no has iniciado sesión en <code>xiaohongshu.com</code> en este navegador, la petición XHR suele devolver otra nota o un esqueleto vacío. Inicia sesión allí, recarga esta página y vuelve a enviar. <em>El contenido enviado sigue incluyendo todo lo que se llegó a leer; esto es solo un aviso.</em>",
-    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
-  },
-  "streamCancelled": {
-    "message": "⚠ Transmisión cancelada",
-    "description": "System line after a user cancel"
-  },
-  "stoppedWatchingResumed": {
-    "message": "⚠ Se dejó de seguir la transmisión reanudada",
-    "description": "System line after cancelling a resumed (background) stream"
-  },
-  "imagesAttachedCount": {
-    "message": "+$1 imagen(es)",
-    "description": "Composer image-strip counter, $1 = image count"
-  },
   "pinnedGroupLabel": {
     "message": "Fijadas",
     "description": "Sessions drawer pinned group header"
