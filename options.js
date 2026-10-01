@@ -10,7 +10,7 @@ import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 import { providerModelList, resolveBridgeApiKey } from './lib/handlers/provider-resolver.js';
 import { BRIDGE_CARD_LABEL } from './lib/provider-display.js';
-import { applyI18n, initI18n, watchUiLang, currentUiLang, t, tSub } from './lib/i18n.js';
+import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { isImeComposing } from './lib/sidepanel/ui-utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,11 +22,15 @@ const statusEl = $('status');
 
 // Stroke-style SVG (matches sidepanel.js's ICONS.close) used instead of the
 // "✕" emoji-range glyph so it renders identically across OS/font.
-const ICON_CLOSE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+const ICON_CLOSE = '<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
 // 14px twin for the bridge-row remove button: at 11px the stroke all but
 // vanishes next to the ⟳ text glyph (2026-10-01 user report — the ✕ was
 // effectively invisible on the bridge card rows).
-const ICON_CLOSE_14 = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+const ICON_CLOSE_14 = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
+const ICON_EYE = '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_EYE_OFF = '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3 3.5M6.4 6.4A19 19 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.6-1.4"/></svg>';
+const ICON_REFRESH = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>';
 
 // Template for a freshly-added LLM provider card (user fills in url/key/
 // model/alias and picks the protocol, then hits Save).
@@ -40,7 +44,7 @@ init();
 async function init() {
   // 语言偏好就绪后先填静态文案，再渲染动态区块（渲染函数里的文案同样走 t()）。
   await initI18n();
-  document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
+  document.documentElement.lang = uiLocale();
   applyI18n();
 
   // UI Language 下拉：选择即生效（写 storage），watchUiLang 统一重渲染。
@@ -52,7 +56,7 @@ async function init() {
     });
   }
   watchUiLang(() => {
-    document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
+    document.documentElement.lang = uiLocale();
     applyI18n();
     syncGuideLink();
     renderProviders({ keepDirty: true });
@@ -98,9 +102,9 @@ async function init() {
 // 中文站地址兜底（JS 未跑/字典未载时也可点），这里只做语言同步。
 function syncGuideLink() {
   const a = document.getElementById('guideLink');
-  if (a) a.href = currentUiLang() === 'en'
-    ? 'https://xiaohuzai.github.io/browsa/en/guide/'
-    : 'https://xiaohuzai.github.io/browsa/guide/';
+  if (a) a.href = uiLocale().startsWith('zh')
+    ? 'https://xiaohuzai.github.io/browsa/guide/'
+    : 'https://xiaohuzai.github.io/browsa/en/guide/';
 }
 
 function applyChatPrefs(cfg) {  const fs = $('fontSize');
@@ -480,14 +484,14 @@ function bridgeRowHtml(url, alias, apiKey, state = '') {
       <div class="bridge-row-main">
         <input data-bridge-url type="text" value="${escapeAttr(url)}" placeholder="http://127.0.0.1:3948" />
         <span class="bridge-dot${state ? ' ' + state : ''}" data-bridge-dot title="${dotTitle}"></span>
-        <button type="button" class="bridge-row-ping" data-act="bridge-row-ping" title="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}" aria-label="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}">⟳</button>
+        <button type="button" class="bridge-row-ping" data-act="bridge-row-ping" title="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}" aria-label="${_t('bridgeRowPingTitle', '单独 Ping 此 Agent')}">${ICON_REFRESH}</button>
         <button type="button" class="bridge-row-x" data-act="bridge-remove" title="${_t('bridgeRemoveTitle', '移除此地址')}" aria-label="${_t('bridgeRemoveTitle', '移除此地址')}">${ICON_CLOSE_14}</button>
       </div>
       <div class="bridge-row-sub">
         <input data-bridge-alias type="text" value="${escapeAttr(alias)}" placeholder="${_t('bridgeAliasPlaceholder', '别名（留空，Ping 后自动发现）')}" />
         <div class="apikey-wrap">
           <input data-bridge-key type="password" value="${escapeAttr(apiKey)}" placeholder="${_t('bridgeKeyPlaceholder', 'API Key（可选）')}" autocomplete="off" />
-          <button type="button" class="bridge-key-eye" data-act="bridge-key-eye" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
+          <button type="button" class="bridge-key-eye" data-act="bridge-key-eye" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">${ICON_EYE}</button>
         </div>
       </div>
     </div>`;
@@ -568,7 +572,7 @@ async function rowPingBridge(card, row) {
   }
   await persist({ providers: cachedCfg.providers });
   updateBridgeRowDots(card, cfg);
-  if (rowBtn) rowBtn.textContent = '⟳';
+  if (rowBtn) rowBtn.innerHTML = ICON_REFRESH;
   const states = Object.values(cfg.endpointPing);
   if (states.includes('reachable')) setBadge(card, 'reachable', name);
   else if (states.length && states.every((s) => s === 'unreachable')) setBadge(card, 'unreachable', name);
@@ -653,7 +657,7 @@ function buildProviderCard(name, cfg, opts = {}) {
         <label>${_t('apiKeyLabel', 'API key')}
           <div class="apikey-wrap">
             <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-            <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">👁</button>
+            <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">${ICON_EYE}</button>
           </div>
         </label>
       </div>`;
@@ -717,7 +721,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       e.stopPropagation();
       const show = apiInput.type === 'password';
       apiInput.type = show ? 'text' : 'password';
-      apiToggle.textContent = show ? '🙈' : '👁';
+      apiToggle.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
     });
   }
 
@@ -795,7 +799,7 @@ function buildProviderCard(name, cfg, opts = {}) {
         if (keyInput) {
           const show = keyInput.type === 'password';
           keyInput.type = show ? 'text' : 'password';
-          eye.textContent = show ? '🙈' : '👁';
+          eye.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
         }
         return;
       }

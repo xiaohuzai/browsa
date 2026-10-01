@@ -1645,5 +1645,11 @@
   "saveFailedContext": {
     "message": "Save failed — the extension was reloaded. Refresh this page and try again.",
     "description": "Shown when storage.set rejects (extension reloaded)"
+  },
+  "moreActions": {
+    "message": "More actions"
+  },
+  "renameSession": {
+    "message": "Rename session"
   }
 }

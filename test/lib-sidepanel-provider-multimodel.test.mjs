@@ -256,3 +256,13 @@ test('activeProvider 未配置但存在已配置项：自动切到第一个已�
   assert.equal(msg.name, 'llm-1');
   assert.equal(msg.model, 'm1');
 });
+
+test('toolbar tools close on Escape and return focus to their disclosure', () => {
+  const tools = document.getElementById('toolbar-tools');
+  assert.ok(tools, 'secondary actions need an accessible disclosure');
+  tools.open = true;
+  document.getElementById('settings').focus();
+  tools.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(tools.open, false);
+  assert.equal(document.activeElement, tools.querySelector('summary'));
+});

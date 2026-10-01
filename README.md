@@ -89,7 +89,7 @@ Choose one installation method:
 **Then, either way:**
 
 1. Open an article and click the extension toolbar icon, or press `Ctrl+Shift+H` (`Command+Shift+H` on macOS).
-2. Open **⚙ Settings**, configure an LLM or Agent provider, and click **Ping** to verify the connection.
+2. Open **⋯ → Settings**, configure an LLM or Agent provider, and click **Ping** to verify the connection.
 3. Select the model or agent in the side-panel dropdown, click **📎** to attach the page, and ask your first question.
 
 See the [quick-start guide](https://xiaohuzai.github.io/browsa/en/guide/quickstart.html) for the full walkthrough. Advanced settings can keep their defaults while you get connected.
@@ -111,7 +111,7 @@ On memory-constrained machines, run tests serially: `node --test --test-concurre
 
 ## Connect a provider
 
-Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active. Two kinds of backends:
+Open ⋯ → Settings, fill in the address, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active. Two kinds of backends:
 
 - **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
@@ -129,7 +129,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
+Open ⋯ → Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself.
 
 
 </details>
@@ -143,7 +143,7 @@ Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and
 opencode serve --port 4096
 ```
 
-Open ⚙ Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
+Open ⋯ → Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
 
 </details>
 
@@ -172,7 +172,7 @@ hermes gateway
 # → [API Server] API server listening on http://127.0.0.1:8642
 ```
 
-**4. Configure browsa** — open ⚙ Settings, select the **Hermes Agent** provider. It only needs a Base URL and API key — its own `/v1/runs` protocol is used automatically (no API-type dropdown).
+**4. Configure browsa** — open ⋯ → Settings, select the **Hermes Agent** provider. It only needs a Base URL and API key — its own `/v1/runs` protocol is used automatically (no API-type dropdown).
 
 | Field | Value |
 |---|---|
@@ -225,7 +225,7 @@ opensquilla gateway start
 3. **Restart the gateway** (`Ctrl+C`, then `opensquilla gateway start` again) — the config is read once at startup.
 4. Jump to **Configure browsa** below.
 
-**Configure browsa (same for both)** — open ⚙ Settings, select the **OpenSquilla** tab:
+**Configure browsa (same for both)** — open ⋯ → Settings, select the **OpenSquilla** tab:
 
 | Field | Value |
 |---|---|
@@ -245,7 +245,7 @@ Notes: each browsa conversation maps to one gateway session (gateway-assigned ke
 
 Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
 
-Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**. Providers live as tabs on one card; add more anytime with the **＋** tab at the end of the tab bar:
+Open ⋯ → Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**. Providers live as tabs on one card; add more anytime with the **＋** tab at the end of the tab bar:
 
 | Field | Value |
 |---|---|
@@ -321,7 +321,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 | Feature | What you get |
 |---|---|
 | **Image attachments** | drag-and-drop or paste images into the composer (for multimodal models) |
-| **Input history & drafts** | ↑/↓ recalls previously sent messages; an unsent draft survives closing the panel |
+| **Input history & drafts** | ↑/↓ recalls previously sent messages for editing; ↓ past the newest entry restores your draft; an unsent draft survives closing the panel |
 | **Slash commands** | type `/` for completions — see the table below |
 | **Quick actions** | one-click Summarize / Key Points / Explain / → 中文 / Outline above the composer |
 | **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · Translate · Summarize — Explain / Translate answer inline (streaming, in place); Ask / Summarize and the right-click menu go to the panel |

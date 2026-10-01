@@ -393,7 +393,7 @@
             <li>API keys are stored locally and used to authenticate with your configured provider</li>
             <li>URLs in page context are masked locally before sending — tokens, passwords and signatures stripped</li>
             <li>PDFs are parsed on-device; extracted text and images can be attached to model requests</li>
-            <li>Office documents (docx/pptx/xlsx/…) are likewise converted to Markdown on-device — files never leave the machine</li>
+            <li>Office documents (docx/pptx/xlsx/…) are converted to Markdown on-device; extracted content can be attached to model requests</li>
             <li>Content goes only to the backend you configure</li>
           </ul>
         </div>
@@ -446,7 +446,7 @@
       </div>
       <p class="site-note">
         <b>Observes, never hijacks:</b> extraction works by watching the browser's own requests — no re-authentication,
-        and nothing is uploaded to third parties. Every other webpage works too, just not as deeply.
+        on-demand site API requests may also run when attaching. Attached content can be sent to your configured model or Agent. Every other webpage works too, just not as deeply.
       </p>
     </div>
   </section>

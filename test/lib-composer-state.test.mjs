@@ -154,6 +154,41 @@ test('clearPersistedDraft empties the draft but keeps the recall history', async
   assert.deepEqual(stored.composerState.history, ['remembered q']);
 });
 
+test('editing a recalled message keeps the edit in the composer and persisted draft', async () => {
+  const cs = await freshModule();
+  const input = makeInput('original draft');
+  cs.attachDraftPersistence(input);
+  cs.pushInputHistory('previous question');
+  setCaret(input, input.value.length);
+  assert.equal(cs.handleHistoryNav(keydown(input, 'ArrowUp')), true);
+  assert.equal(input.value, 'previous question');
+
+  input.value = 'previous question, with more detail';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  assert.equal(input.value, 'previous question, with more detail', 'typing must not restore the pre-recall draft');
+  assert.equal(cs.handleHistoryNav(keydown(input, 'ArrowDown')), false, 'editing ends recall');
+  await new Promise(r => setTimeout(r, 500));
+  assert.equal(stored.composerState.draft, 'previous question, with more detail');
+
+  // A subsequent walk saves the edited question as the new draft.
+  assert.equal(cs.handleHistoryNav(keydown(input, 'ArrowUp')), true);
+  assert.equal(cs.handleHistoryNav(keydown(input, 'ArrowDown')), true);
+  assert.equal(input.value, 'previous question, with more detail');
+});
+
+test('deleting a recalled message does not resurrect the original draft', async () => {
+  const cs = await freshModule();
+  const input = makeInput('original draft');
+  cs.attachDraftPersistence(input);
+  cs.pushInputHistory('previous question');
+  setCaret(input, input.value.length);
+  cs.handleHistoryNav(keydown(input, 'ArrowUp'));
+  input.value = '';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  assert.equal(input.value, '');
+  assert.equal(cs.handleHistoryNav(keydown(input, 'ArrowDown')), false);
+});
+
 test('recall state is per-input: walks never leak between two inputs of one scope', async () => {
   // Within one scope the recall list is shared by every input wired to it,
   // but an in-progress walk must stay bound to the input that started it —

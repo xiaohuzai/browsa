@@ -4,7 +4,7 @@
     "description": "Extension name"
   },
   "extensionDescription": {
-    "message": "Barra lateral de IA que conversa con la página abierta —artículos, vídeos, PDF— con tu propio modelo o agente. Código abierto, sin cuenta.",
+    "message": "Habla con páginas, artículos, vídeos y PDF en una barra lateral con tu propia IA o agente. Código abierto, sin cuenta.",
     "description": "Extension description"
   },
   "settingsTooltip": {
@@ -1645,5 +1645,11 @@
   "saveFailedContext": {
     "message": "Error al guardar: la extensión se recargó. Actualiza esta página e inténtalo de nuevo",
     "description": "Shown when storage.set rejects (extension reloaded)"
+  },
+  "moreActions": {
+    "message": "Más acciones"
+  },
+  "renameSession": {
+    "message": "Renombrar sesión"
   }
 }

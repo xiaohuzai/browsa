@@ -75,7 +75,7 @@
       <p>切换到任一智能体时，browsa 会询问当前对话的去留——把对话记录作为第一条消息带给新 agent 接续上下文，或新建会话从零开始；每条回复都标注来自哪个 provider / agent。</p>
 
       <h2>配一张提供商卡</h2>
-      <p>打开 ⚙ 设置 → LLM Providers。页面上预留了一张空的 <strong>LLM 1</strong> 卡，填完点 Save 即生效；之后每个服务商是卡头上一枚标签，点标签栏末尾的 <strong>＋</strong> 随时加卡：</p>
+      <p>打开 ⋯ → 设置 → LLM Providers。页面上预留了一张空的 <strong>LLM 1</strong> 卡，填完点 Save 即生效；之后每个服务商是卡头上一枚标签，点标签栏末尾的 <strong>＋</strong> 随时加卡：</p>
       <table class="doc-table">
         <thead><tr><th>字段</th><th>填什么</th></tr></thead>
         <tbody>
@@ -169,7 +169,7 @@ chmod 600 agents.json</pre>
   "bridges": [
     { "name": "codex",  "port": 3948, "apiKey": "", "sandbox": "workspace-write", "approval": "on-request" },
     { "name": "claude", "port": 3949, "apiKey": "" },
-    { "name": "pi",     "port": 3950, "apiKey": "" }
+    { "name": "pi",     "port": 3950, "apiKey": "" },
     { "name": "gemini", "port": 3951, "apiKey": "" }
   ]
 }</pre></li>
@@ -177,7 +177,7 @@ chmod 600 agents.json</pre>
 <pre class="doc-code">agent-bridge serve                                # 默认读 ./agents.json
 agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 #  加 --bind 0.0.0.0 可暴露到本机之外（此时每个 entry 必须设 apiKey）</pre></li>
-        <li>在 browsa ⚙ 设置里选中 <strong>Agent Bridge</strong> 卡，点 <strong>＋ 添加 Agent</strong> 逐行填桥地址（一行一个 agent，如 <code>http://127.0.0.1:3948</code>）。每行还可以填<strong>别名</strong>和该桥自己的 <strong>API Key</strong>——这里的 key 是<em>桥自身的访问令牌</em>（<code>agents.json</code> 里的 <code>apiKey</code>），不是模型服务的 key；仅本机使用时两边都留空；</li>
+        <li>在 browsa ⋯ → 设置里选中 <strong>Agent Bridge</strong> 卡，点 <strong>＋ 添加 Agent</strong> 逐行填桥地址（一行一个 agent，如 <code>http://127.0.0.1:3948</code>）。每行还可以填<strong>别名</strong>和该桥自己的 <strong>API Key</strong>——这里的 key 是<em>桥自身的访问令牌</em>（<code>agents.json</code> 里的 <code>apiKey</code>），不是模型服务的 key；仅本机使用时两边都留空；</li>
         <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×4/4 healthy (codex, claude, pi, gemini)</code>）。每行有自己的状态点（灰=未测、绿=可连通、红=不通），行上的 <code>⟳</code> 可随时单独重测某一个 agent；</li>
         <li>回到侧边栏，顶部下拉按「Agent Bridge · codex」逐个选择，各自显示连通状态。每个 agent 有自己独立的会话线程，互不串线；中途切换时 browsa 会询问当前对话是<strong>带过去</strong>继续，还是<strong>新建会话</strong>从零开始。</li>
       </ol>

@@ -398,7 +398,7 @@
             <li>Las claves de API se guardan localmente y solo se usan para autenticarte con tu proveedor configurado</li>
             <li>Las URL del contexto de la página se enmascaran localmente antes de enviarlas — tokens, contraseñas y firmas eliminados</li>
             <li>Los PDF se analizan en el dispositivo; el texto y las imágenes extraídas se pueden adjuntar a las peticiones del modelo</li>
-            <li>Los documentos de Office (docx/pptx/xlsx/…) también se convierten a Markdown en el dispositivo — los archivos nunca salen de la máquina</li>
+            <li>Los documentos de Office (docx/pptx/xlsx/…) se convierten a Markdown en el dispositivo; el contenido extraído se puede adjuntar a las peticiones del modelo</li>
             <li>El contenido va únicamente al backend que tú configuras</li>
           </ul>
         </div>
@@ -450,8 +450,7 @@
         <span class="site-chip">GeekTime<span class="en">artículos</span></span>
       </div>
       <p class="site-note">
-        <b>Observa, nunca secuestra:</b> la extracción funciona observando las propias peticiones del navegador — sin reautenticación,
-        y nada se sube a terceros. Cualquier otra página web también funciona, solo que con menos profundidad.
+        <b>Observa, nunca secuestra:</b> la extracción funciona observando las propias peticiones del navegador — al adjuntar también puede consultar las API del sitio según sea necesario. El contenido adjunto puede enviarse al modelo o agente que configures. Cualquier otra página web también funciona, solo que con menos profundidad.
       </p>
     </div>
   </section>

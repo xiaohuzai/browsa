@@ -27,7 +27,7 @@ import {
 } from './lib/sidepanel/composer-state.js';
 import {
   initSessionsUI, getSessionsDrawer, openSessionsDrawer, onSessionSearch,
-  closeSessionsDrawer, clearAllSessions
+  closeSessionsDrawer, clearAllSessions, renderSessionsList
 } from './lib/sidepanel/sessions-ui.js';
 import {
   initTranscriptDrawer, refreshTranscriptSource, openTranscriptDrawer,
@@ -170,12 +170,13 @@ async function init() {
   applyI18n();
   applyEmptyHint();
   // <html lang> 跟随界面语言（U11）：写死 zh 会让英文界面被读屏按中文朗读。
-  document.documentElement.lang = currentUiLang();
+  document.documentElement.lang = uiLocale();
   // 设置里切换语言：静态文案重填 + provider 下拉按新语言重建（状态随 GET_CONFIG 刷新）。
   watchUiLang(async () => {
     applyI18n();
     applyEmptyHint();
-    document.documentElement.lang = currentUiLang();
+    if (!getSessionsDrawer()?.hidden) renderSessionsList();
+    document.documentElement.lang = uiLocale();
     try {
       const res = await sendMessage({ type: 'GET_CONFIG' });
       const cfg = res?.data || res;
@@ -241,6 +242,26 @@ async function init() {
 
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
+  const tools = $('toolbar-tools');
+  const closeTools = (restoreFocus = false) => {
+    if (!tools?.open) return;
+    tools.open = false;
+    if (restoreFocus) tools.querySelector('summary')?.focus();
+  };
+  tools?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && tools.open) {
+      e.preventDefault(); e.stopPropagation(); closeTools(true);
+    }
+  });
+  tools?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) closeTools(tools.contains(document.activeElement));
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!tools?.contains(e.target)) closeTools();
+  });
+  document.addEventListener('focusin', (e) => {
+    if (!tools?.contains(e.target)) closeTools();
+  });
 
 
   $('sessions-btn')?.addEventListener('click', () => { closeTranscriptDrawer(); openSessionsDrawer(); });
@@ -826,6 +847,7 @@ function populateProviderSelect(cfg) {
     opt.selected = true;
     opt.textContent = _t('providerNoneConfigured', '未设置');
     providerSel.appendChild(opt);
+    syncProviderCaption();
     return;
   }
   // LLM 卡（卡上 Model ID 逗号分隔多个）：每个模型一个选项，按「Alias · model」
@@ -862,6 +884,8 @@ function populateProviderSelect(cfg) {
       opt.value = name;
       opt.dataset.model = model;
       opt.dataset.display = suffix ? `${display} · ${suffix}` : display;
+      opt.dataset.primary = suffix || display;
+      opt.dataset.secondary = suffix ? display : '';
       opt.textContent = suffix ? `${display} · ${suffix} — ${status}` : `${display} — ${status}`;
       // 窄侧栏里原生 select 会把长标签截断，title 让悬停能看到全名。
       opt.title = opt.textContent;
@@ -892,13 +916,28 @@ function populateProviderSelect(cfg) {
       }
     }
   }
+  syncProviderCaption();
+}
+
+// Keep the full provider/model/status label in the native chooser while
+// giving the active model the first line of the compact header.
+function syncProviderCaption() {
+  const opt = providerSel.selectedOptions[0];
+  const primary = $('provider-primary');
+  const secondary = $('provider-secondary');
+  if (primary) primary.textContent = opt?.dataset.primary || opt?.textContent || '';
+  if (secondary) {
+    secondary.textContent = opt?.dataset.secondary || '';
+    secondary.hidden = !secondary.textContent;
+  }
+  providerSel.title = opt?.textContent || '';
 }
 
 // ─── Timestamps ──────────────────────────────────────────────────────────────
 function nowTimeStr() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date().toLocaleTimeString(uiLocale(), { hour: '2-digit', minute: '2-digit' });
 }
-function nowDateStr() { return new Date().toLocaleString(); }
+function nowDateStr() { return new Date().toLocaleString(uiLocale()); }
 function addTimestamp(el) {
   const span = document.createElement('span');
   span.className = 'msg-time';
@@ -1477,6 +1516,7 @@ async function openSettingsPage() {
 }
 
 async function onProviderChange() {
+  syncProviderCaption();
   const name = providerSel.value;
   const opt = providerSel.selectedOptions[0];
   // 多模型 provider：选项按 Alias · model 展示，选中的具体模型随 provider 一起落存储
@@ -3506,4 +3546,3 @@ function showImageLightbox(src, alt) {
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
 }
-

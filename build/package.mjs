@@ -63,6 +63,9 @@ with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
             rel = rel_dir
         for fn in filenames:
             if fn in exclude_files: continue
+            # All README translations are repository documentation, including
+            # future locales; none are browser runtime assets.
+            if fn.startswith("README.") and fn.endswith(".md"): continue
             if fn == out_name: continue
             if fn.startswith("browsa-v") and fn.endswith(".zip"): continue
             # Loose PDFs at any depth are never part of the extension itself

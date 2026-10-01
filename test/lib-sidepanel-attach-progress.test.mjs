@@ -9,7 +9,7 @@
 // GET_CONFIG/sendMessage mock collisions with other sidepanel test files'
 // shared module state.
 
-import { test } from 'node:test';
+import { test, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
@@ -33,6 +33,56 @@ globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 // exactly the moment a real slow extraction would leave the UI in.
 let pendingAttachResolve = null;
 let nextAttachResult = { ok: true, data: { ok: true, ctx: { articleTitle: 'Test Page', text: 'hello world', truncated: { textLength: 11 } } } };
+const confirmations = [];
+
+// Keep the real extractors and mock only the browser Worker boundary. A held
+// reply lets the timeout test exercise the fallback without waiting minutes.
+let holdWorkerReplies = false;
+const heldWorkerReplies = [];
+globalThis.Worker = class {
+  constructor(url) { this.url = url; this.listeners = {}; }
+  addEventListener(type, listener) { this.listeners[type] = listener; }
+  postMessage(msg) {
+    if (msg.type === 'warmup') return;
+    const reply = () => this.listeners.message({ data: this.url.includes('office-inspector')
+      ? { requestId: msg.requestId, ok: true, markdown: 'Converted office document' }
+      : { requestId: msg.requestId, ok: true, result: {
+          markdown: 'Extracted PDF document', pageCount: 1, pdfType: 'Text',
+          confidence: 1, pagesNeedingOcr: [], title: '', layout: {}, hasEncodingIssues: false,
+        } } });
+    if (holdWorkerReplies) heldWorkerReplies.push(reply);
+    else setTimeout(reply, 15);
+  }
+};
+
+// Observe native timer lifetime, rather than unref'ing or shortening the
+// production deadline. Cleanup after each test keeps a red run bounded.
+const nativeSetTimeout = globalThis.setTimeout;
+const nativeClearTimeout = globalThis.clearTimeout;
+const extractionTimers = [];
+globalThis.setTimeout = (callback, ms, ...args) => {
+  const timer = nativeSetTimeout(callback, ms, ...args);
+  if (ms >= 90_000 && /at file:.*\/attach-orchestrator\.js:\d/.test(new Error().stack)) {
+    extractionTimers.push({ timer, ms, callback, cleared: false });
+  }
+  return timer;
+};
+globalThis.clearTimeout = (timer) => {
+  const entry = extractionTimers.find((candidate) => candidate.timer === timer);
+  if (entry) entry.cleared = true;
+  nativeClearTimeout(timer);
+};
+afterEach(() => {
+  for (const entry of extractionTimers) nativeClearTimeout(entry.timer);
+  extractionTimers.length = 0;
+  holdWorkerReplies = false;
+  while (heldWorkerReplies.length) heldWorkerReplies.shift()();
+});
+after(() => {
+  globalThis.setTimeout = nativeSetTimeout;
+  globalThis.clearTimeout = nativeClearTimeout;
+  dom.window.close();
+});
 
 globalThis.chrome = {
   tabs: {
@@ -42,6 +92,7 @@ globalThis.chrome = {
     onUpdated: { addListener: () => {} },
   },
   runtime: {
+    getURL: (path) => `http://localhost/${path}`,
     connect: () => ({
       name: '', sent: [],
       onMessage: { addListener: () => {}, removeListener: () => {} },
@@ -57,7 +108,10 @@ globalThis.chrome = {
         pendingAttachResolve = () => cb(nextAttachResult);
         return;
       }
-      if (msg.type === 'ATTACH_PDF_CONFIRM') { cb({ ok: false }); return; } // don't need history storage for this test
+      if (msg.type === 'ATTACH_PDF_CONFIRM' || msg.type === 'ATTACH_OFFICE_CONFIRM') {
+        confirmations.push(msg);
+        cb({ ok: false }); return; // don't need history storage for this test
+      }
       cb({ ok: true });
     },
     lastError: undefined,
@@ -75,6 +129,13 @@ await import('../sidepanel.js');
 await new Promise((r) => setTimeout(r, 100));
 
 const attachBtn = document.getElementById('attach');
+const waitFor = async (predicate) => {
+  for (let i = 0; i < 100; i++) {
+    if (predicate()) return;
+    await new Promise((resolve) => nativeSetTimeout(resolve, 5));
+  }
+  assert.fail('attach pipeline did not reach the expected state');
+};
 
 test('clicking attach shows a spinning icon on the button and a visible "正在读取页面…" progress pill', async () => {
   const origIconHtml = attachBtn.innerHTML;
@@ -132,11 +193,7 @@ test('the PDF-pending branch updates the progress pill text to "解析 PDF 中�
   pendingAttachResolve();
   // Check via a microtask flush only (not a macrotask/setTimeout) -- the
   // pdf-pending branch's progress-text update is synchronous code running
-  // right up to its own `await Promise.race(...)`, so one microtask tick
-  // after the ATTACH_PAGE response resolves is the precise moment to catch
-  // it. extractPdfContent fails fast in jsdom (no real Worker/DOMMatrix) and
-  // falls through to the placeholder text within a macrotask tick or two, so
-  // a setTimeout-based wait here would already miss this transient state.
+  // right up to its own extraction await. Inspect it before the Worker reply.
   await Promise.resolve();
   await Promise.resolve();
 
@@ -144,10 +201,55 @@ test('the PDF-pending branch updates the progress pill text to "解析 PDF 中�
   assert.ok(progressEl, 'progress pill must still be present while PDF extraction is attempted');
   assert.match(progressEl.textContent, /解析 PDF 中/, 'progress pill text must switch to the PDF-specific stage message');
 
-  // Let the (fast-failing) PDF extraction finish and confirm cleanup still happens.
-  await new Promise((r) => setTimeout(r, 50));
+  // Let the extraction finish and confirm cleanup still happens.
+  await waitFor(() => !attachBtn.disabled);
   assert.equal(document.getElementById('attach-progress'), null, 'progress pill must be cleared once the PDF flow (success or fallback) finishes');
 
   // restore for any subsequent tests
   nextAttachResult = { ok: true, data: { ok: true, ctx: { articleTitle: 'Test Page', text: 'hello world', truncated: { textLength: 11 } } } };
 });
+
+for (const kind of ['pdf', 'office']) {
+  const ctxFor = (bytes) => ({
+    mode: `${kind}-pending`, [`${kind}Base64`]: bytes, filename: 'document.docx',
+    meta: { url: `https://example.com/document.${kind}`, title: 'Document' },
+  });
+
+  for (const outcome of ['success', 'failure']) {
+    test(`${kind} extraction cancels its deadline after an early ${outcome}`, async () => {
+      nextAttachResult = { ok: true, data: { ok: true, ctx: ctxFor(outcome === 'success' ? 'aGVsbG8=' : '?') } };
+      const confirmCount = confirmations.length;
+      pendingAttachResolve = null;
+      attachBtn.click();
+      await waitFor(() => pendingAttachResolve);
+      pendingAttachResolve();
+      await waitFor(() => confirmations.length > confirmCount && !attachBtn.disabled);
+
+      assert.equal(confirmations.at(-1).type, `ATTACH_${kind.toUpperCase()}_CONFIRM`);
+      assert.match(confirmations.at(-1).text, outcome === 'success'
+        ? /(?:Extracted PDF|Converted office) document/
+        : /agent should fetch and read directly/);
+      // Observe only deadlines owned by this pipeline, not Worker deadlines.
+      assert.ok(extractionTimers.length > 0, 'the pipeline must enforce a deadline');
+      assert.ok(extractionTimers.every((entry) => entry.cleared), 'a completed extraction must leave no live deadline timer');
+    });
+  }
+
+  test(`${kind} extraction still falls back when its deadline expires`, async () => {
+    holdWorkerReplies = true;
+    nextAttachResult = { ok: true, data: { ok: true, ctx: ctxFor('aGVsbG8=') } };
+    const confirmCount = confirmations.length;
+    pendingAttachResolve = null;
+    attachBtn.click();
+    await waitFor(() => pendingAttachResolve);
+    pendingAttachResolve();
+    await waitFor(() => heldWorkerReplies.length > 0 && extractionTimers.length > 0);
+    const deadline = extractionTimers.at(-1);
+    nativeClearTimeout(deadline.timer);
+    deadline.callback();
+    await waitFor(() => confirmations.length > confirmCount && !attachBtn.disabled);
+
+    assert.match(confirmations.at(-1).text, /agent should fetch and read directly/);
+    assert.equal(document.getElementById('attach-progress'), null);
+  });
+}

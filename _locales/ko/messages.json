@@ -1645,5 +1645,11 @@
   "saveFailedContext": {
     "message": "저장 실패 — 확장 프로그램이 다시 로드되었습니다. 이 페이지를 새로고침한 후 다시 시도하세요",
     "description": "Shown when storage.set rejects (extension reloaded)"
+  },
+  "moreActions": {
+    "message": "더 많은 작업"
+  },
+  "renameSession": {
+    "message": "세션 이름 변경"
   }
 }
