@@ -9,7 +9,8 @@ description: Use when browsa 需要宣传片、演示视频、demo GIF、随产�
 
 ## 先确定更新范围
 
-- 完整重拍、产品 UI/交互变化：读 [production-v7.md](references/production-v7.md)，核对变更涉及哪些截图和动作，再采集、冻结、渲染、验收。
+- 产品 UI/UX 或交互变化：先读 [maintenance.md](references/maintenance.md) 判断现有分镜是否受影响。没有影响演示操作、结果或功能表达时，可保留视频/GIF并记录原因；需要更新的画面再按 [production-v7.md](references/production-v7.md) 采集、冻结、渲染、验收。
+- 用户要求完整重拍：读 [production-v7.md](references/production-v7.md)，核对本轮故事和素材，再执行制作流程。
 - 只改字幕/章标题、运镜、音效或局部画面：读 [maintenance.md](references/maintenance.md)，先判断能否复用截图与音轨。局部修改仍须交付实际更新的 MP4，不能只改 JSON。
 - YouTube 上传标题/说明，或新片更新发布文案：读 [youtube-metadata.md](references/youtube-metadata.md)。按当前成片输出七语可粘贴文案；只改发布文案无需重渲视频。
 - 批量上传 YouTube、补填已有视频或维护新旧版播放列表：读 [youtube-upload.md](references/youtube-upload.md)。主列表仅保留最新七语，旧版归档；先核对既有记录，避免重复上传。仅要求完善 skill 时不操作线上账号。
@@ -38,8 +39,8 @@ description: Use when browsa 需要宣传片、演示视频、demo GIF、随产�
 
 ## 交付门槛
 
-更新对应的带 BGM 与无 BGM（保留 SFX）两版，复用同一画面流。验收实际编码文件：动作证据、七语文字/转场、完整解码、帧数、空帧扫描、画面流配对；改音频/时轴则回测最终音轨。按 video-shotcraft 做工作台同帧对比，并派干净上下文子代理独立终检；报告区分实际观察、数值验证与无法验证的范围。
+需要更新成片时，更新对应的带 BGM 与无 BGM（保留 SFX）两版，复用同一画面流。验收实际更新的编码文件：动作证据、受影响语言的文字/转场、完整解码、帧数、空帧扫描、画面流配对；改音频/时轴则回测最终音轨。按 video-shotcraft 做工作台同帧对比，并派干净上下文子代理独立终检；报告区分实际观察、数值验证与无法验证的范围。保留成片时记录影响判断即可，无需重新执行制作验收。
 
-截图、banner、GIF、视频 **逐一判断** 是否受本轮变化影响，在各自交付分辨率下可辨就更新；未更新说明依据。GIF 内容变更递增 demo-vN 文件名，再同步七份 README 与七个官网引用。当前交付索引 [docs/promo-v7-2026-10-01.md](../../../docs/promo-v7-2026-10-01.md)。制作完成不自动授权提交、推送、上传或发布。
+截图、banner、GIF、视频 **逐一判断**：先看各自场景是否受影响，再看交付分辨率下是否可辨，不能仅因 UI 有可见差异就自动重拍。视频/GIF 未涉及改动，或仅有不影响演示操作、结果与理解的周边细节变化，可保留并记录原因，详见 maintenance.md。指南中的操作入口仍须准确。GIF 与视频按各自实际镜头独立判断；GIF 内容确实变更才递增 demo-vN 文件名，并同步对应语言的引用。当前交付索引 [docs/promo-v7-2026-10-01.md](../../../docs/promo-v7-2026-10-01.md)。制作完成不自动授权提交、推送、上传或发布。
 
 成片故事、能力表述、音乐或入口变化时，同轮更新对应 YouTube 文案；纯画面调整也核对文案是否仍匹配。当前文案样例为 [七语上传包](../../../docs/youtube-promo-v7-2026-10-01.md)，未来依新成片修订，不固定复用 v7 内容。
