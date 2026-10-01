@@ -48,14 +48,14 @@ async function init() {
   if (uiLangSel) {
     storage.get('uiLang').then((uiLang) => { uiLangSel.value = uiLang || 'auto'; });
     uiLangSel.addEventListener('change', () => {
-      storage.set({ uiLang: uiLangSel.value });
+      persist({ uiLang: uiLangSel.value });
     });
   }
   watchUiLang(() => {
     document.documentElement.lang = currentUiLang() === 'zh' ? 'zh' : 'en';
     applyI18n();
     syncGuideLink();
-    renderProviders();
+    renderProviders({ keepDirty: true });
     syncAsrProviderUI();
   });
   syncGuideLink();
@@ -120,7 +120,7 @@ async function saveChatPrefs() {
   if (!Number.isFinite(fs)) fs = 13.5; // empty/invalid range value → keep the default, don't store NaN
   const ss = $('sendShortcut')?.value || 'enter';
   const tac = !!$('thoughtAutoCollapse')?.checked;
-  await storage.set({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
+  await persist({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
   cachedCfg.fontSize = fs;
   cachedCfg.sendShortcut = ss;
   cachedCfg.thoughtAutoCollapse = tac;
@@ -220,8 +220,11 @@ async function saveAsr() {
   const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim() || p.defaultVideoModel || '';
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
+  // ASR 卡自己的提示位（审计 P3-4）：此前走页底全局 flash，短视口下整段在
+  // 视口外，表现为「保存没反应」；其余卡都是卡内 flashCard，唯独这里漏配。
+  const asrCard = document.querySelector('button[data-act="save-asr"]')?.closest('.card');
   if (enabled && !apiKey) {
-    flash('err', _t('asrNeedApiKey', '启用 ASR 需要填写 API Key。'));
+    flashCard(asrCard, 'err', _t('asrNeedApiKey', '启用 ASR 需要填写 API Key。'));
     return;
   }
   // 方舟 Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
@@ -230,20 +233,33 @@ async function saveAsr() {
   // （含 enabled）都存不进去，反而导致 ASR 静默不生效（2026-08-15 实机踩到）。
   // 仅方舟需要该规整；其他服务商的端点没有这个变体。
   let savedBaseUrl = baseUrl;
+  let rewriteNote = '';
   if (provider === 'ark' && baseUrl.includes('/api/plan')) {
     savedBaseUrl = normalizeArkBaseUrl(baseUrl);
-    flash('err', tSub('asrPlanUrlRewritten', `已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。`, savedBaseUrl));
+    // 审计 P2：改写警告与 ok 提示曾各调一次 flash——同一 statusEl 后者即刻
+    // 覆盖前者，警告存活 0 帧。合并成一条输出（err 级保住作者要的「醒目」）。
+    rewriteNote = tSub('asrPlanUrlRewritten', `已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。`, savedBaseUrl) + ' ';
   }
   cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
-  await storage.set({ asr: cachedCfg.asr });
-  flash('ok', tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
+  await persist({ asr: cachedCfg.asr });
+  flashCard(asrCard, rewriteNote ? 'err' : 'ok', rewriteNote + tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
 }
 
 // LLM 编辑标签：当前显示哪张 LLM 卡（页内跨重渲记忆；不持久化——刷新后回落
 // 激活 provider 或第一个。Agent 侧的 localAgentTab 是持久化偏好，两码事。）
 let llmEditorTab = null;
 
-function renderProviders() {
+function renderProviders({ keepDirty = false } = {}) {
+  // 整卡重渲前捕快照、重建后回填（2026-10-01 审计 P1）：本函数用 innerHTML=''
+  // 从 cachedCfg（上次保存值）重建——切 LLM/Agent 标签、＋添加、切语言都会触发，
+  // 用户未保存的输入曾无声丢失（updateBridgeRowDots 的注释自己承认这个危害，
+  // 但 tab 路径没有豁免）。按 data-name 配对、按输入元素序号回填——重建是同
+  // 代码路径的确定性输出，序号一一对应。**只对 UI 触发的重渲启用**（keepDirty）：
+  // 程序性重渲（saveCard/删除/发现回填后）必须如实反映新 cachedCfg，回填会把
+  // 旧 DOM 值盖回去（options-provider-ping 两个测试锁的正是这个语义）。保存后
+  // 的 keepDirty 回填值与 DOM 相同，无副作用；跨行结构编辑（＋新行后切标签）
+  // 超出序号配对能力，仍会丢（罕见）。
+  const cardInputSnap = keepDirty ? _captureCardInputs() : null;
   const groupOpenStates = new Map(
     [...providersEl.querySelectorAll('.provider-group')]
       .map((details) => [details.dataset.groupType, details.open])
@@ -305,7 +321,7 @@ function renderProviders() {
           if (cachedCfg.localAgentTab === id) return;
           cachedCfg.localAgentTab = id;
           try { await storage.set({ localAgentTab: id }); } catch (_) {}
-          renderProviders();
+          renderProviders({ keepDirty: true });
         });
         return b;
       };
@@ -348,7 +364,7 @@ function renderProviders() {
           e.stopPropagation();
           if (llmEditorTab === name) return;
           llmEditorTab = name;
-          renderProviders();
+          renderProviders({ keepDirty: true });
         });
         tabsWrap.append(b);
       }
@@ -402,6 +418,31 @@ function renderProviders() {
     }
 
     providersEl.appendChild(details);
+  }
+  _restoreCardInputs(cardInputSnap);
+}
+
+// ─── 卡片输入快照（renderProviders 的重渲保编辑机制，见其头注释）─────────────
+function _captureCardInputs() {
+  const snap = new Map();
+  for (const card of providersEl.querySelectorAll('.provider[data-name]')) {
+    snap.set(card.dataset.name,
+      [...card.querySelectorAll('input, select, textarea')].map((el) =>
+        el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value));
+  }
+  return snap;
+}
+
+function _restoreCardInputs(snap) {
+  if (!snap || !snap.size) return;
+  for (const card of providersEl.querySelectorAll('.provider[data-name]')) {
+    const vals = snap.get(card.dataset.name);
+    if (!vals) continue;
+    [...card.querySelectorAll('input, select, textarea')].forEach((el, i) => {
+      if (i >= vals.length) return;
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = vals[i];
+      else if (el.value !== vals[i]) el.value = vals[i];
+    });
   }
 }
 
@@ -525,7 +566,7 @@ async function rowPingBridge(card, row) {
     const aliasInput = row.querySelector('[data-bridge-alias]');
     if (aliasInput && !aliasInput.value.trim()) aliasInput.value = r.agent;
   }
-  await storage.set({ providers: cachedCfg.providers });
+  await persist({ providers: cachedCfg.providers });
   updateBridgeRowDots(card, cfg);
   if (rowBtn) rowBtn.textContent = '⟳';
   const states = Object.values(cfg.endpointPing);
@@ -773,8 +814,9 @@ function buildProviderCard(name, cfg, opts = {}) {
     });
   }
 
-  card.addEventListener('click', async (e) => {
-    if (e.target.closest('input, button, select, textarea')) return;
+  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
+  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
+  const activate = async () => {
     // The reserved empty "LLM 1" slot is render-only (never in storage) — it
     // can't be the active provider, so don't highlight/persist a click on it.
     if (!cachedCfg.providers[name]) return;
@@ -784,8 +826,20 @@ function buildProviderCard(name, cfg, opts = {}) {
     // silently reverted to the stored provider on reload / language switch.
     cachedCfg.activeProvider = name;
     cachedCfg.activeModel = '';
-    await storage.setActiveProvider(name, '');
+    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
+  };
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('input, button, select, textarea')) return;
+    activate();
   });
+  const cardH3 = card.querySelector('.provider-h3');
+  if (cardH3) {
+    cardH3.tabIndex = 0;
+    cardH3.addEventListener('keydown', (e) => {
+      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
+    });
+  }
   card.querySelector('button[data-act="save"]').addEventListener('click', () => saveCard(name, card));
   card.querySelector('button[data-act="ping"]').addEventListener('click', () => pingCard(name, card));
   card.querySelector('button[data-act="reset"]').addEventListener('click', () => resetCard(name, card));
@@ -813,7 +867,7 @@ function readCard(card) {
 }
 
 function flashCard(card, cls, text) {
-  const el = card.querySelector('.card-status');
+  const el = card?.querySelector('.card-status');
   if (!el) return;
   el.className = 'card-status ' + cls;
   el.textContent = text;
@@ -897,12 +951,12 @@ async function saveCard(name, card) {
     // 必须在 storage.set 之前删——否则存储里残留旧 endpointPing，与内存分叉。
     delete cachedCfg.providers[name].endpointPing;
   }
-  await storage.set({ providers: cachedCfg.providers });
+  await persist({ providers: cachedCfg.providers });
   if (configChanged) {
     storage.get('pingStates').then((pingStates) => {
       const updated = { ...(pingStates || {}) };
       delete updated[name];
-      storage.set({ pingStates: updated });
+      persist({ pingStates: updated });
     });
     // 卡面同步回未测态——否则卡片还挂着旧「● reachable」，主页下拉已是
     // 「未 Ping」，两处口径打架。就地改（不重渲，保住用户可能还在改的输入）。
@@ -979,7 +1033,7 @@ async function pingCard(name, card) {
           // 每端点状态（用户拍板：Bridge 多 Agent 各自维护 Ping 结果）——
           // 主页下拉按 agent 逐条显示，卡片行内状态点就地更新。
           cfg.endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
-          await storage.set({ providers: cachedCfg.providers });
+          await persist({ providers: cachedCfg.providers });
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
           for (const row of card.querySelectorAll('.bridge-row')) {
@@ -992,7 +1046,10 @@ async function pingCard(name, card) {
           updateBridgeRowDots(card, cfg);
           const downs = results.length - okUrls.length;
           const names = okUrls.map((r) => cfg.bridgeAgents[r.url] || String(r.url).replace(/^https?:\/\//, '')).join(', ');
-          return `agent-bridge ×${okUrls.length}/${results.length} healthy (${names})${downs ? ` — ${downs} down` : ''}`;
+          // fallback 与旧硬编码逐字节一致（jsdom 测试钉 /×2\/2 healthy/ 等）；
+          // i18n 化是 2026-10-01 options 审计 P3——同页其余文案早已 _t 化。
+          return tSub('bridgePingOk', 'agent-bridge ×$1/$2 healthy ($3)', okUrls.length, results.length, names)
+            + (downs ? ' — ' + tSub('bridgePingDown', '$1 down', downs) : '');
         })()
       : cfg.isOpencode
       ? await (async () => {
@@ -1014,7 +1071,7 @@ async function pingCard(name, card) {
     if (!wasReachable && cachedCfg.activeProvider !== name) {
       cachedCfg.activeProvider = name;
       cachedCfg.activeModel = ''; // 首次 Ping 通自动切换：未指定具体模型，用卡上第一个
-      await storage.set({ activeProvider: name, activeModel: '' });
+      await persist({ activeProvider: name, activeModel: '' });
       document.querySelectorAll('.provider').forEach((c) => c.classList.remove('active'));
       card.classList.add('active');
       activeNote = _t('setActiveNote', ' — set as active provider');
@@ -1030,7 +1087,7 @@ async function pingCard(name, card) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
         cachedCfg.providers[name].isHermes = hasRuns;
-        await storage.set({ providers: cachedCfg.providers });
+        await persist({ providers: cachedCfg.providers });
       }
       flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]${activeNote}`);
     } else {
@@ -1049,7 +1106,7 @@ function setBadge(card, state, name) {
     // Persist to storage so the sidebar dropdown can reflect ping state
     storage.get('pingStates').then((pingStates) => {
       const updated = { ...(pingStates || {}), [name]: state };
-      storage.set({ pingStates: updated });
+      persist({ pingStates: updated });
     });
   }
   const badge = card.querySelector('.provider-badge');
@@ -1073,14 +1130,14 @@ async function resetCard(name, card) {
   // blank template — a user-added card's "stored default" is just its own
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
-  await storage.set({ providers: cachedCfg.providers });
+  await persist({ providers: cachedCfg.providers });
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
   delete _pingState[name];
   storage.get('pingStates').then((pingStates) => {
     const updated = { ...(pingStates || {}) };
     delete updated[name];
-    storage.set({ pingStates: updated });
+    persist({ pingStates: updated });
   });
   renderProviders();
 }
@@ -1097,10 +1154,10 @@ async function addProvider() {
   while (cachedCfg.providers[`llm-${n}`]) n++;
   const name = `llm-${n}`;
   cachedCfg.providers[name] = { ...BLANK_LLM };
-  await storage.set({ providers: cachedCfg.providers });
+  await persist({ providers: cachedCfg.providers });
   // 新服务商即刻成为选中标签（它就是标签栏里横着出现的那一个）。
   llmEditorTab = name;
-  renderProviders();
+  renderProviders({ keepDirty: true });
   // Focus the alias field of the newly added card so the user can immediately
   // type a name. Locate it by its stable data-name — with the tabbed layout
   // only the selected card is visible, and node order no longer implies
@@ -1122,16 +1179,16 @@ async function removeProvider(name) {
   if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
   delete _pingState[name];
-  await storage.set({ providers: cachedCfg.providers });
+  await persist({ providers: cachedCfg.providers });
   storage.get('pingStates').then((pingStates) => {
     const updated = { ...(pingStates || {}) };
     delete updated[name];
-    storage.set({ pingStates: updated });
+    persist({ pingStates: updated });
   });
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
     cachedCfg.activeModel = '';
-    await storage.set({ activeProvider: 'hermes', activeModel: '' });
+    await persist({ activeProvider: 'hermes', activeModel: '' });
   }
   renderProviders();
 }
@@ -1142,7 +1199,7 @@ function applySystemPrompt() {
   if (!el) return;
   el.value = cachedCfg.systemPrompt ?? DEFAULT_SYSTEM_PROMPT ?? '';
   document.querySelector('button[data-act="save-system-prompt"]')?.addEventListener('click', async () => {
-    await storage.set({ systemPrompt: el.value });
+    await persist({ systemPrompt: el.value });
     flash('ok', _t('systemPromptSaved', 'System prompt saved.'));
   });
   document.querySelector('button[data-act="reset-system-prompt"]')?.addEventListener('click', async () => {
@@ -1232,6 +1289,21 @@ function flash(cls, text) {
   // on screen indefinitely, where it could be mistaken for the current state.
   clearTimeout(_flashTimer);
   _flashTimer = setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'status'; }, 4000);
+}
+
+// storage.set 失败兜底（2026-10-01 options 审计 P3）：MV3 下扩展重载后停留在
+// 旧设置页操作，set 以 "Extension context invalidated" 拒绝——此前各点位无
+// try/catch，点击毫无反馈，且各 saveCard 都是 cachedCfg 先改后写，内存持半新
+// 值，下一张卡的保存会把半新对象整体写回。统一走这里：失败 flash + 从盘重读。
+async function persist(patch) {
+  try {
+    await storage.set(patch);
+    return true;
+  } catch (e) {
+    try { Object.assign(cachedCfg, await storage.getAll()); } catch (_) {}
+    flash('err', _t('saveFailedContext', '保存失败：扩展已重载，请刷新本页后重试'));
+    return false;
+  }
 }
 
 function escapeHtml(s) {
