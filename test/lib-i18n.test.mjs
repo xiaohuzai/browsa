@@ -71,6 +71,29 @@ test('显式 en：chrome.i18n 是中文浏览器语言时仍取英文字典', as
   assert.equal(t('hello', 'src'), 'Hello');
 });
 
+test('显式 ja/pt：短码映射到 _locales 目录（ja、pt→pt_BR），未知码回退 auto', async () => {
+  mockChrome({ i18nMessages: { hello: 'browser-locale' }, storage: { uiLang: 'ja' } });
+  globalThis.__i18nFetchMap['mock://_locales/ja/messages.json'] = { hello: { message: '辞書ヒット' } };
+  const m1 = await freshModule();
+  await m1.initI18n();
+  assert.equal(m1.currentUiLang(), 'ja');
+  assert.equal(m1.t('hello', 'src'), '辞書ヒット', 'ja 短码取 ja 目录');
+
+  const m2 = await freshModule();
+  m2.watchUiLang(() => {}); // 注册 storage 监听（监听闭包绑定 m2 的模块状态）
+  globalThis.__i18nFetchMap['mock://_locales/pt_BR/messages.json'] = { hello: { message: 'dicionário pt' } };
+  await globalThis.__i18nStorageListener({ uiLang: { newValue: 'pt' } }, 'local');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(m2.currentUiLang(), 'pt');
+  assert.equal(m2.t('hello', 'src'), 'dicionário pt', 'pt 短码取 pt_BR 目录');
+
+  // 未知短码：回退 auto（不 fetch、不覆盖）
+  await globalThis.__i18nStorageListener({ uiLang: { newValue: 'xx' } }, 'local');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(m2.currentUiLang(), 'auto');
+  assert.equal(m2.t('hello', 'src'), 'browser-locale');
+});
+
 test('字典 fetch 失败：不炸、退回浏览器语言', async () => {
   mockChrome({ i18nMessages: { hello: 'browser-locale' }, storage: { uiLang: 'zh' } });
   globalThis.__i18nFetchMap = {}; // no dict → fetch json throws

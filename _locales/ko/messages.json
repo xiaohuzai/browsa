@@ -6,5 +6,1632 @@
   "extensionDescription": {
     "message": "보고 있는 페이지——기사·동영상·PDF——와 내 모델 또는 에이전트로 대화하는 AI 사이드바. 오픈소스, 계정 불필요.",
     "description": "Extension description"
+  },
+  "settingsTooltip": {
+    "message": "설정 (프로바이더 / API 키)",
+    "description": "Settings button tooltip"
+  },
+  "contextScreenshot": {
+    "message": "스크린샷",
+    "description": "Screenshot mode"
+  },
+  "inputPlaceholder": {
+    "message": "무엇이든 물어보세요…",
+    "description": "Composer placeholder"
+  },
+  "quickSummarize": {
+    "message": "요약",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "핵심 요점",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "설명",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "번역",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "개요",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "빠른 작업 표시/숨기기",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "세션 기록",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ 새 세션",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "제목과 내용 검색…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "저장된 세션이 아직 없습니다.",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "새 세션을 시작하면 이 대화가 보관됩니다.",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "검색과 일치하는 세션이 없습니다.",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "모든 세션 지우기",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "닫기",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "메시지 검색…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "이전 (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "다음 (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "닫기 (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "메시지 검색 (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "메시지 선택",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "새 대화 (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "현재 페이지를 대화에 첨부",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "AI 프로바이더",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "생성 중지",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "자동",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "컨텍스트 모드",
+    "description": "Context mode group aria-label"
+  },
+  "toolbarHide": {
+    "message": "이 페이지에서 숨기기",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "이 페이지에서 툴바를 숨길까요?",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "새로고침하기 전까지는 다시 표시되지 않습니다.",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "취소",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "숨기기",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "질문",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "설명",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "번역",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "요약",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "browsa 빠른 작업",
+    "description": "Selection toolbar aria-label"
+  },
+  "inlineExplainAria": {
+    "message": "설명",
+    "description": "Inline explain popover aria-label"
+  },
+  "inlineExplainWaiting": {
+    "message": "설명 중…",
+    "description": "Inline explain popover: waiting for the model"
+  },
+  "inlineTranslateWaiting": {
+    "message": "번역 중…",
+    "description": "Inline translate popover: waiting for the model"
+  },
+  "inlineTranslateError": {
+    "message": "번역 실패",
+    "description": "Inline translate popover: error prefix"
+  },
+  "inlineExplainCopy": {
+    "message": "복사",
+    "description": "Inline explain popover: copy the answer"
+  },
+  "inlineExplainCopied": {
+    "message": "복사됨",
+    "description": "Inline explain popover: copied feedback"
+  },
+  "inlineExplainRetry": {
+    "message": "다시 시도",
+    "description": "Inline explain popover: retry the request"
+  },
+  "inlineExplainSide": {
+    "message": "사이드바에서 이어서 질문",
+    "description": "Inline explain popover: continue in the side panel"
+  },
+  "inlineExplainClose": {
+    "message": "닫기",
+    "description": "Inline explain popover: close button aria-label"
+  },
+  "inlineExplainError": {
+    "message": "설명 실패",
+    "description": "Inline explain popover: error prefix"
+  },
+  "regenTitle": {
+    "message": "답변 다시 생성",
+    "description": "Assistant message action: regenerate"
+  },
+  "errAuth": {
+    "message": "인증에 실패했습니다 — API 키와 권한을 확인하세요.",
+    "description": "Error card headline: 401/403 class"
+  },
+  "errRateLimit": {
+    "message": "요청 한도를 초과했거나 할당량이 소진되었습니다 — 잠시 기다리거나 결제 상태를 확인하세요.",
+    "description": "Error card headline: 429/quota class"
+  },
+  "errModel": {
+    "message": "이 프로바이더에 없는 모델입니다 — 설정에서 모델 ID를 확인하세요.",
+    "description": "Error card headline: unknown model class"
+  },
+  "errTimeout": {
+    "message": "요청 시간이 초과되었습니다 — 다시 시도해 보세요. 대화가 매우 길면 새 대화를 시작하세요.",
+    "description": "Error card headline: timeout class"
+  },
+  "errNetwork": {
+    "message": "네트워크 오류 — 이 기기에서 엔드포인트에 연결할 수 없습니다.",
+    "description": "Error card headline: network/DNS class"
+  },
+  "errServer": {
+    "message": "프로바이더 서버 오류 — 잠시 후 다시 시도하세요.",
+    "description": "Error card headline: 5xx class"
+  },
+  "errGeneric": {
+    "message": "문제가 발생했습니다.",
+    "description": "Error card headline fallback"
+  },
+  "errRawToggle": {
+    "message": "원본 오류",
+    "description": "Error card raw-text disclosure label"
+  },
+  "copyLabel": {
+    "message": "복사",
+    "description": "Generic copy button label"
+  },
+  "queuedLabel": {
+    "message": "대기열",
+    "description": "Follow-up queue dock label"
+  },
+  "queuedSendNow": {
+    "message": "지금 이 항목 보내기",
+    "description": "Follow-up queue chip: send immediately"
+  },
+  "queuedRemove": {
+    "message": "대기열에서 제거",
+    "description": "Follow-up queue chip: remove"
+  },
+  "followupQueueFull": {
+    "message": "대기열이 가득 찼습니다(최대 5개) — 현재 답변이 끝날 때까지 기다려 주세요",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ 첨부 파일이 모델의 컨텍스트 창을 초과했습니다 — 자동으로 잘라내고 다시 시도했습니다…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ 답변이 출력 한도에 도달했습니다 — 자동으로 이어서 작성합니다…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ 타임스탬프를 추가하는 중…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1단계",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "(탭 닫힘)",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa가 v$1로 업데이트되었습니다 — 페이지에서 플로팅 툴바가 반응하지 않으면 한 번 새로고침하세요.",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 첨부됨: \"$1\"",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "샤오홍슈 콘텐츠는 불완전할 수 있습니다($1). 이 브라우저에서 <code>xiaohongshu.com</code>에 로그인하지 않으면 XHR이 다른 노트나 빈 골격을 반환하는 경우가 많습니다. 해당 사이트에 로그인한 뒤 이 페이지를 새로고침하고 다시 보내세요. <em>전송된 내용에는 실제로 읽은 부분이 그대로 포함되어 있습니다. 이것은 미리 알려두는 안내일 뿐입니다.</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ 답변이 취소되었습니다",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ 백그라운드 답변 추적을 중지했습니다",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "이미지 +$1장",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
+  "pinnedGroupLabel": {
+    "message": "고정됨",
+    "description": "Sessions drawer pinned group header"
+  },
+  "pinSession": {
+    "message": "고정",
+    "description": "Session row pin action tooltip"
+  },
+  "unpinSession": {
+    "message": "고정 해제",
+    "description": "Session row unpin action tooltip"
+  },
+  "deleteSession": {
+    "message": "세션 삭제",
+    "description": "Session row delete tooltip"
+  },
+  "deleteArmedHint": {
+    "message": "다시 클릭하면 삭제됩니다",
+    "description": "Two-step delete armed state tooltip"
+  },
+  "contentMatchHint": {
+    "message": "메시지 내용에서 일치",
+    "description": "Content-only search hit dot tooltip"
+  },
+  "sessionsToday": {
+    "message": "오늘",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsYesterday": {
+    "message": "어제",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsWeek": {
+    "message": "이번 주",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsEarlier": {
+    "message": "이전",
+    "description": "Sessions drawer time bucket"
+  },
+  "transcriptBtnTitle": {
+    "message": "동영상 타임라인",
+    "description": "Topbar button: open the video timeline drawer"
+  },
+  "transcriptTitle": {
+    "message": "동영상 타임라인",
+    "description": "Video timeline drawer header title"
+  },
+  "transcriptSearchPlaceholder": {
+    "message": "타임라인 검색…",
+    "description": "Video timeline drawer search input"
+  },
+  "transcriptNote": {
+    "message": "재생 위치에 메모 추가",
+    "description": "Transcript drawer note-capture button tooltip"
+  },
+  "followPlayback": {
+    "message": "재생 위치로 이동",
+    "description": "Transcript drawer floating pill after manual scroll"
+  },
+  "thinkDoneTitle": {
+    "message": "생각 과정",
+    "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "대화 개요",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "(빈 메시지)",
+    "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "UI 언어",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "언어",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "인터페이스 언어를 전환합니다. 기본값은 브라우저를 따릅니다.",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "자동(브라우저 따름)",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "설정",
+    "description": "Options page subtitle"
+  },
+  "guideLinkText": {
+    "message": "사용 가이드",
+    "description": "Settings header: link to the usage-guide website"
+  },
+  "rateLinkText": {
+    "message": "⭐ browsa 평가하기",
+    "description": "Settings header: neutral link to the Chrome Web Store reviews tab (no incentive wording)"
+  },
+  "providersHeading": {
+    "message": "AI 프로바이더",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "AI 프로바이더를 구성하세요.",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">설정 가이드 열기: AI 프로바이더</a>",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "시스템 프롬프트",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "모든 대화보다 먼저 <code>role: system</code>으로 추가됩니다. 어시스턴트의 언어, 어조, 서식 규칙을 정하는 데 사용하세요.",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "예: 당신은 친절한 어시스턴트입니다. 인라인 수식은 $...$, 디스플레이 수식은 $$...$$를 사용하세요.",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "저장",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "기본값으로 재설정",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "답변 언어",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "자동(시스템 프롬프트 따름)",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ 고급",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "플로팅 선택 툴바",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "텍스트를 선택하면 그 위에 미니 툴바가 나타나 빠른 작업(질문, 설명, 번역, 요약)을 제공합니다.",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "텍스트 선택 시 플로팅 툴바 표시",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "페이지를 첨부할 때(📎) 사이트의 <code>llms.txt</code> 지침 포함",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "채팅 기본 설정",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "메시지 글자 크기",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "전송 단축키",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter (Shift+Enter는 줄바꿈)",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter (Enter는 줄바꿈)",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "생각 블록 자동 접기",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "ASR 자막 및 동영상",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "ASR 사용",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "동영상 페이지를 첨부하면 자동으로 전사/분석합니다. 지원 플랫폼: YouTube, Bilibili.",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "프로바이더",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "자막 소스",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "내장 자막 우선",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "ASR 전사 우선",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "언어",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "자동 감지",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "모델 ID(오디오 전사)",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "동영상 모델 ID(동영상 분석용, 비워 두면 위의 모델 사용)",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "비워 두면 전사 모델과 동일",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "문서",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 문서",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": " (추천)",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "Volcengine Ark",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "Ark API 키(UUID 또는 ark- 접두사)",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "표준 <code>…/api/v3</code> 엔드포인트를 사용하세요. 실제 테스트 결과 Agent Plan의 <code>…/api/plan/v3</code>는 파일 업로드(Files API)를 지원하지 않습니다.",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "왜 이 구성인가요? → Ark 오디오 이해 문서",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 에이전트 프로바이더",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "완전한 에이전트 백엔드 — 도구 실행, 파일 접근, 다단계 작업",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 LLM 프로바이더",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "언어 모델 엔드포인트 — 원하는 만큼 추가하세요. 각 엔드포인트는 자체 와이어 프로토콜을 선택합니다",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ 프로바이더 추가",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "예약된 빈 슬롯 — 구성하고 저장하면 적용됩니다",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "클릭하여 활성 프로바이더로 설정",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "이 프로바이더 제거",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "별칭",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "예: My OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "Base URL",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "API 키",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "키 표시/숨기기",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "API 키 표시 전환",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "모델 ID",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "모델 제거",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "제거",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "모델 ID 추가 — Enter",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "모델 ID 추가",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "모델 추가",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "모델 ID 추가",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● 연결 가능",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● 연결 불가",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ Ping 안 됨",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ 미설정",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "빈 슬롯 — 구성 후 저장",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ LLM 프로바이더에는 모델 ID가 필요합니다",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Ping 중…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " — 활성 프로바이더로 설정됨",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ 저장됨",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "재설정",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Hermes API Server 설정 및 구성 문서",
+    "description": "Options: Hermes docs link text"
+  },
+  "opencodeTip": {
+    "message": "터미널에서 <code>opencode serve --port 4096</code>를 실행하고 출력되는 주소를 입력하세요(포트를 고정하는 것을 권장합니다 — 고정하지 않으면 재시작할 때마다 포트가 바뀝니다). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">opencode 서버 문서</a>",
+    "description": "Options: opencode server setup tip"
+  },
+  "squillaTip": {
+    "message": "OpenSquilla 게이트웨이의 WebSocket 주소 — 기본값은 ws://127.0.0.1:18791/ws입니다. 게이트웨이의 cors.allowed_origins에 이 확장의 origin이 등록되어 있어야 합니다 — CLI 게이트웨이는 ~/.opensquilla/config.toml에, 데스크톱 앱은 자체 프로필 구성(macOS: ~/Library/Application Support/OpenSquilla/opensquilla/config.toml)에 추가합니다 — v0.5.5부터 기본 지원. <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">OpenSquilla 문서</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
+  "bridgeTip": {
+    "message": "<a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">agent-bridge 문서</a>에 따라 브리지를 설치하고 시작하세요. 한 줄에 브리지 주소를 하나씩 입력합니다. API 키는 브리지가 키를 요구하도록 구성된 경우에만 필요합니다 — 루프백 주소의 키 없는 브리지는 이 필드를 무시합니다(키가 틀려도 Ping은 연결 가능으로 표시됩니다).",
+    "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "API 키 (선택 사항)",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "미설정",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "\"$1\"이(가) 구성되지 않아 \"$2\"(으)로 전환했습니다",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ 에이전트 추가",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "별칭 (비워 두면 Ping할 때 자동으로 채워짐)",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "이 주소 제거",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "Ping하기 전에 브리지 주소를 하나 이상 추가하세요.",
+    "description": "Options: bridge ping with zero endpoints"
+  },
+  "systemPromptSaved": {
+    "message": "시스템 프롬프트가 저장되었습니다.",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "시스템 프롬프트가 기본값으로 재설정되었습니다.",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "답변 언어가 \"$1\"(으)로 설정되었습니다.",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "답변 언어: 자동.",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "플로팅 툴바가 사용 설정되었습니다.",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "플로팅 툴바가 사용 중지되었습니다.",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "페이지를 첨부할 때 llms.txt가 포함됩니다.",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt가 사용 중지되었습니다.",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "ASR을 사용하려면 API 키가 필요합니다.",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "Base URL을 Agent Plan 엔드포인트에서 표준 $1(으)로 자동 수정했습니다(api/plan/v3에는 파일 업로드가 없습니다).",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1 ($2, 모델 $3).",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "사용 설정됨",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "사용 중지됨",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusReachable": {
+    "message": "● 연결 가능",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ 연결 불가",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "Ping 안 됨",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "선택된 텍스트가 없습니다 — 다시 선택해 주세요.",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "페이지를 읽는 중…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "페이지를 읽지 못했습니다",
+    "description": "Sidepanel: read page failed"
+  },
+  "pageNavigatedDuringRead": {
+    "message": "읽는 동안 페이지가 이동했습니다 — 다시 첨부해 주세요",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
+  "progressParsingPdf": {
+    "message": "PDF를 구문 분석하는 중…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressParsingDoc": {
+    "message": "문서를 구문 분석하는 중…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
+  "pdfAttachFailed": {
+    "message": "PDF 첨부 실패",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "스크린샷 첨부 실패",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
+  },
+  "officeAttachFailed": {
+    "message": "문서 첨부 실패",
+    "description": "Sidepanel: Office document attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "ASR 첨부 실패",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "페이지 첨부 실패: $1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "세션 저장됨: \"$1\"",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "cannotOpenSettings": {
+    "message": "설정을 열 수 없습니다: $1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "$1(으)로 전환되었습니다",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "이미지가 너무 큽니다: $1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "imageBudgetExceeded": {
+    "message": "이미지를 첨부하지 못했습니다($1) — 전송하기에 너무 큽니다. 한 메시지에는 약 $2 MB의 이미지까지 들어갑니다.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "이미지를 첨부하지 못했습니다($1) — 한 메시지에 최대 $2장까지 첨부할 수 있습니다.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
+  "outputTruncatedToast": {
+    "message": "답변이 여전히 모델의 출력 한도에 도달했습니다 — “계속”을 클릭하거나 继续라고 답하세요.",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ 계속",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "활성 탭이 없습니다.",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "동영상 소스가 사라졌습니다 — 해당 위치로 이동할 수 없습니다.",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "아직 재생 위치나 자막 줄을 사용할 수 없습니다.",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "복사됨",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "기록을 잘라내지 못해 다시 생성이 취소되었습니다.",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "기록을 잘라내지 못해 수정 사항이 저장되지 않았습니다.",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "승인을 보내지 못했습니다: $1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "답변을 보내지 못했습니다: $1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "확장 프로그램 백그라운드가 초기화되었습니다 — 다시 시도하세요",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "동영상 분석",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "ASR 전사",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": " 실패: ",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "알 수 없는 오류",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "— ASR API 키가 Agent Plan 키로 보입니다. 이 키는 표준 Ark 플랫폼 키와 호환되지 않습니다. 설정 → ASR에서 플랫폼 API 키(UUID 또는 ark- 접두사)로 바꾸세요.",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "내장 자막으로 대체했습니다 (YouTube가 오디오 다운로드를 차단했습니다)",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "동영상 메타데이터로 대체했습니다 (YouTube가 오디오 다운로드를 차단했습니다)",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "동영상 메타데이터로 대체했습니다",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ 이 동영상에는 자막이 없습니다 — 그대로 유지합니다(동영상 메타데이터만 첨부됨). 자동 전사를 원하면 설정에서 ASR을 사용 설정한 뒤 다시 첨부하세요.",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "이전에 업로드한 오디오를 재사용합니다(30일간 유효) — 다운로드와 업로드를 건너뜁니다…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "오디오를 다운로드하는 중…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "이전에 업로드한 동영상을 재사용합니다(30일간 유효) — 업로드를 건너뜁니다…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "키프레임을 캡처하는 중…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "오디오를 트랜스코딩하는 중… (WAV로)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "오디오를 업로드하는 중… (0%)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "오디오를 다운로드하면서 전사하는 중…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "입력창으로 건너뛰기",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "메시지",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "선택 항목 삭제",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "취소",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "$1개 선택됨",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "자",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "토큰",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "Mermaid 모듈을 로드하지 못했습니다 — 콘솔을 확인하세요.",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "코드 복사",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "pdbPlddtLegend": {
+    "message": "pLDDT 신뢰도",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
+  "smilesInvalid": {
+    "message": "유효한 화학 구조가 아닙니다 — 원본을 그대로 유지합니다",
+    "description": "Sidepanel: RDKit rejected the SMILES block as chemically invalid"
+  },
+  "mathCopyLatex": {
+    "message": "LaTeX 복사",
+    "description": "Sidepanel: formula hover copy-LaTeX button"
+  },
+  "mermaidViewSource": {
+    "message": "소스 보기",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "확대",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "축소",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "재설정",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportPng": {
+    "message": "PNG 내보내기",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "📎을 클릭해 현재 페이지 첨부",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "AI로 수정",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "수정 중…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "수정 실패: $1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "$1행에서 구문 오류: $2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "페이지가 불완전해 보이면 첨부(📎) 전에 자동으로 펼치고 페이지를 넘기며 읽어옵니다",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "불완전한 페이지 자동 펼치기·넘기기가 사용 설정되었습니다.",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "자동 펼치기·넘기기가 사용 중지되었습니다.",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "페이지가 불완전해 보입니다 — 자동으로 펼치고 넘기는 중…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "콘텐츠를 자동으로 펼치는 중($1/$2)…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "$1페이지를 읽는 중…",
+    "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "생각 중… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "$1(으)로 전환되었습니다. 현재 대화는 어떻게 할까요?"
+  },
+  "providerSwitchCarry": {
+    "message": "현재 대화 이어가기"
+  },
+  "providerSwitchCarrySub": {
+    "message": "대화 내용이 첫 메시지로 전송됩니다"
+  },
+  "providerSwitchCarryToast": {
+    "message": "다음 메시지와 함께 현재 대화가 $1에 전달됩니다"
+  },
+  "providerSwitchFresh": {
+    "message": "새 세션"
+  },
+  "providerSwitchFreshSub": {
+    "message": "현재 대화를 보관하고 새로 시작합니다"
+  },
+  "providerSwitchDirectHint": {
+    "message": "선택하지 않고 보내면 컨텍스트 없이 계속됩니다"
+  },
+  "providerNeedsConfig": {
+    "message": "저장하기 전에 Base URL 또는 별칭을 하나 이상 입력하세요."
+  },
+  "confirmRemoveProvider": {
+    "message": "프로바이더 \"$1\"을(를) 삭제할까요? 구성도 함께 삭제되며 이 작업은 되돌릴 수 없습니다."
+  },
+  "confirmResetProvider": {
+    "message": "프로바이더 \"$1\"을(를) 재설정할까요? 이 작업은 되돌릴 수 없습니다."
+  },
+  "confirmResetSystemPrompt": {
+    "message": "기본 시스템 프롬프트를 복원할까요? 현재 내용이 대체됩니다."
+  },
+  "approvalAllowOnce": {
+    "message": "한 번만 허용"
+  },
+  "approvalAllowSession": {
+    "message": "이 세션 동안 허용"
+  },
+  "approvalAlwaysAllow": {
+    "message": "항상 허용"
+  },
+  "approvalDeny": {
+    "message": "거부"
+  },
+  "approvalRequired": {
+    "message": "승인 필요:"
+  },
+  "clarifyDefault": {
+    "message": "보충 설명해 주세요:"
+  },
+  "clarifyPlaceholder": {
+    "message": "응답 입력…"
+  },
+  "clarifySend": {
+    "message": "보내기"
+  },
+  "closeLabel": {
+    "message": "닫기"
+  },
+  "detailThreadPlaceholder": {
+    "message": "이 부분에 대해 이어서 질문…"
+  },
+  "detailThreadSend": {
+    "message": "보내기"
+  },
+  "detailThreadStop": {
+    "message": "중지"
+  },
+  "detailThreadResize": {
+    "message": "드래그하여 크기 조정"
+  },
+  "inspectCtx": {
+    "message": "검사"
+  },
+  "inspectCtxTitle": {
+    "message": "모델에 전송된 전체 컨텍스트 보기"
+  },
+  "ctxInspectorTitle": {
+    "message": "컨텍스트 미리보기"
+  },
+  "copy": {
+    "message": "복사"
+  },
+  "undoAttach": {
+    "message": "실행 취소"
+  },
+  "undoAttachTitle": {
+    "message": "대화에서 첨부된 이 페이지를 제거"
+  },
+  "removeImage": {
+    "message": "이미지 제거"
+  },
+  "screenshotFailed": {
+    "message": "스크린샷을 불러오지 못했습니다 — 다시 시도해 주세요"
+  },
+  "cropCanvasLabel": {
+    "message": "드래그하거나 방향키로 영역을 선택하세요"
+  },
+  "detailThreadLabel": {
+    "message": "이어서 질문"
+  },
+  "detailThreadTruncated": {
+    "message": "후속 답변이 출력 한도에 도달했습니다 — \"계속\"이라고 보내면 이어서 작성됩니다."
+  },
+  "chemExportPng": {
+    "message": "PNG 내보내기"
+  },
+  "localAgentTabBridge": {
+    "message": "Agent Bridge",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "이 유형은 저장된 구성이 있습니다(클릭하여 보기)",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "추론 수준",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "자동(아무것도 보내지 않음)",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "추가 추론 필드(JSON)",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "답변이 백그라운드에서 계속 진행되며 원래 세션에 저장됩니다",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "streamCancelledNoOrigin": {
+    "message": "진행 중이던 답변이 취소되었습니다 — 원래 세션을 저장할 수 없었습니다",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
+  "sessionActiveDot": {
+    "message": "진행 중",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
+  },
+  "slashPromptDesc": {
+    "message": "현재 활성 시스템 프롬프트를 표시합니다",
+    "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "삭제하려면 다시 클릭"
+  },
+  "deleteTitle": {
+    "message": "메시지 삭제"
+  },
+  "deleteFailed": {
+    "message": "삭제 실패 — 메시지가 유지됩니다"
+  },
+  "sessionLoadFailed": {
+    "message": "세션을 불러오지 못했습니다"
+  },
+  "quickbarAria": {
+    "message": "빠른 작업"
+  },
+  "continueMaxTurns": {
+    "message": "→ 계속"
+  },
+  "retryAction": {
+    "message": "다시 시도"
+  },
+  "quoteTitle": {
+    "message": "인용"
+  },
+  "editResendTitle": {
+    "message": "수정 후 다시 보내기"
+  },
+  "copyResponseTitle": {
+    "message": "답변 복사"
+  },
+  "collapseExpandTitle": {
+    "message": "접기/펼치기"
+  },
+  "editSendBtn": {
+    "message": "보내기"
+  },
+  "editCancelBtn": {
+    "message": "취소"
+  },
+  "clearChatTitle": {
+    "message": "대화 지우기"
+  },
+  "clearChatMsg": {
+    "message": "모든 메시지를 삭제할까요? 이 작업은 되돌릴 수 없습니다."
+  },
+  "clearChatConfirm": {
+    "message": "지우기"
+  },
+  "clearAllTitle": {
+    "message": "모든 세션 지우기"
+  },
+  "clearAllMsg": {
+    "message": "저장된 모든 세션을 삭제할까요? 이 작업은 되돌릴 수 없습니다."
+  },
+  "clearAllConfirm": {
+    "message": "모두 지우기"
+  },
+  "sessionDeleted": {
+    "message": "세션이 삭제되었습니다"
+  },
+  "sessionRenamed": {
+    "message": "세션 이름이 변경되었습니다"
+  },
+  "sessionsCleared": {
+    "message": "모든 세션이 지워졌습니다"
+  },
+  "sessionLoaded": {
+    "message": "불러옴"
+  },
+  "dblClickRename": {
+    "message": "더블클릭하여 이름 변경"
+  },
+  "exportMarkdown": {
+    "message": "Markdown으로 내보내기"
+  },
+  "relJustNow": {
+    "message": "방금"
+  },
+  "copyThinkingTitle": {
+    "message": "생각 내용 복사"
+  },
+  "multiDeletedOk": {
+    "message": "메시지 $1개를 삭제했습니다"
+  },
+  "multiDeletedPartial": {
+    "message": "$1개 삭제, $2개 실패(인덱스 재조정됨)"
+  },
+  "composerAria": {
+    "message": "메시지 — Enter로 전송, Shift+Enter로 줄바꿈"
+  },
+  "slashAria": {
+    "message": "슬래시 명령"
+  },
+  "sessionExportFailed": {
+    "message": "세션을 불러올 수 없습니다"
+  },
+  "sessionExported": {
+    "message": "세션을 내보냈습니다"
+  },
+  "bridgeRowPingTitle": {
+    "message": "이 에이전트만 Ping(/health)하여 상태 점을 갱신합니다",
+    "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "마인드맵 모듈을 로드하지 못했습니다(콘솔을 확인하세요)",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "$1(으)로 이동",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "그림 $1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "결과 없음",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "기록을 렌더링하는 중…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "동영상을 다운로드하는 중… ($1s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "동영상을 다운로드하는 중… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "동영상을 다운로드하는 중… ($1MB 다운로드됨, $2s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "동영상 다운로드 실패: $1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "$1 업로드 중… (0%)",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "$1 업로드 중… ($2%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "$1 업로드 중… ($2MB 업로드됨, $3s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "$1 업로드 실패: $2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "동영상",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "오디오",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "처리",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "동영상 분석",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "전사",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1 중… ($2s 경과)",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "동영상 파일 처리 실패: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "오디오 파일 처리 실패: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "동영상 분석 출력이 모델 한도($1)로 잘렸습니다",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "동영상 분석이 불완전합니다(마지막 타임스탬프 $1s / 동영상 길이 $2s)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "동영상 분석이 불완전합니다(타임라인에 $1분 공백: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "동영상 분석 결과가 비어 있습니다",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "다운로드 약 $1MB",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "이 동영상에는 자막이 없습니다. 처리 방식을 선택하세요:",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "오디오 전사(자막)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "동영상 분석(프레임 + 음성)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "빠름",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "느림",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "토큰 소모 적음",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "토큰 소모 많음",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "오디오를 다운로드하는 중… ($1s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "오디오를 다운로드하는 중… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "오디오를 다운로드하는 중… ($1MB 다운로드됨, $2s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "오디오를 트랜스코딩하는 중… ($1s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "오디오를 업로드하는 중… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "오디오를 업로드하는 중… ($1MB 업로드됨, $2s 경과)",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "ASR 전사가 모델 출력 한도($1)로 잘렸습니다",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "ASR 전사가 불완전합니다(타임라인에 $1분 공백: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": ", $1자",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": ", 내용 없음",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 첨부됨: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 스크린샷 첨부됨: \"$1\"",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": ", $1페이지",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": ", $1페이지는 OCR이 필요할 수 있음",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": ", 그림 $1개",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": ", 텍스트에 인코딩 문제가 있을 수 있음",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": ", $1페이지에 표 포함",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 PDF 첨부됨: \"$1\" (pdf-text$2)",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 문서 첨부됨: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "Bilibili",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "$1 재생 URL이 만료되었고 자동 새로고침에 실패했습니다($2) — 동영상 페이지를 새로고침한 뒤 다시 첨부하세요",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "처리 방식 선택…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "오디오 전사 중…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "$1 동영상",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "자막",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "동영상 분석",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": ", $1MB 동영상",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": ", $1MB 오디오",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": ", 분석 $1줄",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": ", 자막 $1줄",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": ", 스크린샷 $1장",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "(파싱 실패 — 원본 자막 유지)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "(자막 없음 — 대신 동영상 정보 첨부됨)",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 $1 첨부됨: \"$2\" ($3)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "에이전트 세션",
+    "description": "Agent-side session line in the sessions drawer"
+  },
+  "agentSessionCopy": {
+    "message": "세션 ID 복사",
+    "description": "Copy the agent-side session ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "복사 실패",
+    "description": "Clipboard failure notice"
   }
 }

@@ -6,5 +6,1632 @@
   "extensionDescription": {
     "message": "Barra lateral de IA que conversa com a página aberta —artigos, vídeos, PDFs— com seu próprio modelo ou agente. Código aberto, sem conta.",
     "description": "Extension description"
+  },
+  "settingsTooltip": {
+    "message": "Configurações (provedor / chave de API)",
+    "description": "Settings button tooltip"
+  },
+  "contextScreenshot": {
+    "message": "Captura de tela",
+    "description": "Screenshot mode"
+  },
+  "inputPlaceholder": {
+    "message": "Pergunte o que quiser…",
+    "description": "Composer placeholder"
+  },
+  "quickSummarize": {
+    "message": "Resumir",
+    "description": "Quick action: summarize the attached page"
+  },
+  "quickKeypoints": {
+    "message": "Pontos principais",
+    "description": "Quick action: extract key points"
+  },
+  "quickExplain": {
+    "message": "Explicar",
+    "description": "Quick action: explain simply"
+  },
+  "quickTranslate": {
+    "message": "Traduzir",
+    "description": "Quick action: translate to reply language"
+  },
+  "quickOutline": {
+    "message": "Estrutura",
+    "description": "Quick action: nested heading outline"
+  },
+  "quickbarToggle": {
+    "message": "Mostrar/ocultar ações rápidas",
+    "description": "Quickbar collapse toggle tooltip"
+  },
+  "sessionsTitle": {
+    "message": "Histórico de sessões",
+    "description": "Sessions drawer title"
+  },
+  "sessionsNew": {
+    "message": "＋ Nova sessão",
+    "description": "New session button"
+  },
+  "sessionsSearchPlaceholder": {
+    "message": "Pesquisar títulos e conteúdo…",
+    "description": "Sessions search input placeholder"
+  },
+  "sessionsEmpty": {
+    "message": "Nenhuma sessão salva ainda.",
+    "description": "Empty sessions list"
+  },
+  "sessionsEmptyHint": {
+    "message": "Inicie uma nova sessão para arquivar esta conversa.",
+    "description": "Empty sessions list hint"
+  },
+  "sessionsNoMatch": {
+    "message": "Nenhuma sessão corresponde à sua pesquisa.",
+    "description": "Sessions search miss"
+  },
+  "sessionsClearAll": {
+    "message": "Limpar todas as sessões",
+    "description": "Clear-all button title"
+  },
+  "sessionsClose": {
+    "message": "Fechar",
+    "description": "Close drawer"
+  },
+  "searchPlaceholder": {
+    "message": "Pesquisar mensagens…",
+    "description": "Message search input placeholder"
+  },
+  "searchPrev": {
+    "message": "Anterior (Shift+Enter)",
+    "description": "Search previous match"
+  },
+  "searchNext": {
+    "message": "Próximo (Enter)",
+    "description": "Search next match"
+  },
+  "searchClose": {
+    "message": "Fechar (Esc)",
+    "description": "Close search"
+  },
+  "searchBtnTitle": {
+    "message": "Pesquisar mensagens (Ctrl+F)",
+    "description": "Search button tooltip"
+  },
+  "multiselectTitle": {
+    "message": "Selecionar mensagens",
+    "description": "Multiselect toggle tooltip"
+  },
+  "newChatTitle": {
+    "message": "Nova conversa (Ctrl+K)",
+    "description": "Clear/new chat button tooltip"
+  },
+  "attachTitle": {
+    "message": "Anexar a página atual à conversa",
+    "description": "Attach button tooltip"
+  },
+  "providerLabel": {
+    "message": "Provedor de IA",
+    "description": "Provider select aria-label"
+  },
+  "cancelStream": {
+    "message": "Parar de gerar",
+    "description": "Send button while streaming"
+  },
+  "contextAuto": {
+    "message": "Auto",
+    "description": "Auto context mode"
+  },
+  "contextAria": {
+    "message": "Modo de contexto",
+    "description": "Context mode group aria-label"
+  },
+  "toolbarHide": {
+    "message": "Ocultar nesta página",
+    "description": "Selection toolbar close button"
+  },
+  "toolbarHideConfirm": {
+    "message": "Ocultar a barra nesta página?",
+    "description": "Selection toolbar hide confirmation question"
+  },
+  "toolbarHideHint": {
+    "message": "Ela não aparecerá novamente até você recarregar a página.",
+    "description": "Selection toolbar hide confirmation hint"
+  },
+  "toolbarCancel": {
+    "message": "Cancelar",
+    "description": "Confirm dialog cancel"
+  },
+  "toolbarConfirmHide": {
+    "message": "Ocultar",
+    "description": "Confirm dialog hide action"
+  },
+  "toolbarAsk": {
+    "message": "Perguntar",
+    "description": "Selection toolbar: ask about the selection"
+  },
+  "toolbarExplain": {
+    "message": "Explicar",
+    "description": "Selection toolbar: explain the selection"
+  },
+  "toolbarTranslate": {
+    "message": "Traduzir",
+    "description": "Selection toolbar: translate the selection"
+  },
+  "toolbarSummarize": {
+    "message": "Resumir",
+    "description": "Selection toolbar: summarize the selection"
+  },
+  "toolbarAria": {
+    "message": "Ações rápidas do browsa",
+    "description": "Selection toolbar aria-label"
+  },
+  "inlineExplainAria": {
+    "message": "Explicação",
+    "description": "Inline explain popover aria-label"
+  },
+  "inlineExplainWaiting": {
+    "message": "Explicando…",
+    "description": "Inline explain popover: waiting for the model"
+  },
+  "inlineTranslateWaiting": {
+    "message": "Traduzindo…",
+    "description": "Inline translate popover: waiting for the model"
+  },
+  "inlineTranslateError": {
+    "message": "Falha na tradução",
+    "description": "Inline translate popover: error prefix"
+  },
+  "inlineExplainCopy": {
+    "message": "Copiar",
+    "description": "Inline explain popover: copy the answer"
+  },
+  "inlineExplainCopied": {
+    "message": "Copiado",
+    "description": "Inline explain popover: copied feedback"
+  },
+  "inlineExplainRetry": {
+    "message": "Tentar novamente",
+    "description": "Inline explain popover: retry the request"
+  },
+  "inlineExplainSide": {
+    "message": "Continuar no painel",
+    "description": "Inline explain popover: continue in the side panel"
+  },
+  "inlineExplainClose": {
+    "message": "Fechar",
+    "description": "Inline explain popover: close button aria-label"
+  },
+  "inlineExplainError": {
+    "message": "Falha na explicação",
+    "description": "Inline explain popover: error prefix"
+  },
+  "regenTitle": {
+    "message": "Regenerar resposta",
+    "description": "Assistant message action: regenerate"
+  },
+  "errAuth": {
+    "message": "Falha na autenticação — verifique sua chave de API e as permissões.",
+    "description": "Error card headline: 401/403 class"
+  },
+  "errRateLimit": {
+    "message": "Limite de requisições atingido ou cota esgotada — aguarde um pouco ou verifique o faturamento.",
+    "description": "Error card headline: 429/quota class"
+  },
+  "errModel": {
+    "message": "Modelo não encontrado neste provedor — verifique o ID do modelo nas configurações.",
+    "description": "Error card headline: unknown model class"
+  },
+  "errTimeout": {
+    "message": "A requisição expirou — tente novamente; se a conversa estiver muito longa, inicie uma nova.",
+    "description": "Error card headline: timeout class"
+  },
+  "errNetwork": {
+    "message": "Erro de rede — este dispositivo não consegue alcançar o endpoint.",
+    "description": "Error card headline: network/DNS class"
+  },
+  "errServer": {
+    "message": "Erro no servidor do provedor — tente novamente em breve.",
+    "description": "Error card headline: 5xx class"
+  },
+  "errGeneric": {
+    "message": "Algo deu errado.",
+    "description": "Error card headline fallback"
+  },
+  "errRawToggle": {
+    "message": "Erro original",
+    "description": "Error card raw-text disclosure label"
+  },
+  "copyLabel": {
+    "message": "Copiar",
+    "description": "Generic copy button label"
+  },
+  "queuedLabel": {
+    "message": "Na fila",
+    "description": "Follow-up queue dock label"
+  },
+  "queuedSendNow": {
+    "message": "Enviar esta agora",
+    "description": "Follow-up queue chip: send immediately"
+  },
+  "queuedRemove": {
+    "message": "Remover da fila",
+    "description": "Follow-up queue chip: remove"
+  },
+  "followupQueueFull": {
+    "message": "A fila está cheia (máx. 5) — aguarde a resposta atual terminar",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ O anexo excedeu a janela de contexto do modelo — ele foi reduzido e a requisição repetida automaticamente…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ A resposta atingiu o limite de saída — continuando automaticamente…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ Adicionando marcas de tempo…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1 etapa(s)",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "(aba fechada)",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa atualizado para a v$1 — se a barra flutuante não responder em uma página, recarregue-a uma vez.",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 Anexado: \"$1\"",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "O conteúdo do Xiaohongshu pode estar incompleto ($1). Se você não estiver logado no <code>xiaohongshu.com</code> neste navegador, a requisição XHR costuma retornar outra nota ou um esqueleto. Faça login lá, recarregue esta página e reenvie. <em>O conteúdo enviado ainda inclui tudo o que foi lido; isto é apenas um aviso.</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ Streaming cancelado",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ Acompanhamento da resposta em segundo plano interrompido",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "+$1 imagem(s)",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
+  "pinnedGroupLabel": {
+    "message": "Fixadas",
+    "description": "Sessions drawer pinned group header"
+  },
+  "pinSession": {
+    "message": "Fixar",
+    "description": "Session row pin action tooltip"
+  },
+  "unpinSession": {
+    "message": "Desafixar",
+    "description": "Session row unpin action tooltip"
+  },
+  "deleteSession": {
+    "message": "Excluir sessão",
+    "description": "Session row delete tooltip"
+  },
+  "deleteArmedHint": {
+    "message": "Clique novamente para excluir",
+    "description": "Two-step delete armed state tooltip"
+  },
+  "contentMatchHint": {
+    "message": "encontrado no conteúdo da mensagem",
+    "description": "Content-only search hit dot tooltip"
+  },
+  "sessionsToday": {
+    "message": "Hoje",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsYesterday": {
+    "message": "Ontem",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsWeek": {
+    "message": "Esta semana",
+    "description": "Sessions drawer time bucket"
+  },
+  "sessionsEarlier": {
+    "message": "Anteriores",
+    "description": "Sessions drawer time bucket"
+  },
+  "transcriptBtnTitle": {
+    "message": "Linha do tempo do vídeo",
+    "description": "Topbar button: open the video timeline drawer"
+  },
+  "transcriptTitle": {
+    "message": "Linha do tempo do vídeo",
+    "description": "Video timeline drawer header title"
+  },
+  "transcriptSearchPlaceholder": {
+    "message": "Pesquisar na linha do tempo…",
+    "description": "Video timeline drawer search input"
+  },
+  "transcriptNote": {
+    "message": "Inserir nota na posição de reprodução",
+    "description": "Transcript drawer note-capture button tooltip"
+  },
+  "followPlayback": {
+    "message": "Ir para a reprodução",
+    "description": "Transcript drawer floating pill after manual scroll"
+  },
+  "thinkDoneTitle": {
+    "message": "Processo de raciocínio",
+    "description": "Collapsible think-block summary on a finished message"
+  },
+  "outlineAria": {
+    "message": "Estrutura da conversa",
+    "description": "Conversation outline rail aria-label"
+  },
+  "outlineEmpty": {
+    "message": "(mensagem vazia)",
+    "description": "Outline preview for an empty turn"
+  },
+  "uiLangHeading": {
+    "message": "Idioma da interface",
+    "description": "Options: UI language card heading"
+  },
+  "uiLangLabel": {
+    "message": "Idioma",
+    "description": "Options: UI language field label"
+  },
+  "uiLangHint": {
+    "message": "Altere o idioma da interface. Por padrão, segue o seu navegador.",
+    "description": "Options: UI language hint"
+  },
+  "uiLangOptAuto": {
+    "message": "Automático (seguir o navegador)",
+    "description": "Options: UI language auto option"
+  },
+  "settingsSubtitle": {
+    "message": "Configurações",
+    "description": "Options page subtitle"
+  },
+  "guideLinkText": {
+    "message": "Guia do usuário",
+    "description": "Settings header: link to the usage-guide website"
+  },
+  "rateLinkText": {
+    "message": "⭐ Avaliar o browsa",
+    "description": "Settings header: neutral link to the Chrome Web Store reviews tab (no incentive wording)"
+  },
+  "providersHeading": {
+    "message": "Provedores de IA",
+    "description": "Options: providers card heading"
+  },
+  "providersHint": {
+    "message": "Configure seus provedores de IA.",
+    "description": "Options: providers hint"
+  },
+  "providersTipHtml": {
+    "message": "<a href=\"https://xiaohuzai.github.io/browsa/en/guide/providers.html#agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">Abrir o guia de configuração: provedores de IA</a>",
+    "description": "Options: providers ? tip bubble (controlled HTML)"
+  },
+  "systemPromptHeading": {
+    "message": "Prompt de sistema",
+    "description": "Options: system prompt card heading"
+  },
+  "systemPromptHintHtml": {
+    "message": "Adicionado como <code>role: system</code> antes de cada conversa. Use isso para definir o idioma, o tom e as regras de formatação do assistente.",
+    "description": "Options: system prompt hint (controlled HTML)"
+  },
+  "systemPromptPlaceholder": {
+    "message": "ex.: Você é um assistente útil. Use $...$ para fórmulas inline e $$...$$ para fórmulas em bloco.",
+    "description": "Options: system prompt textarea placeholder"
+  },
+  "saveBtn": {
+    "message": "Salvar",
+    "description": "Options: generic Save button"
+  },
+  "resetToDefaultBtn": {
+    "message": "Restaurar padrão",
+    "description": "Options: reset to default button"
+  },
+  "replyLanguageLabel": {
+    "message": "Idioma da resposta",
+    "description": "Options: reply language label"
+  },
+  "replyLanguageAuto": {
+    "message": "Automático (seguir o prompt de sistema)",
+    "description": "Options: reply language auto option"
+  },
+  "advancedSummary": {
+    "message": "⚙ Avançado",
+    "description": "Options: advanced section summary"
+  },
+  "toolbarCardHeading": {
+    "message": "Barra de seleção flutuante",
+    "description": "Options: floating toolbar card heading"
+  },
+  "toolbarCardHint": {
+    "message": "Uma minibarra aparece acima do texto selecionado com ações rápidas: Perguntar, Explicar, Traduzir, Resumir.",
+    "description": "Options: floating toolbar hint"
+  },
+  "toolbarToggleLabelHtml": {
+    "message": "Mostrar a barra flutuante ao selecionar texto",
+    "description": "Options: floating toolbar toggle label (controlled HTML)"
+  },
+  "llmsTxtToggleLabelHtml": {
+    "message": "Incluir as instruções <code>llms.txt</code> do site ao anexar uma página (📎)",
+    "description": "Options: llms.txt toggle label (controlled HTML)"
+  },
+  "chatPrefsHeading": {
+    "message": "Preferências de conversa",
+    "description": "Options: chat preferences heading"
+  },
+  "fontSizeLabel": {
+    "message": "Tamanho da fonte das mensagens",
+    "description": "Options: font size label"
+  },
+  "sendShortcutLabel": {
+    "message": "Atalho de envio",
+    "description": "Options: send shortcut label"
+  },
+  "sendShortcutEnter": {
+    "message": "Enter (Shift+Enter para nova linha)",
+    "description": "Options: Enter shortcut option"
+  },
+  "sendShortcutShiftEnter": {
+    "message": "Shift+Enter (Enter para nova linha)",
+    "description": "Options: Shift+Enter shortcut option"
+  },
+  "thoughtAutoCollapseLabel": {
+    "message": "Recolher automaticamente os blocos de raciocínio",
+    "description": "Options: auto-collapse thinking label"
+  },
+  "asrHeading": {
+    "message": "Legendas ASR e vídeo",
+    "description": "Options: ASR card heading"
+  },
+  "asrEnableLabel": {
+    "message": "Ativar ASR",
+    "description": "Options: ASR enable label"
+  },
+  "asrEnableTip": {
+    "message": "Anexe uma página de vídeo para transcrever/analisar automaticamente. Plataformas compatíveis: YouTube e Bilibili.",
+    "description": "Options: ASR enable tip"
+  },
+  "asrProviderLabel": {
+    "message": "Provedor",
+    "description": "Options: ASR provider label"
+  },
+  "asrSubtitleSourceLabel": {
+    "message": "Origem das legendas",
+    "description": "Options: subtitle source label"
+  },
+  "asrSubtitleOriginal": {
+    "message": "Preferir legendas integradas",
+    "description": "Options: prefer built-in captions option"
+  },
+  "asrSubtitleAsr": {
+    "message": "Preferir transcrição ASR",
+    "description": "Options: prefer ASR option"
+  },
+  "asrLanguageLabel": {
+    "message": "Idioma",
+    "description": "Options: ASR language label"
+  },
+  "asrLanguageAuto": {
+    "message": "Detecção automática",
+    "description": "Options: ASR auto-detect option"
+  },
+  "asrModelLabel": {
+    "message": "ID do modelo (transcrição de áudio)",
+    "description": "Options: ASR model label"
+  },
+  "asrVideoModelLabel": {
+    "message": "ID do modelo de vídeo (análise de vídeo; vazio = usa o modelo acima)",
+    "description": "Options: ASR video model label"
+  },
+  "asrVideoModelPlaceholder": {
+    "message": "Deixe vazio = mesmo modelo da transcrição",
+    "description": "Options: ASR video model placeholder"
+  },
+  "asrDocLabelDefault": {
+    "message": "Docs",
+    "description": "Options: default doc link label"
+  },
+  "asrDocLink": {
+    "message": "📖 Docs",
+    "description": "Options: ASR doc link (static fallback)"
+  },
+  "videoModelRecommended": {
+    "message": " (recomendado)",
+    "description": "Options: recommended model suffix"
+  },
+  "asrLabel_ark": {
+    "message": "Volcengine Ark",
+    "description": "ASR registry: ark label"
+  },
+  "asrApiKeyPlaceholder_ark": {
+    "message": "Chave de API da Ark (UUID ou com prefixo ark-)",
+    "description": "ASR registry: ark api key placeholder"
+  },
+  "asrBaseUrlTip_ark": {
+    "message": "Use o endpoint padrão <code>…/api/v3</code>: o <code>…/api/plan/v3</code> do Agent Plan não suporta upload de arquivos (Files API), conforme testado.",
+    "description": "ASR registry: ark base url tip (controlled HTML)"
+  },
+  "asrDocLabel_ark": {
+    "message": "Por que esta configuração? → documentação de compreensão de áudio da Ark",
+    "description": "ASR registry: ark doc link label"
+  },
+  "agentGroupLabel": {
+    "message": "🤖 Provedores de agente",
+    "description": "Options: agent group title"
+  },
+  "agentGroupDesc": {
+    "message": "Backend de agente completo — execução de ferramentas, acesso a arquivos e tarefas em várias etapas",
+    "description": "Options: agent group description"
+  },
+  "llmGroupLabel": {
+    "message": "💬 Provedores de LLM",
+    "description": "Options: LLM group title"
+  },
+  "llmGroupDesc": {
+    "message": "Endpoint de modelo de linguagem — adicione quantos quiser; cada um escolhe o próprio protocolo de comunicação",
+    "description": "Options: LLM group description"
+  },
+  "addProviderBtn": {
+    "message": "＋ Adicionar provedor",
+    "description": "Options: add provider button"
+  },
+  "reservedSlotTitle": {
+    "message": "Espaço vazio reservado — configure e salve para confirmá-lo",
+    "description": "Options: reserved slot title"
+  },
+  "clickToActivateTitle": {
+    "message": "Clique para definir como provedor ativo",
+    "description": "Options: card click title"
+  },
+  "removeProviderTitle": {
+    "message": "Remover este provedor",
+    "description": "Options: delete provider title"
+  },
+  "aliasLabel": {
+    "message": "Apelido",
+    "description": "Options: alias label"
+  },
+  "aliasPlaceholder": {
+    "message": "ex.: Meu OpenAI",
+    "description": "Options: alias placeholder"
+  },
+  "baseUrlLabel": {
+    "message": "URL base",
+    "description": "Options: base url label"
+  },
+  "apiKeyLabel": {
+    "message": "Chave de API",
+    "description": "Options: api key label"
+  },
+  "apiKeyToggleTitle": {
+    "message": "Mostrar / ocultar chave",
+    "description": "Options: api key visibility title"
+  },
+  "apiKeyToggleAria": {
+    "message": "Alternar a visibilidade da chave de API",
+    "description": "Options: api key visibility aria"
+  },
+  "modelIdLabel": {
+    "message": "ID do modelo",
+    "description": "Options: model id label"
+  },
+  "chipRemoveTitle": {
+    "message": "Remover modelo",
+    "description": "Options: chip remove title"
+  },
+  "chipRemoveAria": {
+    "message": "Remover",
+    "description": "Options: chip remove aria prefix"
+  },
+  "chipInputPlaceholder": {
+    "message": "adicionar ID do modelo — Enter",
+    "description": "Options: chip input placeholder"
+  },
+  "chipInputAria": {
+    "message": "Adicionar ID do modelo",
+    "description": "Options: chip input aria"
+  },
+  "chipAddTitle": {
+    "message": "Adicionar modelo",
+    "description": "Options: chip add title"
+  },
+  "chipAddAria": {
+    "message": "Adicionar ID do modelo",
+    "description": "Options: chip add aria"
+  },
+  "apiLabel": {
+    "message": "API",
+    "description": "Options: API style label"
+  },
+  "statusReachableBadge": {
+    "message": "● acessível",
+    "description": "Options: reachable badge"
+  },
+  "statusUnreachableBadge": {
+    "message": "● inacessível",
+    "description": "Options: unreachable badge"
+  },
+  "badgeNotPinged": {
+    "message": "○ sem ping",
+    "description": "Options: not pinged badge"
+  },
+  "badgeNotSet": {
+    "message": "○ não definido",
+    "description": "Options: not set badge"
+  },
+  "emptySlotStatus": {
+    "message": "Espaço vazio — configure e salve",
+    "description": "Options: reserved slot status"
+  },
+  "modelRequiredErr": {
+    "message": "❌ O ID do modelo é obrigatório para provedores de LLM",
+    "description": "Options: model required error"
+  },
+  "pingingFlash": {
+    "message": "Executando ping…",
+    "description": "Options: pinging status"
+  },
+  "setActiveNote": {
+    "message": " — definir como provedor ativo",
+    "description": "Options: auto set active note"
+  },
+  "savedFlash": {
+    "message": "✓ Salvo",
+    "description": "Options: saved flash"
+  },
+  "pingBtn": {
+    "message": "Ping",
+    "description": "Options: ping button"
+  },
+  "resetBtn": {
+    "message": "Redefinir",
+    "description": "Options: reset button"
+  },
+  "hermesApiDocsLink": {
+    "message": "Documentação de configuração do Hermes API Server",
+    "description": "Options: Hermes docs link text"
+  },
+  "opencodeTip": {
+    "message": "Execute <code>opencode serve --port 4096</code> em um terminal e preencha o endereço que ele exibe (recomenda-se fixar a porta — caso contrário, ela muda a cada reinício). <a href=\"https://opencode.ai/docs/server/\" target=\"_blank\" rel=\"noopener noreferrer\">Documentação do servidor do opencode</a>",
+    "description": "Options: opencode server setup tip"
+  },
+  "squillaTip": {
+    "message": "Endereço WebSocket do gateway OpenSquilla — padrão ws://127.0.0.1:18791/ws. O gateway precisa que a origem desta extensão esteja listada em cors.allowed_origins — em ~/.opensquilla/config.toml para o gateway de CLI, ou na config de perfil do próprio app desktop (macOS: ~/Library/Application Support/OpenSquilla/opensquilla/config.toml) — suporte nativo desde a v0.5.5. <a href=\"https://github.com/opensquilla/opensquilla\" target=\"_blank\" rel=\"noopener noreferrer\">Documentação do OpenSquilla</a>",
+    "description": "Options: OpenSquilla gateway setup tip"
+  },
+  "bridgeTip": {
+    "message": "Instale e inicie a bridge conforme a <a href=\"https://github.com/xiaohuzai/agent-bridge\" target=\"_blank\" rel=\"noopener noreferrer\">documentação do agent-bridge</a>. Um endereço de bridge por linha. A chave de API só é necessária quando a bridge foi configurada com uma — uma bridge sem chave em um endereço de loopback ignora este campo (uma chave errada ainda responde ao ping como acessível).",
+    "description": "Options: agent-bridge setup tip"
+  },
+  "bridgeKeyPlaceholder": {
+    "message": "Chave de API (opcional)",
+    "description": "Options: bridge endpoint row per-endpoint key placeholder"
+  },
+  "providerNoneConfigured": {
+    "message": "Não definido",
+    "description": "Sidebar: dropdown placeholder when nothing is configured"
+  },
+  "providerSwitchedUnconfigured": {
+    "message": "\"$1\" não está configurado — alternado para \"$2\"",
+    "description": "Sidebar: auto-repair toast when the stored active provider has no baseUrl"
+  },
+  "bridgeAddBtn": {
+    "message": "＋ Adicionar agente",
+    "description": "Options: bridge card, add-endpoint button"
+  },
+  "bridgeAliasPlaceholder": {
+    "message": "Apelido (deixe vazio — o Ping preenche automaticamente)",
+    "description": "Options: bridge endpoint row alias placeholder"
+  },
+  "bridgeRemoveTitle": {
+    "message": "Remover este endereço",
+    "description": "Options: bridge endpoint row remove button"
+  },
+  "bridgeNeedEndpointErr": {
+    "message": "Adicione pelo menos um endereço de bridge antes de executar o ping.",
+    "description": "Options: bridge ping with zero endpoints"
+  },
+  "systemPromptSaved": {
+    "message": "Prompt de sistema salvo.",
+    "description": "Options: system prompt saved flash"
+  },
+  "systemPromptReset": {
+    "message": "Prompt de sistema restaurado ao padrão.",
+    "description": "Options: system prompt reset flash"
+  },
+  "replyLanguageSet": {
+    "message": "Idioma da resposta definido como \"$1\".",
+    "description": "Options: reply language set flash ($1 = language name)"
+  },
+  "replyLanguageAutoSet": {
+    "message": "Idioma da resposta: automático.",
+    "description": "Options: reply language auto flash"
+  },
+  "toolbarEnabledFlash": {
+    "message": "Barra flutuante ativada.",
+    "description": "Options: toolbar enabled flash"
+  },
+  "toolbarDisabledFlash": {
+    "message": "Barra flutuante desativada.",
+    "description": "Options: toolbar disabled flash"
+  },
+  "llmsTxtOnFlash": {
+    "message": "llms.txt será incluído ao anexar uma página.",
+    "description": "Options: llms.txt on flash"
+  },
+  "llmsTxtOffFlash": {
+    "message": "llms.txt desativado.",
+    "description": "Options: llms.txt off flash"
+  },
+  "asrNeedApiKey": {
+    "message": "Ativar o ASR exige uma chave de API.",
+    "description": "Options: ASR needs api key error"
+  },
+  "asrPlanUrlRewritten": {
+    "message": "URL base corrigida automaticamente do endpoint do Agent Plan para o padrão $1 (api/plan/v3 não tem upload de arquivos).",
+    "description": "Options: agent plan url rewritten flash ($1 = corrected url)"
+  },
+  "asrSaveOk": {
+    "message": "ASR $1 ($2, modelo $3).",
+    "description": "Options: ASR saved flash ($1 = state, $2 = provider, $3 = model)"
+  },
+  "asrOn": {
+    "message": "ativado",
+    "description": "Options: ASR enabled state word"
+  },
+  "asrOff": {
+    "message": "desativado",
+    "description": "Options: ASR disabled state word"
+  },
+  "statusReachable": {
+    "message": "● acessível",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusUnreachable": {
+    "message": "○ inacessível",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "statusNotPinged": {
+    "message": "sem ping",
+    "description": "Sidepanel: provider dropdown status"
+  },
+  "noSelectionText": {
+    "message": "Nenhum texto selecionado — selecione novamente.",
+    "description": "Sidepanel: no selection error"
+  },
+  "progressReadingPage": {
+    "message": "Lendo a página…",
+    "description": "Sidepanel: attach progress"
+  },
+  "readPageFailed": {
+    "message": "Falha ao ler a página",
+    "description": "Sidepanel: read page failed"
+  },
+  "pageNavigatedDuringRead": {
+    "message": "A página mudou de endereço enquanto era lida — anexe-a novamente",
+    "description": "Sidepanel: the tab left the page mid-extraction, so nothing was attached"
+  },
+  "progressParsingPdf": {
+    "message": "Processando PDF…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressParsingDoc": {
+    "message": "Processando documento…",
+    "description": "Sidepanel: attach progress for Office documents (docx/pptx/xlsx/…)"
+  },
+  "pdfAttachFailed": {
+    "message": "Falha ao anexar o PDF",
+    "description": "Sidepanel: PDF attach failed"
+  },
+  "screenshotAttachFailed": {
+    "message": "Falha ao anexar a captura de tela",
+    "description": "Sidepanel: screenshot attach storage failed (no phantom chip)"
+  },
+  "officeAttachFailed": {
+    "message": "Falha ao anexar o documento",
+    "description": "Sidepanel: Office document attach failed"
+  },
+  "asrAttachFailed": {
+    "message": "Falha ao anexar o ASR",
+    "description": "Sidepanel: ASR attach failed"
+  },
+  "pageAttachFailed": {
+    "message": "Falha ao anexar a página: $1",
+    "description": "Sidepanel: page attach failed ($1 = error)"
+  },
+  "sessionSaved": {
+    "message": "Sessão salva: \"$1\"",
+    "description": "Sidepanel: session saved toast ($1 = name)"
+  },
+  "cannotOpenSettings": {
+    "message": "Não foi possível abrir as configurações: $1",
+    "description": "Sidepanel: cannot open settings ($1 = error)"
+  },
+  "switchedTo": {
+    "message": "Alternado para $1",
+    "description": "Sidepanel: provider switched toast ($1 = display name)"
+  },
+  "imageTooLarge": {
+    "message": "Imagem muito grande: $1",
+    "description": "Sidepanel: image too large ($1 = name)"
+  },
+  "imageBudgetExceeded": {
+    "message": "Imagem não anexada ($1) — grande demais para envio; cerca de $2 MB de imagens cabem em uma mensagem.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image size budget ($1 = name, $2 = MB)"
+  },
+  "imageCountExceeded": {
+    "message": "Imagem não anexada ($1) — até $2 imagens por mensagem.",
+    "description": "Sidepanel: image refused at attach time, over the per-message image count ($1 = name, $2 = max images)"
+  },
+  "outputTruncatedToast": {
+    "message": "A resposta ainda atingiu o limite de saída do modelo — clique em “Continuar” ou responda 继续.",
+    "description": "Sidepanel: output truncated toast"
+  },
+  "continueGenerate": {
+    "message": "→ Continuar",
+    "description": "Sidepanel: continue generation action button"
+  },
+  "noActiveTab": {
+    "message": "Nenhuma aba ativa.",
+    "description": "Sidepanel: no active tab error"
+  },
+  "videoSourceGone": {
+    "message": "A fonte do vídeo não está mais disponível — não é possível pular até ela.",
+    "description": "Sidepanel: video source gone toast"
+  },
+  "noTranscriptPosition": {
+    "message": "Ainda não há posição de reprodução nem linha de legenda disponíveis.",
+    "description": "Sidepanel: no transcript position toast"
+  },
+  "copied": {
+    "message": "Copiado",
+    "description": "Sidepanel: copied toast"
+  },
+  "truncRegenCancelled": {
+    "message": "Falha ao truncar o histórico — regeneração cancelada.",
+    "description": "Sidepanel: truncate failed regenerate cancelled"
+  },
+  "truncEditNotSaved": {
+    "message": "Falha ao truncar o histórico — edição não salva.",
+    "description": "Sidepanel: truncate failed edit not saved"
+  },
+  "approvalSendFailed": {
+    "message": "Falha ao enviar a aprovação: $1",
+    "description": "Sidepanel: approval send failed ($1 = error)"
+  },
+  "replySendFailed": {
+    "message": "Falha ao enviar a resposta: $1",
+    "description": "Sidepanel: reply send failed ($1 = error)"
+  },
+  "bgStateLost": {
+    "message": "o processo em segundo plano da extensão foi reiniciado — tente novamente",
+    "description": "Sidepanel: background state lost fallback"
+  },
+  "asrModeVideo": {
+    "message": "Análise de vídeo",
+    "description": "Sidepanel: ASR video analysis label"
+  },
+  "asrModeTranscribe": {
+    "message": "Transcrição ASR",
+    "description": "Sidepanel: ASR transcription label"
+  },
+  "failColon": {
+    "message": ": ",
+    "description": "Sidepanel: failure suffix (follows mode label)"
+  },
+  "unknownError": {
+    "message": "erro desconhecido",
+    "description": "Sidepanel: unknown error fallback"
+  },
+  "asrAuthHint": {
+    "message": "— a chave de API do ASR parece ser uma chave do Agent Plan, que não é intercambiável com a chave padrão da plataforma Ark. Troque por uma chave de API de plataforma (UUID ou com prefixo ark-) em Configurações → ASR.",
+    "description": "Sidepanel: ASR agent-plan key auth hint"
+  },
+  "asrFallbackOriginal": {
+    "message": "Usando as legendas integradas (o YouTube bloqueou o download do áudio)",
+    "description": "Sidepanel: ASR fallback to built-in captions"
+  },
+  "asrFallbackVideoInfoYt": {
+    "message": "Usando os metadados do vídeo (o YouTube bloqueou o download do áudio)",
+    "description": "Sidepanel: ASR fallback to video metadata (YouTube)"
+  },
+  "asrFallbackVideoInfo": {
+    "message": "Usando os metadados do vídeo",
+    "description": "Sidepanel: ASR fallback to video metadata"
+  },
+  "noTranscriptHint": {
+    "message": "⚠️ Este vídeo não tem legendas — mantido como está (apenas metadados do vídeo). Para transcrever automaticamente, ative o ASR nas Configurações e anexe novamente.",
+    "description": "Sidepanel: no transcript hint on attach"
+  },
+  "progressReuseAudio": {
+    "message": "Reutilizando o áudio enviado anteriormente (válido por 30 dias) — pulando download e upload…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadAudio": {
+    "message": "Baixando áudio…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressReuseVideo": {
+    "message": "Reutilizando o vídeo enviado anteriormente (válido por 30 dias) — pulando upload…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressKeyframes": {
+    "message": "Capturando quadros-chave…",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressTranscodeAudio": {
+    "message": "Transcodificando áudio… (para WAV)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressUploadAudio": {
+    "message": "Enviando áudio… (0%)",
+    "description": "Sidepanel: attach progress"
+  },
+  "progressDownloadTranscribe": {
+    "message": "Baixando e transcrevendo o áudio…",
+    "description": "Sidepanel: attach progress"
+  },
+  "skipToComposer": {
+    "message": "Pular para o campo de mensagem",
+    "description": "Sidepanel: a11y skip link"
+  },
+  "composerLabel": {
+    "message": "Mensagem",
+    "description": "Sidepanel: visually-hidden composer label"
+  },
+  "multiselectDeleteSelected": {
+    "message": "Excluir selecionadas",
+    "description": "Sidepanel: multiselect delete button"
+  },
+  "multiselectCancel": {
+    "message": "Cancelar",
+    "description": "Sidepanel: multiselect cancel button"
+  },
+  "multiselectCount": {
+    "message": "$1 selecionadas",
+    "description": "Sidepanel: multiselect count ($1 = number)"
+  },
+  "charsUnit": {
+    "message": "caracteres",
+    "description": "Sidepanel: char count unit"
+  },
+  "tokensUnit": {
+    "message": "tokens",
+    "description": "Sidepanel: token count unit"
+  },
+  "mermaidLoadFailed": {
+    "message": "Falha ao carregar o módulo Mermaid — verifique o console.",
+    "description": "Sidepanel: mermaid module load failure"
+  },
+  "mermaidCopyCode": {
+    "message": "Copiar código",
+    "description": "Sidepanel: mermaid/chart copy code button"
+  },
+  "pdbPlddtLegend": {
+    "message": "Confiança pLDDT",
+    "description": "Sidepanel: AlphaFold structure viewer legend label"
+  },
+  "smilesInvalid": {
+    "message": "Não é uma estrutura química válida — código original mantido",
+    "description": "Sidepanel: RDKit rejected the SMILES block as chemically invalid"
+  },
+  "mathCopyLatex": {
+    "message": "Copiar LaTeX",
+    "description": "Sidepanel: formula hover copy-LaTeX button"
+  },
+  "mermaidViewSource": {
+    "message": "Ver código-fonte",
+    "description": "Sidepanel: mermaid error view source"
+  },
+  "mermaidZoomIn": {
+    "message": "Ampliar",
+    "description": "Sidepanel: diagram zoom in title"
+  },
+  "mermaidZoomOut": {
+    "message": "Reduzir",
+    "description": "Sidepanel: diagram zoom out title"
+  },
+  "mermaidReset": {
+    "message": "Redefinir",
+    "description": "Sidepanel: diagram reset title"
+  },
+  "mermaidExportPng": {
+    "message": "Exportar PNG",
+    "description": "Sidepanel: chart export png title"
+  },
+  "emptyHint": {
+    "message": "Clique em 📎 para anexar a página atual",
+    "description": "Sidepanel: empty state hint (injected into CSS var)"
+  },
+  "mermaidAIFix": {
+    "message": "Corrigir com IA",
+    "description": "Mermaid error card: AI repair button"
+  },
+  "mermaidFixing": {
+    "message": "Corrigindo…",
+    "description": "Mermaid error card: repairing state"
+  },
+  "mermaidFixFailed": {
+    "message": "Falha ao corrigir: $1",
+    "description": "Mermaid repair failed toast ($1 = error)"
+  },
+  "mermaidSyntaxErrAt": {
+    "message": "Erro de sintaxe na linha $1: $2",
+    "description": "Mermaid short parse-error line ($1 = line no, $2 = offending excerpt)"
+  },
+  "deepExtractToggleLabelHtml": {
+    "message": "Quando uma página parecer incompleta, expandir e percorrer automaticamente antes de anexar (📎)",
+    "description": "Options: deep extraction toggle label (controlled HTML)"
+  },
+  "deepExtractOnFlash": {
+    "message": "Expansão e paginação automáticas em páginas incompletas ativadas.",
+    "description": "Options: deep extraction on flash"
+  },
+  "deepExtractOffFlash": {
+    "message": "Expansão e paginação automáticas desativadas.",
+    "description": "Options: deep extraction off flash"
+  },
+  "deepExtractStart": {
+    "message": "A página parece incompleta — expandindo e percorrendo automaticamente…",
+    "description": "Attach progress: deep extraction starts"
+  },
+  "deepExtractStep": {
+    "message": "Expandindo o conteúdo automaticamente ($1/$2)…",
+    "description": "Attach progress: deep extraction click step ($1=step, $2=max)"
+  },
+  "deepExtractPage": {
+    "message": "Lendo a página $1…",
+    "description": "Attach progress: deep extraction walking to page $1"
+  },
+  "waitThinking": {
+    "message": "Pensando… $1s",
+    "description": "Sidepanel: waiting indicator before the first streamed token ($1 = elapsed seconds)"
+  },
+  "providerSwitchTitle": {
+    "message": "Alternado para $1. O que fazer com a conversa atual?"
+  },
+  "providerSwitchCarry": {
+    "message": "Levar a conversa atual junto"
+  },
+  "providerSwitchCarrySub": {
+    "message": "a transcrição se torna a primeira mensagem"
+  },
+  "providerSwitchCarryToast": {
+    "message": "A conversa será enviada para $1 junto com a sua próxima mensagem"
+  },
+  "providerSwitchFresh": {
+    "message": "Nova sessão"
+  },
+  "providerSwitchFreshSub": {
+    "message": "arquiva a conversa atual e começa do zero"
+  },
+  "providerSwitchDirectHint": {
+    "message": "Enviar sem escolher = continuar sem contexto"
+  },
+  "providerNeedsConfig": {
+    "message": "Preencha ao menos a URL base ou o apelido antes de salvar."
+  },
+  "confirmRemoveProvider": {
+    "message": "Excluir o provedor \"$1\" e a configuração dele? Isso não pode ser desfeito."
+  },
+  "confirmResetProvider": {
+    "message": "Redefinir o provedor \"$1\"? Isso não pode ser desfeito."
+  },
+  "confirmResetSystemPrompt": {
+    "message": "Restaurar o prompt de sistema padrão? O texto atual será substituído."
+  },
+  "approvalAllowOnce": {
+    "message": "Permitir uma vez"
+  },
+  "approvalAllowSession": {
+    "message": "Permitir nesta sessão"
+  },
+  "approvalAlwaysAllow": {
+    "message": "Permitir sempre"
+  },
+  "approvalDeny": {
+    "message": "Negar"
+  },
+  "approvalRequired": {
+    "message": "Aprovação necessária:"
+  },
+  "clarifyDefault": {
+    "message": "Por favor, esclareça:"
+  },
+  "clarifyPlaceholder": {
+    "message": "Sua resposta…"
+  },
+  "clarifySend": {
+    "message": "Enviar"
+  },
+  "closeLabel": {
+    "message": "Fechar"
+  },
+  "detailThreadPlaceholder": {
+    "message": "Pergunte mais sobre isto…"
+  },
+  "detailThreadSend": {
+    "message": "Enviar"
+  },
+  "detailThreadStop": {
+    "message": "Parar"
+  },
+  "detailThreadResize": {
+    "message": "Arraste para redimensionar"
+  },
+  "inspectCtx": {
+    "message": "Inspecionar"
+  },
+  "inspectCtxTitle": {
+    "message": "Ver o contexto completo enviado ao modelo"
+  },
+  "ctxInspectorTitle": {
+    "message": "Prévia do contexto"
+  },
+  "copy": {
+    "message": "Copiar"
+  },
+  "undoAttach": {
+    "message": "Desfazer"
+  },
+  "undoAttachTitle": {
+    "message": "Remover esta página anexada da conversa"
+  },
+  "removeImage": {
+    "message": "Remover imagem"
+  },
+  "screenshotFailed": {
+    "message": "Falha ao carregar a captura de tela — tente novamente"
+  },
+  "cropCanvasLabel": {
+    "message": "Selecione uma região arrastando ou com as teclas de seta"
+  },
+  "detailThreadLabel": {
+    "message": "Perguntar mais"
+  },
+  "detailThreadTruncated": {
+    "message": "A resposta do acompanhamento atingiu o limite de saída — envie \"continuar\" para estendê-la."
+  },
+  "chemExportPng": {
+    "message": "Exportar PNG"
+  },
+  "localAgentTabBridge": {
+    "message": "Agent Bridge",
+    "description": "Options: merged local-agent card, tab switching to the Agent Bridge card"
+  },
+  "localAgentTabOpencode": {
+    "message": "OpenCode",
+    "description": "Options: merged local-agent card, tab switching to the OpenCode card"
+  },
+  "localAgentConfiguredTitle": {
+    "message": "Este tipo tem uma configuração salva (clique para ver)",
+    "description": "Options: merged local-agent card, tooltip on a tab whose provider is configured"
+  },
+  "localAgentTabHermes": {
+    "message": "Hermes",
+    "description": "Options: merged agent card, tab switching to the Hermes card"
+  },
+  "localAgentTabSquilla": {
+    "message": "OpenSquilla",
+    "description": "Options: merged agent card, tab switching to the OpenSquilla card"
+  },
+  "thinkingLevelLabel": {
+    "message": "Nível de raciocínio",
+    "description": "Options: per-model reasoning level selector label"
+  },
+  "thinkingAutoOption": {
+    "message": "automático (não envia nada)",
+    "description": "Options: thinking level select, the default no-op option"
+  },
+  "reasoningRawLabel": {
+    "message": "Campos de raciocínio extras (JSON)",
+    "description": "Options: JSON passthrough merged into the request body"
+  },
+  "streamMovedToBackground": {
+    "message": "A resposta continua em segundo plano e será salva na sessão original",
+    "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
+  },
+  "streamCancelledNoOrigin": {
+    "message": "Resposta em andamento cancelada — não foi possível salvar a sessão dela",
+    "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
+  },
+  "sessionActiveDot": {
+    "message": "Em andamento",
+    "description": "Sessions drawer: in-flight turn marker on a session row"
+  },
+  "slashPromptDesc": {
+    "message": "Mostrar o prompt de sistema ativo no momento",
+    "description": "Slash autocomplete: description for the /prompt command"
+  },
+  "deleteConfirmTitle": {
+    "message": "Clique novamente para confirmar a exclusão"
+  },
+  "deleteTitle": {
+    "message": "Excluir mensagem"
+  },
+  "deleteFailed": {
+    "message": "Falha ao excluir — mensagem mantida"
+  },
+  "sessionLoadFailed": {
+    "message": "Falha ao carregar a sessão"
+  },
+  "quickbarAria": {
+    "message": "Ações rápidas"
+  },
+  "continueMaxTurns": {
+    "message": "→ Continuar"
+  },
+  "retryAction": {
+    "message": "Tentar novamente"
+  },
+  "quoteTitle": {
+    "message": "Citar"
+  },
+  "editResendTitle": {
+    "message": "Editar e reenviar"
+  },
+  "copyResponseTitle": {
+    "message": "Copiar resposta"
+  },
+  "collapseExpandTitle": {
+    "message": "Recolher/expandir"
+  },
+  "editSendBtn": {
+    "message": "Enviar"
+  },
+  "editCancelBtn": {
+    "message": "Cancelar"
+  },
+  "clearChatTitle": {
+    "message": "Limpar conversa"
+  },
+  "clearChatMsg": {
+    "message": "Excluir todas as mensagens? Isso não pode ser desfeito."
+  },
+  "clearChatConfirm": {
+    "message": "Limpar"
+  },
+  "clearAllTitle": {
+    "message": "Limpar todas as sessões"
+  },
+  "clearAllMsg": {
+    "message": "Excluir todas as sessões salvas? Isso não pode ser desfeito."
+  },
+  "clearAllConfirm": {
+    "message": "Limpar tudo"
+  },
+  "sessionDeleted": {
+    "message": "Sessão excluída"
+  },
+  "sessionRenamed": {
+    "message": "Sessão renomeada"
+  },
+  "sessionsCleared": {
+    "message": "Todas as sessões foram limpas"
+  },
+  "sessionLoaded": {
+    "message": "Carregada"
+  },
+  "dblClickRename": {
+    "message": "Clique duas vezes para renomear"
+  },
+  "exportMarkdown": {
+    "message": "Exportar como Markdown"
+  },
+  "relJustNow": {
+    "message": "agora mesmo"
+  },
+  "copyThinkingTitle": {
+    "message": "Copiar raciocínio"
+  },
+  "multiDeletedOk": {
+    "message": "$1 mensagens excluídas"
+  },
+  "multiDeletedPartial": {
+    "message": "Excluídas $1, $2 falharam (índices recalibrados)"
+  },
+  "composerAria": {
+    "message": "Mensagem — Enter para enviar, Shift+Enter para nova linha"
+  },
+  "slashAria": {
+    "message": "Comandos com barra"
+  },
+  "sessionExportFailed": {
+    "message": "Não foi possível carregar a sessão"
+  },
+  "sessionExported": {
+    "message": "Sessão exportada"
+  },
+  "bridgeRowPingTitle": {
+    "message": "Executar o ping apenas neste agente (/health) e atualizar o ponto de status",
+    "description": "Options: per-endpoint ping button on Agent Bridge rows"
+  },
+  "markmapLoadFailed": {
+    "message": "Falha ao carregar o módulo de mapa mental (verifique o console)",
+    "description": "Markmap vendor load failure"
+  },
+  "tsJumpTo": {
+    "message": "Ir para $1",
+    "description": "Timestamp pill tooltip ($1 = stamp)"
+  },
+  "figureAlt": {
+    "message": "Figura $1",
+    "description": "Inline keyframe image alt text ($1 = figure no)"
+  },
+  "noResults": {
+    "message": "Nenhum resultado",
+    "description": "Shared no-results string (msg search / transcript search)"
+  },
+  "renderingHistory": {
+    "message": "Renderizando o histórico…",
+    "description": "Sidepanel: history-upgrade progress line"
+  },
+  "progressDownloadVideoWait": {
+    "message": "Baixando vídeo… ($1s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoPct": {
+    "message": "Baixando vídeo… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadVideoMbWait": {
+    "message": "Baixando vídeo… ($1MB baixados, $2s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "errVideoDownloadFailed": {
+    "message": "Falha no download do vídeo: $1",
+    "description": "Attach pipeline error ($1 = cause)"
+  },
+  "progressUploadStart": {
+    "message": "Enviando $1… (0%)",
+    "description": "Attach pipeline progress ($1 = video/audio)"
+  },
+  "progressUploadPct": {
+    "message": "Enviando $1… ($2%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadMbWait": {
+    "message": "Enviando $1… ($2MB enviados, $3s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "errUploadFailed": {
+    "message": "Falha no upload de $1: $2",
+    "description": "Attach pipeline error"
+  },
+  "mediaLabelVideo": {
+    "message": "vídeo",
+    "description": "Noun for progress/error templates"
+  },
+  "mediaLabelAudio": {
+    "message": "áudio",
+    "description": "Noun for progress/error templates"
+  },
+  "stageRecognizing": {
+    "message": "Processando",
+    "description": "Attach pipeline stage label (Ark file processing)"
+  },
+  "stageVideoAnalysis": {
+    "message": "Analisando o vídeo",
+    "description": "Attach pipeline stage label (progress pill)"
+  },
+  "stageTranscribing": {
+    "message": "Transcrevendo",
+    "description": "Attach pipeline stage label"
+  },
+  "progressStageWait": {
+    "message": "$1… ($2s decorridos)",
+    "description": "Attach pipeline stage progress"
+  },
+  "errVideoFileProcessing": {
+    "message": "Falha no processamento do arquivo de vídeo: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAudioFileProcessing": {
+    "message": "Falha no processamento do arquivo de áudio: $1",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisTruncated": {
+    "message": "A saída da análise de vídeo foi truncada pelo limite do modelo ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteEnd": {
+    "message": "Análise de vídeo incompleta (última marca de tempo em $1s de um vídeo de $2s)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisIncompleteGap": {
+    "message": "Análise de vídeo incompleta (lacuna de $1 minuto na linha do tempo: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "errAnalysisEmpty": {
+    "message": "A análise de vídeo não retornou nenhuma saída",
+    "description": "Attach pipeline error"
+  },
+  "fmtDownloadAboutMb": {
+    "message": "download de ~$1MB",
+    "description": "ASR mode-card size estimate"
+  },
+  "asrModeCardTitle": {
+    "message": "Este vídeo não tem legendas. Escolha como processá-lo:",
+    "description": "ASR mode-card title"
+  },
+  "asrModeBtnAudio": {
+    "message": "Transcrição de áudio (legendas)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeBtnVideo": {
+    "message": "Análise de vídeo (quadros + fala)",
+    "description": "ASR mode-card button"
+  },
+  "asrModeSubFast": {
+    "message": "rápido",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubSlow": {
+    "message": "lento",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubLowToken": {
+    "message": "baixo uso de tokens",
+    "description": "ASR mode-card subtitle"
+  },
+  "asrModeSubHighToken": {
+    "message": "alto uso de tokens",
+    "description": "ASR mode-card subtitle"
+  },
+  "progressDownloadAudioWait": {
+    "message": "Baixando áudio… ($1s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioPct": {
+    "message": "Baixando áudio… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressDownloadAudioMbWait": {
+    "message": "Baixando áudio… ($1MB baixados, $2s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "progressTranscodeAudioWait": {
+    "message": "Transcodificando áudio… ($1s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioPct": {
+    "message": "Enviando áudio… ($1%)",
+    "description": "Attach pipeline progress"
+  },
+  "progressUploadAudioMbWait": {
+    "message": "Enviando áudio… ($1MB enviados, $2s decorridos)",
+    "description": "Attach pipeline progress"
+  },
+  "errAsrTruncated": {
+    "message": "A transcrição ASR foi truncada pelo limite de saída do modelo ($1)",
+    "description": "Attach pipeline error"
+  },
+  "errAsrIncompleteGap": {
+    "message": "A transcrição ASR está incompleta (lacuna de $1 minuto na linha do tempo: $2 → $3)",
+    "description": "Attach pipeline error"
+  },
+  "chipChars": {
+    "message": ", $1 caracteres",
+    "description": "Attach chip label fragment"
+  },
+  "chipEmptyContent": {
+    "message": ", conteúdo vazio",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttached": {
+    "message": "📎 Anexado: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "chipAttachedScreenshot": {
+    "message": "📎 Captura de tela anexada: \"$1\"",
+    "description": "Attach chip (screenshot)"
+  },
+  "chipPdfPages": {
+    "message": ", $1 páginas",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfOcrPages": {
+    "message": ", $1 páginas podem precisar de OCR",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfFigures": {
+    "message": ", $1 figura$2",
+    "description": "Attach chip label fragment ($2 = en plural s)"
+  },
+  "chipPdfEncoding": {
+    "message": ", o texto pode ter problemas de codificação",
+    "description": "Attach chip label fragment"
+  },
+  "chipPdfTables": {
+    "message": ", tabelas em $1 páginas",
+    "description": "Attach chip label fragment"
+  },
+  "chipAttachedPdf": {
+    "message": "📎 PDF anexado: \"$1\" (pdf-text$2)",
+    "description": "Attach chip (PDF)"
+  },
+  "chipAttachedDoc": {
+    "message": "📎 Documento anexado: \"$1\" ($2)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "platformBilibili": {
+    "message": "Bilibili",
+    "description": "Platform display name"
+  },
+  "errPlayurlExpired": {
+    "message": "A URL de reprodução do $1 expirou e a renovação automática falhou ($2) — recarregue a página do vídeo e anexe novamente",
+    "description": "Attach pipeline error"
+  },
+  "btnTitlePickMode": {
+    "message": "Escolher modo de processamento…",
+    "description": "Attach button title"
+  },
+  "btnTitleTranscribing": {
+    "message": "Transcrevendo o áudio…",
+    "description": "Attach button title"
+  },
+  "chipVideoTitleFallback": {
+    "message": "vídeo do $1",
+    "description": "Attach chip title fallback ($1 = platform)"
+  },
+  "kindCaptions": {
+    "message": "legendas",
+    "description": "Noun for the attach chip"
+  },
+  "kindAnalysis": {
+    "message": "análise de vídeo",
+    "description": "Noun for the attach chip"
+  },
+  "chipMbVideo": {
+    "message": ", vídeo de $1MB",
+    "description": "Attach chip label fragment"
+  },
+  "chipMbAudio": {
+    "message": ", áudio de $1MB",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesAnalysis": {
+    "message": ", $1 linhas de análise",
+    "description": "Attach chip label fragment"
+  },
+  "chipLinesCaptions": {
+    "message": ", $1 linhas de legenda",
+    "description": "Attach chip label fragment"
+  },
+  "chipFigures": {
+    "message": ", $1 capturas de tela",
+    "description": "Attach chip label fragment"
+  },
+  "chipParseFailedKeptOriginal": {
+    "message": "(falha no processamento — legendas originais mantidas)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsVideoInfo": {
+    "message": "(sem legendas — informações do vídeo anexadas)",
+    "description": "Attach chip fallback label"
+  },
+  "chipAttachedAsr": {
+    "message": "📎 Anexado: $1 — \"$2\" ($3)",
+    "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
+  },
+  "agentSessionLabel": {
+    "message": "Sessão do agente",
+    "description": "Agent-side session line in the sessions drawer"
+  },
+  "agentSessionCopy": {
+    "message": "Copiar ID da sessão",
+    "description": "Copy the agent-side session ID"
+  },
+  "agentSessionCopyFailed": {
+    "message": "Falha ao copiar",
+    "description": "Clipboard failure notice"
   }
 }
