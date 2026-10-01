@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
+<title>browsa — 브라우저 사이드 패널 AI</title>
+<meta name="description" content="browsa는 Chrome / Edge 사이드 패널 확장입니다. 현재 페이지 — 아티클, 자막, PDF — 를 대화로 가져와 바로 옆에서 답변을 스트리밍합니다. OpenAI 호환 API, Hermes / opencode / OpenSquilla 에이전트, agent-bridge로 연결하는 내 Codex / Claude Code / pi / Gemini CLI까지 지원합니다.">
+<link rel="icon" type="image/png" href="../icon48.png">
+<link rel="stylesheet" href="../site.css">
+<meta property="og:title" content="browsa — 브라우저 사이드 패널 AI">
+<meta property="og:description" content="현재 페이지를 대화로 가져오세요 — 아티클, 동영상, PDF. 모델과 에이전트도 내 것: 오픈 소스, 구독 없음, 추가 수수료 없음.">
+<meta property="og:image" content="https://xiaohuzai.github.io/browsa/og-image.png">
+<meta property="og:url" content="https://xiaohuzai.github.io/browsa/ko/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://xiaohuzai.github.io/browsa/ko/">
+<link rel="alternate" hreflang="zh-CN" href="https://xiaohuzai.github.io/browsa/">
+<link rel="alternate" hreflang="en" href="https://xiaohuzai.github.io/browsa/en/">
+<link rel="alternate" hreflang="ja" href="https://xiaohuzai.github.io/browsa/ja/">
+<link rel="alternate" hreflang="ko" href="https://xiaohuzai.github.io/browsa/ko/">
+<link rel="alternate" hreflang="es" href="https://xiaohuzai.github.io/browsa/es/">
+<link rel="alternate" hreflang="pt-BR" href="https://xiaohuzai.github.io/browsa/pt-br/">
+<link rel="alternate" hreflang="ru" href="https://xiaohuzai.github.io/browsa/ru/">
+</head>
+<body class="landing">
+<a class="skip-link" href="#main">본문으로 건너뛰기</a>
+
+<header class="md-header">
+  <div class="md-header__inner">
+    <a class="md-header__brand" href="#top" aria-label="browsa 홈">
+      <img src="../icon48.png" alt="" width="26" height="26">
+      <span class="md-header__topic"><span class="t">browsa</span><span class="sub">브라우저 사이드 패널 AI</span></span>
+    </a>
+    <nav class="md-header__links" aria-label="페이지 탐색">
+      <a href="../en/guide/">가이드</a>
+      <a href="#demo">데모</a>
+      <a href="#how">작동 방식</a>
+      <a href="#features">기능</a>
+      <a href="#sites" class="hide-m">지원 사이트</a>
+      <a href="#install">설치</a>
+    </nav>
+    <span class="md-header__spacer"></span>
+    <div class="md-header__actions">
+      <a class="md-header__icon" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub">
+        <svg viewBox="0 0 512 512" aria-hidden="true"><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+      </a>
+      <button class="md-header__icon md-scheme-toggle" type="button" aria-label="색 구성 전환" title="색 구성 전환">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3z"/></svg>
+      </button>
+      <span class="md-header__langs"><a href="../" lang="zh-CN">中文</a><a href="../en/" lang="en">EN</a><a href="../ja/" lang="ja">日本語</a><strong lang="ko">한국어</strong><a href="../es/" lang="es">ES</a><a href="../pt-br/" lang="pt-BR">PT</a><a href="../ru/" lang="ru">RU</a></span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Hero -->
+  <section class="hero" id="top">
+    <div class="container">
+      <div class="hero-copy">
+        <p class="eyebrow">browsa / 브라우저 사이드 패널 AI</p>
+        <h1>페이지는 그대로 두고,<span class="mark">바로 옆에서 물어보세요.</span></h1>
+        <p class="lead">
+          긴 아티클, 난해한 논문, 빠르게 흘러가는 동영상? 페이지를 <strong>내 AI</strong>와의 대화로 가져오세요. 복사-붙여넣기 없이, 지금 읽는 페이지를 떠나지 않고도 설명을 얻을 수 있습니다.
+        </p>
+        <div class="cta-group">
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">
+            Chrome에 추가 ↗
+          </a>
+          <a class="btn btn-secondary" href="../en/guide/quickstart.html">
+            시작하기 →
+          </a>
+        </div>
+        <p class="hero-note">Chrome / Edge · <a href="#install">소스 설치도 가능</a><br>무료 확장 프로그램. 모델이나 에이전트는 내 것을 연결하세요.</p>
+        <div class="hero-meta">
+          <a class="chip" href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener"><b>MIT</b> 오픈 소스 ↗</a>
+          <span class="chip">모델은 직접 선택</span>
+          <span class="chip">설정은 로컬 저장</span>
+        </div>
+      </div>
+
+      <!-- Scenario switcher -->
+      <div class="scenarios">
+        <div class="scn-tabs" role="radiogroup" aria-label="사용 예시">
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-article" checked><span class="dot"></span><span>아티클</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-video"><span class="dot"></span><span>동영상</span></label>
+          <label class="scn-tab"><input type="radio" name="scn" id="scn-pdf"><span class="dot"></span><span>논문</span></label>
+        </div>
+
+        <!-- Scenario 1: Watch video (YouTube) -->
+        <figure class="window w-video" role="img" aria-label="YouTube 동영상 페이지 옆의 browsa 패널">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">youtube.com</span>/watch?v=8jPQjjsBbIc</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-video">
+              <div class="yt-nav">
+                <span class="yt-logo"><i>▶</i>YouTube</span>
+                <span class="yt-search">검색…</span>
+                <span class="yt-avatar"></span>
+              </div>
+              <div class="yt-main">
+                <div class="yt-col">
+                  <div class="yt-player">
+                    <span class="badge">4K</span>
+                    <span class="play"></span>
+                    <div class="timeline"><div class="track"><div class="fill"></div></div></div>
+                  </div>
+                  <div class="yt-title">Blue Planet II · Episode 1 – One Ocean (다큐멘터리 전편)</div>
+                  <div class="yt-meta">
+                    <span class="yt-avatar2"></span>
+                    <span class="yt-channel">BBC Earth</span>
+                    <span class="yt-sub">구독</span>
+                    <span>· 조회수 1200만회 · 5일 전</span>
+                  </div>
+                  <div class="yt-desc">
+                    얕은 바다부터 심해까지, 바다의 가장 숨겨진 구석을 탐험합니다:
+                    생체 발광 생물, 무리지어 사냥하는 혹고래, 완전한 어둠 속의 생명.
+                    우리는 달 표면보다 바다를 덜 알고 있습니다.
+                  </div>
+                </div>
+                <div class="yt-side">
+                  <div class="yt-thumb"><span class="v">18:42</span><span class="t">Blue Planet II · Ep.2 – 심해</span></div>
+                  <div class="yt-caption">심해 · 조회수 410만회</div>
+                  <div class="yt-thumb"><span class="v">21:07</span><span class="t">해양 생체발광 완전 정복</span></div>
+                  <div class="yt-caption">생체발광 · 조회수 89만회</div>
+                  <div class="yt-thumb"><span class="v">15:30</span><span class="t">혹고래는 거품 그물로 어떻게 사냥할까</span></div>
+                  <div class="yt-caption">거품 그물 사냥 · 조회수 230만회</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 연결됨</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 첨부됨: 《Blue Planet II》Ep.1 – One Ocean</div>
+                <div class="p-user"><span class="cmd">/summarize</span> 핵심 내용, 타임스탬프와 함께</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> 자막 읽는 중…</div>
+                  <div class="p-body">
+                    <div class="p-h">One Ocean · 핵심 장면</div>
+                    <p>🌊 바다의 규모를 소개합니다 — 달보다 덜 알려진 세계<span class="p-ts">[00:12]</span></p>
+                    <p>✨ 생체 발광은 심해 곳곳에서 먹이 유인과 위장에 쓰입니다<span class="p-ts">[03:40]</span></p>
+                    <p>🐋 혹고래는 거품 그물로 협동 사냥을 합니다<span class="p-ts">[08:15]</span></p>
+                    <p>🐙 심해 생물은 압력과 어둠에 극단적으로 적응해 왔습니다<span class="p-ts">[11:48]</span></p>
+                    <p>🌍 마무리: 인간 활동이 바다 생태계를 재편하고 있습니다<span class="p-ts">[15:02]</span><span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">무엇이든 물어보세요… 📎로 현재 페이지 첨부</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">동영상 노트: 답변에는 클릭 가능한 <code>[mm:ss]</code> 타임스탬프가 붙어, 클릭하면 해당 순간으로 이동합니다.</p>
+        </figure>
+
+        <!-- Scenario 2: Read article -->
+        <figure class="window w-article" role="img" aria-label="블로그 아티클 옆의 browsa 패널">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">dev.to</span>/sidepanel-ai/read-anywhere-ask-anywhere</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-article">
+              <div class="art-nav">
+                <span class="art-logo" style="color:#0f0f0f">DEV</span>
+                <a>포스트</a><a>팟캐스트</a><a>동영상</a><a>태그</a>
+                <span class="art-search">아티클 검색…</span>
+              </div>
+              <div class="art-main">
+                <span class="art-tag" style="color:#57534e;background:rgba(87,83,78,.08)">AI · 브라우저</span>
+                <div class="art-title">읽는 모든 페이지 곁에 AI 코파일럿을</div>
+                <div class="art-meta"><span class="art-avatar" style="background:#0f0f0f"></span><span>Sarah Dev · 12분 분량</span></div>
+                <p class="art-p">페이지 텍스트를 LLM에 넣는 것은 쉽지만, 페이지를 진정으로 '이해'하게 만드는 일은 어렵습니다. 우리는 3단 계단식 추출을 사용합니다. 먼저 Readability로 깨끗한 본문을 가져오고, 다음으로 구조를 보존하는 DOM 트리, 마지막으로 전체 텍스트를 폴백으로 씁니다. 주요 사이트에서는 페이지가 이미 불러온 구조화 데이터 — 자막, 댓글, 기사 원문 — 를 그대로 읽습니다.</p>
+                <div class="art-code"><span class="ac-line hl"></span><span class="ac-line"></span><span class="ac-line short"></span><span class="ac-line mid"></span></div>
+                <p class="art-p">재인증도 없고 제3자 업로드도 없습니다 — 데이터는 브라우저와 내 백엔드 사이에서만 흐릅니다.</p>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 연결됨</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 첨부됨: 읽는 모든 페이지 곁에 AI 코파일럿을</div>
+                <div class="p-user"><span class="cmd">/keypoints</span> 핵심은 무엇일까요?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> 아티클 읽는 중…</div>
+                  <div class="p-body">
+                    <div class="p-h">핵심 정리</div>
+                    <p>🧠 3단 계단식: Readability → DOM 트리 → 전체 텍스트</p>
+                    <p>🕵️ 주요 사이트는 페이지가 직접 불러온 데이터를 읽습니다 — 재인증 없음</p>
+                    <p>🔒 데이터는 브라우저와 내 백엔드 사이에만 머뭅니다</p>
+                    <p>⚡ 아티클, 자막, PDF 모두 지원<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">무엇이든 물어보세요… 📎로 현재 페이지 첨부</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">아티클: <code>/keypoints</code>가 핵심을 뽑아 냅니다. 본문은 Readability 계단식으로 첨부됩니다.</p>
+        </figure>
+
+        <!-- Scenario 3: Open PDF -->
+        <figure class="window w-pdf" role="img" aria-label="PDF 뷰어 옆의 browsa 패널">
+          <div class="win-bar">
+            <span class="win-dots"><i></i><i></i><i></i></span>
+            <span class="win-url"><span class="lock">🔒</span><span class="host">arxiv.org</span>/pdf/1706.03762</span>
+          </div>
+          <div class="win-body">
+            <div class="pg-pdf">
+              <div class="pdf-bar">
+                <span class="pdf-name">attention-is-all-you-need.pdf</span>
+                <span class="pdf-page">1 / 15 페이지</span>
+                <span>100%</span>
+              </div>
+              <div class="pdf-paper">
+                <div class="pdf-title">Attention Is All You Need</div>
+                <div class="pdf-meta">Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, et al.</div>
+                <div class="pdf-abstract"><b>Abstract</b> — 지배적인 시퀀스 변환 모델은 복잡한 순환 또는 합성곱 신경망에 기반합니다… 우리는 오직 어텐션 메커니즘만으로 구성된 새롭고 단순한 네트워크 아키텍처, Transformer를 제안합니다.</div>
+                <div class="pdf-p">Transformer는 순환 구조를 없애고 훨씬 높은 병렬화를 가능하게 하여 학습 시간을 크게 줄입니다.</div>
+                <div class="pdf-figure">
+                  <div class="fig-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="fig-cap">Figure 1: The Transformer – 모델 아키텍처</div>
+                </div>
+                <div class="pdf-p">WMT 2014 영어→독일어, 영어→프랑스어 작업에서 학습 비용의 일부만으로 최고 수준의 성능을 달성합니다.</div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="p-topbar">
+                <span class="p-status"></span>
+                <span class="p-wordmark">browsa</span>
+                <span class="p-provider"><span class="dot"></span>my-agent · 연결됨</span>
+                <span class="p-ico"></span><span class="p-ico"></span><span class="p-ico"></span>
+              </div>
+              <div class="p-msgs">
+                <div class="p-sys">📎 첨부됨: PDF 《Attention Is All You Need》(15페이지 · 그림 6개)</div>
+                <div class="p-user">이 논문의 핵심 기여는 무엇인가요?</div>
+                <div class="p-assist">
+                  <div class="p-tool"><span class="spin"></span> PDF 분석 중…</div>
+                  <div class="p-body">
+                    <div class="p-h">핵심 기여</div>
+                    <p>⚙️ Transformer — 어텐션만으로, 순환도 합성곱도 없음</p>
+                    <p>⚡ 높은 병렬성으로 RNN/LSTM보다 훨씬 빠르게 학습</p>
+                    <p>📊 그림 1은 아키텍처, 그림 2–4는 학습 과정과 BLEU 결과<span class="p-ts">Fig.1</span></p>
+                    <p>🏆 WMT 2014 두 작업 모두 더 낮은 학습 비용으로 SOTA 달성<span class="p-cursor"></span></p>
+                  </div>
+                </div>
+              </div>
+              <div class="p-composer">
+                <span class="p-attach"></span>
+                <span class="p-input">무엇이든 물어보세요… 📎로 현재 페이지 첨부</span>
+                <span class="p-send"></span>
+              </div>
+            </div>
+          </div>
+          <p class="win-caption">PDF: 로컬 WASM이 표 / 제목 / 레이아웃을 재구성하고, 그림 영역은 자동으로 잘라 캡션을 붙입니다.</p>
+        </figure>
+        <p class="scenario-note">인터페이스 예시 · 장면을 전환하며 browsa가 페이지와 함께 동작하는 모습을 살펴보세요.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo video -->
+  <section id="demo">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">데모</p>
+        <h2>60초로 보는 browsa</h2>
+        <p>실제 화면 녹화입니다: 페이지를 첨부해 질문하고, 선택한 구절에 이어서 묻고, 드래그한 영역을 그 자리에서 설명받고, 클릭할 수 있는 동영상 타임라인 — 답변 안에 다이어그램과 3D 단백질 구조가 렌더링되고, 마지막은 에이전트의 도구 호출이 승인 카드로 마무리됩니다.</p>
+      </div>
+      <figure class="demo-video">
+        <video controls preload="none" poster="../assets/promo/poster.jpg" width="960">
+          <source src="../assets/promo/browsa-promo-v3.mp4" type="video/mp4" />
+          브라우저에서 내장 동영상을 지원하지 않습니다 — <a href="../assets/promo/browsa-promo-v3.mp4">여기서 다운로드</a>하세요.
+        </video>
+        <figcaption>무음 시나리오를 위한 설계: 전 구간 이중 언어 자막으로 음소거 상태에서도 완전히 이해할 수 있습니다. <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a>에서도 볼 수 있습니다.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">작동 방식</p>
+        <h2>세 단계로 웹페이지와 대화하기</h2>
+        <p>창을 옮길 필요도, 복사-붙여넣기도 없습니다. browsa는 지금 읽고 있는 페이지 곁에 조용히 머무르는 페이지 여백의 메모처럼 동작합니다.</p>
+      </div>
+      <div class="how-list">
+        <div class="how">
+          <span class="no">01</span>
+          <h3>사이드 패널 열기 <span class="tag">Ctrl+Shift+H</span></h3>
+          <p>아무 페이지에서나 단축키를 누르거나 툴바 아이콘을 클릭하세요. browsa 패널이 오른쪽에 나타납니다.</p>
+        </div>
+        <div class="how">
+          <span class="no">02</span>
+          <h3>페이지 첨부 <span class="tag">📎</span></h3>
+          <p>📎을 클릭하면 페이지 내용이 대화로 흘러 들어갑니다 — 아티클, 자막, PDF. 선택한 텍스트는 바로 질문할 수도 있습니다.</p>
+        </div>
+        <div class="how">
+          <span class="no">03</span>
+          <h3>답변 스트리밍 <span class="tag">어떤 백엔드든</span></h3>
+          <p>답변은 단어 단위로 스트리밍되며 Markdown, 수식, 차트를 갖춰 나타납니다. 직접 쓰는 OpenAI 호환 API와 Hermes / opencode / OpenSquilla 에이전트 — 구독으로 로그인한 Codex / Claude Code, agent-bridge로 연결하는 Google 로그인 Gemini CLI, 또는 자체 모델을 구성해 둔 pi를 연결하세요. UI는 브라우저 언어를 따라갑니다 — English, 中文, 日本語, 한국어, Español, Português, Русский — 설정에서 언제든 바꿀 수 있습니다.</p>
+        </div>
+      </div>
+      <p class="site-note">설치했나요? <a href="../en/guide/quickstart.html">빠른 시작</a>이 첫 질문까지 안내하고, <a href="../en/guide/">전체 가이드</a>는 읽기, 동영상, 렌더링, 세션, 백엔드, 설정을 다룹니다.</p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">기능</p>
+        <h2>채팅창 그 이상</h2>
+        <p>browsa는 '읽기'와 '묻기'를 한곳에 모읍니다: 긴 아티클, 동영상, PDF를 읽는 동안 AI가 항상 바로 옆에 있습니다.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature">
+          <span class="f-tag">attach</span>
+          <h3>페이지 첨부</h3>
+          <p>클릭 한 번으로 현재 페이지를 대화로 가져옵니다 — 모드는 알아서 골라집니다:</p>
+          <ul>
+            <li>자동 계단식: Readability 본문 → DOM 트리 → 전체 텍스트</li>
+            <li>📷 스크린샷 모드, 멀티모달 모델용</li>
+            <li>PDF 로컬 파싱: WASM이 표 / 제목 / 레이아웃을 재구성하고 그림은 자동으로 잘라 냅니다</li>
+            <li>GitHub 파일 페이지는 페이지 정리를 건너뛰고 raw 소스를 직접 가져옵니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">select</span>
+          <h3>선택 영역 Q&amp;A</h3>
+          <p>아무 페이지에서 텍스트를 선택해 바로 질문하세요:</p>
+          <ul>
+            <li>플로팅 툴바: 질문 · 설명 · 번역 · 요약</li>
+            <li>설명 / 번역은 그 자리에서 인라인으로 답합니다 — 스트리밍, 그 자리에서, 패널 없이</li>
+            <li>질문 / 요약: 선택 영역이 패널로 전달됩니다 — 먼저 📎를 누를 필요가 없습니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">render</span>
+          <h3>풍부한 렌더링</h3>
+          <p>답변은 단순 텍스트 그 이상 — 수식과 다이어그램이 브라우저 안에서 렌더링됩니다:</p>
+          <ul>
+            <li>Markdown GFM + 40개 이상 언어의 구문 강조</li>
+            <li>LaTeX 수식 (KaTeX, Web Worker 가속)</li>
+            <li>Mermaid 다이어그램, ECharts, Markmap 마인드맵</li>
+            <li>파싱에 실패한 Mermaid 블록? 구성해 둔 AI에게 고쳐 다시 그리도록 요청하세요</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">video</span>
+          <h3>동영상 노트</h3>
+          <p>동영상을 위한 완전한 워크플로 — YouTube와 Bilibili의 구조화된 자막:</p>
+          <ul>
+            <li>답변에는 동영상을 해당 시점으로 이동시키는 클릭 가능한 <code>[mm:ss]</code> 타임스탬프가 붙습니다</li>
+            <li>자막 없는 Bilibili 동영상도 요약할 수 있습니다 — 자동 ASR 전사</li>
+            <li>긴 전사문은 타임스탬프를 유지한 채 자동으로 요점으로 압축됩니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">provider</span>
+          <h3>어떤 백엔드든</h3>
+          <p>벤더 종속 없음 — 내 모델을 연결하세요:</p>
+          <ul>
+            <li>Hermes 에이전트: 도구 실행, 위험 작업 승인, 진행 상태 표시</li>
+            <li>OpenCode 에이전트: opencode CLI 에이전트와 직통 연결 — 동일한 전체 도구 &amp; 승인 흐름</li>
+            <li>OpenSquilla 에이전트: 게이트웨이 WebSocket으로 연결하는 로컬 데스크톱 에이전트 — 서버 측 세션 메모리, 사고 과정 출력, 서버 측 취소</li>
+            <li>Agent Bridge: 로컬 CLI 에이전트를 연결합니다 — 구독으로 로그인한 Codex / Claude Code (모델 쪽은 내 구독으로 동작), Google 로그인 Gemini CLI, 또는 원하는 모델을 구성해 둔 pi; 한 카드로 여러 에이전트를 동시에 연결하며 각자 독립적인 세션과 핑 상태를 갖습니다</li>
+            <li>에이전트와의 대화는 에이전트 쪽에 남습니다: browsa가 세션 이름을 자동으로 붙이므로('browsa:' + 첫 메시지) 에이전트 자체 인터페이스에서 이어서 작업할 수 있습니다; 세션 ID는 세션 드로어에서 표시되고 복사할 수 있습니다</li>
+            <li>모든 OpenAI 호환 API: OpenAI, Ollama, LiteLLM…</li>
+            <li>카드에 모델을 여러 개 추가 — 사이드바에서 '별칭 · 모델'로 전환</li>
+            <li>모델별 사고 수준: 선택지는 모델 계열을 따르고 요청 필드는 각 API 방언에 맞게 조정됩니다</li>
+            <li>Ping으로 연결 상태와 지원 기능을 확인합니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">privacy</span>
+          <h3>프라이버시 우선</h3>
+          <p>browsa 계정은 없습니다. 모델 서비스는 내 선택:</p>
+          <ul>
+            <li>API 키는 로컬에 저장되고 구성한 프로바이더 인증에만 사용됩니다</li>
+            <li>페이지 컨텍스트의 URL은 전송 전 로컬에서 마스킹됩니다 — 토큰, 비밀번호, 서명은 제거됩니다</li>
+            <li>PDF는 기기 안에서 파싱되며, 추출된 텍스트와 이미지는 모델 요청에 첨부할 수 있습니다</li>
+            <li>Office 문서(docx/pptx/xlsx/…)도 마찬가지로 기기 안에서 Markdown으로 변환됩니다 — 파일은 결코 기기를 떠나지 않습니다</li>
+            <li>내용은 내가 구성한 백엔드로만 전송됩니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">input</span>
+          <h3>빠른 입력</h3>
+          <p>더 두드리지 않고 더 말하기:</p>
+          <ul>
+            <li>빠른 작업: 요약 / 핵심 / 설명 / 목차</li>
+            <li>슬래시 명령 + ↑/↓ 입력 기록; 작성 중인 문구는 패널을 닫아도 남습니다</li>
+            <li>답변이 스트리밍되는 동안에도 계속 입력 — 메시지는 대기열에 쌓여 순서대로 전송됩니다</li>
+            <li>컴포저에 코드를 붙여넣으면 내 버블이 강조된 코드 블록으로 렌더링합니다(복사 버튼, 언어 자동 감지); 나머지 텍스트는 바이트 그대로 유지됩니다</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <span class="f-tag">session</span>
+          <h3>세션</h3>
+          <p>긴 대화도 정돈된 상태로:</p>
+          <ul>
+            <li>이름 있는 세션 저장 / 복원, Markdown 내보내기</li>
+            <li>답변 도중에 세션을 바꿔도 답변은 끊기지 않습니다 — 백그라운드에서 끝까지 진행되어 시작된 세션에 기록됩니다</li>
+            <li>대화 내 전체 텍스트 검색(<code>Ctrl+F</code>)</li>
+            <li>답변의 어떤 텍스트든 '상세 스레드'로 파고들어도 메인 기록은 그대로입니다; 이미지를 바로 붙여넣을 수 있고, 입력창의 ↑/↓는 이어서 던진 질문만 불러오며, 인용된 수식은 수식으로 렌더링됩니다</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sites -->
+  <section id="sites">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">지원 사이트</p>
+        <h2>웹페이지를 제대로 읽습니다</h2>
+        <p>이 사이트들에서 browsa는 추측 대신 페이지가 이미 불러온 구조화 데이터 — 자막, 댓글, 기사 원문, 시세 — 를 읽습니다.</p>
+      </div>
+      <div class="site-strip">
+        <span class="site-chip">YouTube<span class="en">자막/챕터</span></span>
+        <span class="site-chip">Bilibili<span class="en">자막/ASR/통계</span></span>
+        <span class="site-chip">Xiaohongshu<span class="en">노트/댓글</span></span>
+        <span class="site-chip">Juejin<span class="en">아티클 원문</span></span>
+        <span class="site-chip">Zhihu<span class="en">아티클/답변</span></span>
+        <span class="site-chip">X / Twitter<span class="en">트윗/답글</span></span>
+        <span class="site-chip">Reddit<span class="en">글/댓글</span></span>
+        <span class="site-chip">Xueqiu<span class="en">시세/글</span></span>
+        <span class="site-chip">Xiaoyuzhou<span class="en">팟캐스트</span></span>
+        <span class="site-chip">Dedao<span class="en">아티클</span></span>
+        <span class="site-chip">GeekTime<span class="en">아티클</span></span>
+      </div>
+      <p class="site-note">
+        <b>지켜볼 뿐, 가로채지 않습니다:</b> 추출은 브라우저 자체의 요청을 지켜보는 방식으로 동작합니다 — 재인증도 없고,
+        제3자로 업로드되는 것도 없습니다. 그 밖의 모든 웹페이지도 동작하며, 다만 이만큼 깊지는 않습니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <!-- Your Keys -->
+  <section id="keys">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">내 키, 내 에이전트</p>
+        <h2>키는 내 것. 모델도 내 것. <em>에이전트도 내 것.</em></h2>
+        <p>browsa는 구독을 팔지 않고, 계정을 요구하지 않고, 추가 수수료를 붙이지 않습니다. 단지 내 모델 엔드포인트를 사이드 패널로 옮겨줄 뿐입니다 — 클라우드든, 로컬이든, 자체 호스팅이든.</p>
+      </div>
+      <div class="keys-grid">
+        <ul class="keys-list">
+          <li><span class="tick">›</span><span><b>계정도, 텔레메트리도 없습니다.</b> 설치하고 바로 사용 — 어떤 데이터도 우리를 거치지 않습니다.</span></li>
+          <li><span class="tick">›</span><span><b>API 키는 로컬에만 저장</b>되며, 내가 구성한 엔드포인트로만 전송됩니다.</span></li>
+          <li><span class="tick">›</span><span><b>Ollama / LM Studio 로컬 모델</b> — 완전한 오프라인도 가능합니다.</span></li>
+          <li><span class="tick">›</span><span><b>진짜 에이전트</b>: 도구 실행, 실시간 진행 상황, 위험 작업 전 승인.</span></li>
+        </ul>
+        <div class="prov-board" data-label="연결 예시" role="img" aria-label="연결 예시: 모델 API, 로컬 모델, Hermes, OpenCode, OpenSquilla, Agent Bridge">
+          <div class="prov-card">
+            <span class="prov-ava pa-openai">O</span>
+            <span class="prov-info"><span class="prov-name">내 OpenAI</span><span class="prov-model">gpt-4o · /v1/chat/completions</span></span>
+            <span class="prov-badge pb-ok">연결됨</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-claude">C</span>
+            <span class="prov-info"><span class="prov-name">Claude</span><span class="prov-model">claude-sonnet · /v1/messages</span></span>
+            <span class="prov-badge pb-idle">핑 확인 전</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-ollama">L</span>
+            <span class="prov-info"><span class="prov-name">Ollama (로컬)</span><span class="prov-model">localhost:11434 · qwen3:32b</span></span>
+            <span class="prov-badge pb-ok">오프라인 OK</span>
+          </div>
+          <div class="prov-card active">
+            <span class="prov-ava pa-hermes">H</span>
+            <span class="prov-info"><span class="prov-name">Hermes Agent</span><span class="prov-model">/v1/runs · tools · approvals</span></span>
+            <span class="prov-badge pb-ok">연결됨</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-opencode">oc</span>
+            <span class="prov-info"><span class="prov-name">OpenCode Agent</span><span class="prov-model">opencode serve · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">핑 확인 전</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-squilla">Sq</span>
+            <span class="prov-info"><span class="prov-name">OpenSquilla Agent</span><span class="prov-model">gateway /ws · tools · approvals</span></span>
+            <span class="prov-badge pb-idle">핑 확인 전</span>
+          </div>
+          <div class="prov-card">
+            <span class="prov-ava pa-bridge">↔</span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini · 로컬 CLI 에이전트 연결</span></span>
+            <span class="prov-badge pb-idle">브리지</span>
+          </div>
+        </div>
+      </div>
+      <p class="site-note">무엇을 선택할지 확실하지 않나요? <a href="../en/guide/providers.html">모델·에이전트 설정 가이드 읽기 →</a></p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">설치</p>
+        <h2>다음 읽기부터 시작하세요.</h2>
+        <p>설치 방법을 하나 고르고, 모델이나 에이전트를 연결하세요. browsa 확장 프로그램은 무료입니다.</p>
+      </div>
+      <div class="install-options">
+        <article class="install-option recommended">
+          <p class="install-label">추천 · 자동 업데이트</p>
+          <h3>스토어에서 설치</h3>
+          <p>가장 간단한 시작 방법입니다. 확장을 추가한 뒤 설정에서 모델을 연결하세요. 스토어 심사는 GitHub 릴리스보다 늦을 수 있습니다.</p>
+          <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho" target="_blank" rel="noopener">Chrome에 추가 ↗</a>
+        </article>
+        <article class="install-option">
+          <p class="install-label">대안 · 수동 업데이트</p>
+          <h3>GitHub에서 불러오기</h3>
+          <p>릴리스를 내려받아 압축을 풀고, 브라우저의 확장 프로그램 관리자에서 개발자 모드를 사용한 뒤, '압축해제된 확장 프로그램을 로드'를 선택하고 <code>manifest.json</code>이 있는 폴더를 고르세요.</p>
+          <a class="btn btn-secondary" href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">릴리스 다운로드 ↗</a>
+        </article>
+      </div>
+      <div class="install-next">
+        <div><h3>설치했나요? 이제 연결할 차례입니다.</h3><p>설정에서 모델 API나 로컬 에이전트를 구성하고 Ping으로 확인하세요. 아티클을 하나 열어 📎로 첨부하고 첫 질문을 던져 보세요.</p></div>
+        <a class="btn btn-secondary" href="../en/guide/quickstart.html">설정 가이드 따라하기 →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="md-footer">
+  <div class="md-footer__inner">
+    <div class="md-footer__copy">
+      <div class="brandline"><img src="../icon48.png" alt="" width="18" height="18"><span class="wordmark">browsa</span></div>
+      <div class="maintained"><a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">xiaohuzai</a>가 유지 관리합니다.</div>
+    </div>
+    <nav class="md-footer__links">
+      <a href="https://github.com/xiaohuzai/browsa" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/xiaohuzai/browsa/releases" target="_blank" rel="noopener">릴리스</a>
+      <a href="../en/guide/">가이드</a>
+      <a href="https://github.com/xiaohuzai/browsa/issues" target="_blank" rel="noopener">이슈</a>
+      <a href="../en/privacy.html">개인정보 처리</a>
+    </nav>
+    <div class="md-footer__meta"><span>브라우저 사이드 패널 AI · 어디서든 읽고, 어디서든 묻습니다</span><span>browsa · MIT 라이선스</span></div>
+  </div>
+</footer>
+
+<script src="../site.js"></script>
+</body>
+</html>

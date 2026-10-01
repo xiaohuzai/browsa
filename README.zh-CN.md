@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="./README.md">English</a> · <strong>简体中文</strong>
+  <a href="./README.md">English</a> · <strong>简体中文</strong> · <a href="./README.ja.md">日本語</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a>
 </p>
 
 <p align="center">
@@ -338,7 +338,7 @@ opensquilla gateway start
 |---|---|
 | **系统提示词** | 每轮对话以 `role: system` 注入——回复语言、语气与格式规则在这里定 |
 | **回复语言** | 无论页面语言，强制用指定语言回复 |
-| **界面语言** | English / 中文 / Auto（跟随浏览器语言）——即时生效，无需重载 |
+| **界面语言** | 中文 / English / 日本語 / 한국어 / Español / Português / Русский / Auto（跟随浏览器语言）——即时生效，无需重载 |
 | **划词工具栏与 llms.txt** | 开关划选文字时的浮动工具栏；附加页面（📎）时抓取一次 `<origin>/llms.txt`，把站点 LLM 指令烘入页面上下文——放在系统提示词之外，保证提示词前缀跨轮次字节稳定（对 prompt 缓存友好） |
 | **思考档位** | 按模型设置思考深度（`auto` 不发送；其余按模型自带的档位——GLM/Qwen 类是开关档，GPT/Claude 类是低→最高力度梯）。可选项跟着你填的模型 id 自适应，请求字段按各家 API 方言自动适配（`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`……） |
 | **阅读偏好** | 消息字号、发送快捷键（Enter / Shift+Enter）、思考块自动折叠 |
