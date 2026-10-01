@@ -25,7 +25,7 @@ browsa は Chrome / Edge のサイドパネル拡張機能です。テキスト�
   <img src="docs/assets/readme/demo-v16-ja.gif" alt="browsa が Transformer の記事の隣で注意の式と図を表示し、ポッドキャストの要点へ移動します。ノートのコピー、画像保存、同じセッションのエージェントでの続行も示します。" width="720" />
 </p>
 <p align="center">
-  <a href="docs/assets/promo/browsa-promo-v7-ja.mp4"><strong>▶ 紹介動画 · 68秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/ja/#demo"><strong>▶ ページから離れず、その隣で尋ねる。</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube（旧版デモ）</a> — 実際のUIデモ：browsaで自分のAIやエージェントを選択・切り替え、記事を添付し、一文を掘り下げ、数式・フローチャート・グラフを表示します。動画のタイムラインで内容を確認し、複数のセッションを管理して、セッションIDでエージェント側の作業を続けます。回答・保存結果・CLI継続画面はデモデータで、再生は編集されています。ファイル保存は接続先エージェントの機能に依存します。</p>
+  <a href="https://www.youtube.com/watch?v=umnWxVXfmjg"><strong>▶ 紹介動画 · 68秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/ja/#demo"><strong>▶ ページから離れず、その隣で尋ねる。</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-ja.mp4">MP4をダウンロード</a> — 実際のUIデモ：browsaで自分のAIやエージェントを選択・切り替え、記事を添付し、一文を掘り下げ、数式・フローチャート・グラフを表示します。動画のタイムラインで内容を確認し、複数のセッションを管理して、セッションIDでエージェント側の作業を続けます。回答・保存結果・CLI継続画面はデモデータで、再生は編集されています。ファイル保存は接続先エージェントの機能に依存します。</p>
 
 ## ハイライト
 
