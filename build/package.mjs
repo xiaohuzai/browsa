@@ -41,7 +41,10 @@ root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "bu
     "dev-preview", "preview-shots", "store-assets", "docs"}
 exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "AGENTS.md", "skills-lock.json",
     # Repo housekeeping / dev docs that must not ship in the CWS zip.
-    ".gitignore", "README.md", "README.zh-CN.md", "SITES.md"}
+    # (2026-10-01 audit: CONTEXT.md and the manual-test checklist were swept in
+    # -- the third recurrence of this failure mode. Keep this list in sync with
+    # whatever root-level docs exist, or switch to an allowlist.)
+    ".gitignore", "README.md", "README.zh-CN.md", "SITES.md", "CONTEXT.md", "MANUAL-TEST-2026-09-30.md"}
 # Dev/editor dot-directories (.pi channel transcripts, .claude local config,
 # .github workflows, .vscode, ...) must never ship in a distribution zip --
 # they can contain Feishu chat transcripts and local secrets. Handled below

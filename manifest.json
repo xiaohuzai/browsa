@@ -15,7 +15,6 @@
     "webNavigation",
     "alarms",
     "contextMenus",
-    "downloads",
     "declarativeNetRequest",
     "cookies",
     "unlimitedStorage"
@@ -28,6 +27,33 @@
     "type": "module"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.xiaohongshu.com/*",
+        "https://xiaohongshu.com/*",
+        "https://juejin.cn/*",
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://www.zhihu.com/*",
+        "https://zhuanlan.zhihu.com/*",
+        "https://www.dedao.cn/*",
+        "https://time.geekbang.org/*",
+        "https://www.bilibili.com/*",
+        "https://bilibili.com/*",
+        "https://xueqiu.com/*",
+        "https://www.xueqiu.com/*",
+        "https://twitter.com/*",
+        "https://x.com/*",
+        "https://www.xiaoyuzhoufm.com/*",
+        "https://xiaoyuzhoufm.com/*"
+      ],
+      "js": [
+        "lib/content-scripts/site-relay.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "ISOLATED"
+    },
     {
       "matches": [
         "https://www.xiaohongshu.com/*",
@@ -186,7 +212,8 @@
       "resources": [
         "lib/vendor/Readability.iife.js",
         "lib/vendor/Turndown.iife.js",
-        "icons/icon16.png"
+        "icons/icon16.png",
+        "_locales/*/messages.json"
       ],
       "matches": [
         "<all_urls>"

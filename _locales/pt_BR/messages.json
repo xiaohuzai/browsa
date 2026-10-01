@@ -255,6 +255,54 @@
     "message": "Remover da fila",
     "description": "Follow-up queue chip: remove"
   },
+  "followupQueueFull": {
+    "message": "A fila está cheia (máx. 5) — aguarde o término da resposta atual",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ O anexo excedeu a janela de contexto do modelo — foi cortado e a tentativa repetida automaticamente…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ A resposta atingiu o limite de saída — continuando automaticamente…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ Adicionando marcações de tempo…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1 etapa(s)",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "(aba fechada)",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa atualizado para v$1 — se a barra flutuante não responder em uma página, recarregue-a uma vez.",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 Anexado: \"$1\"",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "O conteúdo do Xiaohongshu pode estar incompleto ($1). Se você não estiver logado em <code>xiaohongshu.com</code> neste navegador, o XHR costuma retornar outra nota ou um esqueleto. Faça login lá, recarregue esta página e reenvie. <em>O conteúdo enviado ainda inclui o que foi lido; este é apenas um aviso.</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ Resposta cancelada",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ Parou de acompanhar a resposta em segundo plano",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "+$1 imagem(ns) anexada(s)",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
   "pinnedGroupLabel": {
     "message": "Fixadas",
     "description": "Sessions drawer pinned group header"

@@ -788,19 +788,6 @@ async function handle(msg, sender) {
         if (handoff) {
           return { ok: true, ctx };
         }
-        // Bilibili video WITHOUT subtitles + ASR enabled: hand off to sidepanel
-        // for the ASR pipeline (download audio in page-world -> upload to 火山方舟
-        // Files API -> poll -> Responses API transcript). Deferred storage until
-        // ATTACH_ASR_CONFIRM, mirroring the pdf-pending handoff. The audio stream
-        // URL is read fresh via the MAIN-world-exposed reader so the signed URL is
-        // valid at handoff time. Detection keys off the structured noTranscript
-        // flag (from synthesizeBilibiliResult), NOT the `## 字幕` text marker — auto
-        // mode's silent Jina fallback can rewrite ctx.text and drop the marker.
-        // `all.asr.subtitleSource === 'asr'` additionally forces the ASR handoff even
-        // for videos that ALREADY have subtitles (user opted to prefer ASR
-        // subtitles over low-quality originals — the strip/replace happens in the
-        // sidepanel at ATTACH_ASR_CONFIRM time, keeping ctx.text intact for the
-        // fail-open fallback).
         // Bilibili / YouTube video WITHOUT subtitles + ASR enabled: hand off to
         // sidepanel for the ASR pipeline (download audio in page-world -> upload to 火山方舟
         // Files API -> poll -> Responses API transcript). Deferred storage until

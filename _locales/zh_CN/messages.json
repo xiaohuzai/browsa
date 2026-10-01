@@ -255,6 +255,54 @@
     "message": "从队列移除",
     "description": "Follow-up queue chip: remove"
   },
+  "followupQueueFull": {
+    "message": "排队已满（最多 5 条），先等当前回复完成",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ 附件超出模型上下文窗口，已临时裁剪大附件并自动重试…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ 回复被输出上限截断，正在自动续写…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ 正在补充时间戳…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1 步",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "（标签页已关闭）",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa 已更新到 v$1——悬浮工具条在页面上没反应时，刷新一次页面即可。",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 已附加：「$1」",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "小红书内容可能不完整（$1）。若你未在本浏览器登录 <code>xiaohongshu.com</code>，XHR 常返回另一条笔记或空壳。请在该站登录后刷新本页再重发。<em>已发送内容仍包含实际读到的部分；这里只是提醒。</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ 已取消回复",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ 已停止跟踪后台回复",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "已附加 +$1 张图",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
   "pinnedGroupLabel": {
     "message": "置顶",
     "description": "Sessions drawer pinned group header"

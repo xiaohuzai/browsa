@@ -255,6 +255,54 @@
     "message": "Убрать из очереди",
     "description": "Follow-up queue chip: remove"
   },
+  "followupQueueFull": {
+    "message": "Очередь заполнена (макс. 5) — дождитесь завершения текущего ответа",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ Вложение превысило контекстное окно модели — оно усечено и попытка повторена автоматически…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ Ответ достиг лимита вывода — продолжаю автоматически…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ Добавляю временные метки…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1 шаг(ов)",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "(вкладка закрыта)",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa обновлён до v$1 — если плавающая панель не реагирует на странице, обновите страницу один раз.",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 Прикреплено: «$1»",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "Контент Xiaohongshu может быть неполным ($1). Если вы не вошли в <code>xiaohongshu.com</code> в этом браузере, XHR часто возвращает другую заметку или пустой каркас. Войдите там, перезагрузите страницу и отправьте снова. <em>В отправленном содержимом по-прежнему всё, что удалось прочитать; это лишь предупреждение.</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ Ответ отменён",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ Отслеживание фонового ответа остановлено",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "Прикреплено изображений: $1",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
   "pinnedGroupLabel": {
     "message": "Закреплённые",
     "description": "Sessions drawer pinned group header"

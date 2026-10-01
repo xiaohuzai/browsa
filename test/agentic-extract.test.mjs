@@ -89,7 +89,21 @@ afterEach(() => {
   delete globalThis.fetch;
 });
 
-const { parseAction, assembleDeepText, maybeDeepExtract } = await import('../lib/agentic-extract.js');
+const { parseAction, assembleDeepText, maybeDeepExtract, isSameOrigin } = await import('../lib/agentic-extract.js');
+
+// ── isSameOrigin（deep-extract 同源 pin，2026-10-01）────────────────────────
+
+test('isSameOrigin: cross-origin, custom-scheme and unparseable hrefs are rejected', () => {
+  // The background-tab walker must never carry the user's cookies to a
+  // page-controlled rel=next on another origin (GET-CSRF / tracking surface).
+  assert.equal(isSameOrigin('https://a.example/p2', 'https://a.example'), true);
+  assert.equal(isSameOrigin('https://a.example:443/p2', 'https://a.example'), true, 'default port normalizes away');
+  assert.equal(isSameOrigin('https://b.example/p2', 'https://a.example'), false);
+  assert.equal(isSameOrigin('http://a.example/p2', 'https://a.example'), false, 'scheme flip = different origin');
+  assert.equal(isSameOrigin('javascript:alert(1)', 'https://a.example'), false);
+  assert.equal(isSameOrigin('p2.html', 'https://a.example'), true, 'relative refs resolve against the origin — staying in-origin is the safe answer');
+  assert.equal(isSameOrigin('not a url', null), false, 'no base + unparseable = reject');
+});
 
 // ── parseAction ─────────────────────────────────────────────────────────────
 

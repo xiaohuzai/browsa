@@ -1895,6 +1895,8 @@ math[display="block"] {
   object-fit: contain;
   background: var(--bg-3);
   display: block;
+  /* 点击放大（lightbox 委托，2026-10-01 拍板）——给个可点的视觉供手 */
+  cursor: zoom-in;
 }
 
 /* ─── Diff syntax highlighting ───────────────────────────────────────────────── */

@@ -94,3 +94,13 @@ test('lockstep: the smiles hint keeps the validity clause (RDKit rejects bad SMI
   assert.match(promptJs, /must be chemically valid/, 'hint must teach valences/rings matter');
   assert.match(promptJs, /invalid structures are NOT drawn/, 'hint must state the rejection behavior');
 });
+
+test('lockstep: user-pasted images are lightbox-zoomable (2026-10-01 拍板, closing the unpinned b37fea0 exclusion)', () => {
+  const sidepanelJs = readFileSync(join(ROOT, 'sidepanel.js'), 'utf8');
+  // The lightbox delegate must not exclude .msg-images — the old exclusion
+  // (uncommented, untested) left user screenshots stuck at 180×140 with a
+  // dead click. If you ever need to exclude a strip again, pin the reason here.
+  assert.doesNotMatch(sidepanelJs, /!img\.closest\('\.msg-images'\)/, 'no .msg-images exclusion in the lightbox delegate');
+  assert.match(css, /\.msg-image\s*\{[^}]*cursor:\s*zoom-in/, 'thumbnails carry a clickable affordance');
+});
+

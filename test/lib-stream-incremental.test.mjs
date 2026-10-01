@@ -92,6 +92,24 @@ test('findStreamingBlockBoundary: no boundary without blank lines or content', (
   assert.ok(findStreamingBlockBoundary('\n\npara', 0) <= 2);
 });
 
+test('findStreamingBlockBoundary: 1-3 space INDENTED fence is recognized (09-22 [ \\\\t] typo regression)', () => {
+  // The opener regex shipped with a double backslash — [ \\t] in a regex
+  // literal matches BACKSLASH or letter t, not space/tab. Indented fences
+  // therefore fell out of fence-awareness mid-stream and their blank lines
+  // committed as block boundaries; column-0 fences were unaffected, which is
+  // why it survived unnoticed (DONE's full render healed everything anyway).
+  const text = 'intro\n\n  ```js\n  const a = 1;\n\n  const b = 2;';
+  const b = findStreamingBlockBoundary(text, 0);
+  assert.equal(text.slice(0, b), 'intro\n', 'with the typo, the blank line INSIDE the indented fence committed mid-fence');
+});
+
+test('findStreamingBlockBoundary: indented loose list keeps its blank-line cohesion', () => {
+  const text = 'para\n\n  - item one\n\n  - item two\n\ntail';
+  const b = findStreamingBlockBoundary(text, 0);
+  assert.equal(text.slice(0, b), 'para\n\n  - item one\n\n  - item two\n',
+    'indented list continuation lines must reject the split (loose-list lookahead)');
+});
+
 test('findStreamingBlockBoundary: trailing blank run at EOF is commitable', () => {
   const text = 'para one\n\npara two\n\n';
   const b = findStreamingBlockBoundary(text, 0);

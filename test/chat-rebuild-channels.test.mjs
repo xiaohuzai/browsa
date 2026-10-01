@@ -415,6 +415,63 @@ test('hermes mirror: turn.continueWith rebuilds runsInput + conversation_history
   ], 'conversation_history must be rebuilt with the user turn + v1 appended');
 });
 
+test('continuation keeps the v1 turn images (2026-10-01 audit: the old text-only rebuild had the model continue a look-at-this-image answer blind)', async () => {
+  const IMG = 'data:image/png;base64,iVBORw0KGgo=';
+  const msg = { userText: '描述这张图', images: [IMG] };
+  const mk = (provider) => createTurnRequest({
+    provider,
+    activeProvider: 'p1',
+    all: { activeProvider: 'p1', providers: { p1: provider } },
+    msg,
+    sendHistory: [{ role: 'user', content: 'prior' }],
+    effectiveSystemPrompt: 'SYS',
+  });
+
+  // chat: v1 rides contHistory as a multimodal entry (buildMessages pushes history verbatim).
+  const chat = mk(CHAT_PROVIDER);
+  await chat.prepare();
+  chat.continueWith('CONT', 'V1');
+  const v1 = chat.messages.at(-3);
+  assert.equal(v1.role, 'user');
+  assert.ok(Array.isArray(v1.content), 'v1 must stay multimodal in the continuation request');
+  assert.equal(v1.content.at(-1).image_url.url, IMG);
+
+  // responses: history parts become input_image.
+  const resp = mk(RESPONSES_PROVIDER);
+  await resp.prepare();
+  resp.continueWith('CONT', 'V1');
+  assert.match(JSON.stringify(resp.responsesInput), /input_image/);
+  assert.ok(JSON.stringify(resp.responsesInput).includes(IMG));
+
+  // anthropic: history image_url → base64 blocks.
+  const anti = mk(ANTHROPIC_PROVIDER);
+  await anti.prepare();
+  anti.continueWith('CONT', 'V1');
+  assert.ok(anti.anthropicMessages.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image')));
+
+  // hermes runs: history is string-only — images degrade to [image] markers,
+  // never base64 (same policy as every other history image).
+  const herm = mk(HERMES_PROVIDER);
+  await herm.prepare();
+  herm.continueWith('CONT', 'V1');
+  const v1h = herm.runsConvHistory.at(-2);
+  assert.equal(v1h.role, 'user');
+  assert.match(v1h.content, /\[image\]/);
+  assert.ok(!String(v1h.content).includes('iVBOR'), 'runs history must never carry base64');
+});
+
+test('buildAnthropicMessages normalizes a headless history to user-first (Anthropic 400s assistant-first requests on every turn)', async () => {
+  const { buildAnthropicMessages } = await import('../lib/message-builder.js');
+  const out = buildAnthropicMessages({ userText: 'next' }, [
+    { role: 'assistant', content: 'orphan reply (its question was trimmed/deleted)' },
+    { role: 'user', content: 'q' },
+    { role: 'assistant', content: 'a' },
+  ]);
+  assert.equal(out[0].role, 'user', 'leading assistant entries must be dropped, not sent');
+  const out2 = buildAnthropicMessages({ userText: 'next' }, [{ role: 'assistant', content: 'only' }]);
+  assert.equal(out2[0].role, 'user', 'fully assistant-only history gets a placeholder user head');
+});
+
 // =============================================================================
 // Channel 2: timestamp-rewrite (video notes → silent reformat pass)
 // The rewrite history comes from the RAW history's videoSrc entry
