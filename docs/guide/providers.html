@@ -181,15 +181,19 @@ agent-bridge serve --config /path/to/agents.json  # 指定配置文件
         <li>点 <strong>Ping</strong>——每个地址都会被探测；别名留空的行会自动用 /health 返回的 agent 名字填上，状态里一并显示（如 <code>×4/4 healthy (codex, claude, pi, gemini)</code>）。每行有自己的状态点（灰=未测、绿=可连通、红=不通），行上的 <code>⟳</code> 可随时单独重测某一个 agent；</li>
         <li>回到侧边栏，顶部下拉按「Agent Bridge · codex」逐个选择，各自显示连通状态。每个 agent 有自己独立的会话线程，互不串线；中途切换时 browsa 会询问当前对话是<strong>带过去</strong>继续，还是<strong>新建会话</strong>从零开始。</li>
       </ol>
-      <p>不想手动执行 1–3 步？把下面这段整段<strong>复制给你的 CLI agent</strong>，让它替你完成安装、配置与启动，最后把它报告的桥地址填进第 4 步即可：</p>
+      <p>不想手动执行 1–3 步？把下面这段整段<strong>复制给你的 CLI agent</strong>，让它替你完成安装、配置与启动，最后把它报告的桥地址填进上面第 4 步即可：</p>
       <pre class="doc-code">请在本机配置 agent-bridge 守护进程，让 browsa 浏览器扩展能通过本地 HTTP 调用你：
 
+0. 先自检场景：你必须正运行在装着 browsa 浏览器扩展的这台电脑上（桥要和浏览器同机）。如果你在 SSH 会话、容器或另一台机器上，停下直接告诉我。
 1. 全局安装（Node ≥ 18，零依赖）：npm i -g @xiaohuzai/agent-bridge
 2. 在固定工作目录创建 agents.json（条目形态以包内 agents.example.json 与 README 为准），为你自己加一个条目。如果你是 codex，保留 "approval": "on-request"（否则操作确认无法弹到 browsa）与 "sandbox": "workspace-write"：
    {"bridges":[{"name":"codex","port":3948,"apiKey":"","sandbox":"workspace-write","approval":"on-request"}]}
    其他 CLI agent（如 claude、pi）条目只需 name/port/apiKey。
 3. 启动并验证：运行 agent-bridge serve（默认读 ./agents.json，前台驻留——验证要另开一条命令）：curl http://127.0.0.1:3948/health 应返回含你名字的 JSON。
-4. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。
+4. 真回合冒烟（/health 只证明进程活着，不证明 agent 能跑通回合）：再另开一条命令发一个最小回合：
+   curl -N -s -X POST http://127.0.0.1:3948/turns -H 'Content-Type: application/json' -d '{"text":"只回复两个字：就绪"}'
+   这条 curl 会在回复完成后自己结束；期间流里应依次出现 start（带 sessionId）、delta、done。若出现 error 事件，把 message 原样发我。
+5. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。
 
 任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。</pre>
       <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤8 张）。三点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址；pi 的内置工具自动执行、通常不弹审批卡，也不上报 token 用量。</p>
