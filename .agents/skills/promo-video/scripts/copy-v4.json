@@ -1,0 +1,695 @@
+{
+  "en": {
+    "locale": "en",
+    "htmlLang": "en",
+    "brandTag": "Ask right where you read.",
+    "chapters": [
+      {
+        "eyebrow": "READ",
+        "title": [
+          "Read a page.",
+          "Find your answer."
+        ],
+        "sub": "Keep the page in view. Ask beside it."
+      },
+      {
+        "eyebrow": "ATTACH",
+        "title": [
+          "Bring the page",
+          "into the chat."
+        ],
+        "sub": "Attach what you’re reading. Ask for what matters."
+      },
+      {
+        "eyebrow": "FOLLOW UP",
+        "title": [
+          "One sentence.",
+          "A deeper answer."
+        ],
+        "sub": "Select a line and ask a focused follow-up."
+      },
+      {
+        "eyebrow": "WATCH",
+        "title": [
+          "Find the idea.",
+          "Jump to the moment."
+        ],
+        "sub": "Click a timestamp to return to the explanation."
+      },
+      {
+        "eyebrow": "KEEP",
+        "title": [
+          "A useful page.",
+          "A note to keep."
+        ],
+        "sub": "A connected Agent can prepare a file for your approval."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Read. Ask.",
+          "Keep going."
+        ],
+        "sub": "Your next question belongs right beside the page."
+      }
+    ],
+    "q1": "Give me 3 key points from this page",
+    "a1": "For non-shared WebAssembly memory:\n\n- Each page is 64 KiB.\n- After grow(), old views are detached.\n- Recreate views from memory.buffer after growing.",
+    "phrase": "old views are detached",
+    "q2": "Why do old views stop working? How do I avoid it?",
+    "a2": "For non-shared memory, grow() detaches the old buffer. Views over that buffer stop working.\n\nAfter growing, create a new Uint8Array(memory.buffer). Use the new view for subsequent reads and writes.",
+    "agentQ": "Save this article’s code examples as a Markdown note",
+    "agentTools": [
+      "Read the page",
+      "Extract code snippets",
+      "Prepare the Markdown file"
+    ],
+    "approvalDescription": "Create a new Markdown file with the article’s code snippets.",
+    "agentA": "Saved to `~/notes/wasm-memory.md`.\n\n- Included the code examples.\n- Added a reminder to recreate views after grow().",
+    "videoTitle": "WebAssembly Memory, Explained",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Let’s look at how non-shared WebAssembly memory works."
+      },
+      {
+        "time": 84,
+        "text": "Memory is measured in pages. Each page holds 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "After grow(), old views are detached. Recreate them from memory.buffer."
+      },
+      {
+        "time": 590,
+        "text": "Keep the new view for later reads and writes."
+      }
+    ],
+    "videoQ": "Summarize this lesson in 2 key points",
+    "videoA": "- [01:24] Memory grows in pages of 64 KiB.\n- [07:42] For non-shared memory, recreate views from memory.buffer after grow().",
+    "lessonLabels": [
+      "64 KiB pages",
+      "grow()",
+      "recreate views"
+    ],
+    "cta": "Get browsa for Chrome / Edge",
+    "disclaimer": "Demo data · playback edited",
+    "demoAlt": "browsa attaches a page, answers a question, and explains a selected sentence in a follow-up.",
+    "videoHeading": "Read. Ask. Keep going.",
+    "videoDesc": "Attach a page, ask a focused follow-up, or jump to a video timestamp. Saving a note depends on the connected Agent. Demo data; playback edited."
+  },
+  "zh": {
+    "locale": "zh_CN",
+    "htmlLang": "zh-CN",
+    "brandTag": "读到哪，问到哪。",
+    "chapters": [
+      {
+        "eyebrow": "阅读",
+        "title": [
+          "读一页内容，",
+          "找到你的答案。"
+        ],
+        "sub": "页面就在眼前，问题就在旁边。"
+      },
+      {
+        "eyebrow": "附加",
+        "title": [
+          "把眼前这一页，",
+          "带进对话。"
+        ],
+        "sub": "附加正在读的内容，问你关心的问题。"
+      },
+      {
+        "eyebrow": "追问",
+        "title": [
+          "一句话，",
+          "再问深一点。"
+        ],
+        "sub": "选中一句话，展开针对它的追问。"
+      },
+      {
+        "eyebrow": "观看",
+        "title": [
+          "找到要点，",
+          "回到那一刻。"
+        ],
+        "sub": "点击时间戳，跳回视频里的解释。"
+      },
+      {
+        "eyebrow": "留存",
+        "title": [
+          "一页好内容，",
+          "一份可留的笔记。"
+        ],
+        "sub": "接入的智能体可以整理文件，等你确认写入。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "读到哪，问到哪。",
+          "让阅读继续。"
+        ],
+        "sub": "下一个问题，就在页面旁边。"
+      }
+    ],
+    "q1": "帮我提炼这页的 3 个要点",
+    "a1": "针对非共享 WebAssembly 内存：\n\n- 每页大小为 64 KiB。\n- grow() 后，旧视图会失效。\n- 扩容后，用 memory.buffer 重新创建视图。",
+    "phrase": "旧视图会失效",
+    "q2": "为什么旧视图会失效？怎么避免？",
+    "a2": "非共享内存调用 grow() 后，旧缓冲区会被分离，指向它的视图就无法继续使用。\n\n扩容后，重新创建 Uint8Array(memory.buffer)，后续读写改用新视图。",
+    "agentQ": "把这篇文章的代码示例保存成 Markdown 笔记",
+    "agentTools": [
+      "读取页面内容",
+      "提取代码片段",
+      "准备笔记文件"
+    ],
+    "approvalDescription": "新建 Markdown 文件，收录文章中的代码片段。",
+    "agentA": "已保存到 `~/notes/wasm-memory.md`。\n\n- 收录文章的代码示例。\n- 补充 grow() 后重建视图的提醒。",
+    "videoTitle": "读懂 WebAssembly 内存",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "我们来看看非共享 WebAssembly 内存是怎么工作的。"
+      },
+      {
+        "time": 84,
+        "text": "内存以页为单位，每页大小为 64 KiB。"
+      },
+      {
+        "time": 462,
+        "text": "grow() 后，旧视图会失效，要用 memory.buffer 重新创建。"
+      },
+      {
+        "time": 590,
+        "text": "之后的读取和写入，都使用这个新视图。"
+      }
+    ],
+    "videoQ": "用 2 个要点总结这节课",
+    "videoA": "- [01:24] 内存按页扩容，每页 64 KiB。\n- [07:42] 非共享内存调用 grow() 后，要用 memory.buffer 重建视图。",
+    "lessonLabels": [
+      "每页 64 KiB",
+      "grow()",
+      "重建视图"
+    ],
+    "cta": "在 Chrome / Edge 中使用 browsa",
+    "disclaimer": "演示数据 · 播放经过剪辑",
+    "demoAlt": "browsa 附加页面、回答问题，并通过追问解释选中的一句话。",
+    "videoHeading": "读到哪，问到哪。让阅读继续。",
+    "videoDesc": "附加页面、针对一句话追问，或点击时间戳定位视频。保存笔记的能力取决于接入的智能体。使用演示数据，播放经过剪辑。"
+  },
+  "ja": {
+    "locale": "ja",
+    "htmlLang": "ja",
+    "brandTag": "読んでいる、その場で聞く。",
+    "chapters": [
+      {
+        "eyebrow": "読む",
+        "title": [
+          "ページを読む。",
+          "答えが見つかる。"
+        ],
+        "sub": "ページを見ながら、すぐ隣で質問。"
+      },
+      {
+        "eyebrow": "添付",
+        "title": [
+          "このページを、",
+          "会話に添える。"
+        ],
+        "sub": "読んでいる内容を添付して、知りたいことを聞く。"
+      },
+      {
+        "eyebrow": "深掘り",
+        "title": [
+          "気になる一文を、",
+          "もっと深く。"
+        ],
+        "sub": "一文を選んで、その内容を掘り下げる。"
+      },
+      {
+        "eyebrow": "見る",
+        "title": [
+          "要点を見つけ、",
+          "その場面へ。"
+        ],
+        "sub": "タイムスタンプを押して、動画の説明に戻る。"
+      },
+      {
+        "eyebrow": "残す",
+        "title": [
+          "役立つページを、",
+          "残せるノートに。"
+        ],
+        "sub": "接続したエージェントがファイルを用意し、承認を待ちます。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "読む。聞く。",
+          "続きを読もう。"
+        ],
+        "sub": "次の質問も、ページのすぐ隣で。"
+      }
+    ],
+    "q1": "このページの要点を3つ教えて",
+    "a1": "非共有の WebAssembly メモリでは：\n\n- 1ページは 64 KiB。\n- grow() 後、古いビューは使えなくなる。\n- 拡張後は memory.buffer からビューを作り直す。",
+    "phrase": "古いビューは使えなくなる",
+    "q2": "古いビューが使えなくなるのはなぜ？どう対処する？",
+    "a2": "非共有メモリで grow() を呼ぶと、古いバッファが切り離され、それを参照するビューは使えなくなります。\n\n拡張後に Uint8Array(memory.buffer) を作り直し、その後の読み書きには新しいビューを使います。",
+    "agentQ": "この記事のコード例を Markdown のノートに保存して",
+    "agentTools": [
+      "ページを読む",
+      "コードを抽出",
+      "ノートを用意"
+    ],
+    "approvalDescription": "記事のコード例を含む Markdown ファイルを新規作成します。",
+    "agentA": "`~/notes/wasm-memory.md` に保存しました。\n\n- 記事のコード例を収録。\n- grow() 後にビューを作り直す注意点を追加。",
+    "videoTitle": "WebAssembly メモリのしくみ",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "非共有の WebAssembly メモリのしくみを見ていきましょう。"
+      },
+      {
+        "time": 84,
+        "text": "メモリはページ単位です。1ページは 64 KiB です。"
+      },
+      {
+        "time": 462,
+        "text": "grow() 後、古いビューは使えなくなります。memory.buffer から作り直します。"
+      },
+      {
+        "time": 590,
+        "text": "その後の読み書きには、新しいビューを使います。"
+      }
+    ],
+    "videoQ": "この講義の要点を2つにまとめて",
+    "videoA": "- [01:24] メモリは1ページ 64 KiB 単位で拡張する。\n- [07:42] 非共有メモリでは grow() 後、memory.buffer からビューを作り直す。",
+    "lessonLabels": [
+      "1ページ 64 KiB",
+      "grow()",
+      "ビューを再作成"
+    ],
+    "cta": "Chrome / Edge で browsa を使う",
+    "disclaimer": "デモデータ · 再生は編集済み",
+    "demoAlt": "browsa でページを添付して質問し、選択した一文について追加で聞くデモ。",
+    "videoHeading": "読む。聞く。続きを読もう。",
+    "videoDesc": "ページを添付し、一文を掘り下げ、タイムスタンプから動画へ。ノートの保存機能は接続するエージェントに依存します。デモデータを使用し、再生は編集しています。"
+  },
+  "ko": {
+    "locale": "ko",
+    "htmlLang": "ko",
+    "brandTag": "읽는 그 자리에서 질문하세요.",
+    "chapters": [
+      {
+        "eyebrow": "읽기",
+        "title": [
+          "페이지를 읽고,",
+          "답을 찾으세요."
+        ],
+        "sub": "페이지를 보면서 바로 옆에서 질문하세요."
+      },
+      {
+        "eyebrow": "첨부",
+        "title": [
+          "읽던 페이지를",
+          "대화로 가져오세요."
+        ],
+        "sub": "지금 읽는 내용을 첨부하고 궁금한 점을 물어보세요."
+      },
+      {
+        "eyebrow": "후속 질문",
+        "title": [
+          "한 문장에서,",
+          "더 깊은 이해로."
+        ],
+        "sub": "문장을 선택하고 그 내용에 대해 더 물어보세요."
+      },
+      {
+        "eyebrow": "시청",
+        "title": [
+          "핵심을 찾고,",
+          "그 순간으로."
+        ],
+        "sub": "타임스탬프를 눌러 영상 속 설명으로 돌아가세요."
+      },
+      {
+        "eyebrow": "보관",
+        "title": [
+          "유용한 페이지를",
+          "오래 남길 노트로."
+        ],
+        "sub": "연결된 에이전트가 파일을 준비하고 승인을 기다립니다."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "읽고, 질문하고,",
+          "계속 읽으세요."
+        ],
+        "sub": "다음 질문도 페이지 바로 옆에서."
+      }
+    ],
+    "q1": "이 페이지의 핵심을 3가지로 정리해 줘",
+    "a1": "비공유 WebAssembly 메모리에서는:\n\n- 한 페이지는 64 KiB입니다.\n- grow() 후 기존 뷰는 사용할 수 없습니다.\n- 확장 후 memory.buffer로 뷰를 다시 만듭니다.",
+    "phrase": "기존 뷰는 사용할 수 없습니다",
+    "q2": "기존 뷰는 왜 사용할 수 없어져? 어떻게 대처해?",
+    "a2": "비공유 메모리에서 grow()를 호출하면 기존 버퍼가 분리됩니다. 이 버퍼를 참조하던 뷰도 사용할 수 없습니다.\n\n확장 후 Uint8Array(memory.buffer)를 새로 만들고, 이후 읽기와 쓰기에는 새 뷰를 사용하세요.",
+    "agentQ": "이 글의 코드 예제를 Markdown 노트로 저장해 줘",
+    "agentTools": [
+      "페이지 읽는 중",
+      "코드 추출 중",
+      "노트 파일 준비 중"
+    ],
+    "approvalDescription": "글의 코드 예제를 담은 Markdown 파일을 새로 만듭니다.",
+    "agentA": "`~/notes/wasm-memory.md`에 저장했습니다.\n\n- 글의 코드 예제를 포함했습니다.\n- grow() 후 뷰를 다시 만들라는 설명을 추가했습니다.",
+    "videoTitle": "WebAssembly 메모리 이해하기",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "비공유 WebAssembly 메모리가 어떻게 작동하는지 살펴보겠습니다."
+      },
+      {
+        "time": 84,
+        "text": "메모리는 페이지 단위입니다. 한 페이지는 64 KiB입니다."
+      },
+      {
+        "time": 462,
+        "text": "grow() 후 기존 뷰는 사용할 수 없습니다. memory.buffer로 다시 만들어야 합니다."
+      },
+      {
+        "time": 590,
+        "text": "이후 읽기와 쓰기에는 새 뷰를 사용합니다."
+      }
+    ],
+    "videoQ": "이 강의의 핵심을 2가지로 정리해 줘",
+    "videoA": "- [01:24] 메모리는 64 KiB 페이지 단위로 확장됩니다.\n- [07:42] 비공유 메모리에서는 grow() 후 memory.buffer로 뷰를 다시 만듭니다.",
+    "lessonLabels": [
+      "페이지당 64 KiB",
+      "grow()",
+      "뷰 다시 만들기"
+    ],
+    "cta": "Chrome / Edge에서 browsa 사용하기",
+    "disclaimer": "데모 데이터 · 재생 편집됨",
+    "demoAlt": "browsa로 페이지를 첨부하고 질문한 뒤, 선택한 문장에 대해 더 물어보는 데모.",
+    "videoHeading": "읽고, 질문하고, 계속 읽으세요.",
+    "videoDesc": "페이지를 첨부하고, 문장에 대해 더 묻고, 타임스탬프로 영상 속 장면을 찾으세요. 노트 저장 기능은 연결된 에이전트에 따라 달라집니다. 데모 데이터를 사용하며 재생은 편집되었습니다."
+  },
+  "es": {
+    "locale": "es",
+    "htmlLang": "es",
+    "brandTag": "Pregunta donde lees.",
+    "chapters": [
+      {
+        "eyebrow": "LEE",
+        "title": [
+          "Lee una página.",
+          "Resuelve tus dudas."
+        ],
+        "sub": "La página a la vista. Tus preguntas, a su lado."
+      },
+      {
+        "eyebrow": "ADJUNTA",
+        "title": [
+          "La página,",
+          "en tu conversación."
+        ],
+        "sub": "Adjunta lo que lees y pregunta lo que te interesa."
+      },
+      {
+        "eyebrow": "PROFUNDIZA",
+        "title": [
+          "Una frase.",
+          "Más por descubrir."
+        ],
+        "sub": "Selecciona una frase y profundiza con otra pregunta."
+      },
+      {
+        "eyebrow": "MIRA",
+        "title": [
+          "Encuentra la idea.",
+          "Vuelve al momento."
+        ],
+        "sub": "Pulsa la marca de tiempo para volver a la explicación."
+      },
+      {
+        "eyebrow": "GUARDA",
+        "title": [
+          "Una buena página.",
+          "Una nota para ti."
+        ],
+        "sub": "Un agente conectado puede preparar un archivo para tu aprobación."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Lee. Pregunta.",
+          "Sigue adelante."
+        ],
+        "sub": "Tu próxima pregunta, justo al lado de la página."
+      }
+    ],
+    "q1": "Dame 3 ideas clave de esta página",
+    "a1": "En memoria WebAssembly no compartida:\n\n- Cada página tiene 64 KiB.\n- Tras grow(), las vistas anteriores quedan desconectadas.\n- Recrea las vistas desde memory.buffer al ampliar.",
+    "phrase": "las vistas anteriores quedan desconectadas",
+    "q2": "¿Por qué dejan de funcionar las vistas? ¿Cómo lo evito?",
+    "a2": "En memoria no compartida, grow() desconecta el búfer anterior. Sus vistas dejan de funcionar.\n\nTras ampliar, crea un nuevo Uint8Array(memory.buffer) y usa esa vista para las siguientes lecturas y escrituras.",
+    "agentQ": "Guarda los ejemplos de código de este artículo en una nota Markdown",
+    "agentTools": [
+      "Leer la página",
+      "Extraer código",
+      "Preparar el archivo"
+    ],
+    "approvalDescription": "Crear un archivo Markdown con los ejemplos de código del artículo.",
+    "agentA": "Guardado en `~/notes/wasm-memory.md`.\n\n- Incluye los ejemplos de código.\n- Añade un recordatorio para recrear las vistas tras grow().",
+    "videoTitle": "La memoria WebAssembly, explicada",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Veamos cómo funciona la memoria WebAssembly no compartida."
+      },
+      {
+        "time": 84,
+        "text": "La memoria se mide en páginas. Cada página tiene 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "Tras grow(), las vistas anteriores quedan desconectadas. Recréalas desde memory.buffer."
+      },
+      {
+        "time": 590,
+        "text": "Usa la nueva vista para las siguientes lecturas y escrituras."
+      }
+    ],
+    "videoQ": "Resume esta lección en 2 ideas clave",
+    "videoA": "- [01:24] La memoria crece en páginas de 64 KiB.\n- [07:42] En memoria no compartida, recrea las vistas desde memory.buffer tras grow().",
+    "lessonLabels": [
+      "Páginas de 64 KiB",
+      "grow()",
+      "Recrear vistas"
+    ],
+    "cta": "Consigue browsa para Chrome / Edge",
+    "disclaimer": "Datos de demostración · reproducción editada",
+    "demoAlt": "browsa adjunta una página, responde una pregunta y explica una frase seleccionada mediante una pregunta de seguimiento.",
+    "videoHeading": "Lee. Pregunta. Sigue adelante.",
+    "videoDesc": "Adjunta una página, profundiza en una frase o salta a una marca de tiempo del vídeo. Guardar notas depende del agente conectado. Datos de demostración; reproducción editada."
+  },
+  "pt-BR": {
+    "locale": "pt_BR",
+    "htmlLang": "pt-BR",
+    "brandTag": "Pergunte onde você lê.",
+    "chapters": [
+      {
+        "eyebrow": "LEIA",
+        "title": [
+          "Leia uma página.",
+          "Encontre respostas."
+        ],
+        "sub": "A página à vista. Suas perguntas, ao lado."
+      },
+      {
+        "eyebrow": "ANEXE",
+        "title": [
+          "Traga a página",
+          "para a conversa."
+        ],
+        "sub": "Anexe o que está lendo e pergunte o que importa."
+      },
+      {
+        "eyebrow": "APROFUNDE",
+        "title": [
+          "Uma frase.",
+          "Mais para entender."
+        ],
+        "sub": "Selecione uma frase e faça uma pergunta sobre ela."
+      },
+      {
+        "eyebrow": "ASSISTA",
+        "title": [
+          "Encontre a ideia.",
+          "Volte ao momento."
+        ],
+        "sub": "Clique no tempo indicado para voltar à explicação."
+      },
+      {
+        "eyebrow": "GUARDE",
+        "title": [
+          "Uma boa página.",
+          "Uma nota para você."
+        ],
+        "sub": "Um agente conectado pode preparar um arquivo para sua aprovação."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Leia. Pergunte.",
+          "Continue."
+        ],
+        "sub": "Sua próxima pergunta fica ao lado da página."
+      }
+    ],
+    "q1": "Resuma esta página em 3 pontos principais",
+    "a1": "Na memória WebAssembly não compartilhada:\n\n- Cada página tem 64 KiB.\n- Após grow(), as views antigas são desvinculadas.\n- Recrie as views a partir de memory.buffer após expandir.",
+    "phrase": "as views antigas são desvinculadas",
+    "q2": "Por que as views antigas param de funcionar? Como evitar isso?",
+    "a2": "Na memória não compartilhada, grow() desvincula o buffer antigo. As views dele deixam de funcionar.\n\nApós expandir, crie um novo Uint8Array(memory.buffer). Use a nova view nas próximas leituras e escritas.",
+    "agentQ": "Salve os exemplos de código deste artigo em uma nota Markdown",
+    "agentTools": [
+      "Ler a página",
+      "Extrair o código",
+      "Preparar o arquivo"
+    ],
+    "approvalDescription": "Criar um arquivo Markdown com os exemplos de código do artigo.",
+    "agentA": "Salvo em `~/notes/wasm-memory.md`.\n\n- Inclui os exemplos de código.\n- Adiciona um lembrete para recriar as views após grow().",
+    "videoTitle": "Entenda a memória WebAssembly",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Vamos ver como funciona a memória WebAssembly não compartilhada."
+      },
+      {
+        "time": 84,
+        "text": "A memória é medida em páginas. Cada página tem 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "Após grow(), as views antigas são desvinculadas. Recrie-as a partir de memory.buffer."
+      },
+      {
+        "time": 590,
+        "text": "Use a nova view nas próximas leituras e escritas."
+      }
+    ],
+    "videoQ": "Resuma esta aula em 2 pontos principais",
+    "videoA": "- [01:24] A memória cresce em páginas de 64 KiB.\n- [07:42] Na memória não compartilhada, recrie as views de memory.buffer após grow().",
+    "lessonLabels": [
+      "Páginas de 64 KiB",
+      "grow()",
+      "Recriar views"
+    ],
+    "cta": "Instale o browsa no Chrome / Edge",
+    "disclaimer": "Dados de demonstração · reprodução editada",
+    "demoAlt": "O browsa anexa uma página, responde a uma pergunta e explica uma frase selecionada em uma pergunta de acompanhamento.",
+    "videoHeading": "Leia. Pergunte. Continue.",
+    "videoDesc": "Anexe uma página, aprofunde uma frase ou pule para um tempo indicado no vídeo. Salvar notas depende do agente conectado. Dados de demonstração; reprodução editada."
+  },
+  "ru": {
+    "locale": "ru",
+    "htmlLang": "ru",
+    "brandTag": "Спрашивайте там, где читаете.",
+    "chapters": [
+      {
+        "eyebrow": "ЧИТАЙТЕ",
+        "title": [
+          "Читайте страницу.",
+          "Находите ответы."
+        ],
+        "sub": "Страница перед глазами. Вопросы — рядом."
+      },
+      {
+        "eyebrow": "ПРИКРЕПЛЯЙТЕ",
+        "title": [
+          "Добавьте страницу",
+          "в разговор."
+        ],
+        "sub": "Прикрепите то, что читаете, и спросите о важном."
+      },
+      {
+        "eyebrow": "УТОЧНЯЙТЕ",
+        "title": [
+          "Одна фраза.",
+          "Больше понимания."
+        ],
+        "sub": "Выделите фразу и задайте уточняющий вопрос."
+      },
+      {
+        "eyebrow": "СМОТРИТЕ",
+        "title": [
+          "Найдите мысль.",
+          "Вернитесь к ней."
+        ],
+        "sub": "Нажмите на метку времени, чтобы вернуться к объяснению."
+      },
+      {
+        "eyebrow": "СОХРАНЯЙТЕ",
+        "title": [
+          "Полезная страница.",
+          "Заметка на потом."
+        ],
+        "sub": "Подключённый агент может подготовить файл и запросить ваше одобрение."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Читайте. Спросите.",
+          "Продолжайте."
+        ],
+        "sub": "Следующий вопрос — прямо рядом со страницей."
+      }
+    ],
+    "q1": "Выдели 3 главные мысли этой страницы",
+    "a1": "Для неразделяемой памяти WebAssembly:\n\n- Одна страница — 64 KiB.\n- После grow() старые представления отсоединяются.\n- После роста пересоздайте их из memory.buffer.",
+    "phrase": "старые представления отсоединяются",
+    "q2": "Почему старые представления перестают работать? Что делать?",
+    "a2": "Для неразделяемой памяти grow() отсоединяет старый буфер. Его представления перестают работать.\n\nПосле роста создайте новый Uint8Array(memory.buffer). Дальнейшие чтение и запись выполняйте через него.",
+    "agentQ": "Сохрани примеры кода из статьи в заметку Markdown",
+    "agentTools": [
+      "Чтение страницы",
+      "Извлечение кода",
+      "Подготовка файла"
+    ],
+    "approvalDescription": "Создать файл Markdown с примерами кода из статьи.",
+    "agentA": "Сохранено в `~/notes/wasm-memory.md`.\n\n- Добавлены примеры кода.\n- Добавлено напоминание пересоздавать представления после grow().",
+    "videoTitle": "Как устроена память WebAssembly",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Разберём, как работает неразделяемая память WebAssembly."
+      },
+      {
+        "time": 84,
+        "text": "Память измеряется страницами. Одна страница занимает 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "После grow() старые представления отсоединяются. Пересоздайте их из memory.buffer."
+      },
+      {
+        "time": 590,
+        "text": "Дальнейшие чтение и запись выполняйте через новое представление."
+      }
+    ],
+    "videoQ": "Кратко изложи урок в 2 пунктах",
+    "videoA": "- [01:24] Память растёт страницами по 64 KiB.\n- [07:42] Для неразделяемой памяти после grow() пересоздайте представления из memory.buffer.",
+    "lessonLabels": [
+      "Страницы по 64 KiB",
+      "grow()",
+      "Новые представления"
+    ],
+    "cta": "Установите browsa для Chrome / Edge",
+    "disclaimer": "Демоданные · воспроизведение смонтировано",
+    "demoAlt": "browsa прикрепляет страницу, отвечает на вопрос и поясняет выделенную фразу в уточняющем диалоге.",
+    "videoHeading": "Читайте. Спросите. Продолжайте.",
+    "videoDesc": "Прикрепите страницу, уточните смысл фразы или перейдите к метке времени в видео. Сохранение заметок зависит от подключённого агента. Демоданные; воспроизведение смонтировано."
+  }
+}

@@ -1,0 +1,2711 @@
+{
+  "en": {
+    "locale": "en",
+    "htmlLang": "en",
+    "brandTag": "Stay on the page. Ask beside it.",
+    "chapters": [
+      {
+        "eyebrow": "BROWSER EXTENSION",
+        "title": [
+          "Your page. Your AI."
+        ],
+        "sub": "Bring your own AI to Chrome / Edge with browsa."
+      },
+      {
+        "eyebrow": "READ",
+        "title": [
+          "How does attention work?"
+        ],
+        "sub": "Attach the article. Ask for three clear points."
+      },
+      {
+        "eyebrow": "ATTENTION FORMULA",
+        "title": [
+          "Give the idea a shape."
+        ],
+        "sub": "Read scaled dot-product attention beside the explanation."
+      },
+      {
+        "eyebrow": "TECH INTERVIEW",
+        "title": [
+          "Find the point. Replay the moment."
+        ],
+        "sub": "Click 07:42 to hear which decisions still need human judgment."
+      },
+      {
+        "eyebrow": "KEEP",
+        "title": [
+          "Take the answer with you."
+        ],
+        "sub": "Copy the message. Download the rendered image."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Read. Keep. Continue."
+        ],
+        "sub": "Your browser. Your AI. Your next step."
+      }
+    ],
+    "q1": "Explain Transformer attention in 3 intuitive points",
+    "a1": "- Queries ask what to look for; keys describe what can be matched; values carry the information.\n- Attention scores compare queries with keys, then weight and combine the values.\n- Residual connections preserve a path for information; a feed-forward network transforms each token.",
+    "phrase": "Queries ask what to look for",
+    "q2": "Why divide the attention scores by the square root of d_k?",
+    "a2": "When query and key components have roughly unit variance, their dot product’s variance grows with d_k. Dividing by √d_k keeps the score scale steadier and helps prevent softmax from becoming overly sharp.",
+    "agentQ": "Organize the attention article and the separate AI-work interview into research notes",
+    "agentTools": [
+      "Read the attention article",
+      "Check the podcast key points",
+      "Organize the architecture notes"
+    ],
+    "approvalDescription": "Demonstration of a connected Agent’s approval interface.",
+    "agentA": "The research notes separate the article’s attention mechanics from the interview’s advice on AI at work. They are ready to copy or continue in the same session.",
+    "videoTitle": "AI is changing how we work · A long-form tech interview",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Today, a host and a product builder discuss how AI is changing work."
+      },
+      {
+        "time": 130,
+        "text": "AI can handle repetitive tasks so people can spend more attention on work that needs thought."
+      },
+      {
+        "time": 462,
+        "text": "Human judgment still matters. Check AI outputs and important facts before taking action."
+      },
+      {
+        "time": 860,
+        "text": "AI collaboration works better when people and tools share the task’s context."
+      }
+    ],
+    "videoQ": "Find the key points in this tech interview about AI and work, with timestamps",
+    "videoA": "- [02:10] AI can take repetitive tasks and free our attention.\n- [07:42] Human judgment and fact-checking remain critical.\n- [14:20] Collaborative AI workflows need shared context.",
+    "lessonLabels": [
+      "How is AI changing work?",
+      "Repetitive tasks",
+      "Human judgment"
+    ],
+    "cta": "Read. Keep. Continue. · Chrome / Edge extension",
+    "disclaimer": "Fictional demo data · playback edited",
+    "demoAlt": "browsa opens beside a Transformer article, renders the attention equation and diagrams, jumps to podcast key points, then copies notes, downloads images and continues the same session in an Agent demo.",
+    "videoHeading": "Stay on the page. Ask beside it.",
+    "videoDesc": "browsa is a Chrome / Edge browser extension for your own AI or Agent. One Transformer study connects an article, attention formula, Mermaid Q/K/V flow, Graphviz architecture and clickable key points from a separate long-form interview about AI at work. Brief protein and chemistry examples show additional renderers. Copy the answer, download images, manage sessions and resume the same session in Codex. The equations and colored Graphviz come from an actual Codex response rendered by the loaded browsa extension; other editions translate the prose and retain the same math and graph. The browser frame, article and interview are compositional demos. Agent continuation is labeled DEMO and playback is edited. Music and action sounds only.",
+    "identity": "Chrome / Edge browser extension",
+    "setupNote": "Connect your own AI or Agent to get started.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Free · MIT",
+      "7 languages"
+    ],
+    "article": {
+      "title": "Understanding Transformer attention",
+      "dek": "From Q/K/V to scaled scores, then through residual connections and a feed-forward network.",
+      "sections": [
+        {
+          "heading": "01 · Queries, keys and values",
+          "text": "Each token is projected into a query Q, a key K and a value V. Queries specify what to look for; keys are used for matching; values carry the information that attention combines."
+        },
+        {
+          "heading": "02 · Scale, normalize, combine",
+          "text": "Scaled dot-product attention is Attention(Q,K,V) = softmax(QK^T / √d_k)V. The score matrix compares queries with keys. Scaling steadies the logits; softmax produces weights for combining the values."
+        },
+        {
+          "heading": "03 · Beyond attention",
+          "text": "A Transformer block also uses residual connections and a position-wise feed-forward network. Residual paths help information and gradients flow, while the feed-forward network transforms each token’s representation. Layer normalization is also part of standard blocks."
+        }
+      ],
+      "note": "Token positions and LayerNorm are shown in the classic post-LN encoder example. Protein 1LYZ and chemistry are separate brief rendering examples."
+    },
+    "titles": [
+      {
+        "kicker": "BROWSER EXTENSION",
+        "title": "Your page. Your AI.",
+        "sub": "Bring your own AI to Chrome / Edge with browsa."
+      },
+      {
+        "kicker": "READ",
+        "title": "How does attention work?",
+        "sub": "Attach the article. Ask for three clear points."
+      },
+      {
+        "kicker": "ATTENTION FORMULA",
+        "title": "Give the idea a shape.",
+        "sub": "Read scaled dot-product attention beside the explanation."
+      },
+      {
+        "kicker": "TECH INTERVIEW",
+        "title": "Find the point. Replay the moment.",
+        "sub": "Click 07:42 to hear which decisions still need human judgment."
+      },
+      {
+        "kicker": "KEEP",
+        "title": "Take the answer with you.",
+        "sub": "Copy the message. Download the rendered image."
+      },
+      {
+        "kicker": "CONTINUE",
+        "title": "Start here. Continue in Codex.",
+        "sub": "Copy the session ID and resume the same session. Demo."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Read. Keep. Continue.",
+        "sub": "Your browser. Your AI. Your next step."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "ATTENTION FORMULA",
+      "title": "Give the idea a shape.",
+      "sub": "Read scaled dot-product attention beside the explanation."
+    },
+    "sessionsTitle": {
+      "kicker": "SESSIONS",
+      "title": "Return to this Transformer study.",
+      "sub": "Save, pin and switch conversations."
+    },
+    "relayTitle": {
+      "kicker": "CONTINUE",
+      "title": "Start here. Continue in Codex.",
+      "sub": "Copy the session ID and resume the same session. Demo."
+    },
+    "storyTitles": [
+      {
+        "kicker": "BROWSER EXTENSION",
+        "title": "Your page. Your AI.",
+        "sub": "Bring your own AI to Chrome / Edge with browsa."
+      },
+      {
+        "kicker": "READ",
+        "title": "How does attention work?",
+        "sub": "Attach the article. Ask for three clear points."
+      },
+      {
+        "kicker": "ATTENTION FORMULA",
+        "title": "Give the idea a shape.",
+        "sub": "Read scaled dot-product attention beside the explanation."
+      },
+      {
+        "kicker": "GRAPHVIZ",
+        "title": "See the Transformer block.",
+        "sub": "Attention, residual paths and the feed-forward network."
+      },
+      {
+        "kicker": "TECH INTERVIEW",
+        "title": "Find the point. Replay the moment.",
+        "sub": "Click 07:42 to hear which decisions still need human judgment."
+      },
+      {
+        "kicker": "KEEP",
+        "title": "Take the answer with you.",
+        "sub": "Copy the message. Download the rendered image."
+      },
+      {
+        "kicker": "SESSIONS",
+        "title": "Return to this Transformer study.",
+        "sub": "Save, pin and switch conversations."
+      },
+      {
+        "kicker": "CONTINUE",
+        "title": "Start here. Continue in Codex.",
+        "sub": "Copy the session ID and resume the same session. Demo."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Read. Keep. Continue.",
+        "sub": "Your browser. Your AI. Your next step."
+      }
+    ],
+    "continueQ": "Continue these notes with the smallest runnable PyTorch example of scaled dot-product attention",
+    "artifactTitle": "ARCHITECTURE NOTES / Transformer attention",
+    "storyGoal": "Understand → keep → continue",
+    "podcast": {
+      "label": "FICTIONAL TECH INTERVIEW · DEMO",
+      "host": "HOST",
+      "guest": "PRODUCT BUILDER",
+      "topic": "AI is changing how we work"
+    },
+    "sessionNames": [
+      "Transformer reading",
+      "AI-work interview",
+      "Research notes"
+    ],
+    "progressLabels": [
+      "Read the article",
+      "Check the key points",
+      "Continue the same session"
+    ],
+    "introline": "browsa is a Chrome / Edge browser extension. Bring your own AI to the page you’re reading.",
+    "finalAnswer": "### Research notes: attention and AI at work\n\n- **Article — Q/K/V:** queries match keys; attention weights combine values.\n- **Article — scaling:** divide QKᵀ by √d_k before softmax to keep the score scale steadier.\n- **Interview — judgment:** the guest advises checking AI outputs before acting. Revisit [07:42].\n- **Interview — collaboration:** shared task context helps AI workflows. Revisit [14:20].",
+    "keypoints": "Key points",
+    "copyLabel": "Copy message",
+    "downloadLabel": "Download image",
+    "agentDemo": "AGENT CONTINUATION · DEMO",
+    "richLabels": [
+      "Input",
+      "Attention",
+      "Residual + LayerNorm",
+      "FFN",
+      "Output"
+    ],
+    "renderQ": [
+      "Show Q/K/V projections, multi-head attention and post-LN encoder equations",
+      "Draw the complete multi-head attention flow in Mermaid",
+      "Draw a detailed classic post-LN Transformer encoder block in Graphviz",
+      "Briefly show 1LYZ as another supported 3D rendering type",
+      "Briefly show peptide hydrolysis as another supported chemistry rendering type"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "BROWSER EXTENSION",
+        "title": "Your page. Your AI.",
+        "sub": "Bring your own AI to Chrome / Edge with browsa."
+      },
+      "read": {
+        "kicker": "READ",
+        "title": "How does attention work?",
+        "sub": "Attach the article. Ask for three clear points."
+      },
+      "math": {
+        "kicker": "ATTENTION FORMULA",
+        "title": "Give the idea a shape.",
+        "sub": "Q/K/V projections, scaled attention, concatenation and output projection."
+      },
+      "mermaid": {
+        "kicker": "MERMAID",
+        "title": "Follow Q, K and V.",
+        "sub": "Projection, softmax, multiple heads and output projection."
+      },
+      "dot": {
+        "kicker": "GRAPHVIZ",
+        "title": "See the Transformer block.",
+        "sub": "Token + position, multi-head attention, residual + LayerNorm, feed-forward network."
+      },
+      "protein": {
+        "kicker": "MORE RENDERERS",
+        "title": "Beyond formulas and diagrams.",
+        "sub": "Protein structures in 3D, right in the conversation."
+      },
+      "chemistry": {
+        "kicker": "MORE RENDERERS",
+        "title": "Chemical reactions, too.",
+        "sub": "Another rendering type, shown in one glance."
+      },
+      "podcast": {
+        "kicker": "TECH INTERVIEW",
+        "title": "Find the point. Replay the moment.",
+        "sub": "Click 07:42 to hear which decisions still need human judgment."
+      },
+      "take": {
+        "kicker": "KEEP",
+        "title": "Take the answer with you.",
+        "sub": "Copy the message. Download the rendered image."
+      },
+      "sessions": {
+        "kicker": "SESSIONS",
+        "title": "Return to this Transformer study.",
+        "sub": "Save, pin and switch conversations."
+      },
+      "relay": {
+        "kicker": "CONTINUE",
+        "title": "Start here. Continue in Codex.",
+        "sub": "Copy the session ID and resume the same session. Demo."
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "Stay on the page. Ask beside it.",
+        "sub": "Your browser. Your AI. Your next step."
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "Read articles",
+        "sub": "Technical docs · Blogs · Web pages"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "Watch videos",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "Keep the result. Continue.",
+        "sub": "Copy messages · Save images · Manage sessions"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "Connect your own AI",
+        "sub": "BYOK · Your LLM, or your local Agent"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "Ask the next question",
+        "sub": "Select the answer. Ask why attention scores are scaled."
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Switch Agents. Keep the context.",
+        "sub": "Codex → Claude · Choose “Carry this conversation”"
+      }
+    },
+    "labels": {
+      "keypoints": "Key points",
+      "host": "HOST",
+      "guest": "PRODUCT BUILDER",
+      "copyMessage": "Copy message",
+      "downloadImage": "Download image",
+      "agentDemo": "AGENT CONTINUATION · DEMO"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M is an optional additive padding mask (0 for allowed positions, −∞ for masked positions). Each head has d_k = d_model/h. FFN uses ReLU in this classic post-LN encoder.",
+    "proteinNote": "Another supported renderer: the lysozyme structure 1LYZ in 3D.",
+    "chemistryNote": "Another supported renderer: a separate illustration of peptide-bond hydrolysis.",
+    "chapterCards": [
+      [
+        "Read articles",
+        "Technical docs · Blogs · Web pages",
+        "Ask about the page. Understand the idea."
+      ],
+      [
+        "Watch videos",
+        "Bilibili · YouTube",
+        "Turn a long video into clickable keypoints."
+      ],
+      [
+        "Switch Agents. Continue talking.",
+        "LLM / Agent · Carry the context",
+        "Choose another Agent in browsa. Keep asking."
+      ],
+      [
+        "Back to your Agent. Keep working.",
+        "Keep results · Save sessions · Resume",
+        "Continue the same session beyond your browser."
+      ]
+    ],
+    "contextQ": "Turn our explanation of attention scaling into two notes",
+    "contextA": "Continuing our discussion:\n- QKᵀ compares queries with keys.\n- Divide by √d_k to stabilize scores, then use softmax to weight V.",
+    "followPhrase": "Attention scores compare queries with keys, then weight and combine the values."
+  },
+  "zh": {
+    "locale": "zh_CN",
+    "htmlLang": "zh-CN",
+    "brandTag": "读到哪里，问到哪里。",
+    "chapters": [
+      {
+        "eyebrow": "浏览器插件",
+        "title": [
+          "眼前的页面，你的 AI。"
+        ],
+        "sub": "用 browsa，把自己的 AI 带进 Chrome / Edge。"
+      },
+      {
+        "eyebrow": "读文章",
+        "title": [
+          "注意力，究竟怎么工作？"
+        ],
+        "sub": "附加文章，让 AI 用三个要点讲清楚。"
+      },
+      {
+        "eyebrow": "注意力公式",
+        "title": [
+          "把抽象的概念，看清楚。"
+        ],
+        "sub": "缩放点积注意力公式，和解释放在一起读。"
+      },
+      {
+        "eyebrow": "科技访谈",
+        "title": [
+          "找到要点，重听那一刻。"
+        ],
+        "sub": "点击 07:42，听听哪些判断仍然要由人来做。"
+      },
+      {
+        "eyebrow": "带走结果",
+        "title": [
+          "好答案，直接带走。"
+        ],
+        "sub": "复制整条消息，下载渲染后的图片。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "读懂、带走、继续做。"
+        ],
+        "sub": "你的浏览器，你的 AI，你的下一步。"
+      }
+    ],
+    "q1": "用 3 个直观的要点，解释 Transformer 注意力机制",
+    "a1": "- 查询表示想找什么，键用于匹配，值承载需要汇总的信息。\n- 注意力得分比较查询与键，再加权组合对应的值。\n- 残差连接保留信息通路，前馈网络进一步变换每个词元。",
+    "phrase": "查询表示想找什么",
+    "q2": "注意力得分为什么要除以 d_k 的平方根？",
+    "a2": "当查询和键的分量方差大致为 1 时，点积的方差会随 d_k 增大。除以 √d_k 可以让得分尺度更稳定，避免 softmax 过于尖锐。",
+    "agentQ": "把注意力文章与这场独立的 AI 工作访谈，整理成研究笔记",
+    "agentTools": [
+      "阅读注意力文章",
+      "核对播客要点",
+      "整理架构笔记"
+    ],
+    "approvalDescription": "接入智能体的审批界面演示。",
+    "agentA": "研究笔记已分开整理：文章中的注意力原理，以及访谈中关于 AI 工作方式的观点。可以直接复制，也可以继续同一会话。",
+    "videoTitle": "AI 正在怎样改变工作 · 一场科技长访谈",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "今天，主持人与一位产品创业者聊聊 AI 正在怎样改变工作。"
+      },
+      {
+        "time": 130,
+        "text": "AI 可以接手重复任务，让人把注意力放在更需要思考的工作上。"
+      },
+      {
+        "time": 462,
+        "text": "人的判断依然重要。在采取行动前，要核对 AI 的输出和关键事实。"
+      },
+      {
+        "time": 860,
+        "text": "人与工具共享任务上下文，AI 协作才能更顺畅。"
+      }
+    ],
+    "videoQ": "找出这场科技访谈关于 AI 与工作的关键观点，附上时间点",
+    "videoA": "- [02:10] AI 接手重复任务，让人腾出注意力。\n- [07:42] 人的判断与事实核查，仍然不可少。\n- [14:20] AI 协作流程，需要共享任务上下文。",
+    "lessonLabels": [
+      "AI 正在怎样改变工作？",
+      "重复任务",
+      "人的判断"
+    ],
+    "cta": "读懂、带走、继续做。· Chrome / Edge 浏览器插件",
+    "disclaimer": "虚构演示数据 · 播放经过剪辑",
+    "demoAlt": "browsa 在 Transformer 文章旁打开，呈现注意力公式和图示，点击播客要点跳转，再复制笔记、下载图片，并演示在智能体侧继续同一会话。",
+    "videoHeading": "读到哪里，问到哪里。",
+    "videoDesc": "browsa 是可接入自己 AI 或智能体的 Chrome / Edge 浏览器插件。从附加 Transformer 文档开始，展示公式、Mermaid 与 Graphviz，再核对科技访谈的可点击时间线，最后拷贝消息、下载图、管理会话并切回 Agent 继续。蛋白质与化学作为其他渲染能力简短展示。 公式与彩色 Graphviz 来自真实 Codex 回复，由已加载的 browsa 扩展渲染；其他语言翻译说明文字并保留相同公式与图。浏览器框架、文章与科技访谈为演示构图，Agent 接续明确标为演示，播放经过剪辑。仅背景音乐和动作音效，无旁白。",
+    "identity": "Chrome / Edge 浏览器插件",
+    "setupNote": "开始前，请连接你自己的 AI 或智能体。",
+    "badges": [
+      "PDF",
+      "Office",
+      "免费 · MIT 开源",
+      "7 种语言"
+    ],
+    "article": {
+      "title": "读懂 Transformer 注意力机制",
+      "dek": "从查询、键、值，到缩放得分，再到残差连接与前馈网络。",
+      "sections": [
+        {
+          "heading": "01 · 查询、键与值",
+          "text": "每个词元投影为查询 Q、键 K 和值 V。查询表示想找什么，键用于匹配，值承载最后由注意力汇总的信息。"
+        },
+        {
+          "heading": "02 · 缩放、归一化、汇总",
+          "text": "缩放点积注意力写作 Attention(Q,K,V) = softmax(QK^T / √d_k)V。得分矩阵比较查询与键，缩放让得分尺度更稳定，softmax 生成用于汇总值的权重。"
+        },
+        {
+          "heading": "03 · 注意力之外",
+          "text": "Transformer 模块还包括残差连接与逐位置前馈网络。残差通路帮助信息和梯度流动，前馈网络进一步变换每个词元的表示。标准模块中也有层归一化。"
+        }
+      ],
+      "note": "展示经典后归一化编码器的位置信息与层归一化。1LYZ 和化学反应仅简短展示其他渲染能力，与注意力示例无关。"
+    },
+    "titles": [
+      {
+        "kicker": "浏览器插件",
+        "title": "眼前的页面，你的 AI。",
+        "sub": "用 browsa，把自己的 AI 带进 Chrome / Edge。"
+      },
+      {
+        "kicker": "读文章",
+        "title": "注意力，究竟怎么工作？",
+        "sub": "附加文章，让 AI 用三个要点讲清楚。"
+      },
+      {
+        "kicker": "注意力公式",
+        "title": "把抽象的概念，看清楚。",
+        "sub": "缩放点积注意力公式，和解释放在一起读。"
+      },
+      {
+        "kicker": "科技访谈",
+        "title": "找到要点，重听那一刻。",
+        "sub": "点击 07:42，听听哪些判断仍然要由人来做。"
+      },
+      {
+        "kicker": "带走结果",
+        "title": "好答案，直接带走。",
+        "sub": "复制整条消息，下载渲染后的图片。"
+      },
+      {
+        "kicker": "继续同一会话",
+        "title": "浏览器里开始，Codex 里继续。",
+        "sub": "复制会话 ID，在智能体侧续接。演示。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "读懂、带走、继续做。",
+        "sub": "你的浏览器，你的 AI，你的下一步。"
+      }
+    ],
+    "renderTitle": {
+      "kicker": "注意力公式",
+      "title": "把抽象的概念，看清楚。",
+      "sub": "缩放点积注意力公式，和解释放在一起读。"
+    },
+    "sessionsTitle": {
+      "kicker": "管理会话",
+      "title": "回到这次 Transformer 学习。",
+      "sub": "保存、置顶、切换，找回原来的讨论。"
+    },
+    "relayTitle": {
+      "kicker": "继续同一会话",
+      "title": "浏览器里开始，Codex 里继续。",
+      "sub": "复制会话 ID，在智能体侧续接。演示。"
+    },
+    "storyTitles": [
+      {
+        "kicker": "浏览器插件",
+        "title": "眼前的页面，你的 AI。",
+        "sub": "用 browsa，把自己的 AI 带进 Chrome / Edge。"
+      },
+      {
+        "kicker": "读文章",
+        "title": "注意力，究竟怎么工作？",
+        "sub": "附加文章，让 AI 用三个要点讲清楚。"
+      },
+      {
+        "kicker": "注意力公式",
+        "title": "把抽象的概念，看清楚。",
+        "sub": "缩放点积注意力公式，和解释放在一起读。"
+      },
+      {
+        "kicker": "Graphviz",
+        "title": "看清 Transformer 模块。",
+        "sub": "注意力、残差通路、前馈网络，一图串起。"
+      },
+      {
+        "kicker": "科技访谈",
+        "title": "找到要点，重听那一刻。",
+        "sub": "点击 07:42，听听哪些判断仍然要由人来做。"
+      },
+      {
+        "kicker": "带走结果",
+        "title": "好答案，直接带走。",
+        "sub": "复制整条消息，下载渲染后的图片。"
+      },
+      {
+        "kicker": "管理会话",
+        "title": "回到这次 Transformer 学习。",
+        "sub": "保存、置顶、切换，找回原来的讨论。"
+      },
+      {
+        "kicker": "继续同一会话",
+        "title": "浏览器里开始，Codex 里继续。",
+        "sub": "复制会话 ID，在智能体侧续接。演示。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "读懂、带走、继续做。",
+        "sub": "你的浏览器，你的 AI，你的下一步。"
+      }
+    ],
+    "continueQ": "接着这些笔记，补一个最小可运行的 PyTorch 缩放点积注意力示例",
+    "artifactTitle": "架构笔记 / Transformer 注意力",
+    "storyGoal": "读懂 → 带走 → 继续",
+    "podcast": {
+      "label": "虚构科技访谈 · 演示节目",
+      "host": "主持人",
+      "guest": "产品创业者",
+      "topic": "AI 正在怎样改变工作"
+    },
+    "sessionNames": [
+      "Transformer 阅读",
+      "AI 工作访谈",
+      "研究笔记"
+    ],
+    "progressLabels": [
+      "读懂文章",
+      "核对要点",
+      "继续同一会话"
+    ],
+    "introline": "browsa 是 Chrome / Edge 浏览器插件。把你自己的 AI，带到正在读的页面旁边。",
+    "finalAnswer": "### 研究笔记：注意力原理与 AI 工作方式\n\n- **文章 · 查询、键、值：**查询与键匹配，注意力权重汇总对应的值。\n- **文章 · 缩放得分：**先将 QKᵀ 除以 √d_k，再经过 softmax，让得分尺度更稳定。\n- **访谈 · 保留判断：**嘉宾建议采取行动前，先核对 AI 输出。可回听 [07:42]。\n- **访谈 · 协作上下文：**共享任务背景，让 AI 工作流程更顺畅。可回听 [14:20]。",
+    "keypoints": "关键观点",
+    "copyLabel": "复制消息",
+    "downloadLabel": "下载图片",
+    "agentDemo": "智能体续接 · 演示",
+    "richLabels": [
+      "输入",
+      "注意力",
+      "残差 + 层归一化",
+      "前馈网络",
+      "输出"
+    ],
+    "renderQ": [
+      "展示 Q/K/V 投影、多头注意力与后归一化编码器公式",
+      "用 Mermaid 画出完整的多头注意力计算流程",
+      "用 Graphviz 画出详细的经典后归一化 Transformer 编码器模块",
+      "简短展示另一种渲染能力：1LYZ 蛋白质三维结构",
+      "简短展示另一种渲染能力：肽键水解反应示意"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "浏览器插件",
+        "title": "眼前的页面，你的 AI。",
+        "sub": "用 browsa，把自己的 AI 带进 Chrome / Edge。"
+      },
+      "read": {
+        "kicker": "读文章",
+        "title": "注意力，究竟怎么工作？",
+        "sub": "附加文章，让 AI 用三个要点讲清楚。"
+      },
+      "math": {
+        "kicker": "注意力公式",
+        "title": "把抽象的概念，看清楚。",
+        "sub": "Q/K/V 投影、缩放点积、多头拼接与输出投影。"
+      },
+      "mermaid": {
+        "kicker": "Mermaid",
+        "title": "顺着查询、键、值，走一遍。",
+        "sub": "从投影、softmax、多头拼接，到输出投影。"
+      },
+      "dot": {
+        "kicker": "Graphviz",
+        "title": "看清 Transformer 模块。",
+        "sub": "词元与位置、多头注意力、残差与层归一化、前馈网络。"
+      },
+      "protein": {
+        "kicker": "更多渲染能力",
+        "title": "公式与图表之外，还有更多。",
+        "sub": "蛋白质三维结构，也能直接呈现。"
+      },
+      "chemistry": {
+        "kicker": "更多渲染能力",
+        "title": "化学反应，也能画出来。",
+        "sub": "化学键的变化，也能清晰呈现。"
+      },
+      "podcast": {
+        "kicker": "科技访谈",
+        "title": "找到要点，重听那一刻。",
+        "sub": "点击 07:42，听听哪些判断仍然要由人来做。"
+      },
+      "take": {
+        "kicker": "带走结果",
+        "title": "好答案，直接带走。",
+        "sub": "复制整条消息，下载渲染后的图片。"
+      },
+      "sessions": {
+        "kicker": "管理会话",
+        "title": "回到这次 Transformer 学习。",
+        "sub": "保存、置顶、切换，找回原来的讨论。"
+      },
+      "relay": {
+        "kicker": "继续同一会话",
+        "title": "浏览器里开始，Codex 里继续。",
+        "sub": "复制会话 ID，在智能体侧续接。演示。"
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "读到哪里，问到哪里。",
+        "sub": "你的浏览器，你的 AI，你的下一步。"
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "读文章",
+        "sub": "技术文档 · 博客 · 网页"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "看视频",
+        "sub": "B 站 · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "带走成果，继续工作",
+        "sub": "拷贝消息 · 下载图片 · 管理会话"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "接上你自己的 AI",
+        "sub": "BYOK · 自选 LLM，或连接本地 Agent"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "没懂的地方，接着问",
+        "sub": "选中回答，追问为什么要缩放注意力得分"
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "换个 Agent，接着聊",
+        "sub": "Codex → Claude · 选择“带上当前对话继续”"
+      }
+    },
+    "labels": {
+      "keypoints": "关键观点",
+      "host": "主持人",
+      "guest": "产品创业者",
+      "copyMessage": "复制消息",
+      "downloadImage": "下载图片",
+      "agentDemo": "智能体续接 · 演示"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M 是可选的加性填充掩码：允许位置为 0，屏蔽位置为 −∞。每个头的维度 d_k = d_model/h。这里采用经典后归一化编码器，前馈网络使用 ReLU。",
+    "proteinNote": "也支持蛋白质三维结构：溶菌酶 1LYZ。",
+    "chemistryNote": "也支持化学反应：独立展示肽键水解示意。",
+    "chapterCards": [
+      [
+        "读文章",
+        "技术文档 · 博客 · 网页",
+        "从正在读的页面，问到真正理解。"
+      ],
+      [
+        "看视频",
+        "B 站 · YouTube",
+        "把长视频变成可点击的关键时间线。"
+      ],
+      [
+        "切换 Agent，继续对话",
+        "LLM / Agent · 带上当前上下文",
+        "在 browsa 里换个 Agent，接着问。"
+      ],
+      [
+        "回到 Agent，继续工作",
+        "整理成果 · 保存会话 · 终端续接",
+        "从浏览器里的阅读，接到同一个会话。"
+      ]
+    ],
+    "contextQ": "把刚才关于注意力缩放的解释，整理成两条笔记",
+    "contextA": "接着刚才的讨论：\n- QKᵀ 比较查询与键。\n- 除以 √d_k 稳定得分尺度，再用 softmax 加权汇总 V。",
+    "followPhrase": "注意力得分比较查询与键，再加权组合对应的值。"
+  },
+  "ja": {
+    "locale": "ja",
+    "htmlLang": "ja",
+    "brandTag": "ページから離れず、その隣で尋ねる。",
+    "chapters": [
+      {
+        "eyebrow": "ブラウザー拡張",
+        "title": [
+          "あなたのページ、あなたの AI。"
+        ],
+        "sub": "browsa で自分の AI を Chrome / Edge へ。"
+      },
+      {
+        "eyebrow": "記事を読む",
+        "title": [
+          "注意機構はどう働く？"
+        ],
+        "sub": "記事を添付し、3つの要点を聞く。"
+      },
+      {
+        "eyebrow": "注意機構の式",
+        "title": [
+          "概念を、見える形に。"
+        ],
+        "sub": "スケーリングされた内積注意を説明と読む。"
+      },
+      {
+        "eyebrow": "技術対談",
+        "title": [
+          "要点を見つけ、その場面をもう一度。"
+        ],
+        "sub": "07:42 をクリックし、人に残る判断について聞く。"
+      },
+      {
+        "eyebrow": "持ち出す",
+        "title": [
+          "役立つ答えを、手元に。"
+        ],
+        "sub": "メッセージをコピー。描画した画像を保存。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "理解して、持ち出して、続けよう。"
+        ],
+        "sub": "あなたのブラウザー、AI、次の一歩。"
+      }
+    ],
+    "q1": "Transformer の注意機構を、直感的な3つのポイントで説明して",
+    "a1": "- クエリは探す内容、キーは照合の対象、バリューは集約する情報を表します。\n- 注意スコアはクエリとキーを比較し、バリューを重み付きで組み合わせます。\n- 残差接続は情報の経路を保ち、順伝播ネットワークが各トークンを変換します。",
+    "phrase": "クエリは探す内容",
+    "q2": "注意スコアを d_k の平方根で割るのはなぜ？",
+    "a2": "クエリとキーの成分の分散がおよそ1なら、内積の分散は d_k とともに増えます。√d_k で割るとスコアの尺度が安定し、softmax が極端に尖るのを抑えられます。",
+    "agentQ": "注意機構の記事と、別の AI と仕事の対談を研究ノートに整理して",
+    "agentTools": [
+      "注意機構の記事を読む",
+      "ポッドキャストの要点を確認",
+      "構成ノートを整理"
+    ],
+    "approvalDescription": "接続したエージェントの承認画面のデモです。",
+    "agentA": "記事の注意機構の原理と、対談の AI 活用への助言を分けて整理しました。コピーするか、同じセッションで続けられます。",
+    "videoTitle": "AI は仕事をどう変えるのか · 長編テクノロジー対談",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "今日は司会者とプロダクト開発者が、AI による仕事の変化を語ります。"
+      },
+      {
+        "time": 130,
+        "text": "AI に反復作業を任せれば、人は考える必要のある仕事に注意を向けられます。"
+      },
+      {
+        "time": 462,
+        "text": "人の判断は今も重要です。行動する前に AI の出力と重要な事実を確認しましょう。"
+      },
+      {
+        "time": 860,
+        "text": "人とツールが作業の文脈を共有すると、AI との協働が円滑になります。"
+      }
+    ],
+    "videoQ": "この対談の AI と仕事に関する要点を、時刻付きでまとめて",
+    "videoA": "- [02:10] AI が反復作業を担い、人の注意をほかに向けられます。\n- [07:42] 人の判断と事実確認は欠かせません。\n- [14:20] AI と協働するには作業の文脈の共有が必要です。",
+    "lessonLabels": [
+      "AI は仕事をどう変える？",
+      "反復作業",
+      "人の判断"
+    ],
+    "cta": "理解して、持ち出して、続けよう。· Chrome / Edge 拡張機能",
+    "disclaimer": "架空のデモデータ · 編集済み",
+    "demoAlt": "browsa が Transformer の記事の隣で注意の式と図を表示し、ポッドキャストの要点へ移動します。ノートのコピー、画像保存、同じセッションのエージェントでの続行も示します。",
+    "videoHeading": "ページから離れず、その隣で尋ねる。",
+    "videoDesc": "browsa は自分の AI を接続する Chrome / Edge 拡張機能。Transformer の記事を読み、数式と図で理解し、対談の要点をクリックして確認。回答や画像を保存し、同じセッションを Agent で続けます。数式とカラー Graphviz は実際の Codex の回答を browsa 拡張で表示したものです。他言語版は説明文を翻訳し、数式と図を保持します。ブラウザー枠、記事、対談はデモ構成です。Agent の続行はデモと明記し、再生は編集されています。音楽と操作音のみ。",
+    "identity": "Chrome / Edge ブラウザー拡張機能",
+    "setupNote": "最初に自分の AI またはエージェントを接続してください。",
+    "badges": [
+      "PDF",
+      "Office",
+      "無料 · MIT",
+      "7言語"
+    ],
+    "article": {
+      "title": "Transformer の注意機構を理解する",
+      "dek": "Q/K/V、スコアの調整、残差接続、順伝播ネットワークへ。",
+      "sections": [
+        {
+          "heading": "01 · クエリ・キー・バリュー",
+          "text": "各トークンはクエリ Q、キー K、バリュー V に射影されます。クエリは探す内容、キーは照合の対象、バリューは注意機構が集約する情報を表します。"
+        },
+        {
+          "heading": "02 · 調整、正規化、集約",
+          "text": "スケーリングされた内積注意は Attention(Q,K,V) = softmax(QK^T / √d_k)V です。スコア行列がクエリとキーを比較し、調整で尺度を安定させ、softmax がバリューを集約する重みを生成します。"
+        },
+        {
+          "heading": "03 · 注意機構の先へ",
+          "text": "Transformer ブロックには残差接続と位置ごとの順伝播ネットワークもあります。残差経路は情報や勾配の流れを助け、順伝播ネットワークが各トークンの表現を変換します。標準的なブロックには層正規化も含まれます。"
+        }
+      ],
+      "note": "標準的な Post-LN エンコーダーの位置情報と層正規化を表示。1LYZ と化学反応は別の描画例です。"
+    },
+    "titles": [
+      {
+        "kicker": "ブラウザー拡張",
+        "title": "あなたのページ、あなたの AI。",
+        "sub": "browsa で自分の AI を Chrome / Edge へ。"
+      },
+      {
+        "kicker": "記事を読む",
+        "title": "注意機構はどう働く？",
+        "sub": "記事を添付し、3つの要点を聞く。"
+      },
+      {
+        "kicker": "注意機構の式",
+        "title": "概念を、見える形に。",
+        "sub": "スケーリングされた内積注意を説明と読む。"
+      },
+      {
+        "kicker": "技術対談",
+        "title": "要点を見つけ、その場面をもう一度。",
+        "sub": "07:42 をクリックし、人に残る判断について聞く。"
+      },
+      {
+        "kicker": "持ち出す",
+        "title": "役立つ答えを、手元に。",
+        "sub": "メッセージをコピー。描画した画像を保存。"
+      },
+      {
+        "kicker": "続ける",
+        "title": "ここで始め、Codex で続ける。",
+        "sub": "セッション ID をコピーして同じ会話を再開。デモ。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "理解して、持ち出して、続けよう。",
+        "sub": "あなたのブラウザー、AI、次の一歩。"
+      }
+    ],
+    "renderTitle": {
+      "kicker": "注意機構の式",
+      "title": "概念を、見える形に。",
+      "sub": "スケーリングされた内積注意を説明と読む。"
+    },
+    "sessionsTitle": {
+      "kicker": "セッション",
+      "title": "この Transformer 学習に戻る。",
+      "sub": "保存、固定、切り替えで会話を管理。"
+    },
+    "relayTitle": {
+      "kicker": "続ける",
+      "title": "ここで始め、Codex で続ける。",
+      "sub": "セッション ID をコピーして同じ会話を再開。デモ。"
+    },
+    "storyTitles": [
+      {
+        "kicker": "ブラウザー拡張",
+        "title": "あなたのページ、あなたの AI。",
+        "sub": "browsa で自分の AI を Chrome / Edge へ。"
+      },
+      {
+        "kicker": "記事を読む",
+        "title": "注意機構はどう働く？",
+        "sub": "記事を添付し、3つの要点を聞く。"
+      },
+      {
+        "kicker": "注意機構の式",
+        "title": "概念を、見える形に。",
+        "sub": "スケーリングされた内積注意を説明と読む。"
+      },
+      {
+        "kicker": "Graphviz",
+        "title": "Transformer ブロックを見る。",
+        "sub": "注意機構、残差経路、順伝播ネットワーク。"
+      },
+      {
+        "kicker": "技術対談",
+        "title": "要点を見つけ、その場面をもう一度。",
+        "sub": "07:42 をクリックし、人に残る判断について聞く。"
+      },
+      {
+        "kicker": "持ち出す",
+        "title": "役立つ答えを、手元に。",
+        "sub": "メッセージをコピー。描画した画像を保存。"
+      },
+      {
+        "kicker": "セッション",
+        "title": "この Transformer 学習に戻る。",
+        "sub": "保存、固定、切り替えで会話を管理。"
+      },
+      {
+        "kicker": "続ける",
+        "title": "ここで始め、Codex で続ける。",
+        "sub": "セッション ID をコピーして同じ会話を再開。デモ。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "理解して、持ち出して、続けよう。",
+        "sub": "あなたのブラウザー、AI、次の一歩。"
+      }
+    ],
+    "continueQ": "このノートの続きとして、スケーリングされた内積注意の最小実行可能な PyTorch 例を追加して",
+    "artifactTitle": "構成ノート / Transformer 注意機構",
+    "storyGoal": "理解 → 保存 → 続行",
+    "podcast": {
+      "label": "架空の技術対談 · デモ",
+      "host": "司会",
+      "guest": "プロダクト開発者",
+      "topic": "AI は仕事をどう変えるのか"
+    },
+    "sessionNames": [
+      "Transformer の読書",
+      "AI と仕事の対談",
+      "研究ノート"
+    ],
+    "progressLabels": [
+      "記事を理解",
+      "要点を確認",
+      "同じセッションを続ける"
+    ],
+    "introline": "browsa は Chrome / Edge のブラウザー拡張機能です。自分の AI を、読んでいるページの隣へ。",
+    "finalAnswer": "### 研究ノート：注意機構と AI の仕事活用\n\n- **記事 · Q/K/V：**クエリとキーを照合し、注意の重みでバリューを集約します。\n- **記事 · スケーリング：**QKᵀ を √d_k で割ってから softmax に渡し、尺度を安定させます。\n- **対談 · 判断：**行動の前に AI の出力を確認するよう、ゲストが助言します。[07:42]。\n- **対談 · 協働：**作業の文脈を共有すると AI の活用が円滑になります。[14:20]。",
+    "keypoints": "要点",
+    "copyLabel": "メッセージをコピー",
+    "downloadLabel": "画像をダウンロード",
+    "agentDemo": "エージェントで続ける · デモ",
+    "richLabels": [
+      "入力",
+      "注意機構",
+      "Residual + LayerNorm",
+      "順伝播網",
+      "出力"
+    ],
+    "renderQ": [
+      "Q/K/V の射影、多頭注意、Post-LN エンコーダーの数式を表示",
+      "Mermaid で多頭注意の計算全体を描く",
+      "Graphviz で標準的な Post-LN Transformer エンコーダーを詳しく描く",
+      "別の描画機能として 1LYZ のタンパク質3Dを短く示して",
+      "別の描画機能としてペプチド結合の加水分解を短く示して"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "ブラウザー拡張",
+        "title": "あなたのページ、あなたの AI。",
+        "sub": "browsa で自分の AI を Chrome / Edge へ。"
+      },
+      "read": {
+        "kicker": "記事を読む",
+        "title": "注意機構はどう働く？",
+        "sub": "記事を添付し、3つの要点を聞く。"
+      },
+      "math": {
+        "kicker": "注意機構の式",
+        "title": "概念を、見える形に。",
+        "sub": "Q/K/V 投影、スケーリング、多頭の連結と出力投影。"
+      },
+      "mermaid": {
+        "kicker": "Mermaid",
+        "title": "Q、K、V をたどる。",
+        "sub": "射影、softmax、ヘッドの連結、出力射影まで。"
+      },
+      "dot": {
+        "kicker": "Graphviz",
+        "title": "Transformer ブロックを見る。",
+        "sub": "トークンと位置、多頭注意、残差と層正規化、FFN。"
+      },
+      "protein": {
+        "kicker": "ほかの描画機能",
+        "title": "数式や図の、その先も。",
+        "sub": "タンパク質の3D構造も会話の中で表示。"
+      },
+      "chemistry": {
+        "kicker": "ほかの描画機能",
+        "title": "化学反応も描ける。",
+        "sub": "別の描画機能を、ひと目で紹介。"
+      },
+      "podcast": {
+        "kicker": "技術対談",
+        "title": "要点を見つけ、その場面をもう一度。",
+        "sub": "07:42 をクリックし、人に残る判断について聞く。"
+      },
+      "take": {
+        "kicker": "持ち出す",
+        "title": "役立つ答えを、手元に。",
+        "sub": "メッセージをコピー。描画した画像を保存。"
+      },
+      "sessions": {
+        "kicker": "セッション",
+        "title": "この Transformer 学習に戻る。",
+        "sub": "保存、固定、切り替えで会話を管理。"
+      },
+      "relay": {
+        "kicker": "続ける",
+        "title": "ここで始め、Codex で続ける。",
+        "sub": "セッション ID をコピーして同じ会話を再開。デモ。"
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "ページから離れず、その隣で尋ねる。",
+        "sub": "あなたのブラウザー、AI、次の一歩。"
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "記事を読む",
+        "sub": "技術文書 · ブログ · ウェブページ"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "動画を見る",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "成果を保存。作業を続ける。",
+        "sub": "回答をコピー · 画像を保存 · 会話を管理"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "自分の AI をつなぐ",
+        "sub": "BYOK · 好きな LLM、またはローカル Agent"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "疑問を、その場で深掘り",
+        "sub": "回答を選択し、注意力スコアを縮小する理由を質問"
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Agent を切り替え、続きを聞く",
+        "sub": "Codex → Claude · 現在の会話を引き継ぐ"
+      }
+    },
+    "labels": {
+      "keypoints": "要点",
+      "host": "司会",
+      "guest": "プロダクト開発者",
+      "copyMessage": "メッセージをコピー",
+      "downloadImage": "画像をダウンロード",
+      "agentDemo": "エージェントで続ける · デモ"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M は任意の加算型パディングマスクです。許可位置は0、マスク位置は−∞。各ヘッドの次元は d_k = d_model/h。標準的な Post-LN 構成の FFN は ReLU を使います。",
+    "proteinNote": "ほかの描画機能：リゾチーム 1LYZ の3D構造。",
+    "chemistryNote": "ほかの描画機能：独立したペプチド結合の加水分解図。",
+    "chapterCards": [
+      [
+        "記事を読む",
+        "技術文書 · ブログ · ウェブページ",
+        "今読んでいるページから、理解を深める。"
+      ],
+      [
+        "動画を見る",
+        "Bilibili · YouTube",
+        "長い動画を、クリックできる要点に。"
+      ],
+      [
+        "Agent を切り替え、会話を続ける",
+        "LLM / Agent · 現在の文脈を引き継ぐ",
+        "browsa で別の Agent に、続きを質問。"
+      ],
+      [
+        "Agent に戻って作業を続ける",
+        "成果を保存・会話管理・再開",
+        "ブラウザの読書から、同じ会話の続きを。"
+      ]
+    ],
+    "contextQ": "注意力のスケーリングの説明を、2つのメモにまとめて",
+    "contextA": "先ほどの議論を続けます。\n- QKᵀ はクエリとキーを比較します。\n- √d_k で割りスコアを安定させ、softmax で V を重み付けします。",
+    "followPhrase": "注意スコアはクエリとキーを比較し、バリューを重み付きで組み合わせます。"
+  },
+  "ko": {
+    "locale": "ko",
+    "htmlLang": "ko",
+    "brandTag": "페이지에 머무르고, 곁에서 물어보세요.",
+    "chapters": [
+      {
+        "eyebrow": "브라우저 확장",
+        "title": [
+          "나의 페이지, 나의 AI."
+        ],
+        "sub": "browsa로 나의 AI를 Chrome / Edge에 연결하세요."
+      },
+      {
+        "eyebrow": "기사 읽기",
+        "title": [
+          "어텐션은 어떻게 작동할까?"
+        ],
+        "sub": "기사를 첨부하고 핵심 3가지를 물어보세요."
+      },
+      {
+        "eyebrow": "어텐션 수식",
+        "title": [
+          "개념을 눈에 보이게."
+        ],
+        "sub": "스케일드 내적 어텐션을 설명과 함께 읽으세요."
+      },
+      {
+        "eyebrow": "기술 인터뷰",
+        "title": [
+          "핵심을 찾고, 그 순간을 다시 듣기."
+        ],
+        "sub": "07:42를 눌러 어떤 판단을 사람이 해야 하는지 들어보세요."
+      },
+      {
+        "eyebrow": "결과 가져가기",
+        "title": [
+          "유용한 답을 내 손에."
+        ],
+        "sub": "메시지를 복사하고 렌더링된 이미지를 내려받으세요."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "이해하고, 가져가고, 이어 가세요."
+        ],
+        "sub": "나의 브라우저, 나의 AI, 다음 단계."
+      }
+    ],
+    "q1": "Transformer 어텐션을 직관적인 핵심 3가지로 설명해 줘",
+    "a1": "- 쿼리는 찾을 내용, 키는 매칭할 대상, 값은 모을 정보를 나타냅니다.\n- 어텐션 점수는 쿼리와 키를 비교하고 값들을 가중 결합합니다.\n- 잔차 연결은 정보 경로를 유지하고 피드포워드 네트워크가 각 토큰을 변환합니다.",
+    "phrase": "쿼리는 찾을 내용",
+    "q2": "어텐션 점수를 d_k의 제곱근으로 나누는 이유는 뭐야?",
+    "a2": "쿼리와 키의 각 성분 분산이 대략 1이면 내적의 분산은 d_k에 따라 커집니다. √d_k로 나누면 점수의 크기를 안정시키고 softmax가 지나치게 뾰족해지는 것을 줄일 수 있습니다.",
+    "agentQ": "어텐션 기사와 별도의 AI 업무 인터뷰를 연구 노트로 정리해 줘",
+    "agentTools": [
+      "어텐션 기사 읽기",
+      "팟캐스트 핵심 확인",
+      "구조 노트 정리"
+    ],
+    "approvalDescription": "연결된 에이전트의 승인 화면 시연입니다.",
+    "agentA": "기사의 어텐션 원리와 인터뷰의 AI 업무 조언을 구분해 정리했습니다. 복사하거나 같은 세션을 이어 갈 수 있습니다.",
+    "videoTitle": "AI는 일을 어떻게 바꿀까 · 긴 기술 인터뷰",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "오늘은 진행자와 제품 개발자가 AI가 일을 어떻게 바꾸는지 이야기합니다."
+      },
+      {
+        "time": 130,
+        "text": "AI가 반복 업무를 맡으면 사람은 더 깊은 생각이 필요한 일에 집중할 수 있습니다."
+      },
+      {
+        "time": 462,
+        "text": "사람의 판단은 여전히 중요합니다. 행동하기 전에 AI의 출력과 중요한 사실을 확인해야 합니다."
+      },
+      {
+        "time": 860,
+        "text": "사람과 도구가 업무 맥락을 공유하면 AI 협업이 더 원활해집니다."
+      }
+    ],
+    "videoQ": "이 기술 인터뷰의 AI와 일에 관한 핵심 내용을 시간과 함께 정리해 줘",
+    "videoA": "- [02:10] AI가 반복 업무를 맡으면 사람은 다른 일에 집중할 수 있습니다.\n- [07:42] 사람의 판단과 사실 확인은 여전히 중요합니다.\n- [14:20] AI 협업에는 업무 맥락의 공유가 필요합니다.",
+    "lessonLabels": [
+      "AI는 일을 어떻게 바꿀까?",
+      "반복 업무",
+      "사람의 판단"
+    ],
+    "cta": "이해하고, 가져가고, 이어 가세요. · Chrome / Edge 확장 프로그램",
+    "disclaimer": "가상 시연 데이터 · 편집된 재생",
+    "demoAlt": "browsa가 Transformer 기사 옆에서 어텐션 수식과 도표를 보여 주고 팟캐스트 핵심 시간으로 이동합니다. 노트 복사, 이미지 다운로드, 같은 세션을 에이전트에서 이어 가는 모습도 보여 줍니다.",
+    "videoHeading": "페이지에 머무르고, 곁에서 물어보세요.",
+    "videoDesc": "browsa는 나의 AI나 에이전트를 연결하는 Chrome / Edge 확장 프로그램입니다. Transformer 학습을 기사, 어텐션 수식, Mermaid Q/K/V 흐름, Graphviz 구조, 별도의 AI 업무 장편 인터뷰에서 클릭 가능한 핵심 내용으로 연결합니다. 수식과 컬러 Graphviz는 실제 Codex 답변을 browsa 확장에서 렌더링한 결과입니다. 다른 언어는 설명을 번역하고 같은 수식과 도형을 유지합니다. 브라우저 프레임, 기사와 인터뷰는 데모 구성입니다. Agent 이어하기는 데모로 표시되며 재생은 편집되었습니다. 음악과 동작 효과음만 사용합니다.",
+    "identity": "Chrome / Edge 브라우저 확장 프로그램",
+    "setupNote": "먼저 나의 AI 또는 에이전트를 연결하세요.",
+    "badges": [
+      "PDF",
+      "Office",
+      "무료 · MIT",
+      "7개 언어"
+    ],
+    "article": {
+      "title": "Transformer 어텐션 이해하기",
+      "dek": "Q/K/V에서 점수 스케일링으로, 잔차 연결과 피드포워드 네트워크로.",
+      "sections": [
+        {
+          "heading": "01 · 쿼리, 키, 값",
+          "text": "각 토큰은 쿼리 Q, 키 K, 값 V로 투영됩니다. 쿼리는 찾을 내용, 키는 매칭할 대상, 값은 어텐션이 모을 정보를 나타냅니다."
+        },
+        {
+          "heading": "02 · 스케일링, 정규화, 결합",
+          "text": "스케일드 내적 어텐션은 Attention(Q,K,V) = softmax(QK^T / √d_k)V입니다. 점수 행렬이 쿼리와 키를 비교하고 스케일링이 점수 크기를 안정시킵니다. softmax는 값을 결합할 가중치를 만듭니다."
+        },
+        {
+          "heading": "03 · 어텐션 다음 단계",
+          "text": "Transformer 블록에는 잔차 연결과 위치별 피드포워드 네트워크도 있습니다. 잔차 경로는 정보와 기울기의 흐름을 돕고 피드포워드 네트워크는 각 토큰 표현을 변환합니다. 표준 블록에는 층 정규화도 포함됩니다."
+        }
+      ],
+      "note": "전통적인 Post-LN 인코더의 위치 정보와 LayerNorm을 표시합니다. 1LYZ와 화학 반응은 별도의 렌더링 예입니다."
+    },
+    "titles": [
+      {
+        "kicker": "브라우저 확장",
+        "title": "나의 페이지, 나의 AI.",
+        "sub": "browsa로 나의 AI를 Chrome / Edge에 연결하세요."
+      },
+      {
+        "kicker": "기사 읽기",
+        "title": "어텐션은 어떻게 작동할까?",
+        "sub": "기사를 첨부하고 핵심 3가지를 물어보세요."
+      },
+      {
+        "kicker": "어텐션 수식",
+        "title": "개념을 눈에 보이게.",
+        "sub": "스케일드 내적 어텐션을 설명과 함께 읽으세요."
+      },
+      {
+        "kicker": "기술 인터뷰",
+        "title": "핵심을 찾고, 그 순간을 다시 듣기.",
+        "sub": "07:42를 눌러 어떤 판단을 사람이 해야 하는지 들어보세요."
+      },
+      {
+        "kicker": "결과 가져가기",
+        "title": "유용한 답을 내 손에.",
+        "sub": "메시지를 복사하고 렌더링된 이미지를 내려받으세요."
+      },
+      {
+        "kicker": "계속하기",
+        "title": "여기서 시작해 Codex에서 계속.",
+        "sub": "세션 ID를 복사해 같은 대화를 재개하세요. 시연."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "이해하고, 가져가고, 이어 가세요.",
+        "sub": "나의 브라우저, 나의 AI, 다음 단계."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "어텐션 수식",
+      "title": "개념을 눈에 보이게.",
+      "sub": "스케일드 내적 어텐션을 설명과 함께 읽으세요."
+    },
+    "sessionsTitle": {
+      "kicker": "세션",
+      "title": "이 Transformer 학습으로 돌아오세요.",
+      "sub": "저장·고정·전환으로 대화를 관리하세요."
+    },
+    "relayTitle": {
+      "kicker": "계속하기",
+      "title": "여기서 시작해 Codex에서 계속.",
+      "sub": "세션 ID를 복사해 같은 대화를 재개하세요. 시연."
+    },
+    "storyTitles": [
+      {
+        "kicker": "브라우저 확장",
+        "title": "나의 페이지, 나의 AI.",
+        "sub": "browsa로 나의 AI를 Chrome / Edge에 연결하세요."
+      },
+      {
+        "kicker": "기사 읽기",
+        "title": "어텐션은 어떻게 작동할까?",
+        "sub": "기사를 첨부하고 핵심 3가지를 물어보세요."
+      },
+      {
+        "kicker": "어텐션 수식",
+        "title": "개념을 눈에 보이게.",
+        "sub": "스케일드 내적 어텐션을 설명과 함께 읽으세요."
+      },
+      {
+        "kicker": "Graphviz",
+        "title": "Transformer 블록을 보세요.",
+        "sub": "어텐션, 잔차 경로, 피드포워드 네트워크."
+      },
+      {
+        "kicker": "기술 인터뷰",
+        "title": "핵심을 찾고, 그 순간을 다시 듣기.",
+        "sub": "07:42를 눌러 어떤 판단을 사람이 해야 하는지 들어보세요."
+      },
+      {
+        "kicker": "결과 가져가기",
+        "title": "유용한 답을 내 손에.",
+        "sub": "메시지를 복사하고 렌더링된 이미지를 내려받으세요."
+      },
+      {
+        "kicker": "세션",
+        "title": "이 Transformer 학습으로 돌아오세요.",
+        "sub": "저장·고정·전환으로 대화를 관리하세요."
+      },
+      {
+        "kicker": "계속하기",
+        "title": "여기서 시작해 Codex에서 계속.",
+        "sub": "세션 ID를 복사해 같은 대화를 재개하세요. 시연."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "이해하고, 가져가고, 이어 가세요.",
+        "sub": "나의 브라우저, 나의 AI, 다음 단계."
+      }
+    ],
+    "continueQ": "이 노트에 가장 작은 실행 가능한 PyTorch 스케일드 내적 어텐션 예제를 추가해 줘",
+    "artifactTitle": "구조 노트 / Transformer 어텐션",
+    "storyGoal": "이해 → 저장 → 계속",
+    "podcast": {
+      "label": "가상 기술 인터뷰 · 시연",
+      "host": "진행자",
+      "guest": "제품 개발자",
+      "topic": "AI는 일을 어떻게 바꿀까"
+    },
+    "sessionNames": [
+      "Transformer 읽기",
+      "AI 업무 인터뷰",
+      "연구 노트"
+    ],
+    "progressLabels": [
+      "기사 이해",
+      "핵심 확인",
+      "같은 세션 이어 가기"
+    ],
+    "introline": "browsa는 Chrome / Edge 브라우저 확장 프로그램입니다. 읽고 있는 페이지 옆에 나의 AI를 가져오세요.",
+    "finalAnswer": "### 연구 노트: 어텐션과 AI 업무\n\n- **기사 · Q/K/V:** 쿼리와 키를 매칭하고 어텐션 가중치로 값을 모읍니다.\n- **기사 · 스케일링:** QKᵀ를 √d_k로 나눈 뒤 softmax에 넣어 점수의 크기를 안정시킵니다.\n- **인터뷰 · 판단:** 게스트는 행동하기 전에 AI 출력을 확인하라고 조언합니다. [07:42].\n- **인터뷰 · 협업:** 업무 맥락을 공유하면 AI 작업 흐름이 원활해집니다. [14:20].",
+    "keypoints": "핵심 내용",
+    "copyLabel": "메시지 복사",
+    "downloadLabel": "이미지 다운로드",
+    "agentDemo": "에이전트에서 이어 가기 · 시연",
+    "richLabels": [
+      "입력",
+      "어텐션",
+      "Residual + LayerNorm",
+      "피드포워드",
+      "출력"
+    ],
+    "renderQ": [
+      "Q/K/V 투영, 멀티헤드 어텐션과 Post-LN 인코더 수식을 보여 줘",
+      "Mermaid로 멀티헤드 어텐션의 전체 계산 흐름을 그려 줘",
+      "Graphviz로 전통적인 Post-LN Transformer 인코더를 자세히 그려 줘",
+      "다른 렌더링 기능으로 1LYZ 단백질 3D를 짧게 보여 줘",
+      "다른 렌더링 기능으로 펩타이드 결합 가수분해를 짧게 보여 줘"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "브라우저 확장",
+        "title": "나의 페이지, 나의 AI.",
+        "sub": "browsa로 나의 AI를 Chrome / Edge에 연결하세요."
+      },
+      "read": {
+        "kicker": "기사 읽기",
+        "title": "어텐션은 어떻게 작동할까?",
+        "sub": "기사를 첨부하고 핵심 3가지를 물어보세요."
+      },
+      "math": {
+        "kicker": "어텐션 수식",
+        "title": "개념을 눈에 보이게.",
+        "sub": "Q/K/V 투영, 스케일링, 헤드 연결과 출력 투영."
+      },
+      "mermaid": {
+        "kicker": "Mermaid",
+        "title": "Q, K, V를 따라가세요.",
+        "sub": "투영, softmax, 헤드 연결과 출력 투영까지."
+      },
+      "dot": {
+        "kicker": "Graphviz",
+        "title": "Transformer 블록을 보세요.",
+        "sub": "토큰과 위치, 멀티헤드 어텐션, 잔차와 LayerNorm, FFN."
+      },
+      "protein": {
+        "kicker": "더 많은 렌더링",
+        "title": "수식과 도표를 넘어.",
+        "sub": "단백질 3D 구조도 대화 안에서 보여 줍니다."
+      },
+      "chemistry": {
+        "kicker": "더 많은 렌더링",
+        "title": "화학 반응도 그립니다.",
+        "sub": "다른 렌더링 기능을 한눈에 소개합니다."
+      },
+      "podcast": {
+        "kicker": "기술 인터뷰",
+        "title": "핵심을 찾고, 그 순간을 다시 듣기.",
+        "sub": "07:42를 눌러 어떤 판단을 사람이 해야 하는지 들어보세요."
+      },
+      "take": {
+        "kicker": "결과 가져가기",
+        "title": "유용한 답을 내 손에.",
+        "sub": "메시지를 복사하고 렌더링된 이미지를 내려받으세요."
+      },
+      "sessions": {
+        "kicker": "세션",
+        "title": "이 Transformer 학습으로 돌아오세요.",
+        "sub": "저장·고정·전환으로 대화를 관리하세요."
+      },
+      "relay": {
+        "kicker": "계속하기",
+        "title": "여기서 시작해 Codex에서 계속.",
+        "sub": "세션 ID를 복사해 같은 대화를 재개하세요. 시연."
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "페이지에 머무르고, 곁에서 물어보세요.",
+        "sub": "나의 브라우저, 나의 AI, 다음 단계."
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "글 읽기",
+        "sub": "기술 문서 · 블로그 · 웹페이지"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "영상 보기",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "결과를 저장하고 이어가기",
+        "sub": "메시지 복사 · 이미지 저장 · 세션 관리"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "내 AI를 연결하세요",
+        "sub": "BYOK · 원하는 LLM 또는 로컬 Agent"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "궁금한 부분을 더 물어보세요",
+        "sub": "답변을 선택해 어텐션 점수를 조정하는 이유를 질문"
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Agent를 바꿔 이어가세요",
+        "sub": "Codex → Claude · 현재 대화를 가져와 계속"
+      }
+    },
+    "labels": {
+      "keypoints": "핵심 내용",
+      "host": "진행자",
+      "guest": "제품 개발자",
+      "copyMessage": "메시지 복사",
+      "downloadImage": "이미지 다운로드",
+      "agentDemo": "에이전트에서 이어 가기 · 시연"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M은 선택적인 가산 패딩 마스크입니다. 허용 위치는0, 가린 위치는−∞입니다. 각 헤드의 차원은 d_k = d_model/h입니다. 전통적인 Post-LN 인코더의 FFN은 ReLU를 사용합니다.",
+    "proteinNote": "다른 렌더링 기능: 라이소자임 1LYZ의 3D 구조.",
+    "chemistryNote": "다른 렌더링 기능: 별도의 펩타이드 결합 가수분해 그림.",
+    "chapterCards": [
+      [
+        "글 읽기",
+        "기술 문서 · 블로그 · 웹페이지",
+        "읽고 있는 페이지에서 이해를 넓히세요."
+      ],
+      [
+        "영상 보기",
+        "Bilibili · YouTube",
+        "긴 영상을 클릭 가능한 핵심 타임라인으로."
+      ],
+      [
+        "Agent를 바꿔 대화를 이어가세요",
+        "LLM / Agent · 현재 맥락 가져오기",
+        "browsa에서 다른 Agent에게 계속 물어보세요."
+      ],
+      [
+        "Agent로 돌아가 작업을 계속",
+        "결과 저장 · 대화 관리 · 재개",
+        "브라우저 밖에서도 같은 대화를 이어가세요."
+      ]
+    ],
+    "contextQ": "어텐션 스케일링 설명을 두 가지 메모로 정리해 줘",
+    "contextA": "앞선 논의를 이어서:\n- QKᵀ는 쿼리와 키를 비교합니다.\n- √d_k로 나눠 점수를 안정화하고 softmax로 V를 가중 합산합니다.",
+    "followPhrase": "어텐션 점수는 쿼리와 키를 비교하고 값들을 가중 결합합니다."
+  },
+  "es": {
+    "locale": "es",
+    "htmlLang": "es",
+    "brandTag": "Quédate en la página. Pregunta a su lado.",
+    "chapters": [
+      {
+        "eyebrow": "EXTENSIÓN",
+        "title": [
+          "Tu página. Tu IA."
+        ],
+        "sub": "Lleva tu propia IA a Chrome / Edge con browsa."
+      },
+      {
+        "eyebrow": "LEER",
+        "title": [
+          "¿Cómo funciona la atención?"
+        ],
+        "sub": "Adjunta el artículo. Pide tres puntos claros."
+      },
+      {
+        "eyebrow": "FÓRMULA DE ATENCIÓN",
+        "title": [
+          "Dale forma a la idea."
+        ],
+        "sub": "Lee la atención de producto escalar escalado y su explicación."
+      },
+      {
+        "eyebrow": "ENTREVISTA TECNOLÓGICA",
+        "title": [
+          "Encuentra el punto. Repite el momento."
+        ],
+        "sub": "Pulsa 07:42 para oír qué decisiones siguen necesitando criterio humano."
+      },
+      {
+        "eyebrow": "GUARDAR",
+        "title": [
+          "Llévate la respuesta."
+        ],
+        "sub": "Copia el mensaje. Descarga la imagen renderizada."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Entiende. Guarda. Continúa."
+        ],
+        "sub": "Tu navegador. Tu IA. Tu siguiente paso."
+      }
+    ],
+    "q1": "Explica la atención de un Transformer en 3 puntos intuitivos",
+    "a1": "- Las consultas indican qué buscar, las claves sirven para comparar y los valores contienen la información.\n- Las puntuaciones comparan consultas con claves y combinan los valores con pesos.\n- Las conexiones residuales mantienen una ruta para la información; la red de propagación hacia delante transforma cada token.",
+    "phrase": "Las consultas indican qué buscar",
+    "q2": "¿Por qué dividir las puntuaciones de atención por la raíz cuadrada de d_k?",
+    "a2": "Si los componentes de consultas y claves tienen una varianza cercana a 1, la varianza del producto escalar crece con d_k. Dividir por √d_k estabiliza la escala y ayuda a evitar que softmax sea demasiado pronunciada.",
+    "agentQ": "Organiza el artículo de atención y la entrevista independiente sobre IA y trabajo en notas de investigación",
+    "agentTools": [
+      "Leer el artículo de atención",
+      "Comprobar los puntos del pódcast",
+      "Organizar las notas de arquitectura"
+    ],
+    "approvalDescription": "Demostración de la interfaz de aprobación de un agente conectado.",
+    "agentA": "Las notas separan los mecanismos de atención del artículo de los consejos de la entrevista sobre IA en el trabajo. Puedes copiarlas o continuar la misma sesión.",
+    "videoTitle": "La IA está cambiando el trabajo · Una entrevista tecnológica en profundidad",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Hoy, un presentador y un creador de productos hablan de cómo la IA está cambiando el trabajo."
+      },
+      {
+        "time": 130,
+        "text": "La IA puede asumir tareas repetitivas para que las personas dediquen más atención al trabajo que requiere reflexión."
+      },
+      {
+        "time": 462,
+        "text": "El criterio humano sigue siendo importante. Comprueba las respuestas de IA y los hechos clave antes de actuar."
+      },
+      {
+        "time": 860,
+        "text": "La colaboración con IA mejora cuando las personas y las herramientas comparten el contexto de la tarea."
+      }
+    ],
+    "videoQ": "Resume los puntos clave de esta entrevista sobre IA y trabajo con marcas de tiempo",
+    "videoA": "- [02:10] La IA asume tareas repetitivas y libera nuestra atención.\n- [07:42] El criterio humano y la verificación de hechos siguen siendo esenciales.\n- [14:20] Colaborar con IA requiere compartir el contexto de la tarea.",
+    "lessonLabels": [
+      "¿Cómo cambia la IA el trabajo?",
+      "Tareas repetitivas",
+      "Criterio humano"
+    ],
+    "cta": "Entiende. Guarda. Continúa. · Extensión para Chrome / Edge",
+    "disclaimer": "Datos ficticios de demostración · reproducción editada",
+    "demoAlt": "browsa aparece junto a un artículo de Transformers, muestra la ecuación y los diagramas de atención, salta a puntos del pódcast, copia notas, descarga imágenes y demuestra cómo continuar la misma sesión en un agente.",
+    "videoHeading": "Quédate en la página. Pregunta a su lado.",
+    "videoDesc": "browsa es una extensión para Chrome / Edge que conecta tu IA o agente. Un estudio de Transformers enlaza artículo, fórmula de atención, flujo Q/K/V con Mermaid, arquitectura con Graphviz y puntos pulsables de una entrevista independiente y extensa sobre IA en el trabajo. Las fórmulas y Graphviz en color proceden de una respuesta real de Codex renderizada en browsa. Las demás ediciones traducen el texto y conservan las fórmulas y el diagrama. El marco del navegador, artículo y entrevista son demos compuestas. La continuación en Agent está marcada como DEMO y la reproducción está editada. Solo música y sonidos de acciones.",
+    "identity": "Extensión para Chrome / Edge",
+    "setupNote": "Conecta tu propia IA o agente para empezar.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Gratis · MIT",
+      "7 idiomas"
+    ],
+    "article": {
+      "title": "Entender la atención de un Transformer",
+      "dek": "De Q/K/V al escalado, las conexiones residuales y la red de propagación hacia delante.",
+      "sections": [
+        {
+          "heading": "01 · Consultas, claves y valores",
+          "text": "Cada token se proyecta en una consulta Q, una clave K y un valor V. Las consultas indican qué buscar, las claves sirven para comparar y los valores contienen la información que combina la atención."
+        },
+        {
+          "heading": "02 · Escalar, normalizar, combinar",
+          "text": "La atención de producto escalar escalado es Attention(Q,K,V) = softmax(QK^T / √d_k)V. La matriz de puntuaciones compara consultas y claves. El escalado estabiliza la escala; softmax genera pesos para combinar los valores."
+        },
+        {
+          "heading": "03 · Más allá de la atención",
+          "text": "Un bloque Transformer también tiene conexiones residuales y una red de propagación hacia delante aplicada a cada posición. Las rutas residuales facilitan el flujo de información y gradientes; la red transforma la representación de cada token. Los bloques estándar también incluyen normalización de capas."
+        }
+      ],
+      "note": "Se muestran la posición y LayerNorm del encoder clásico post-LN. 1LYZ y la química son ejemplos de renderizado independientes."
+    },
+    "titles": [
+      {
+        "kicker": "EXTENSIÓN",
+        "title": "Tu página. Tu IA.",
+        "sub": "Lleva tu propia IA a Chrome / Edge con browsa."
+      },
+      {
+        "kicker": "LEER",
+        "title": "¿Cómo funciona la atención?",
+        "sub": "Adjunta el artículo. Pide tres puntos claros."
+      },
+      {
+        "kicker": "FÓRMULA DE ATENCIÓN",
+        "title": "Dale forma a la idea.",
+        "sub": "Lee la atención de producto escalar escalado y su explicación."
+      },
+      {
+        "kicker": "ENTREVISTA TECNOLÓGICA",
+        "title": "Encuentra el punto. Repite el momento.",
+        "sub": "Pulsa 07:42 para oír qué decisiones siguen necesitando criterio humano."
+      },
+      {
+        "kicker": "GUARDAR",
+        "title": "Llévate la respuesta.",
+        "sub": "Copia el mensaje. Descarga la imagen renderizada."
+      },
+      {
+        "kicker": "CONTINUAR",
+        "title": "Empieza aquí. Continúa en Codex.",
+        "sub": "Copia el ID y retoma la misma sesión. Demostración."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Entiende. Guarda. Continúa.",
+        "sub": "Tu navegador. Tu IA. Tu siguiente paso."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "FÓRMULA DE ATENCIÓN",
+      "title": "Dale forma a la idea.",
+      "sub": "Lee la atención de producto escalar escalado y su explicación."
+    },
+    "sessionsTitle": {
+      "kicker": "SESIONES",
+      "title": "Vuelve a este estudio de Transformers.",
+      "sub": "Guarda, fija y cambia de conversación."
+    },
+    "relayTitle": {
+      "kicker": "CONTINUAR",
+      "title": "Empieza aquí. Continúa en Codex.",
+      "sub": "Copia el ID y retoma la misma sesión. Demostración."
+    },
+    "storyTitles": [
+      {
+        "kicker": "EXTENSIÓN",
+        "title": "Tu página. Tu IA.",
+        "sub": "Lleva tu propia IA a Chrome / Edge con browsa."
+      },
+      {
+        "kicker": "LEER",
+        "title": "¿Cómo funciona la atención?",
+        "sub": "Adjunta el artículo. Pide tres puntos claros."
+      },
+      {
+        "kicker": "FÓRMULA DE ATENCIÓN",
+        "title": "Dale forma a la idea.",
+        "sub": "Lee la atención de producto escalar escalado y su explicación."
+      },
+      {
+        "kicker": "GRAPHVIZ",
+        "title": "Ve el bloque Transformer.",
+        "sub": "Atención, rutas residuales y red de propagación hacia delante."
+      },
+      {
+        "kicker": "ENTREVISTA TECNOLÓGICA",
+        "title": "Encuentra el punto. Repite el momento.",
+        "sub": "Pulsa 07:42 para oír qué decisiones siguen necesitando criterio humano."
+      },
+      {
+        "kicker": "GUARDAR",
+        "title": "Llévate la respuesta.",
+        "sub": "Copia el mensaje. Descarga la imagen renderizada."
+      },
+      {
+        "kicker": "SESIONES",
+        "title": "Vuelve a este estudio de Transformers.",
+        "sub": "Guarda, fija y cambia de conversación."
+      },
+      {
+        "kicker": "CONTINUAR",
+        "title": "Empieza aquí. Continúa en Codex.",
+        "sub": "Copia el ID y retoma la misma sesión. Demostración."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Entiende. Guarda. Continúa.",
+        "sub": "Tu navegador. Tu IA. Tu siguiente paso."
+      }
+    ],
+    "continueQ": "Añade a estas notas el ejemplo ejecutable más pequeño de atención de producto escalar escalado en PyTorch",
+    "artifactTitle": "NOTAS DE ARQUITECTURA / atención de Transformer",
+    "storyGoal": "Entender → guardar → continuar",
+    "podcast": {
+      "label": "ENTREVISTA TECNOLÓGICA FICTICIA · DEMO",
+      "host": "PRESENTADOR",
+      "guest": "CREADOR DE PRODUCTOS",
+      "topic": "La IA está cambiando cómo trabajamos"
+    },
+    "sessionNames": [
+      "Lectura sobre Transformers",
+      "Entrevista sobre IA y trabajo",
+      "Notas de investigación"
+    ],
+    "progressLabels": [
+      "Leer el artículo",
+      "Comprobar los puntos clave",
+      "Continuar la misma sesión"
+    ],
+    "introline": "browsa es una extensión para Chrome / Edge. Lleva tu propia IA a la página que estás leyendo.",
+    "finalAnswer": "### Notas de investigación: atención e IA en el trabajo\n\n- **Artículo · Q/K/V:** las consultas se comparan con las claves y los pesos combinan los valores.\n- **Artículo · Escalado:** dividir QKᵀ por √d_k antes de softmax estabiliza la escala de las puntuaciones.\n- **Entrevista · Criterio:** el invitado aconseja comprobar las respuestas de IA antes de actuar. [07:42].\n- **Entrevista · Colaboración:** compartir el contexto mejora los flujos de trabajo con IA. [14:20].",
+    "keypoints": "Puntos clave",
+    "copyLabel": "Copiar mensaje",
+    "downloadLabel": "Descargar imagen",
+    "agentDemo": "CONTINUAR CON EL AGENTE · DEMOSTRACIÓN",
+    "richLabels": [
+      "Entrada",
+      "Atención",
+      "Residual + LayerNorm",
+      "FFN",
+      "Salida"
+    ],
+    "renderQ": [
+      "Muestra las proyecciones Q/K/V, atención multicabeza y ecuaciones del encoder post-LN",
+      "Dibuja el cálculo completo de atención multicabeza en Mermaid",
+      "Dibuja un encoder Transformer clásico post-LN detallado en Graphviz",
+      "Muestra brevemente 1LYZ como otro tipo de renderizado 3D",
+      "Muestra brevemente la hidrólisis peptídica como otro tipo de renderizado químico"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "EXTENSIÓN",
+        "title": "Tu página. Tu IA.",
+        "sub": "Lleva tu propia IA a Chrome / Edge con browsa."
+      },
+      "read": {
+        "kicker": "LEER",
+        "title": "¿Cómo funciona la atención?",
+        "sub": "Adjunta el artículo. Pide tres puntos claros."
+      },
+      "math": {
+        "kicker": "FÓRMULA DE ATENCIÓN",
+        "title": "Dale forma a la idea.",
+        "sub": "Proyecciones Q/K/V, atención escalada, concatenación y salida."
+      },
+      "mermaid": {
+        "kicker": "MERMAID",
+        "title": "Sigue Q, K y V.",
+        "sub": "Proyección, softmax, concatenación de cabezas y proyección de salida."
+      },
+      "dot": {
+        "kicker": "GRAPHVIZ",
+        "title": "Ve el bloque Transformer.",
+        "sub": "Tokens y posición, atención multicabeza, residual + LayerNorm y FFN."
+      },
+      "protein": {
+        "kicker": "MÁS RENDERIZADORES",
+        "title": "Más allá de fórmulas y diagramas.",
+        "sub": "Estructuras de proteínas en 3D, dentro de la conversación."
+      },
+      "chemistry": {
+        "kicker": "MÁS RENDERIZADORES",
+        "title": "También reacciones químicas.",
+        "sub": "Otro tipo de renderizado, en un vistazo."
+      },
+      "podcast": {
+        "kicker": "ENTREVISTA TECNOLÓGICA",
+        "title": "Encuentra el punto. Repite el momento.",
+        "sub": "Pulsa 07:42 para oír qué decisiones siguen necesitando criterio humano."
+      },
+      "take": {
+        "kicker": "GUARDAR",
+        "title": "Llévate la respuesta.",
+        "sub": "Copia el mensaje. Descarga la imagen renderizada."
+      },
+      "sessions": {
+        "kicker": "SESIONES",
+        "title": "Vuelve a este estudio de Transformers.",
+        "sub": "Guarda, fija y cambia de conversación."
+      },
+      "relay": {
+        "kicker": "CONTINUAR",
+        "title": "Empieza aquí. Continúa en Codex.",
+        "sub": "Copia el ID y retoma la misma sesión. Demostración."
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "Quédate en la página. Pregunta a su lado.",
+        "sub": "Tu navegador. Tu IA. Tu siguiente paso."
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "Leer artículos",
+        "sub": "Documentación · Blogs · Páginas web"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "Ver vídeos",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "Guarda el resultado. Continúa.",
+        "sub": "Copia mensajes · Guarda imágenes · Gestiona sesiones"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "Conecta tu propia IA",
+        "sub": "BYOK · Tu LLM o tu Agent local"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "Sigue preguntando",
+        "sub": "Selecciona la respuesta. Pregunta por la escala de atención."
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Cambia de Agent con contexto",
+        "sub": "Codex → Claude · Elige continuar con esta conversación"
+      }
+    },
+    "labels": {
+      "keypoints": "Puntos clave",
+      "host": "PRESENTADOR",
+      "guest": "CREADOR DE PRODUCTOS",
+      "copyMessage": "Copiar mensaje",
+      "downloadImage": "Descargar imagen",
+      "agentDemo": "CONTINUAR CON EL AGENTE · DEMOSTRACIÓN"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M es una máscara aditiva de padding opcional: 0 en posiciones permitidas y −∞ en posiciones ocultas. Cada cabeza tiene d_k = d_model/h. Este encoder clásico post-LN usa ReLU en la FFN.",
+    "proteinNote": "Otro renderizador: la estructura de lisozima 1LYZ en 3D.",
+    "chemistryNote": "Otro renderizador: una ilustración independiente de hidrólisis peptídica.",
+    "chapterCards": [
+      [
+        "Leer artículos",
+        "Documentación · Blogs · Páginas web",
+        "Pregunta sobre la página. Comprende la idea."
+      ],
+      [
+        "Ver vídeos",
+        "Bilibili · YouTube",
+        "Convierte vídeos largos en puntos clave pulsables."
+      ],
+      [
+        "Cambia de Agent y sigue hablando",
+        "LLM / Agent · Lleva el contexto",
+        "Elige otro Agent en browsa. Sigue preguntando."
+      ],
+      [
+        "Vuelve a tu Agent y sigue trabajando",
+        "Guarda resultados · Sesiones · Reanuda",
+        "Continúa la misma sesión fuera del navegador."
+      ]
+    ],
+    "contextQ": "Resume nuestra explicación de la escala de atención en dos notas",
+    "contextA": "Siguiendo nuestra conversación:\n- QKᵀ compara consultas y claves.\n- Dividir por √d_k estabiliza los valores; softmax pondera V.",
+    "followPhrase": "Las puntuaciones comparan consultas con claves y combinan los valores con pesos."
+  },
+  "pt-BR": {
+    "locale": "pt_BR",
+    "htmlLang": "pt-BR",
+    "brandTag": "Fique na página. Pergunte ao lado dela.",
+    "chapters": [
+      {
+        "eyebrow": "EXTENSÃO",
+        "title": [
+          "Sua página. Sua IA."
+        ],
+        "sub": "Traga sua própria IA para Chrome / Edge com o browsa."
+      },
+      {
+        "eyebrow": "LER",
+        "title": [
+          "Como funciona a atenção?"
+        ],
+        "sub": "Anexe o artigo. Peça três pontos claros."
+      },
+      {
+        "eyebrow": "FÓRMULA DE ATENÇÃO",
+        "title": [
+          "Dê forma à ideia."
+        ],
+        "sub": "Leia a atenção por produto escalar escalado com a explicação."
+      },
+      {
+        "eyebrow": "ENTREVISTA DE TECNOLOGIA",
+        "title": [
+          "Encontre o ponto. Reveja o momento."
+        ],
+        "sub": "Clique em 07:42 para ouvir quais decisões ainda exigem julgamento humano."
+      },
+      {
+        "eyebrow": "GUARDAR",
+        "title": [
+          "Leve a resposta com você."
+        ],
+        "sub": "Copie a mensagem. Baixe a imagem renderizada."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Entenda. Leve com você. Continue."
+        ],
+        "sub": "Seu navegador. Sua IA. Seu próximo passo."
+      }
+    ],
+    "q1": "Explique a atenção de um Transformer em 3 pontos intuitivos",
+    "a1": "- Consultas indicam o que buscar, chaves servem para comparar e valores carregam a informação.\n- As pontuações comparam consultas com chaves e combinam os valores com pesos.\n- Conexões residuais preservam um caminho para a informação; a rede de propagação direta transforma cada token.",
+    "phrase": "Consultas indicam o que buscar",
+    "q2": "Por que dividir as pontuações de atenção pela raiz quadrada de d_k?",
+    "a2": "Quando os componentes das consultas e chaves têm variância próxima de 1, a variância do produto escalar cresce com d_k. Dividir por √d_k estabiliza a escala e ajuda a evitar que softmax fique excessivamente acentuada.",
+    "agentQ": "Organize o artigo sobre atenção e a entrevista independente sobre IA e trabalho em notas de pesquisa",
+    "agentTools": [
+      "Ler o artigo sobre atenção",
+      "Conferir os pontos do podcast",
+      "Organizar as notas de arquitetura"
+    ],
+    "approvalDescription": "Demonstração da interface de aprovação de um agente conectado.",
+    "agentA": "As notas separam os mecanismos de atenção do artigo dos conselhos da entrevista sobre IA no trabalho. Você pode copiá-las ou continuar a mesma sessão.",
+    "videoTitle": "A IA está mudando o trabalho · Uma entrevista longa sobre tecnologia",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Hoje, um apresentador e um criador de produtos conversam sobre como a IA está mudando o trabalho."
+      },
+      {
+        "time": 130,
+        "text": "A IA pode assumir tarefas repetitivas para que as pessoas dediquem mais atenção ao trabalho que exige reflexão."
+      },
+      {
+        "time": 462,
+        "text": "O julgamento humano continua importante. Confira as respostas de IA e os fatos importantes antes de agir."
+      },
+      {
+        "time": 860,
+        "text": "A colaboração com IA melhora quando pessoas e ferramentas compartilham o contexto da tarefa."
+      }
+    ],
+    "videoQ": "Resuma os pontos-chave desta entrevista sobre IA e trabalho com os tempos",
+    "videoA": "- [02:10] A IA assume tarefas repetitivas e libera nossa atenção.\n- [07:42] O julgamento humano e a verificação de fatos continuam essenciais.\n- [14:20] A colaboração com IA precisa de contexto compartilhado.",
+    "lessonLabels": [
+      "Como a IA muda o trabalho?",
+      "Tarefas repetitivas",
+      "Julgamento humano"
+    ],
+    "cta": "Entenda. Leve com você. Continue. · Extensão para Chrome / Edge",
+    "disclaimer": "Dados fictícios de demonstração · reprodução editada",
+    "demoAlt": "O browsa aparece ao lado de um artigo de Transformers, mostra a equação e diagramas de atenção, vai aos pontos do podcast, copia notas, baixa imagens e demonstra como continuar a mesma sessão em um agente.",
+    "videoHeading": "Fique na página. Pergunte ao lado dela.",
+    "videoDesc": "O browsa é uma extensão para Chrome / Edge que conecta sua IA ou agente. Um estudo de Transformers liga artigo, fórmula de atenção, fluxo Q/K/V com Mermaid, arquitetura com Graphviz e pontos clicáveis de uma entrevista longa e independente sobre IA no trabalho. As fórmulas e o Graphviz colorido vêm de uma resposta real do Codex renderizada no browsa. As outras versões traduzem o texto e mantêm as fórmulas e o diagrama. A moldura do navegador, artigo e entrevista são composições de demonstração. A continuação no Agent é marcada como DEMO e a reprodução é editada. Apenas música e sons de ações.",
+    "identity": "Extensão para Chrome / Edge",
+    "setupNote": "Conecte sua própria IA ou agente para começar.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Grátis · MIT",
+      "7 idiomas"
+    ],
+    "article": {
+      "title": "Entendendo a atenção de um Transformer",
+      "dek": "De Q/K/V à escala, às conexões residuais e à rede de propagação direta.",
+      "sections": [
+        {
+          "heading": "01 · Consultas, chaves e valores",
+          "text": "Cada token é projetado em uma consulta Q, uma chave K e um valor V. Consultas indicam o que buscar, chaves servem para comparar e valores carregam a informação que a atenção combina."
+        },
+        {
+          "heading": "02 · Escalar, normalizar, combinar",
+          "text": "A atenção por produto escalar escalado é Attention(Q,K,V) = softmax(QK^T / √d_k)V. A matriz de pontuações compara consultas e chaves. A escala estabiliza as pontuações; softmax gera pesos para combinar os valores."
+        },
+        {
+          "heading": "03 · Além da atenção",
+          "text": "Um bloco Transformer também usa conexões residuais e uma rede de propagação direta aplicada a cada posição. Os caminhos residuais ajudam o fluxo de informação e gradientes; a rede transforma a representação de cada token. Blocos padrão também incluem normalização de camadas."
+        }
+      ],
+      "note": "Posição e LayerNorm são mostradas no encoder clássico post-LN. 1LYZ e química são exemplos de renderização separados."
+    },
+    "titles": [
+      {
+        "kicker": "EXTENSÃO",
+        "title": "Sua página. Sua IA.",
+        "sub": "Traga sua própria IA para Chrome / Edge com o browsa."
+      },
+      {
+        "kicker": "LER",
+        "title": "Como funciona a atenção?",
+        "sub": "Anexe o artigo. Peça três pontos claros."
+      },
+      {
+        "kicker": "FÓRMULA DE ATENÇÃO",
+        "title": "Dê forma à ideia.",
+        "sub": "Leia a atenção por produto escalar escalado com a explicação."
+      },
+      {
+        "kicker": "ENTREVISTA DE TECNOLOGIA",
+        "title": "Encontre o ponto. Reveja o momento.",
+        "sub": "Clique em 07:42 para ouvir quais decisões ainda exigem julgamento humano."
+      },
+      {
+        "kicker": "GUARDAR",
+        "title": "Leve a resposta com você.",
+        "sub": "Copie a mensagem. Baixe a imagem renderizada."
+      },
+      {
+        "kicker": "CONTINUAR",
+        "title": "Comece aqui. Continue no Codex.",
+        "sub": "Copie o ID e retome a mesma sessão. Demonstração."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Entenda. Leve com você. Continue.",
+        "sub": "Seu navegador. Sua IA. Seu próximo passo."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "FÓRMULA DE ATENÇÃO",
+      "title": "Dê forma à ideia.",
+      "sub": "Leia a atenção por produto escalar escalado com a explicação."
+    },
+    "sessionsTitle": {
+      "kicker": "SESSÕES",
+      "title": "Volte a este estudo de Transformers.",
+      "sub": "Salve, fixe e troque de conversa."
+    },
+    "relayTitle": {
+      "kicker": "CONTINUAR",
+      "title": "Comece aqui. Continue no Codex.",
+      "sub": "Copie o ID e retome a mesma sessão. Demonstração."
+    },
+    "storyTitles": [
+      {
+        "kicker": "EXTENSÃO",
+        "title": "Sua página. Sua IA.",
+        "sub": "Traga sua própria IA para Chrome / Edge com o browsa."
+      },
+      {
+        "kicker": "LER",
+        "title": "Como funciona a atenção?",
+        "sub": "Anexe o artigo. Peça três pontos claros."
+      },
+      {
+        "kicker": "FÓRMULA DE ATENÇÃO",
+        "title": "Dê forma à ideia.",
+        "sub": "Leia a atenção por produto escalar escalado com a explicação."
+      },
+      {
+        "kicker": "GRAPHVIZ",
+        "title": "Veja o bloco Transformer.",
+        "sub": "Atenção, caminhos residuais e rede de propagação direta."
+      },
+      {
+        "kicker": "ENTREVISTA DE TECNOLOGIA",
+        "title": "Encontre o ponto. Reveja o momento.",
+        "sub": "Clique em 07:42 para ouvir quais decisões ainda exigem julgamento humano."
+      },
+      {
+        "kicker": "GUARDAR",
+        "title": "Leve a resposta com você.",
+        "sub": "Copie a mensagem. Baixe a imagem renderizada."
+      },
+      {
+        "kicker": "SESSÕES",
+        "title": "Volte a este estudo de Transformers.",
+        "sub": "Salve, fixe e troque de conversa."
+      },
+      {
+        "kicker": "CONTINUAR",
+        "title": "Comece aqui. Continue no Codex.",
+        "sub": "Copie o ID e retome a mesma sessão. Demonstração."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Entenda. Leve com você. Continue.",
+        "sub": "Seu navegador. Sua IA. Seu próximo passo."
+      }
+    ],
+    "continueQ": "Acrescente a estas notas o menor exemplo executável de atenção por produto escalar escalado em PyTorch",
+    "artifactTitle": "NOTAS DE ARQUITETURA / atenção de Transformer",
+    "storyGoal": "Entender → guardar → continuar",
+    "podcast": {
+      "label": "ENTREVISTA TECNOLÓGICA FICTÍCIA · DEMO",
+      "host": "APRESENTADOR",
+      "guest": "CRIADOR DE PRODUTOS",
+      "topic": "A IA está mudando como trabalhamos"
+    },
+    "sessionNames": [
+      "Leitura sobre Transformers",
+      "Entrevista sobre IA e trabalho",
+      "Notas de pesquisa"
+    ],
+    "progressLabels": [
+      "Ler o artigo",
+      "Conferir os pontos-chave",
+      "Continuar a mesma sessão"
+    ],
+    "introline": "O browsa é uma extensão para Chrome / Edge. Traga sua própria IA para a página que está lendo.",
+    "finalAnswer": "### Notas de pesquisa: atenção e IA no trabalho\n\n- **Artigo · Q/K/V:** consultas são comparadas com chaves e os pesos combinam os valores.\n- **Artigo · Escala:** dividir QKᵀ por √d_k antes de softmax estabiliza a escala das pontuações.\n- **Entrevista · Julgamento:** o convidado recomenda conferir as respostas de IA antes de agir. [07:42].\n- **Entrevista · Colaboração:** compartilhar o contexto melhora os fluxos de trabalho com IA. [14:20].",
+    "keypoints": "Pontos-chave",
+    "copyLabel": "Copiar mensagem",
+    "downloadLabel": "Baixar imagem",
+    "agentDemo": "CONTINUAR NO AGENTE · DEMONSTRAÇÃO",
+    "richLabels": [
+      "Entrada",
+      "Atenção",
+      "Residual + LayerNorm",
+      "FFN",
+      "Saída"
+    ],
+    "renderQ": [
+      "Mostre projeções Q/K/V, atenção multi-head e equações do encoder post-LN",
+      "Desenhe todo o cálculo de atenção multi-head em Mermaid",
+      "Desenhe um encoder Transformer clássico post-LN detalhado em Graphviz",
+      "Mostre brevemente 1LYZ como outro tipo de renderização 3D",
+      "Mostre brevemente a hidrólise peptídica como outro tipo de renderização química"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "EXTENSÃO",
+        "title": "Sua página. Sua IA.",
+        "sub": "Traga sua própria IA para Chrome / Edge com o browsa."
+      },
+      "read": {
+        "kicker": "LER",
+        "title": "Como funciona a atenção?",
+        "sub": "Anexe o artigo. Peça três pontos claros."
+      },
+      "math": {
+        "kicker": "FÓRMULA DE ATENÇÃO",
+        "title": "Dê forma à ideia.",
+        "sub": "Projeções Q/K/V, atenção escalada, concatenação e saída."
+      },
+      "mermaid": {
+        "kicker": "MERMAID",
+        "title": "Acompanhe Q, K e V.",
+        "sub": "Projeção, softmax, concatenação das cabeças e projeção de saída."
+      },
+      "dot": {
+        "kicker": "GRAPHVIZ",
+        "title": "Veja o bloco Transformer.",
+        "sub": "Tokens e posição, atenção multi-head, residual + LayerNorm e FFN."
+      },
+      "protein": {
+        "kicker": "MAIS RENDERIZADORES",
+        "title": "Além de fórmulas e diagramas.",
+        "sub": "Estruturas de proteínas em 3D, na própria conversa."
+      },
+      "chemistry": {
+        "kicker": "MAIS RENDERIZADORES",
+        "title": "Reações químicas também.",
+        "sub": "Outro tipo de renderização, em um instante."
+      },
+      "podcast": {
+        "kicker": "ENTREVISTA DE TECNOLOGIA",
+        "title": "Encontre o ponto. Reveja o momento.",
+        "sub": "Clique em 07:42 para ouvir quais decisões ainda exigem julgamento humano."
+      },
+      "take": {
+        "kicker": "GUARDAR",
+        "title": "Leve a resposta com você.",
+        "sub": "Copie a mensagem. Baixe a imagem renderizada."
+      },
+      "sessions": {
+        "kicker": "SESSÕES",
+        "title": "Volte a este estudo de Transformers.",
+        "sub": "Salve, fixe e troque de conversa."
+      },
+      "relay": {
+        "kicker": "CONTINUAR",
+        "title": "Comece aqui. Continue no Codex.",
+        "sub": "Copie o ID e retome a mesma sessão. Demonstração."
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "Fique na página. Pergunte ao lado dela.",
+        "sub": "Seu navegador. Sua IA. Seu próximo passo."
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "Ler artigos",
+        "sub": "Documentação · Blogs · Páginas web"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "Assistir a vídeos",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "Salve o resultado. Continue.",
+        "sub": "Copie mensagens · Salve imagens · Gerencie sessões"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "Conecte sua própria IA",
+        "sub": "BYOK · Seu LLM ou Agent local"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "Continue perguntando",
+        "sub": "Selecione a resposta. Pergunte sobre a escala da atenção."
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Troque de Agent com contexto",
+        "sub": "Codex → Claude · Escolha continuar com esta conversa"
+      }
+    },
+    "labels": {
+      "keypoints": "Pontos-chave",
+      "host": "APRESENTADOR",
+      "guest": "CRIADOR DE PRODUTOS",
+      "copyMessage": "Copiar mensagem",
+      "downloadImage": "Baixar imagem",
+      "agentDemo": "CONTINUAR NO AGENTE · DEMONSTRAÇÃO"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M é uma máscara aditiva de padding opcional: 0 nas posições permitidas e −∞ nas mascaradas. Cada cabeça tem d_k = d_model/h. Este encoder clássico post-LN usa ReLU na FFN.",
+    "proteinNote": "Outro renderizador: a estrutura da lisozima 1LYZ em 3D.",
+    "chemistryNote": "Outro renderizador: uma ilustração separada de hidrólise peptídica.",
+    "chapterCards": [
+      [
+        "Ler artigos",
+        "Documentação · Blogs · Páginas web",
+        "Pergunte sobre a página. Entenda a ideia."
+      ],
+      [
+        "Assistir a vídeos",
+        "Bilibili · YouTube",
+        "Transforme vídeos longos em pontos clicáveis."
+      ],
+      [
+        "Troque de Agent e continue a conversa",
+        "LLM / Agent · Leve o contexto",
+        "Escolha outro Agent no browsa. Continue perguntando."
+      ],
+      [
+        "Volte ao seu Agent e continue",
+        "Guarde resultados · Sessões · Retome",
+        "Continue a mesma sessão fora do navegador."
+      ]
+    ],
+    "contextQ": "Resuma nossa explicação da escala da atenção em duas notas",
+    "contextA": "Continuando nossa conversa:\n- QKᵀ compara consultas e chaves.\n- Dividir por √d_k estabiliza os valores; softmax pondera V.",
+    "followPhrase": "As pontuações comparam consultas com chaves e combinam os valores com pesos."
+  },
+  "ru": {
+    "locale": "ru",
+    "htmlLang": "ru",
+    "brandTag": "Оставайтесь на странице. Спрашивайте рядом.",
+    "chapters": [
+      {
+        "eyebrow": "РАСШИРЕНИЕ",
+        "title": [
+          "Ваша страница. Ваш ИИ."
+        ],
+        "sub": "Подключите свой ИИ к Chrome / Edge через browsa."
+      },
+      {
+        "eyebrow": "ЧТЕНИЕ",
+        "title": [
+          "Как работает внимание?"
+        ],
+        "sub": "Прикрепите статью. Попросите три понятных тезиса."
+      },
+      {
+        "eyebrow": "ФОРМУЛА ВНИМАНИЯ",
+        "title": [
+          "Придайте идее форму."
+        ],
+        "sub": "Читайте масштабированное скалярное внимание с объяснением."
+      },
+      {
+        "eyebrow": "ТЕХНОЛОГИЧЕСКОЕ ИНТЕРВЬЮ",
+        "title": [
+          "Найдите тезис. Вернитесь к моменту."
+        ],
+        "sub": "Нажмите 07:42 и узнайте, какие решения остаются за человеком."
+      },
+      {
+        "eyebrow": "СОХРАНЕНИЕ",
+        "title": [
+          "Заберите полезный ответ."
+        ],
+        "sub": "Скопируйте сообщение. Скачайте готовое изображение."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Разберитесь. Сохраните. Продолжайте."
+        ],
+        "sub": "Ваш браузер. Ваш ИИ. Ваш следующий шаг."
+      }
+    ],
+    "q1": "Объясни механизм внимания Transformer в 3 понятных пунктах",
+    "a1": "- Запросы задают, что искать, ключи служат для сопоставления, а значения содержат информацию.\n- Оценки внимания сравнивают запросы с ключами и взвешенно объединяют значения.\n- Остаточные связи сохраняют путь для информации; сеть прямого распространения преобразует каждый токен.",
+    "phrase": "Запросы задают, что искать",
+    "q2": "Зачем делить оценки внимания на квадратный корень из d_k?",
+    "a2": "Если дисперсия компонентов запросов и ключей близка к 1, дисперсия скалярного произведения растёт с d_k. Деление на √d_k стабилизирует масштаб оценок и помогает избежать слишком резкого распределения softmax.",
+    "agentQ": "Объедини статью о внимании и отдельное интервью об ИИ и работе в исследовательские заметки",
+    "agentTools": [
+      "Прочитать статью о внимании",
+      "Проверить тезисы подкаста",
+      "Систематизировать архитектуру"
+    ],
+    "approvalDescription": "Демонстрация интерфейса согласования подключённого агента.",
+    "agentA": "Заметки разделяют механизм внимания из статьи и советы об ИИ в работе из интервью. Их можно скопировать или продолжить в той же сессии.",
+    "videoTitle": "ИИ меняет нашу работу · Большое технологическое интервью",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Сегодня ведущий и создатель продуктов обсуждают, как ИИ меняет работу."
+      },
+      {
+        "time": 130,
+        "text": "ИИ может выполнять повторяющиеся задачи, чтобы люди уделяли больше внимания работе, требующей размышления."
+      },
+      {
+        "time": 462,
+        "text": "Человеческое суждение по-прежнему важно. Проверяйте ответы ИИ и ключевые факты, прежде чем действовать."
+      },
+      {
+        "time": 860,
+        "text": "Совместная работа с ИИ становится лучше, когда люди и инструменты разделяют контекст задачи."
+      }
+    ],
+    "videoQ": "Выдели ключевые тезисы интервью об ИИ и работе с отметками времени",
+    "videoA": "- [02:10] ИИ берёт на себя повторяющиеся задачи и освобождает внимание.\n- [07:42] Человеческое суждение и проверка фактов остаются важными.\n- [14:20] Для совместной работы с ИИ нужен общий контекст задачи.",
+    "lessonLabels": [
+      "Как ИИ меняет работу?",
+      "Повторяющиеся задачи",
+      "Человеческое суждение"
+    ],
+    "cta": "Разберитесь. Сохраните. Продолжайте. · Расширение Chrome / Edge",
+    "disclaimer": "Вымышленные демоданные · монтаж",
+    "demoAlt": "browsa открывается рядом со статьёй о Transformer, показывает формулу и схемы внимания, переходит к тезисам подкаста, копирует заметки, скачивает изображения и демонстрирует продолжение той же сессии в агенте.",
+    "videoHeading": "Оставайтесь на странице. Спрашивайте рядом.",
+    "videoDesc": "browsa — расширение для Chrome / Edge с вашим ИИ или агентом. Изучение Transformer связывает статью, формулу внимания, поток Q/K/V в Mermaid, архитектуру в Graphviz и кликабельные тезисы отдельного большого интервью об ИИ и работе. Формулы и цветной Graphviz взяты из настоящего ответа Codex, отображённого расширением browsa. В других версиях переведён текст, формулы и граф сохранены. Рамка браузера, статья и интервью — демонстрационная композиция. Продолжение в Agent отмечено DEMO, воспроизведение смонтировано. Только музыка и звуки действий.",
+    "identity": "Расширение для Chrome / Edge",
+    "setupNote": "Для начала подключите свой ИИ или агента.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Бесплатно · MIT",
+      "7 языков"
+    ],
+    "article": {
+      "title": "Понимаем внимание Transformer",
+      "dek": "От Q/K/V к масштабированию, остаточным связям и сети прямого распространения.",
+      "sections": [
+        {
+          "heading": "01 · Запросы, ключи и значения",
+          "text": "Каждый токен проецируется в запрос Q, ключ K и значение V. Запросы задают, что искать, ключи служат для сопоставления, а значения содержат информацию, которую объединяет внимание."
+        },
+        {
+          "heading": "02 · Масштабировать, нормировать, объединить",
+          "text": "Масштабированное скалярное внимание: Attention(Q,K,V) = softmax(QK^T / √d_k)V. Матрица оценок сравнивает запросы и ключи. Масштабирование стабилизирует оценки; softmax создаёт веса для объединения значений."
+        },
+        {
+          "heading": "03 · После внимания",
+          "text": "Блок Transformer также использует остаточные связи и сеть прямого распространения для каждой позиции. Остаточные пути помогают потоку информации и градиентов, а сеть преобразует представление каждого токена. Стандартные блоки также включают нормализацию слоёв."
+        }
+      ],
+      "note": "Показаны позиции и LayerNorm классического энкодера post-LN. 1LYZ и химия — отдельные примеры рендеринга."
+    },
+    "titles": [
+      {
+        "kicker": "РАСШИРЕНИЕ",
+        "title": "Ваша страница. Ваш ИИ.",
+        "sub": "Подключите свой ИИ к Chrome / Edge через browsa."
+      },
+      {
+        "kicker": "ЧТЕНИЕ",
+        "title": "Как работает внимание?",
+        "sub": "Прикрепите статью. Попросите три понятных тезиса."
+      },
+      {
+        "kicker": "ФОРМУЛА ВНИМАНИЯ",
+        "title": "Придайте идее форму.",
+        "sub": "Читайте масштабированное скалярное внимание с объяснением."
+      },
+      {
+        "kicker": "ТЕХНОЛОГИЧЕСКОЕ ИНТЕРВЬЮ",
+        "title": "Найдите тезис. Вернитесь к моменту.",
+        "sub": "Нажмите 07:42 и узнайте, какие решения остаются за человеком."
+      },
+      {
+        "kicker": "СОХРАНЕНИЕ",
+        "title": "Заберите полезный ответ.",
+        "sub": "Скопируйте сообщение. Скачайте готовое изображение."
+      },
+      {
+        "kicker": "ПРОДОЛЖЕНИЕ",
+        "title": "Начните здесь. Продолжите в Codex.",
+        "sub": "Скопируйте ID и возобновите ту же сессию. Демо."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Разберитесь. Сохраните. Продолжайте.",
+        "sub": "Ваш браузер. Ваш ИИ. Ваш следующий шаг."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "ФОРМУЛА ВНИМАНИЯ",
+      "title": "Придайте идее форму.",
+      "sub": "Читайте масштабированное скалярное внимание с объяснением."
+    },
+    "sessionsTitle": {
+      "kicker": "СЕССИИ",
+      "title": "Вернитесь к изучению Transformer.",
+      "sub": "Сохраняйте, закрепляйте и переключайте разговоры."
+    },
+    "relayTitle": {
+      "kicker": "ПРОДОЛЖЕНИЕ",
+      "title": "Начните здесь. Продолжите в Codex.",
+      "sub": "Скопируйте ID и возобновите ту же сессию. Демо."
+    },
+    "storyTitles": [
+      {
+        "kicker": "РАСШИРЕНИЕ",
+        "title": "Ваша страница. Ваш ИИ.",
+        "sub": "Подключите свой ИИ к Chrome / Edge через browsa."
+      },
+      {
+        "kicker": "ЧТЕНИЕ",
+        "title": "Как работает внимание?",
+        "sub": "Прикрепите статью. Попросите три понятных тезиса."
+      },
+      {
+        "kicker": "ФОРМУЛА ВНИМАНИЯ",
+        "title": "Придайте идее форму.",
+        "sub": "Читайте масштабированное скалярное внимание с объяснением."
+      },
+      {
+        "kicker": "GRAPHVIZ",
+        "title": "Рассмотрите блок Transformer.",
+        "sub": "Внимание, остаточные пути и сеть прямого распространения."
+      },
+      {
+        "kicker": "ТЕХНОЛОГИЧЕСКОЕ ИНТЕРВЬЮ",
+        "title": "Найдите тезис. Вернитесь к моменту.",
+        "sub": "Нажмите 07:42 и узнайте, какие решения остаются за человеком."
+      },
+      {
+        "kicker": "СОХРАНЕНИЕ",
+        "title": "Заберите полезный ответ.",
+        "sub": "Скопируйте сообщение. Скачайте готовое изображение."
+      },
+      {
+        "kicker": "СЕССИИ",
+        "title": "Вернитесь к изучению Transformer.",
+        "sub": "Сохраняйте, закрепляйте и переключайте разговоры."
+      },
+      {
+        "kicker": "ПРОДОЛЖЕНИЕ",
+        "title": "Начните здесь. Продолжите в Codex.",
+        "sub": "Скопируйте ID и возобновите ту же сессию. Демо."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Разберитесь. Сохраните. Продолжайте.",
+        "sub": "Ваш браузер. Ваш ИИ. Ваш следующий шаг."
+      }
+    ],
+    "continueQ": "Добавь к этим заметкам минимальный запускаемый пример масштабированного скалярного внимания на PyTorch",
+    "artifactTitle": "ЗАМЕТКИ ОБ АРХИТЕКТУРЕ / внимание Transformer",
+    "storyGoal": "Понять → сохранить → продолжить",
+    "podcast": {
+      "label": "ВЫМЫШЛЕННОЕ ТЕХНОИНТЕРВЬЮ · ДЕМО",
+      "host": "ВЕДУЩИЙ",
+      "guest": "СОЗДАТЕЛЬ ПРОДУКТОВ",
+      "topic": "ИИ меняет то, как мы работаем"
+    },
+    "sessionNames": [
+      "Чтение о Transformer",
+      "Интервью об ИИ и работе",
+      "Исследовательские заметки"
+    ],
+    "progressLabels": [
+      "Прочитать статью",
+      "Проверить тезисы",
+      "Продолжить ту же сессию"
+    ],
+    "introline": "browsa — расширение для Chrome / Edge. Подключите свой ИИ прямо рядом с открытой страницей.",
+    "finalAnswer": "### Исследовательские заметки: внимание и ИИ в работе\n\n- **Статья · Q/K/V:** запросы сопоставляются с ключами, а веса внимания объединяют значения.\n- **Статья · Масштаб:** деление QKᵀ на √d_k перед softmax стабилизирует масштаб оценок.\n- **Интервью · Суждение:** гость советует проверять ответы ИИ перед действием. [07:42].\n- **Интервью · Сотрудничество:** общий контекст улучшает рабочие процессы с ИИ. [14:20].",
+    "keypoints": "Ключевые тезисы",
+    "copyLabel": "Скопировать сообщение",
+    "downloadLabel": "Скачать изображение",
+    "agentDemo": "ПРОДОЛЖЕНИЕ В АГЕНТЕ · ДЕМО",
+    "richLabels": [
+      "Вход",
+      "Внимание",
+      "Residual + LayerNorm",
+      "FFN",
+      "Выход"
+    ],
+    "renderQ": [
+      "Покажи проекции Q/K/V, многоголовое внимание и формулы энкодера post-LN",
+      "Нарисуй полный расчёт многоголового внимания в Mermaid",
+      "Нарисуй подробный классический энкодер Transformer post-LN в Graphviz",
+      "Кратко покажи 1LYZ как другой тип трёхмерного отображения",
+      "Кратко покажи гидролиз пептидной связи как другой тип химического отображения"
+    ],
+    "inkTitles": {
+      "intro": {
+        "kicker": "РАСШИРЕНИЕ",
+        "title": "Ваша страница. Ваш ИИ.",
+        "sub": "Подключите свой ИИ к Chrome / Edge через browsa."
+      },
+      "read": {
+        "kicker": "ЧТЕНИЕ",
+        "title": "Как работает внимание?",
+        "sub": "Прикрепите статью. Попросите три понятных тезиса."
+      },
+      "math": {
+        "kicker": "ФОРМУЛА ВНИМАНИЯ",
+        "title": "Придайте идее форму.",
+        "sub": "Проекции Q/K/V, масштабирование, объединение голов и выход."
+      },
+      "mermaid": {
+        "kicker": "MERMAID",
+        "title": "Проследите Q, K и V.",
+        "sub": "Проекции, softmax, объединение голов и выходная проекция."
+      },
+      "dot": {
+        "kicker": "GRAPHVIZ",
+        "title": "Рассмотрите блок Transformer.",
+        "sub": "Токены и позиции, многоголовое внимание, residual + LayerNorm и FFN."
+      },
+      "protein": {
+        "kicker": "ДРУГИЕ ВОЗМОЖНОСТИ",
+        "title": "Не только формулы и схемы.",
+        "sub": "Структуры белков в 3D прямо в разговоре."
+      },
+      "chemistry": {
+        "kicker": "ДРУГИЕ ВОЗМОЖНОСТИ",
+        "title": "Химические реакции тоже.",
+        "sub": "Ещё один тип отображения одним взглядом."
+      },
+      "podcast": {
+        "kicker": "ТЕХНОЛОГИЧЕСКОЕ ИНТЕРВЬЮ",
+        "title": "Найдите тезис. Вернитесь к моменту.",
+        "sub": "Нажмите 07:42 и узнайте, какие решения остаются за человеком."
+      },
+      "take": {
+        "kicker": "СОХРАНЕНИЕ",
+        "title": "Заберите полезный ответ.",
+        "sub": "Скопируйте сообщение. Скачайте готовое изображение."
+      },
+      "sessions": {
+        "kicker": "СЕССИИ",
+        "title": "Вернитесь к изучению Transformer.",
+        "sub": "Сохраняйте, закрепляйте и переключайте разговоры."
+      },
+      "relay": {
+        "kicker": "ПРОДОЛЖЕНИЕ",
+        "title": "Начните здесь. Продолжите в Codex.",
+        "sub": "Скопируйте ID и возобновите ту же сессию. Демо."
+      },
+      "outro": {
+        "kicker": "BROWSA",
+        "title": "Оставайтесь на странице. Спрашивайте рядом.",
+        "sub": "Ваш браузер. Ваш ИИ. Ваш следующий шаг."
+      },
+      "chapter-read": {
+        "kicker": "01",
+        "title": "Читайте статьи",
+        "sub": "Документация · Блоги · Веб-страницы"
+      },
+      "chapter-video": {
+        "kicker": "02",
+        "title": "Смотрите видео",
+        "sub": "Bilibili · YouTube"
+      },
+      "chapter-continue": {
+        "kicker": "03",
+        "title": "Сохраните результат. Продолжайте.",
+        "sub": "Копируйте ответы · Сохраняйте картинки · Управляйте сессиями"
+      },
+      "byok": {
+        "kicker": "YOUR AI",
+        "title": "Подключите свой ИИ",
+        "sub": "BYOK · Своя LLM или локальный Agent"
+      },
+      "followup": {
+        "kicker": "FOLLOW-UP",
+        "title": "Задайте уточняющий вопрос",
+        "sub": "Выделите ответ. Спросите о масштабе оценок внимания."
+      },
+      "context": {
+        "kicker": "AGENT CONTEXT",
+        "title": "Смените Agent с контекстом",
+        "sub": "Codex → Claude · Продолжите с текущим диалогом"
+      }
+    },
+    "labels": {
+      "keypoints": "Ключевые тезисы",
+      "host": "ВЕДУЩИЙ",
+      "guest": "СОЗДАТЕЛЬ ПРОДУКТОВ",
+      "copyMessage": "Скопировать сообщение",
+      "downloadImage": "Скачать изображение",
+      "agentDemo": "ПРОДОЛЖЕНИЕ В АГЕНТЕ · ДЕМО"
+    },
+    "sessionId": "0199-demo-4820-browsa-transformer",
+    "mathNote": "M — необязательная аддитивная маска padding: 0 для разрешённых позиций, −∞ для скрытых. Размер головы d_k = d_model/h. В этом классическом энкодере post-LN сеть FFN использует ReLU.",
+    "proteinNote": "Другой тип отображения: структура лизоцима 1LYZ в 3D.",
+    "chemistryNote": "Другой тип отображения: отдельная схема гидролиза пептидной связи.",
+    "chapterCards": [
+      [
+        "Читайте статьи",
+        "Документация · Блоги · Веб-страницы",
+        "Задайте вопрос о странице. Поймите идею."
+      ],
+      [
+        "Смотрите видео",
+        "Bilibili · YouTube",
+        "Превратите длинное видео в кликабельные тезисы."
+      ],
+      [
+        "Смените Agent и продолжите диалог",
+        "LLM / Agent · Перенос контекста",
+        "Выберите другой Agent в browsa и спрашивайте дальше."
+      ],
+      [
+        "Вернитесь к Agent и продолжите",
+        "Результаты · Сессии · Возобновление",
+        "Продолжите ту же сессию за пределами браузера."
+      ]
+    ],
+    "contextQ": "Собери наше объяснение масштаба внимания в две заметки",
+    "contextA": "Продолжая обсуждение:\n- QKᵀ сравнивает запросы с ключами.\n- Деление на √d_k стабилизирует оценки; softmax взвешивает V.",
+    "followPhrase": "Оценки внимания сравнивают запросы с ключами и взвешенно объединяют значения."
+  }
+}

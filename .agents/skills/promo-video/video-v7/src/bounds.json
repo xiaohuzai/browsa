@@ -1,0 +1,1304 @@
+{
+  "en": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 266.1875
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 186.265625
+      },
+      "copy-button": {
+        "x": 1664.75,
+        "y": 257.546875,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 319.75,
+        "width": 287,
+        "height": 68.25
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 237,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 243,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 312.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 394.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 448.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "zh": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 390.59375,
+        "height": 108.796875
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 266.1875
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 260.65625
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 512.671875,
+        "height": 163.046875
+      },
+      "copy-button": {
+        "x": 1571.671875,
+        "y": 257.546875,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 301,
+        "width": 287,
+        "height": 49.5
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 237,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 243,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 312.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 394.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 448.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "ja": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 525.59375,
+        "height": 108.796875
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 266.1875
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 583.859375,
+        "height": 163.046875
+      },
+      "copy-button": {
+        "x": 1642.859375,
+        "y": 257.546875,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 319.75,
+        "width": 287,
+        "height": 68.25
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 238,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 244,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 313.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 395.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 449.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "ko": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 462.015625,
+        "height": 108.796875
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 266.1875
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 502,
+        "height": 163.046875
+      },
+      "copy-button": {
+        "x": 1561,
+        "y": 257.546875,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 301,
+        "width": 287,
+        "height": 68.25
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 235,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 241,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 310.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 392.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 446.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "es": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 276.765625,
+        "width": 605.75,
+        "height": 289.40625
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 307.015625,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 276.765625,
+        "width": 605.75,
+        "height": 255.921875
+      },
+      "copy-button": {
+        "x": 1664.75,
+        "y": 280.765625,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 357.25,
+        "width": 287,
+        "height": 87
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 237,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 243,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 312.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 394.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 448.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "pt-BR": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 289.40625
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 281.875,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 276.765625,
+        "width": 605.75,
+        "height": 232.703125
+      },
+      "copy-button": {
+        "x": 1664.75,
+        "y": 280.765625,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 357.25,
+        "width": 287,
+        "height": 87
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 237,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 243,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 312.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 394.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 448.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  },
+  "ru": {
+    "bounds": {
+      "empty:#attach": {
+        "x": 1160,
+        "y": 916.859375,
+        "width": 28,
+        "height": 28
+      },
+      "empty:#input": {
+        "x": 1194,
+        "y": 922.9375,
+        "width": 502,
+        "height": 22.921875
+      },
+      "empty:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "attached:#send": {
+        "x": 1702,
+        "y": 912.859375,
+        "width": 32,
+        "height": 32
+      },
+      "typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 178.453125
+      },
+      "math:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 605.75,
+        "height": 289.40625
+      },
+      "math:#messages .katex": {
+        "x": 1131,
+        "y": 283.796875,
+        "width": 587.75,
+        "height": 170.1875
+      },
+      "mermaid:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 579.3125
+      },
+      "mermaid:.mermaid-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "diagram-download:.mermaid-toolbar button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "download-button": {
+        "x": 1712,
+        "y": 287.875,
+        "width": 26,
+        "height": 26
+      },
+      "dot:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 256.359375
+      },
+      "dot:.dot-diagram svg": {
+        "x": 1691,
+        "y": 294.875,
+        "width": 12,
+        "height": 12
+      },
+      "protein:.msg.assistant": {
+        "x": 1115,
+        "y": 253.546875,
+        "width": 631,
+        "height": 408.9375
+      },
+      "protein:.pdb-viewer canvas": {
+        "x": 1133,
+        "y": 380.875,
+        "width": 609,
+        "height": 239
+      },
+      "chemistry:.msg.assistant": {
+        "x": 1115,
+        "y": 276.765625,
+        "width": 631,
+        "height": 407.15625
+      },
+      "chemistry:.smiles-svg": {
+        "x": 1131,
+        "y": 305.09375,
+        "width": 460,
+        "height": 331
+      },
+      "take:.msg.assistant": {
+        "x": 1115,
+        "y": 276.765625,
+        "width": 605.75,
+        "height": 255.921875
+      },
+      "copy-button": {
+        "x": 1664.75,
+        "y": 280.765625,
+        "width": 24,
+        "height": 24
+      },
+      "agent-switch:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "timeline:#transcript-drawer": {
+        "x": 1460,
+        "y": 108,
+        "width": 300,
+        "height": 892
+      },
+      "timeline:.ts-row[data-s=\"462\"]": {
+        "x": 1467,
+        "y": 376,
+        "width": 287,
+        "height": 87
+      },
+      "sessions:#sessions-drawer": {
+        "x": 1480,
+        "y": 108,
+        "width": 280,
+        "height": 892
+      },
+      "sessions:#agent-session-line": {
+        "x": 1481,
+        "y": 237,
+        "width": 279,
+        "height": 41
+      },
+      "sessions-button": {
+        "x": 1648,
+        "y": 123,
+        "width": 28,
+        "height": 28
+      },
+      "agent-copy": {
+        "x": 1722,
+        "y": 243,
+        "width": 28,
+        "height": 28
+      }
+    },
+    "rows": [
+      {
+        "x": 1486,
+        "y": 312.3125,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 394.5625,
+        "width": 267,
+        "height": 52.9375
+      },
+      {
+        "x": 1486,
+        "y": 448.5,
+        "width": 267,
+        "height": 52.9375
+      }
+    ]
+  }
+}

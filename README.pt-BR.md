@@ -22,11 +22,10 @@ O browsa é uma extensão de painel lateral para Chrome / Edge. Traga um artigo,
 **Extensão gratuita, sob licença MIT.** Traga o seu próprio modelo ou agente. As chaves de API ficam armazenadas localmente e são usadas para autenticar nos serviços que você configurar.
 
 <p align="center">
-  <img src="docs/assets/readme/demo-v9.gif" alt="Demonstração do browsa: anexar a página atual e perguntar, fazer follow-up sobre uma frase selecionada, explicar uma seleção no lugar e ver uma estrutura proteica 3D ser renderizada dentro da resposta" width="720" />
+  <img src="docs/assets/readme/demo-v16-pt-br.gif" alt="O browsa aparece ao lado de um artigo de Transformers, mostra a equação e diagramas de atenção, vai aos pontos do podcast, copia notas, baixa imagens e demonstra como continuar a mesma sessão em um agente." width="720" />
 </p>
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Assista ao tour completo de um minuto</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a> — anexar &amp; perguntar · threads de follow-up · barra de seleção · linha do tempo de vídeo · diagramas &amp; 3D ao vivo · aprovações do agente
-</p>
+  <a href="docs/assets/promo/browsa-promo-v7-pt-br.mp4"><strong>▶ Vídeo completo · 68 segundos</strong></a> · <a href="https://xiaohuzai.github.io/browsa/pt-br/#demo"><strong>▶ Fique na página. Pergunte ao lado dela.</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube (demo anterior)</a> — Demonstração da interface real: abra o browsa, escolha ou alterne sua própria IA e agentes, anexe um artigo, aprofunde uma frase e veja fórmulas, fluxogramas e gráficos. Confira o conteúdo na linha do tempo do vídeo, gerencie várias sessões e continue no agente com o ID da sessão. Respostas, resultados salvos e a ilustração de continuidade na CLI usam dados de demonstração; a reprodução foi editada. Salvar arquivos depende do agente conectado.</p>
 
 ## Destaques
 

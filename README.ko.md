@@ -22,11 +22,10 @@ browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트
 **무료, MIT 라이선스 확장 프로그램입니다.** 모델이나 에이전트는 직접 준비해서 연결하세요. API 키는 로컬에 저장되며, 구성한 서비스를 인증할 때 사용됩니다.
 
 <p align="center">
-  <img src="docs/assets/readme/demo-v9.gif" alt="browsa 데모: 현재 페이지를 첨부해 질문하고, 선택한 문구에 후속 질문을 이어가며, 선택한 텍스트를 그 자리에서 설명하고, 3D 단백질 구조가 답변 안에서 렌더링되는 모습" width="720" />
+  <img src="docs/assets/readme/demo-v16-ko.gif" alt="browsa가 Transformer 기사 옆에서 어텐션 수식과 도표를 보여 주고 팟캐스트 핵심 시간으로 이동합니다. 노트 복사, 이미지 다운로드, 같은 세션을 에이전트에서 이어 가는 모습도 보여 줍니다." width="720" />
 </p>
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ 1분 전체 투어 보기</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a> — 첨부 &amp; 질문 · 후속 질문 스레드 · 선택 툴바 · 동영상 타임라인 · 실시간 다이어그램 &amp; 3D · 에이전트 승인
-</p>
+  <a href="docs/assets/promo/browsa-promo-v7-ko.mp4"><strong>▶ 전체 영상 · 68초</strong></a> · <a href="https://xiaohuzai.github.io/browsa/ko/#demo"><strong>▶ 페이지에 머무르고, 곁에서 물어보세요.</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube (이전 데모)</a> — 실제 UI 데모: browsa에서 내 AI와 에이전트를 선택하거나 전환하고, 글을 첨부해 한 문장을 더 질문하며 수식·흐름도·차트를 확인합니다. 영상 타임라인으로 내용을 검증하고 여러 세션을 관리하며, 세션 ID로 에이전트 쪽에서 작업을 이어갑니다. 답변·저장 결과·CLI 연결 화면은 데모 데이터이며 재생은 편집되었습니다. 파일 저장은 연결된 에이전트의 기능에 따라 달라집니다.</p>
 
 ## 주요 기능
 
