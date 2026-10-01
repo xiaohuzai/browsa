@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>Privacy Policy — browsa</title>
-<meta name="description" content="browsa privacy policy: no collection, no uploads, no accounts. Your data stays in your browser; network requests go only to endpoints you configure.">
+<meta name="description" content="browsa privacy policy: no telemetry or developer relay server. Local storage, page extraction and data sent to your configured model, Agent and analysis services.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <style>
@@ -52,46 +52,54 @@
   <a class="back" href="./">← back to browsa</a>
   <p class="eyebrow">privacy policy</p>
   <h1>Privacy Policy</h1>
-  <p class="updated">Effective date: September 26, 2026 · Applies to the browsa browser extension and this website</p>
+  <p class="updated">Effective date: October 1, 2026 · Applies to the browsa browser extension and this website</p>
 
   <div class="callout">
-    The one-line version: <b>browsa collects nothing.</b> No accounts, no analytics, no servers of ours. Your conversations, settings, and API keys live only inside your own browser.
+    <b>No browsa account, no telemetry, no developer relay server.</b> The extension stores settings and conversations locally. When you use AI features, your browser sends the relevant content directly to the model or Agent service you configure.
   </div>
 
-  <h2>What we collect</h2>
-  <p><b>Nothing.</b> browsa contains no telemetry, analytics, or tracking code of any kind. No usage data, page content, or personal information is ever sent to the developer or to any third-party service on our side. You can audit this claim — the source is public under the MIT license at <a href="https://github.com/xiaohuzai/browsa" style="color:var(--mark)">github.com/xiaohuzai/browsa</a>.</p>
+  <h2>What data is processed</h2>
+  <p>browsa processes the following data to provide reading and chat features. It does not send usage records, page content, or personal information to the developer, has no analytics, and does not sell user data. The source is publicly auditable under the MIT license at <a href="https://github.com/xiaohuzai/browsa" style="color:var(--mark)">github.com/xiaohuzai/browsa</a>.</p>
+  <ul>
+    <li><b>Pages and files:</b> the current page's URL, title, readable text and subtitles, plus documents, screenshots or images you attach. Content scripts on supported sites observe loaded data when the page loads so it can be extracted later; attachments provide conversation context.</li>
+    <li><b>Conversations and settings:</b> your questions, model replies, attachments, saved sessions, model and Agent configurations, and interface preferences.</li>
+    <li><b>Authentication information:</b> API keys you enter authenticate with their respective services; on-demand platform media retrieval may use that platform's login context.</li>
+    <li><b>Audio and video (optional):</b> media you choose to transcribe or analyze, used to produce transcripts, notes or audiovisual analysis.</li>
+  </ul>
 
   <h2>Where data lives</h2>
   <ul>
-    <li>Chat history, saved sessions, provider configs, and API keys are stored <b>exclusively in your browser's local storage</b> (<code>chrome.storage.local</code>) on your device.</li>
-    <li>Uninstalling the extension removes everything; clearing browser data removes it too.</li>
-    <li>browsa performs no cloud sync of any kind.</li>
+    <li>Chat history (including saved attachment images), saved sessions, service configurations, API keys and preferences stay in <code>chrome.storage.local</code> on your device. Temporary runtime state uses memory or <code>chrome.storage.session</code>. browsa provides no cloud sync.</li>
+    <li>You can delete messages or sessions and change configurations within the extension. Uninstalling removes its browser storage; files you exported must be deleted separately.</li>
+    <li>Data sent to a model, Agent or analysis service is processed and retained according to that service's settings and privacy policy. Deleting a local session does not delete copies held by the service.</li>
   </ul>
 
   <h2>Where network requests go</h2>
-  <p>browsa only makes network requests when you act, and <b>only to destinations you configure yourself</b>:</p>
   <ul>
-    <li><b>AI chat:</b> requests are sent by your browser directly to the provider address you entered in Settings (OpenAI, Anthropic, any OpenAI-compatible API, or local Ollama). They never pass through an intermediary server. Page content attached to a conversation passes through a local preprocessing step: sensitive URL parameters such as passwords, tokens, and signatures are masked before anything is sent — entirely inside your browser.</li>
-    <li><b>Speech transcription (optional):</b> only if you enable ASR and enter your own Volcengine Ark key — audio is transcoded locally, then uploaded by your browser straight to that service. If disabled, nothing runs.</li>
-    <li><b>Site extraction:</b> reads data the page itself already loaded (subtitles, article bodies) — no re-authentication, no uploading to third parties.</li>
-    <li><b>Audiovisual analysis (optional):</b> when you run transcription or deep reading on a video/audio, browsa fetches the media bytes from that platform's CDN on demand (connections open only on your action; requests carry the Referer/Cookie headers the CDN requires), then transcodes them locally and sends them to your configured analysis service. If unused, nothing happens.</li>
+    <li><b>Models and Agents:</b> conversations, questions and relevant attachments go directly to the address configured in Settings, without passing through a browsa developer server. API keys are transmitted to authenticate with their service. Connection checks also contact the configured service. An initiated turn may continue after you switch sessions.</li>
+    <li><b>Local parsing and model requests:</b> PDFs and Office documents are parsed into text and images on-device; those results can be attached and sent to your configured model or Agent. Recognized credentials in page-context URLs, such as tokens, passwords and signatures, are masked before sending. This is not a comprehensive filter for sensitive page text and does not rewrite URLs used to fetch resources.</li>
+    <li><b>Site extraction:</b> besides reading already-loaded data, browsa makes on-demand requests to the current site and its APIs for text, comments, subtitles, documents or media, including raw code files and arXiv paper metadata. Requests may use the browser's existing login context. arXiv metadata queries send a paper identifier, not conversations.</li>
+    <li><b>Audiovisual analysis (optional):</b> your browser retrieves media from its platform or CDN on demand, with that platform's Cookie or Referer headers where required. After local transcoding, it sends audio or analysis inputs to your configured transcription or analysis service. This processing occurs only when you enable and use the relevant features.</li>
+    <li><b>External reply resources:</b> displaying reply images contacts their source. Protein structures requested by identifier contact structure databases such as RCSB or AlphaFold and send the corresponding identifier. These requests do not send the full conversation.</li>
+    <li><b>Website:</b> web fonts come from Google Fonts, which your browser contacts directly for font resources. The website adds no analytics or tracking scripts. External links lead to sites with their own privacy policies.</li>
   </ul>
 
   <h2>Permission usage</h2>
   <ul>
-    <li><code>&lt;all_urls&gt;</code> / <code>tabs</code> / <code>scripting</code>: to read readable content from the page when you click 📎, inject read-only extraction scripts, and seek videos when you click a timestamp. Runs only on your action.</li>
-    <li><code>cookies</code>: read-only, used solely to read that platform's login context when audiovisual analysis fetches its media, so the CDN-required request headers can be built.</li>
-    <li><code>declarativeNetRequest</code>: temporary session-scoped rules that add Referer-type headers to those audiovisual media fetches (anti-hotlinking); removed after use and clear with the browser session.</li>
-    <li><code>downloads</code>: saves files you explicitly export (e.g. a diagram's "Export SVG").</li>
-    <li><code>webNavigation</code>: watches the current tab's URL changes so the side panel follows your navigation; its listeners are registered only while the side panel is open.</li>
-    <li><code>storage</code>: the local data described above.</li>
+    <li><code>&lt;all_urls&gt;</code> / <code>tabs</code> / <code>scripting</code>: read and attach pages, screenshots or documents, inject extraction scripts as needed, connect to configured services and seek videos when you click a timestamp. Supported-site observation scripts and selection tools load with the page. They do not upload your entire browsing history to the developer.</li>
+    <li><code>cookies</code>: read the platform's login context when audiovisual analysis retrieves its media, to construct required headers; not sent to the developer.</li>
+    <li><code>declarativeNetRequest</code>: temporary session rules add Referer-type headers during media retrieval; removed after use and cleared when the browser session ends.</li>
+    <li><code>webNavigation</code>: detect navigation while the side panel is open and update current-page information.</li>
+    <li><code>storage</code> / <code>unlimitedStorage</code>: save the local settings, conversations and attachments described above.</li>
+    <li><code>sidePanel</code> / <code>contextMenus</code>: display the chat side panel and context-menu actions.</li>
+    <li><code>alarms</code>: runtime maintenance such as clearing temporary stream state; not telemetry.</li>
   </ul>
 
-  <h2>Subprocessors and third parties</h2>
-  <p>browsa has no backend and therefore no subprocessors. You remain responsible for the privacy terms of the AI providers you configure; with local models such as Ollama, conversations never leave your device at all.</p>
+  <h2>Third-party services</h2>
+  <p>The browsa developer operates no backend for receiving extension data. Your chosen model, Agent and analysis services, and content-source sites, each have their own privacy terms. With an on-device model, model requests can stay on your device. Whether a local Agent calls external models or tools depends on its own configuration.</p>
 
   <h2>Children</h2>
-  <p>browsa collects no information from anyone of any age — there is no data to concern minors.</p>
+  <p>browsa does not request your age or target children for data collection. The age requirements and privacy policies of configured third-party services still apply.</p>
 
   <h2>Changes &amp; contact</h2>
   <p>Material changes will be posted on this page with an updated effective date. Questions? Open an issue at <a href="https://github.com/xiaohuzai/browsa/issues" style="color:var(--mark)">github.com/xiaohuzai/browsa/issues</a>.</p>

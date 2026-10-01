@@ -37,6 +37,8 @@ body {
    .messages/.msg.user/.msg.assistant/.quickbar/.qa-btn/.composer/
    .composer-box/.sendbtn/.composer-footer/.composerinfo and is gone. */
 .topbar {
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -62,8 +64,63 @@ body {
   background: var(--border-soft);
   order: 1;
 }
-.topbar .provider { order: 0; }
+.topbar .provider-control { order: 0; }
 .topbar .iconbtn { order: 2; }
+.topbar .toolbar-tools { order: 2; }
+
+.provider-control { flex: 1; min-width: 0; position: relative; display: flex; }
+.provider-control .provider { width: 100%; height: 40px; color: transparent; }
+.provider-control .provider option { color: var(--fg); }
+@media (forced-colors: active) {
+  .provider-control .provider { color: CanvasText; }
+  .provider-control .provider-caption { display: none; }
+}
+.provider-caption {
+  position: absolute;
+  inset: 0 26px 0 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: none;
+  line-height: 1.3;
+  min-width: 0;
+}
+.provider-caption span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#provider-primary { font-size: 12px; font-weight: 600; color: var(--fg); }
+#provider-secondary { font-size: 10px; color: var(--muted); }
+.toolbar-tools { position: relative; flex-shrink: 0; }
+.toolbar-tools > summary { list-style: none; }
+.toolbar-tools > summary::-webkit-details-marker { display: none; }
+.toolbar-tools[open] > summary { background: var(--bg-3); color: var(--fg); border-color: var(--border); }
+.toolbar-tools-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(252px, calc(100vw - 24px));
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.toolbar-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.toolbar-action svg { flex-shrink: 0; }
+.toolbar-action.active, .toolbar-action:hover, .toolbar-action:focus-visible { background: var(--hover-bg); color: var(--fg); }
 
 /* Live state indicator (idle / streaming / error) — a quiet dot next to the
    wordmark, driven by setStatusDotState() in sidepanel.js. Replaces an
@@ -1208,22 +1265,20 @@ math[display="block"] {
 /* ─── Quick action bar ──────────────────────────────────────────────────────── */
 .quickbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin: 0 12px 8px;
   padding: 5px 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
   flex-shrink: 0;
   /* border shorthand (was border-top) — the merged effective state draws the
      hairline on all four sides of the capsule dock. */
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg-2) 88%, transparent);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
 }
-.quickbar::-webkit-scrollbar { display: none; }
 .qa-btn {
   flex-shrink: 0;
   min-height: 26px;
@@ -1373,7 +1428,7 @@ math[display="block"] {
   field-sizing: content;
 }
 /* U14: placeholder contrast in the token (--fg-faint), not a 0.45 alpha dim. */
-#input::placeholder { color: var(--fg-faint); opacity: 1; }
+#input::placeholder { color: var(--muted); opacity: 1; }
 
 /* Attach / clear buttons */
 .attachbtn {
@@ -2047,6 +2102,8 @@ code.language-patch .hljs-addition { color: #7ee787; }
 }
 .session-item:hover .session-item-actions { opacity: 1; }
 .session-export-btn,
+.session-pin-btn,
+.session-rename-btn,
 .session-del-btn {
   display: inline-flex;
   align-items: center;
@@ -2063,7 +2120,7 @@ code.language-patch .hljs-addition { color: #7ee787; }
   min-width: 24px;
   min-height: 24px;
 }
-.session-export-btn:hover { color: var(--accent); }
+.session-export-btn:hover, .session-pin-btn:hover, .session-rename-btn:hover { color: var(--accent); background: var(--hover-bg); }
 .session-del-btn:hover { color: var(--err); }
 
 /* Pin toggle — same icon-button family as export/delete; pinned rows tint

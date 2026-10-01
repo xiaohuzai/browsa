@@ -76,7 +76,7 @@
       <p>When you switch to any agent, browsa asks what to do with the current conversation — carry it over as the new agent's first message, or start a new session from scratch; every reply is labeled with the provider / agent that produced it.</p>
 
       <h2>Filling in a provider card</h2>
-      <p>Open ⚙ Settings → LLM Providers. An empty <strong>LLM 1</strong> card is reserved for you — fill it in and Save. Providers live as tabs on one card; add more anytime with the <strong>＋</strong> tab at the end of the tab bar:</p>
+      <p>Open ⋯ → Settings → LLM Providers. An empty <strong>LLM 1</strong> card is reserved for you — fill it in and Save. Providers live as tabs on one card; add more anytime with the <strong>＋</strong> tab at the end of the tab bar:</p>
       <table class="doc-table">
         <thead><tr><th>Field</th><th>What to put</th></tr></thead>
         <tbody>
@@ -171,7 +171,7 @@ chmod 600 agents.json</pre>
   "bridges": [
     { "name": "codex",  "port": 3948, "apiKey": "", "sandbox": "workspace-write", "approval": "on-request" },
     { "name": "claude", "port": 3949, "apiKey": "" },
-    { "name": "pi",     "port": 3950, "apiKey": "" }
+    { "name": "pi",     "port": 3950, "apiKey": "" },
     { "name": "gemini", "port": 3951, "apiKey": "" }
   ]
 }</pre></li>
@@ -179,7 +179,7 @@ chmod 600 agents.json</pre>
 <pre class="doc-code">agent-bridge serve                                # reads ./agents.json
 agent-bridge serve --config /path/to/agents.json  # explicit config path
 #  add --bind 0.0.0.0 to expose it beyond this machine (then every entry needs an apiKey)</pre></li>
-        <li>In browsa ⚙ settings, select the <strong>Agent Bridge</strong> card and click <strong>＋ Add agent</strong> to add bridge addresses one per row (one agent per address, e.g. <code>http://127.0.0.1:3948</code>). Each row also takes an optional <strong>alias</strong> and that bridge's own <strong>API key</strong> — that key is the <em>bridge's own access token</em> (<code>apiKey</code> in <code>agents.json</code>), not a model-service key; leave both empty for purely local use;</li>
+        <li>In browsa ⋯ → Settings, select the <strong>Agent Bridge</strong> card and click <strong>＋ Add agent</strong> to add bridge addresses one per row (one agent per address, e.g. <code>http://127.0.0.1:3948</code>). Each row also takes an optional <strong>alias</strong> and that bridge's own <strong>API key</strong> — that key is the <em>bridge's own access token</em> (<code>apiKey</code> in <code>agents.json</code>), not a model-service key; leave both empty for purely local use;</li>
         <li>Hit <strong>Ping</strong> — every address is probed; rows with an empty alias are auto-filled from the agent name returned by /health, and everything shows in the status (e.g. <code>×4/4 healthy (codex, claude, pi, gemini)</code>). Each row carries its own status dot (gray = untested, green = reachable, red = down) and a <code>⟳</code> button to re-probe just that agent anytime;</li>
         <li>Back in the sidebar, the top dropdown lists them as "Agent Bridge · codex", each with its own ping status. Each agent keeps its own independent session thread; when you switch mid-conversation, browsa asks whether to <strong>carry the conversation over</strong> or <strong>start a new session</strong>.</li>
       </ol>

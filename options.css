@@ -468,6 +468,10 @@ details.provider-group[open] > .provider-group-header::before {
   background: var(--surface);
 }
 .model-chips .chip-x {
+  min-width: 24px;
+  min-height: 24px;
+  justify-content: center;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   background: none;
@@ -595,6 +599,11 @@ details.provider-group[open] > .provider-group-header::before {
 .bridge-row .bridge-row-x { color: var(--fg-2, var(--muted)); }
 .bridge-row .bridge-row-x:hover { color: var(--err); border-color: var(--border); }
 .bridge-key-eye {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -658,9 +667,9 @@ details.provider-group[open] > .provider-group-header::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   margin-left: auto;
   padding: 0;
   border: none;
@@ -754,6 +763,8 @@ input[type="range"] { accent-color: var(--accent); }
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 .inline-field label {
   font-size: 13px;
@@ -775,6 +786,9 @@ input[type="range"] { accent-color: var(--accent); }
    the System prompt card rendered with the browser-native (white, dark-mode
    clashing) chrome instead of the theme's input surface. */
 .inline-field select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
   font: inherit;
   font-size: 13px;
   padding: 7px 10px;
@@ -930,6 +944,11 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .apikey-wrap input { flex: 1; }
 .apikey-toggle {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -982,7 +1001,17 @@ input[type="range"] { accent-color: var(--accent); }
   .card-header, .card-body { padding-inline: 16px; }
   .fields { grid-template-columns: 1fr; }
   .field.field-full { grid-column: auto; }
+  .inline-field label { flex-basis: 100%; white-space: normal; }
+  .inline-field > button { flex-shrink: 0; }
+  .provider-group-header { flex-wrap: wrap; gap: 4px 8px; }
+  .provider-group-title { white-space: normal; }
+  .provider-group-desc { flex-basis: 100%; padding-left: 17px; line-height: 1.5; }
+  .provider h3 { flex-wrap: wrap; }
+  .provider h3 .provider-tabs { flex-basis: 100%; flex-shrink: 0; }
+  .provider-tabs .provider-tab { min-height: 28px; }
 }
+
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .common-settings-card {
   border-top-color: var(--gold);

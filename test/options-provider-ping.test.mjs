@@ -370,10 +370,10 @@ test('options.js: init() renders the agent squad (bridge + opencode + squilla + 
   assert.equal(document.querySelector('.provider-tab-add') != null, true, 'the ＋ add-provider tab is always present — even with the reserved slot');
 });
 
-test('options.js: settings header carries the usage-guide link (zh site by default, new tab)', () => {
+test('options.js: settings header carries the guide link matching the UI locale', () => {
   const a = document.getElementById('guideLink');
   assert.ok(a, 'guide link present in the settings page header');
-  assert.equal(a.href, 'https://xiaohuzai.github.io/browsa/guide/', 'default href points at the zh guide site');
+  assert.equal(a.href, 'https://xiaohuzai.github.io/browsa/en/guide/', 'auto on an English browser points at the English guide');
   assert.equal(a.target, '_blank', 'opens in a new tab so settings stay put');
   assert.equal(a.rel, 'noopener noreferrer');
 });

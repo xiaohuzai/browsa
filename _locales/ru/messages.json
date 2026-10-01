@@ -1645,5 +1645,11 @@
   "saveFailedContext": {
     "message": "Не сохранено: расширение было перезагружено. Обновите страницу и повторите",
     "description": "Shown when storage.set rejects (extension reloaded)"
+  },
+  "moreActions": {
+    "message": "Другие действия"
+  },
+  "renameSession": {
+    "message": "Переименовать диалог"
   }
 }

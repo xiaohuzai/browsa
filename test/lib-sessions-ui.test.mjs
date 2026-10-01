@@ -25,11 +25,25 @@ let serverSessions = [
 let localStore = {};
 let loadSessionOk = true; // B5 用例用：模拟 LOAD_SESSION 未命中（内层 ok:false）
 let saveSessionFails = false; // 空-origin 用例：模拟 SAVE_SESSION 没能保存（无 data.session）
+let failedMessageType = '';
+let noReceiverMessageType = '';
+let deferredSessionsResponse = null;
+let deferredRenameResponse = null;
 globalThis.chrome = {
   runtime: {
     sendMessage: (msg, cb) => {
       sentMessages.push(msg);
+      if (msg.type === failedMessageType) {
+        return cb({ ok: false, error: 'Storage write failed', code: 'Error', hint: '' });
+      }
+      if (msg.type === noReceiverMessageType) {
+        chrome.runtime.lastError = { message: 'Receiving end does not exist' };
+        cb(undefined);
+        chrome.runtime.lastError = undefined;
+        return;
+      }
       if (msg.type === 'GET_SESSIONS') {
+        if (deferredSessionsResponse) { deferredSessionsResponse(cb); return; }
         const q = String(msg.q || '').trim().toLowerCase();
         let list = [...serverSessions].reverse();
         if (q) {
@@ -37,7 +51,10 @@ globalThis.chrome = {
             s.name.toLowerCase().includes(q) ||
             (s.history || []).some(m => typeof m?.content === 'string' && m.content.toLowerCase().includes(q)));
         }
-        return cb({ data: { sessions: list } });
+        return cb({ ok: true, data: { sessions: list } });
+      }
+      if (msg.type === 'RENAME_SESSION' && deferredRenameResponse) {
+        deferredRenameResponse(cb); return;
       }
       if (msg.type === 'GET_SESSION_FULL') {
         const s = serverSessions.find(s => s.id === msg.id);
@@ -57,7 +74,7 @@ globalThis.chrome = {
         // 真实 envelope：外层 ok 恒 true，判据在内层 data.ok（B5 修复后的唯一读法）。
         return cb({ ok: true, data: { ok: loadSessionOk, len: loadSessionOk ? 2 : -1 } });
       }
-      cb({ ok: true });
+      cb({ ok: true, data: { ok: true } });
     },
     lastError: undefined,
   },
@@ -102,6 +119,9 @@ initSessionsUI({
 });
 
 function setupDom() {
+  closeSessionsDrawer();
+  const toastContainer = document.querySelector('.toast-container');
+  toastContainer?.replaceChildren();
   sentMessages.length = 0;
   deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
   deps.streaming = false; deps.stoppedWatching = false; deps.cancelledDrop = false; deps.resumed = false;
@@ -109,6 +129,11 @@ function setupDom() {
   localStore = {}; // 归属指针等 local 键随用例复位
   loadSessionOk = true;
   saveSessionFails = false;
+  failedMessageType = '';
+  noReceiverMessageType = '';
+  deferredSessionsResponse = null;
+  deferredRenameResponse = null;
+  initSessionsUI({ getAgentSessionInfo: async () => deps.agentSessionInfo });
   serverSessions = [
     { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
     { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
@@ -119,8 +144,76 @@ function setupDom() {
       <div id="agent-session-line" class="agent-session-line" hidden></div>
       <div id="sessions-list"></div>
     </div>`;
+  // The real toast utility owns a lazily created container across calls.
+  // Preserve that DOM node across fixtures instead of leaving it detached.
+  if (toastContainer) document.body.appendChild(toastContainer);
 }
 beforeEach(() => setupDom());
+
+test('direct rename action edits without loading and can be used again after cancel', async () => {
+  await renderSessionsList();
+  const row = document.querySelector('.session-item');
+  const rename = row.querySelector('.session-rename-btn');
+  assert.ok(rename, 'rename must be discoverable without a double-click');
+  rename.click();
+  assert.equal(row.querySelector('.session-rename-input')?.value, 'First session');
+  assert.equal(sentMessages.some(m => m.type === 'LOAD_SESSION'), false);
+  rename.click();
+  assert.equal(row.querySelectorAll('.session-rename-input').length, 1);
+  row.querySelector('.session-rename-input').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await new Promise(resolve => setImmediate(resolve));
+  document.querySelector('.session-rename-btn').click();
+  assert.equal(document.querySelector('.session-rename-input')?.value, 'First session');
+});
+
+for (const succeeds of [true, false]) {
+  test(`pending rename cannot reopen an editable done input and unlocks after ${succeeds ? 'success' : 'failure'}`, async () => {
+    await renderSessionsList();
+    const row = document.querySelector('.session-item');
+    const button = row.querySelector('.session-rename-btn');
+    button.click();
+    const input = row.querySelector('.session-rename-input');
+    input.value = 'First edit';
+    let reply;
+    deferredRenameResponse = cb => { reply = cb; };
+    button.focus(); // Tab from the input starts the blur save.
+    button.click(); // Keyboard activation must not revive the committed editor.
+    assert.ok(reply, 'blur must start the save');
+    assert.equal(input.disabled, true, 'saving input must not accept edits that cannot be saved');
+    assert.equal(button.disabled, true, 'cannot reopen this row until its save completes');
+    assert.notEqual(document.activeElement, input);
+    failedMessageType = 'GET_SESSIONS'; // Keep this row to check completion locally.
+    reply(succeeds ? { ok: true } : { ok: false, error: 'Storage write failed' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(row.querySelector('.session-rename-input'), null);
+    assert.equal(button.disabled, false);
+    button.click();
+    assert.equal(row.querySelector('.session-rename-input')?.value, succeeds ? 'First edit' : 'First session');
+    row.querySelector('.session-rename-input').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise(resolve => setImmediate(resolve));
+  });
+}
+
+test('a refresh started by rename blur cannot remove a newly opened editor', async () => {
+  await renderSessionsList();
+  const buttons = [...document.querySelectorAll('.session-rename-btn')];
+  buttons[0].focus(); buttons[0].click();
+  buttons[1].focus(); buttons[1].click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(document.querySelector('.session-rename-input')?.value, 'Second session');
+  assert.equal(document.activeElement, document.querySelector('.session-rename-input'));
+});
+
+test('a changed-name blur cannot replace an editor opened on another row', async () => {
+  await renderSessionsList();
+  const buttons = [...document.querySelectorAll('.session-rename-btn')];
+  buttons[0].focus(); buttons[0].click();
+  document.querySelector('.session-rename-input').value = 'Renamed first';
+  buttons[1].focus(); buttons[1].click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(document.querySelector('.session-rename-input')?.value, 'Second session');
+  assert.equal(document.activeElement, document.querySelector('.session-rename-input'));
+});
 
 // Auto-confirm any showConfirmDialog that pops up (used by delete/clear-all),
 // so tests exercising the "confirmed" path don't hang waiting for a click.
@@ -244,6 +337,130 @@ test('clearAllSessions sends CLEAR_ALL_SESSIONS when confirmed', async () => {
   assert.ok(sentMessages.some(m => m.type === 'CLEAR_ALL_SESSIONS'));
 });
 
+// A failed background envelope must stop each mutation's success branch.
+// These exercise the real row handlers, confirm dialog, and toast utility.
+for (const type of ['PIN_SESSION', 'DELETE_SESSION', 'RENAME_SESSION', 'CLEAR_ALL_SESSIONS']) {
+  test(`${type} surfaces a storage failure without claiming success`, async () => {
+    openSessionsDrawer();
+    await new Promise(resolve => setImmediate(resolve));
+    failedMessageType = type;
+    if (type === 'CLEAR_ALL_SESSIONS') {
+      const clearing = clearAllSessions();
+      await autoConfirm(true);
+      await clearing;
+    } else {
+      const item = document.querySelector('.session-item');
+      if (type === 'PIN_SESSION') {
+        item.querySelector('.session-pin-btn').click();
+      } else if (type === 'DELETE_SESSION') {
+        item.querySelector('.session-del-btn').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, ctrlKey: true }));
+      } else {
+        item.querySelector('.session-item-name').dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+        const input = item.querySelector('.session-rename-input');
+        input.value = 'Changed name';
+        input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      }
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    const errorToast = document.querySelector('.toast-error');
+    assert.ok(errorToast, 'a failed operation must have a visible error notification');
+    assert.match(errorToast.textContent, /Storage write failed/);
+    assert.equal(document.querySelector('.toast-success'), null, 'failed storage must never show a success toast');
+    assert.equal(document.querySelectorAll('.session-item').length, 2, 'saved sessions must remain available');
+    assert.equal(document.querySelector('.session-item-name').textContent, 'First session', 'failed rename must restore the previous name');
+    assert.equal(document.querySelector('.session-pin-btn').classList.contains('active'), false, 'failed pin must remain unpinned');
+  });
+}
+
+test('clearAllSessions surfaces a missing service worker instead of showing success', async () => {
+  noReceiverMessageType = 'CLEAR_ALL_SESSIONS';
+  const clearing = clearAllSessions();
+  await autoConfirm(true);
+  await clearing;
+  assert.match(document.querySelector('.toast-error')?.textContent || '', /Receiving end does not exist/);
+  assert.equal(document.querySelector('.toast-success'), null);
+});
+
+test('a failed sessions refresh preserves the visible list and reports the read error', async () => {
+  openSessionsDrawer();
+  await new Promise(resolve => setImmediate(resolve));
+  const visibleNames = ['First session', 'Second session'];
+  let reply;
+  deferredSessionsResponse = cb => { reply = cb; };
+  const refresh = renderSessionsList();
+  await new Promise(resolve => setImmediate(resolve));
+  const pendingNames = [...document.querySelectorAll('.session-item-name')].map(el => el.textContent);
+  reply({ ok: false, error: 'Storage read failed', code: 'Error', hint: '' });
+  await refresh;
+  assert.match(document.querySelector('.toast-error')?.textContent || '', /Storage read failed/);
+  assert.deepEqual(pendingNames, visibleNames, 'the previous list stays visible while its replacement is loading');
+  assert.deepEqual([...document.querySelectorAll('.session-item-name')].map(el => el.textContent), visibleNames,
+    'failed refresh must leave the previous sessions visible');
+  assert.equal(document.querySelector('.sessions-empty'), null, 'a read error is not an empty session store');
+});
+
+for (const ending of ['cancel', 'unchanged commit']) {
+  test(`${ending} exits session rename locally when the list refresh fails`, async () => {
+    openSessionsDrawer();
+    await new Promise(resolve => setImmediate(resolve));
+    const body = document.querySelector('.session-item-body');
+    body.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+    const input = body.querySelector('.session-rename-input');
+    if (ending === 'cancel') input.value = 'Discarded draft';
+    failedMessageType = 'GET_SESSIONS';
+    input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ending === 'cancel' ? 'Escape' : 'Enter', bubbles: true }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(body.querySelector('.session-rename-input'), null, 'ending the edit must remove its done input without relying on a refresh');
+    assert.equal(body.querySelector('.session-item-name')?.textContent, 'First session');
+    assert.equal(sentMessages.some(msg => msg.type === 'RENAME_SESSION'), false, 'cancel and no-op commits must not rename');
+    body.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+    assert.equal(body.querySelector('.session-rename-input')?.value, 'First session', 'F2 must be able to begin a new edit');
+  });
+}
+
+test('successful session rename exits the editor and uses the saved name when its refresh fails', async () => {
+  openSessionsDrawer();
+  await new Promise(resolve => setImmediate(resolve));
+  const body = document.querySelector('.session-item-body');
+  body.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'F2', bubbles: true }));
+  const input = body.querySelector('.session-rename-input');
+  input.value = 'Saved new name';
+  failedMessageType = 'GET_SESSIONS';
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(body.querySelector('.session-rename-input'), null, 'successful save must exit the editor before refreshing');
+  assert.equal(body.querySelector('.session-item-name')?.textContent, 'Saved new name');
+  body.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(getSessionsDrawer().hidden, true, 'the retained row must still load the session');
+  assert.match([...document.querySelectorAll('.toast-success')].map(el => el.textContent).join('\n'), /Loaded: "Saved new name"/,
+    'retained row handlers must use the latest saved name when loading');
+});
+
+test('a stale agent-session lookup cannot erase a newer session list or overwrite its agent id', async () => {
+  let resolveOldAgentInfo;
+  let lookupCount = 0;
+  initSessionsUI({
+    getAgentSessionInfo: () => ++lookupCount === 1
+      ? new Promise(resolve => { resolveOldAgentInfo = resolve; })
+      : Promise.resolve({ id: 'new-agent-session' }),
+  });
+  const oldRender = renderSessionsList();
+  await renderSessionsList();
+  assert.equal(document.querySelectorAll('.session-item').length, 2);
+  let resolveOldSessions;
+  deferredSessionsResponse = cb => { resolveOldSessions = cb; };
+  resolveOldAgentInfo({ id: 'old-agent-session' });
+  await new Promise(resolve => setImmediate(resolve));
+  // Always drain the old render, even when the assertion below fails.
+  const names = [...document.querySelectorAll('.session-item-name')].map(el => el.textContent);
+  const agentId = document.querySelector('.agent-session-id')?.title;
+  resolveOldSessions?.({ ok: true, data: { sessions: [] } });
+  await oldRender;
+  assert.deepEqual(names, ['First session', 'Second session'], 'old lookup completion must not clear a newer list');
+  assert.equal(agentId, 'new-agent-session', 'old lookup completion must not replace the current agent session');
+});
+
 test('loadSession keeps an in-flight reply running in the background, saves, loads, and clears pending images', async () => {
   // 2026-09-24：切换会话不再取消在途回复（旧行为把 thinking 烧几分钟的回复
   // 直接蒸发）——转后台 + 停止观看 + 把写入归属钉到来源会话。
@@ -343,6 +560,7 @@ test('agent-session line: hidden when there is no agent session (LLM provider / 
   assert.equal(line.hidden, true, 'the line must hide when the active provider has no agent session');
   assert.equal(line.innerHTML, '');
 });
+
 
 test('loading a saved conversation refreshes the visible Agent ID before the drawer is closed', async () => {
   const { getAgentSessionInfo } = await import('../lib/storage.js');

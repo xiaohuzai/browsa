@@ -1645,5 +1645,11 @@
   "saveFailedContext": {
     "message": "保存失败：扩展已重载，请刷新本页后重试",
     "description": "Shown when storage.set rejects (extension reloaded)"
+  },
+  "moreActions": {
+    "message": "更多操作"
+  },
+  "renameSession": {
+    "message": "重命名会话"
   }
 }

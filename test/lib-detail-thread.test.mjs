@@ -531,12 +531,10 @@ test('the card input recalls its own sent questions with ↑, never main-compose
   input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
   assert.equal(input.value, 'recall me later', '↑ recalls the just-sent card question, not the main-composer send');
 
-  // Typing disarms the walk and restores the pre-nav draft (nav started
-  // from an empty input) — same job attachDraftPersistence does for the
-  // main composer, minus draft persistence (the card is ephemeral).
+  // Editing a recalled question ends the walk while keeping the edit.
   input.value = 'typed during recall';
   input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
-  assert.equal(input.value, '');
+  assert.equal(input.value, 'typed during recall');
 
   // ↓ with no active walk is left alone (normal caret movement).
   input.value = 'fresh text';

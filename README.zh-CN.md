@@ -89,7 +89,7 @@ flowchart LR
 **接下来两种方式都一样：**
 
 1. 打开一篇文章，点击扩展工具栏图标，或按 `Ctrl+Shift+H`（macOS 为 `Command+Shift+H`）打开侧边栏。
-2. 进入 **⚙ 设置**，配置一个 LLM 或 Agent 服务商，点 **Ping** 验证连接。
+2. 进入 **⋯ → 设置**，配置一个 LLM 或 Agent 服务商，点 **Ping** 验证连接。
 3. 在侧边栏下拉框选择模型或 agent，点 **📎** 附加当前页面，再问第一个问题。
 
 完整步骤见[快速开始指南](https://xiaohuzai.github.io/browsa/guide/quickstart.html)。首次使用先连通服务即可，高级设置可以保留默认值。
@@ -111,7 +111,7 @@ npm run package      # → browsa-v<version>.zip
 
 ## 连接 Provider
 
-打开 ⚙ 设置，填好地址、点 **Ping**——验证连通性并自动检测能力；第一个验证通过的 provider 自动设为激活。两类后端：
+打开 ⋯ → 设置，填好地址、点 **Ping**——验证连通性并自动检测能力；第一个验证通过的 provider 自动设为激活。两类后端：
 
 - **Agent Provider（智能体）**——完整的智能体后端，在服务端执行工具（bash、文件操作、联网搜索……）。AI 真的能*做事*。
 - **LLM Provider（纯语言模型）**——仅用于对话的聊天端点。需填写模型 ID。
@@ -129,7 +129,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # 每个 entry 一座桥，端口写在 agents.json 里
 ```
 
-打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
+打开 ⋯ → 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。
 
 
 </details>
@@ -143,7 +143,7 @@ agent-bridge serve                                # 每个 entry 一座桥，端
 opencode serve --port 4096
 ```
 
-打开 ⚙ 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
+打开 ⋯ → 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
 
 </details>
 
@@ -172,7 +172,7 @@ hermes gateway
 # → [API Server] API server listening on http://127.0.0.1:8642
 ```
 
-**4. 配置 browsa**——打开 ⚙ 设置，选择 **Hermes Agent** provider。只需 Base URL 和 API key——它自己的 `/v1/runs` 协议会自动启用（无需选择 API 类型）。
+**4. 配置 browsa**——打开 ⋯ → 设置，选择 **Hermes Agent** provider。只需 Base URL 和 API key——它自己的 `/v1/runs` 协议会自动启用（无需选择 API 类型）。
 
 | 字段 | 值 |
 |---|---|
@@ -225,7 +225,7 @@ opensquilla gateway start
 3. **重启网关**（`Ctrl+C` 停掉，再 `opensquilla gateway start`）——配置只在启动时读一次。
 4. 跳到下方「配置 browsa」。
 
-**配置 browsa（两种方式相同）**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
+**配置 browsa（两种方式相同）**——打开 ⋯ → 设置，切到 **OpenSquilla** 标签：
 
 | 字段 | 值 |
 |---|---|
@@ -245,7 +245,7 @@ opensquilla gateway start
 
 任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。
 
-打开 ⚙ 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**。服务商以标签形式收在一张卡里，随时点标签栏末尾的 **＋** 新建：
+打开 ⋯ → 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**。服务商以标签形式收在一张卡里，随时点标签栏末尾的 **＋** 新建：
 
 | 字段 | 值 |
 |---|---|
@@ -321,7 +321,7 @@ opensquilla gateway start
 | 功能 | 说明 |
 |---|---|
 | **图片附件** | 直接把图片拖入或粘贴到输入框（用于多模态模型） |
-| **输入历史与草稿** | ↑/↓ 召回之前发送过的消息；未发送的草稿在面板关闭后仍在 |
+| **输入历史与草稿** | ↑/↓ 召回之前发送过的消息并继续编辑；↓ 越过最新一条恢复原草稿；未发送的草稿在面板关闭后仍在 |
 | **斜杠命令** | 输入 `/` 查看补全——见下表 |
 | **快捷操作** | 输入框上方的「总结 / 要点 / 解释 / → 中文 / 大纲」一键按钮 |
 | **浮动工具栏与右键菜单** | 在任意页面划选文字：提问 · 解释 · 翻译 · 总结——解释 / 翻译就地流式作答；提问 / 总结与右键菜单送侧栏 |
