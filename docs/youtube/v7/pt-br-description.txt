@@ -1,0 +1,26 @@
+Fique na página. Pergunte ao lado dela.
+browsa é uma extensão para Chrome / Edge que permite ler, perguntar e continuar trabalhando ao lado da página, com a IA que você já usa.
+
+O vídeo mostra quatro fluxos conectados:
+• Leia artigos, blogs e documentação técnica: anexe um artigo sobre Transformers, faça uma pergunta e selecione parte da resposta para aprofundar. Veja fórmulas LaTeX e diagramas Mermaid / Graphviz no painel lateral.
+• Assista a vídeos do YouTube / Bilibili: organize os pontos principais de uma entrevista em uma linha do tempo e clique em um horário para conferir o trecho original.
+• Troque de Agent: escolha levar a conversa atual para outro Agent e continue conversando.
+• Continue no seu Agent: copie mensagens, baixe imagens, salve e restaure conversas, e retome a mesma sessão do Agent. O exemplo usa o Codex.
+
+A extensão é gratuita e de código aberto (MIT). Conecte sua própria API de modelos, o Ollama ou um Agent compatível. O custo do modelo depende do seu provedor.
+
+Instale o browsa:
+https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho
+Site:
+https://xiaohuzai.github.io/browsa/pt-br/
+Guia de início (em inglês):
+https://xiaohuzai.github.io/browsa/en/guide/quickstart.html
+GitHub:
+https://github.com/xiaohuzai/browsa
+
+Demonstração editada do produto, com respostas de exemplo, uma entrevista fictícia original e um exemplo de continuação pela CLI. Os resultados dependem do modelo ou Agent configurado.
+
+Music: Cat Walk — Arulo / Mixkit
+https://mixkit.co/
+
+#browsa #IA #ChromeExtension
