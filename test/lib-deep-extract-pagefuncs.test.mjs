@@ -44,8 +44,10 @@ function makeCtx(html, { url = 'https://example.com/a' } = {}) {
   return {
     dom,
     ctx: vm.createContext({
-      document: dom.window.document,
-      location: { href: url },
+    document: dom.window.document,
+    // location.origin: detectIncompleteness 的同源 pin（2026-10-01）会读它——
+    // 沙盒哲学：函数摸到的全局必须在这里声明。
+    location: { href: url, origin: new URL(url).origin },
       getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
       URL: globalThis.URL,
       setTimeout,

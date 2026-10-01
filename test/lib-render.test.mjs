@@ -192,6 +192,66 @@ test('renderSafe: spaced formula "$ x^2 $" renders literal (Pandoc tight-opening
   assert.ok(html.includes('$ x^2 $'));
 });
 
+test('renderSafe: $…$ inside fenced/inline code is verbatim data, never extracted (2026-10-01 fence guard)', async () => {
+  // LaTeX tutorials deliberately put raw LaTeX inside a fence so it does NOT
+  // render; the old extraction swallowed it into a placeholder the moment the
+  // final renderSafe ran (streaming looked fine, DONE "broke" the bubble).
+  const html = await renderSafe('```latex\nThe formula $E = mc^2$ is famous.\n```');
+  assert.doesNotMatch(html, /<math/, 'fence content must not become KaTeX');
+  assert.ok(html.includes('$E = mc^2$'), 'fence body stays verbatim');
+  const html2 = await renderSafe('看 `x=$foo$bar` 与 $y^2$ 真公式');
+  assert.ok(html2.includes('x=$foo$bar'), 'inline code untouched');
+  assert.match(html2, /<math/, 'prose math still renders');
+});
+
+test('renderSafe: two fences each holding $$ never pair across the fence (echo $$ shell docs)', async () => {
+  // The block-math regex's [\s\S]*? used to pair the two $$ across the fences
+  // and everything in between became ONE giant invalid formula.
+  const html = await renderSafe('```bash\necho $$\n```\n\nbetween\n\n```bash\necho $$\n```');
+  assert.doesNotMatch(html, /<math/);
+  assert.equal((html.match(/echo \$\$/g) || []).length, 2, 'both fences keep their $$ verbatim');
+});
+
+test('sanitizeMarkmapNodeHtml strips script/iframe/event handlers, keeps benign formatting + anchors', async () => {
+  // markmap-lib parses with html:true and markmap-view lands node HTML in the
+  // extension page DOM via d3 innerHTML — before 2026-10-01 it was the only
+  // SVG renderer with NO sanitization (mermaid has sanitizeMermaidSvg).
+  const { sanitizeMarkmapNodeHtml } = await import('../lib/sidepanel/render.js');
+  const out = sanitizeMarkmapNodeHtml(
+    '<p><strong>hi</strong><script>alert(1)</script>' +
+    '<a href="https://evil.example">x</a>' +
+    '<img src="https://example.com/i.png">' +
+    '<iframe src="https://evil.example"></iframe>' +
+    '<b onclick="alert(1)">y</b></p>'
+  );
+  assert.doesNotMatch(out, /<script/);
+  assert.doesNotMatch(out, /<iframe/);
+  assert.doesNotMatch(out, /onclick/);
+  assert.match(out, /<strong>hi<\/strong>/);
+  assert.match(out, /href="https:\/\/evil\.example"/, 'benign anchors survive — decorateLinks adds target/rel separately');
+  assert.match(out, /<img/);
+});
+
+test('initMermaidTheme re-initializes on OS theme hot-switch (per-render parity with the other renderers)', async () => {
+  // The theme used to be snapshotted into mermaid.initialize ONCE at first
+  // module load — after an OS dark/light hot-switch, NEW diagrams kept the
+  // stale theme (echarts/markmap/dot/rdkit all re-read matchMedia per render).
+  const { initMermaidTheme } = await import('../lib/sidepanel/render.js');
+  const calls = [];
+  const fake = { initialize: (cfg) => calls.push(cfg.theme) };
+  const orig = window.matchMedia;
+  try {
+    window.matchMedia = () => ({ matches: true });
+    initMermaidTheme(fake);            // dark
+    window.matchMedia = () => ({ matches: false });
+    initMermaidTheme(fake);            // hot-switch → light
+    initMermaidTheme(fake);            // same theme → no-op
+  } finally {
+    window.matchMedia = orig;
+  }
+  assert.deepEqual(calls, ['dark', 'default'], 're-init only on theme change');
+});
+
 test('renderSafe: symbol-punctuation bold adjacent to CJK still parses (**2.5×**涨到)', async () => {
   const html = await renderSafe('硬科技占比从**2.5×**涨到**6×**');
   assert.doesNotMatch(html, /\*\*/, 'no literal ** may remain');

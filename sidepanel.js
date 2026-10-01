@@ -196,7 +196,7 @@ async function init() {
     stopWatchingStream: () => stopWatchingStream(),
     cancelStreamDrop: () => cancelStream({ salvage: false }),
     getTabId: () => streamTabIdOf(),
-    resumeInFlight: () => { resumeInFlightStream(); },
+    resumeInFlight: () => { resumeInFlightStream(streamTabIdOf()); },
     renderHistory,
     scrollToBottom,
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); },
@@ -365,6 +365,11 @@ async function init() {
   // Global shortcuts (Esc = cancel stream or close drawer/search, Ctrl+F = search)
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      // 顶层浮层占用短路（2026-10-01 审计）：确认框（.confirm-overlay，含上下文/
+      // 提示词检查器）与 native <dialog>（灯箱、截图裁剪）各有自己的 Esc 处理，
+      // 与这条 document 链并行注册——此前一次 Esc 既关浮层又穿透到链上（流式中
+      // 弹「清空」确认框，按 Esc 想反悔却把回复一起 cancel）。有浮层时链不接管。
+      if (document.querySelector('.confirm-overlay, dialog[open]')) return;
       if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
       if (isInMultiSelectMode()) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
@@ -453,7 +458,7 @@ async function init() {
     if (msg.type !== 'NAVIGATED') return;
     if (msg.tabId !== currentTabId) return; // firehose filter
     if (msg.closed) {
-      pagemetaEl.textContent = '(tab closed)';
+      pagemetaEl.textContent = _t('tabClosed', '(tab closed)');
       pagemetaEl.href = '#';
       pagemetaEl.title = '';
       diagnosticsEl.hidden = true;
@@ -623,7 +628,7 @@ async function init() {
   try {
     const { pendingUpdateNotice } = await storage.get(['pendingUpdateNotice']);
     if (pendingUpdateNotice) {
-      appendSystem(`🔄 browsa updated to v${pendingUpdateNotice} — if the floating toolbar doesn't respond on a page, refresh it once.`);
+      appendSystem(tSub('updatedNotice', `🔄 browsa updated to v${pendingUpdateNotice} — if the floating toolbar doesn't respond on a page, refresh it once.`, pendingUpdateNotice));
       await storage.remove('pendingUpdateNotice');
       chrome.action.setBadgeText({ text: '' });
     }
@@ -666,12 +671,14 @@ async function init() {
     scrollToBottomBtn.hidden = !isUserScrolledUp;
   }, { passive: true });
 
-  // Image lightbox — delegate click on all img inside messages
+  // Image lightbox — delegate click on all img inside messages. 用户贴图
+  // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
+  // 排除无注释无测试，20MB 截图只配 180×140 缩略还点不动，属漏配不属设计。
   messagesEl.addEventListener('click', (e) => {
     const ts = e.target.closest('.browsa-ts');
     if (ts) { onTimestampClick(ts); return; }
     const img = e.target.closest('img');
-    if (img && img.src && !img.closest('.msg-images')) {
+    if (img && img.src) {
       showImageLightbox(img.src, img.alt);
     }
   });
@@ -766,7 +773,7 @@ async function handleSelectionAction(action, text) {
       const preview = text.length > 80
         ? text.slice(0, 50) + ' … ' + text.slice(-25)
         : text;
-      appendAttachSystem(`📎 已附加：「${preview}」`, null, text, undefined, undefined, res.data?.attachId);
+      appendAttachSystem(tSub('chipAttachedQuote', '📎 已附加：「$1」', preview), null, text, undefined, undefined, res.data?.attachId);
     } else {
       appendError(res?.data?.error || _t('noSelectionText', '没有获取到选中文字，请重新选择'));
     }
@@ -989,12 +996,13 @@ function renderDiagnostics(ctx) {
   // Build the warning. The reasons array gives specific signals.
   const reasons = (ctx.xhsDegradeReasons || []).map((r) => `<code>${escM(r)}</code>`).join(', ');
   diagnosticsEl.hidden = false;
-  diagnosticsEl.innerHTML =
-    `小红书 content may be incomplete (${reasons}). ` +
+  diagnosticsEl.innerHTML = tSub('xhsDegradeBanner',
+    `小红书 content may be incomplete ($1). ` +
     `If you're not logged in to <code>xiaohongshu.com</code> in this browser, ` +
     `the XHR often returns a different note or a skeleton. ` +
     `Login there, reload this page, then re-send. ` +
-    `<em>Sent content still includes whatever was read; this is just a heads-up.</em>`;
+    `<em>Sent content still includes whatever was read; this is just a heads-up.</em>`,
+    reasons);
 }
 
 // Like renderDiagnostics but driven directly by a live XHR note we
@@ -1386,7 +1394,9 @@ function cancelStream({ salvage = true, detach = false } = {}) {
   // of a resumed stream (wasResumed=true). A resumed stream's "cancel"
   // is closer to "stop watching" — the LLM is still running for the
   // tab. Same UX though: the local assistant bubble is dropped.
-  if (!detach) appendSystem(wasResumed ? '⚠ Stopped watching resumed stream' : '⚠ Stream cancelled');
+  if (!detach) appendSystem(wasResumed
+    ? _t('stoppedWatchingResumed', '⚠ Stopped watching resumed stream')
+    : _t('streamCancelled', '⚠ Stream cancelled'));
 }
 
 // 切会话/新会话：停止观看（本地收尾同 cancelStream——端口分离、气泡定稿、
@@ -1583,7 +1593,7 @@ function removeImage(idx) {
 
 function refreshImageStrip() {
   renderImageStrip(imagePreviewsEl, images, removeImage);
-  imageInfoEl.textContent = images.length ? `+${images.length} image${images.length > 1 ? 's' : ''}` : '';
+  imageInfoEl.textContent = images.length ? tSub('imagesAttachedCount', `+${images.length} image${images.length > 1 ? 's' : ''}`, images.length) : '';
   updateComposerInfo();
 }
 
@@ -1754,8 +1764,10 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
 
     } else if (m.type === 'TOOL_PROGRESS') {
       turnChrome.stopWait();
-      state.toolEvents.push(m.text);
-      turnChrome.showToolProgress(target.getEl(), m.text);
+      // 背景推送带 msgKey 时走应用内语言字典（fallback 逐字 = 背景中文原文）
+      const ptext = m.msgKey ? _t(m.msgKey, m.text) : m.text;
+      state.toolEvents.push(ptext);
+      turnChrome.showToolProgress(target.getEl(), ptext);
 
     } else if (m.type === 'TS_STATUS') {
       turnChrome.stopWait();
@@ -1764,7 +1776,7 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       // tool-progress but NOT recorded into toolEvents, so DONE's
       // renderToolHistory won't render it as a tool event; DONE's
       // existing clearTurnChrome removes it.
-      turnChrome.showToolProgress(target.getEl(), m.text, 'warn');
+      turnChrome.showToolProgress(target.getEl(), m.msgKey ? _t(m.msgKey, m.text) : m.text, 'warn');
 
     } else if (m.type === 'APPROVAL') {
       turnChrome.stopWait();
@@ -1900,7 +1912,12 @@ async function onSend() {
   // Queue it instead; the dock above the composer drains automatically when
   // this turn finishes (maybeDrainFollowups in the DONE branch).
   if (activeController && !activeController.cancelled) {
-    enqueueFollowup(rawText);
+    // 入队失败 = 队列满：提示并保留输入。此前返回值被忽略，第 6 条起被静默
+    // 清空丢弃（无 toast、无 chip、不进 ↑ 召回）。
+    if (!enqueueFollowup(rawText)) {
+      showToast(_t('followupQueueFull', '排队已满（最多 5 条），先等当前回复完成'));
+      return;
+    }
     resetHistoryNav(inputEl); // 同 onSend：先复位召回态再清空
     inputEl.value = '';
     clearPersistedDraft();

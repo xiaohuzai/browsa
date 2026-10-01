@@ -255,6 +255,54 @@
     "message": "キューから削除",
     "description": "Follow-up queue chip: remove"
   },
+  "followupQueueFull": {
+    "message": "キューがいっぱいです（最大5件）。現在の返信の完了をお待ちください",
+    "description": "Toast when a mid-stream message can't be queued"
+  },
+  "ctxOverflowRetry": {
+    "message": "⚠️ 添付ファイルがモデルのコンテキスト上限を超えたため、切り詰めて自動再試行しました…",
+    "description": "Background push: overflow self-rescue"
+  },
+  "tsOutputContinuing": {
+    "message": "✍️ 返答が出力上限に達したため、自動的に続きを生成しています…",
+    "description": "Background push: output-cap continuation"
+  },
+  "tsSeeking": {
+    "message": "⏱ タイムスタンプを追加中…",
+    "description": "Background push: timestamp rewrite pass"
+  },
+  "toolHistorySteps": {
+    "message": "$1 ステップ",
+    "description": "Tool-history fold summary, $1 = event count"
+  },
+  "tabClosed": {
+    "message": "(タブが閉じられました)",
+    "description": "Page-meta line when the watched tab closes"
+  },
+  "updatedNotice": {
+    "message": "🔄 browsa を v$1 に更新しました。ページ上でフローティングツールバーが反応しないときは、ページを一度再読み込みしてください。",
+    "description": "One-time system notice after an extension update, $1 = version"
+  },
+  "chipAttachedQuote": {
+    "message": "📎 添付しました：「$1」",
+    "description": "Selection-attach chip, $1 = preview"
+  },
+  "xhsDegradeBanner": {
+    "message": "小红書のコンテンツは不完全な可能性があります（$1）。このブラウザで <code>xiaohongshu.com</code> にログインしていない場合、XHR は別のノートや空枠を返すことがよくあります。同サイトでログインし、このページを再読み込みしてから再送信してください。<em>送信済みの内容には実際に読み取れた部分がそのまま含まれます。これはあくまで注意喚起です。</em>",
+    "description": "Diagnostics banner: XHS extraction degraded, $1 = reason list (controlled HTML)"
+  },
+  "streamCancelled": {
+    "message": "⚠ 返信をキャンセルしました",
+    "description": "System line after a user cancel"
+  },
+  "stoppedWatchingResumed": {
+    "message": "⚠ バックグラウンドの返信の追跡を停止しました",
+    "description": "System line after cancelling a resumed (background) stream"
+  },
+  "imagesAttachedCount": {
+    "message": "画像 $1 枚を添付",
+    "description": "Composer image-strip counter, $1 = image count"
+  },
   "pinnedGroupLabel": {
     "message": "ピン留め",
     "description": "Sessions drawer pinned group header"

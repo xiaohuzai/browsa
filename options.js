@@ -61,6 +61,10 @@ async function init() {
   syncGuideLink();
 
   cachedCfg = await storage.getAll();
+  // localAgentTab 是 targeted-read 键（不在 GET_ALL_KEYS），getAll 读不到——
+  // 补一次定向读回。此前持久化是单向的：切换时写了 storage.set，却从来没人
+  // 读回，每次打开设置页都回落「唯一已配置/activeProvider/bridge」启发式。
+  try { cachedCfg.localAgentTab = (await storage.get('localAgentTab'))?.localAgentTab || cachedCfg.localAgentTab; } catch (_) {}
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
   applyAsr(cachedCfg);

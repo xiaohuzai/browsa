@@ -37,9 +37,9 @@ test('reasoningLevelOptions: auto leads the model vocabulary', () => {
 
 // --------------- level resolution precedence --------------------------------
 
-test('resolveReasoningLevel: per-model override beats card default beats auto', () => {
+test('resolveReasoningLevel: card default beats auto (per-model override branch removed 2026-10-01 — no UI ever wrote reasoningByModel)', () => {
   const provider = { reasoningDefault: 'low', reasoningByModel: { 'gpt-5.6': 'high' } };
-  assert.equal(resolveReasoningLevel(provider, 'gpt-5.6'), 'high');
+  assert.equal(resolveReasoningLevel(provider, 'gpt-5.6'), 'low');
   assert.equal(resolveReasoningLevel(provider, 'claude-sonnet-5'), 'low');
   assert.equal(resolveReasoningLevel({}, 'claude-sonnet-5'), 'auto');
 });
