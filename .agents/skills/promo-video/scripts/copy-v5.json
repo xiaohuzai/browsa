@@ -1,0 +1,1633 @@
+{
+  "en": {
+    "locale": "en",
+    "htmlLang": "en",
+    "brandTag": "Ask right where you read.",
+    "chapters": [
+      {
+        "eyebrow": "READ",
+        "title": [
+          "Read a page.",
+          "Find your answer."
+        ],
+        "sub": "Keep the page in view. Ask beside it."
+      },
+      {
+        "eyebrow": "ATTACH",
+        "title": [
+          "Bring the page",
+          "into the chat."
+        ],
+        "sub": "Attach what you’re reading. Ask for what matters."
+      },
+      {
+        "eyebrow": "FOLLOW UP",
+        "title": [
+          "One sentence.",
+          "A deeper answer."
+        ],
+        "sub": "Select a line and ask a focused follow-up."
+      },
+      {
+        "eyebrow": "WATCH",
+        "title": [
+          "Find the idea.",
+          "Jump to the moment."
+        ],
+        "sub": "Click a timestamp to return to the explanation."
+      },
+      {
+        "eyebrow": "KEEP",
+        "title": [
+          "A useful page.",
+          "A note to keep."
+        ],
+        "sub": "A connected Agent can prepare a file for your approval."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Read. Ask.",
+          "Keep going."
+        ],
+        "sub": "Your next question belongs right beside the page."
+      }
+    ],
+    "q1": "Give me 3 key points from this page",
+    "a1": "For non-shared WebAssembly memory:\n\n- Each page is 64 KiB.\n- After grow(), old views are detached.\n- Recreate views from memory.buffer after growing.",
+    "phrase": "old views are detached",
+    "q2": "Why do old views stop working? How do I avoid it?",
+    "a2": "For non-shared memory, grow() detaches the old buffer. Views over that buffer stop working.\n\nAfter growing, create a new Uint8Array(memory.buffer). Use the new view for subsequent reads and writes.",
+    "agentQ": "Combine the article and podcast insights in a Markdown code note",
+    "agentTools": [
+      "Read the page",
+      "Extract code snippets",
+      "Prepare the Markdown file"
+    ],
+    "approvalDescription": "Create a new Markdown file with the article’s code snippets.",
+    "agentA": "Combined the article and podcast insights in `~/notes/wasm-memory.md`.\n\n- Each page is 64 KiB.\n- Recreate views after grow().\n- Podcast [07:42] confirms the same rule.",
+    "videoTitle": "Engineers on WebAssembly memory",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Let’s look at how non-shared WebAssembly memory works."
+      },
+      {
+        "time": 130,
+        "text": "Memory is measured in pages. Each page holds 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "After grow(), old views are detached. Recreate them from memory.buffer."
+      },
+      {
+        "time": 860,
+        "text": "Keep the new view for later reads and writes."
+      }
+    ],
+    "videoQ": "Find this podcast’s key points about memory growth, with timestamps",
+    "videoA": "- [02:10] Memory grows in pages of 64 KiB.\n- [07:42] For non-shared memory, recreate views from memory.buffer after grow().",
+    "lessonLabels": [
+      "What happens to old views after growth?",
+      "grow()",
+      "recreate views"
+    ],
+    "cta": "Chrome / Edge extension · Bring your own AI.",
+    "disclaimer": "Demo data · playback edited",
+    "demoAlt": "The browsa browser extension opens beside an article, attaches it to the chat, and answers a focused follow-up about a selected sentence.",
+    "videoHeading": "Your page. Your AI. From reading to action.",
+    "videoDesc": "Open the browsa browser extension, connect your own AI or Agent, attach an article, ask about a sentence, and verify a video timestamp. File saving depends on the connected Agent. Demo responses and Agent results; playback edited.",
+    "identity": "Chrome / Edge browser extension",
+    "setupNote": "Connect your own AI or Agent to get started.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Free · MIT",
+      "7 languages"
+    ],
+    "article": {
+      "title": "WebAssembly memory: grow without stale views",
+      "dek": "Three practical rules for working with non-shared WebAssembly memory in JavaScript.",
+      "sections": [
+        {
+          "heading": "01 · Count pages, not bytes",
+          "text": "WebAssembly memory uses pages of 64 KiB (65,536 bytes). Two initial pages provide 128 KiB.\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · Growth changes the buffer",
+          "text": "For non-shared memory, memory.grow() detaches the old ArrayBuffer. Typed-array views over that buffer can no longer be used for ordinary reads and writes.\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · Refresh your view",
+          "text": "Create a new view from memory.buffer after calling grow(). Keep this new view for later reads and writes.\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "This example uses non-shared memory. Shared WebAssembly memory has different buffer behavior."
+    },
+    "titles": [
+      {
+        "kicker": "BROWSER",
+        "title": "Your page. Your AI.",
+        "sub": "Open browsa beside the page you’re reading."
+      },
+      {
+        "kicker": "CONNECT",
+        "title": "Your AI. Your choice of Agent.",
+        "sub": "Switch between Codex, Claude Code, pi and more."
+      },
+      {
+        "kicker": "READ",
+        "title": "One page. Three key points.",
+        "sub": "Attach the article and ask what matters."
+      },
+      {
+        "kicker": "GO DEEPER",
+        "title": "One sentence. A deeper answer.",
+        "sub": "Ask about a selected line in its own thread."
+      },
+      {
+        "kicker": "VERIFY",
+        "title": "A video timeline you can revisit.",
+        "sub": "Browse the transcript and jump back to the explanation."
+      },
+      {
+        "kicker": "ACT",
+        "title": "From reading to a saved note.",
+        "sub": "Your connected Agent requests approval before writing."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Ask right where you read.",
+        "sub": "Read, understand, and keep going with your AI."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "RENDER",
+      "title": "Answers beyond text.",
+      "sub": "Formulas, code, diagrams and charts. Right in the chat."
+    },
+    "sessionsTitle": {
+      "title": "Every conversation has a place.",
+      "sub": "Save, pin and switch. Return to the question."
+    },
+    "relayTitle": {
+      "title": "Start here. Continue with your Agent.",
+      "sub": "Copy the session ID and resume in the connected Agent."
+    },
+    "storyTitles": [
+      {
+        "title": "Turn an article and podcast into code notes.",
+        "sub": "Understand the rule. Check the discussion. Let Codex add an example."
+      },
+      {
+        "title": "Start with the rules in the article.",
+        "sub": "Attach this page and ask for three key points."
+      },
+      {
+        "title": "Wait. Why do old views stop working?",
+        "sub": "Select that sentence and clarify it in a separate thread."
+      },
+      {
+        "title": "Make the rule visible.",
+        "sub": "A formula, a flowchart and a chart explain the same idea."
+      },
+      {
+        "title": "Check what the engineers say.",
+        "sub": "Podcast key points on a timeline. Click 07:42 to verify the rule."
+      },
+      {
+        "title": "Now ask Codex to write the note.",
+        "sub": "Switch Agents, approve the write, keep article and podcast insights."
+      },
+      {
+        "title": "Return to this research. Keep going.",
+        "sub": "Article, podcast and code notes stay in separate saved sessions."
+      },
+      {
+        "title": "The note is ready. Add a working example.",
+        "sub": "Copy the session ID and continue the same discussion in Codex."
+      },
+      {
+        "title": "From a page to your next action.",
+        "sub": "Chrome / Edge extension · Bring your own AI."
+      }
+    ],
+    "continueQ": "Add a runnable JavaScript example to this note",
+    "artifactTitle": "CODE NOTES / wasm-memory.md",
+    "storyGoal": "Learn → note → example",
+    "podcast": {
+      "label": "DEMO PODCAST · KEY POINTS",
+      "host": "HOST",
+      "guest": "GUEST",
+      "topic": "What happens to old views after growth?"
+    },
+    "sessionNames": [
+      "WebAssembly reading",
+      "Podcast key points",
+      "Code notes"
+    ],
+    "progressLabels": [
+      "Build code notes",
+      "Check podcast insights",
+      "Add a code example"
+    ]
+  },
+  "zh": {
+    "locale": "zh_CN",
+    "htmlLang": "zh-CN",
+    "brandTag": "读到哪，问到哪。",
+    "chapters": [
+      {
+        "eyebrow": "阅读",
+        "title": [
+          "读一页内容，",
+          "找到你的答案。"
+        ],
+        "sub": "页面就在眼前，问题就在旁边。"
+      },
+      {
+        "eyebrow": "附加",
+        "title": [
+          "把眼前这一页，",
+          "带进对话。"
+        ],
+        "sub": "附加正在读的内容，问你关心的问题。"
+      },
+      {
+        "eyebrow": "追问",
+        "title": [
+          "一句话，",
+          "再问深一点。"
+        ],
+        "sub": "选中一句话，展开针对它的追问。"
+      },
+      {
+        "eyebrow": "观看",
+        "title": [
+          "找到要点，",
+          "回到那一刻。"
+        ],
+        "sub": "点击时间戳，跳回视频里的解释。"
+      },
+      {
+        "eyebrow": "留存",
+        "title": [
+          "一页好内容，",
+          "一份可留的笔记。"
+        ],
+        "sub": "接入的智能体可以整理文件，等你确认写入。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "读到哪，问到哪。",
+          "让阅读继续。"
+        ],
+        "sub": "下一个问题，就在页面旁边。"
+      }
+    ],
+    "q1": "帮我提炼这页的 3 个要点",
+    "a1": "针对非共享 WebAssembly 内存：\n\n- 每页大小为 64 KiB。\n- grow() 后，旧视图会失效。\n- 扩容后，用 memory.buffer 重新创建视图。",
+    "phrase": "旧视图会失效",
+    "q2": "为什么旧视图会失效？怎么避免？",
+    "a2": "非共享内存调用 grow() 后，旧缓冲区会被分离，指向它的视图就无法继续使用。\n\n扩容后，重新创建 Uint8Array(memory.buffer)，后续读写改用新视图。",
+    "agentQ": "把文章和这集播客的要点整理成 Markdown 代码笔记",
+    "agentTools": [
+      "读取页面内容",
+      "提取代码片段",
+      "准备笔记文件"
+    ],
+    "approvalDescription": "新建 Markdown 文件，收录文章中的代码片段。",
+    "agentA": "已整理文章和播客观点，保存到 `~/notes/wasm-memory.md`。\n\n- 每页 64 KiB。\n- grow() 后重建视图。\n- 播客 [07:42] 核对了同一条规则。",
+    "videoTitle": "两位工程师聊 WebAssembly 内存",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "我们来看看非共享 WebAssembly 内存是怎么工作的。"
+      },
+      {
+        "time": 130,
+        "text": "内存以页为单位，每页大小为 64 KiB。"
+      },
+      {
+        "time": 462,
+        "text": "grow() 后，旧视图会失效，要用 memory.buffer 重新创建。"
+      },
+      {
+        "time": 860,
+        "text": "之后的读取和写入，都使用这个新视图。"
+      }
+    ],
+    "videoQ": "找出这集播客关于内存扩容的关键观点，附上时间点",
+    "videoA": "- [02:10] 内存按页扩容，每页 64 KiB。\n- [07:42] 非共享内存调用 grow() 后，要用 memory.buffer 重建视图。",
+    "lessonLabels": [
+      "扩容之后，旧视图发生了什么？",
+      "grow()",
+      "重建视图"
+    ],
+    "cta": "Chrome / Edge 浏览器插件 · 带上你自己的 AI。",
+    "disclaimer": "演示数据 · 播放经过剪辑",
+    "demoAlt": "browsa 浏览器插件在文章旁边打开，将页面附加到对话，并针对选中的一句话继续追问。",
+    "videoHeading": "眼前的页面，你的 AI。从读懂，到做完。",
+    "videoDesc": "打开 browsa 浏览器插件，接入自己的 AI 或智能体，附加文章、针对一句话追问，再点击时间戳核对视频。保存文件的能力取决于接入的智能体。回复与智能体结果使用演示数据，播放经过剪辑。",
+    "identity": "Chrome / Edge 浏览器插件",
+    "setupNote": "开始前，请连接你自己的 AI 或智能体。",
+    "badges": [
+      "PDF",
+      "Office",
+      "免费 · MIT 开源",
+      "7 种语言"
+    ],
+    "article": {
+      "title": "WebAssembly 内存：扩容后，别忘了重建视图",
+      "dek": "用三个实用规则，理解 JavaScript 中的非共享 WebAssembly 内存。",
+      "sections": [
+        {
+          "heading": "01 · 按页计算，而不是按字节",
+          "text": "WebAssembly 内存以页为单位，每页 64 KiB，即 65,536 字节。初始分配两页，就有 128 KiB 内存。\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · 扩容会改变缓冲区",
+          "text": "非共享内存调用 memory.grow() 后，旧的 ArrayBuffer 会被分离。指向旧缓冲区的类型化数组视图，无法继续正常读写。\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · 重新创建视图",
+          "text": "调用 grow() 后，用 memory.buffer 创建新的视图。后续读取和写入，都使用新视图。\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "本示例使用非共享内存；共享 WebAssembly 内存的缓冲区行为有所不同。"
+    },
+    "titles": [
+      {
+        "kicker": "浏览器",
+        "title": "眼前的页面，你的 AI。",
+        "sub": "打开 browsa，在页面旁边开始对话。"
+      },
+      {
+        "kicker": "连接",
+        "title": "自己选 AI，也能切换 Agent。",
+        "sub": "Codex、Claude Code、pi 等，按需切换。"
+      },
+      {
+        "kicker": "阅读",
+        "title": "一页内容，三个要点。",
+        "sub": "附加正在读的文章，问你关心的问题。"
+      },
+      {
+        "kicker": "深入",
+        "title": "一句话，再问深一点。",
+        "sub": "选中一句话，在独立对话里继续追问。"
+      },
+      {
+        "kicker": "核对",
+        "title": "时间线，把视频变成可查的笔记。",
+        "sub": "浏览字幕、点击时间戳，回到原来的解释。"
+      },
+      {
+        "kicker": "行动",
+        "title": "从读懂，到留下一份笔记。",
+        "sub": "接入的智能体在写入前，请你确认。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "读到哪，问到哪。",
+        "sub": "带着你的 AI，让阅读继续。"
+      }
+    ],
+    "renderTitle": {
+      "kicker": "呈现",
+      "title": "回答，不止是文字。",
+      "sub": "公式、代码、流程图、数据图表，直接呈现。"
+    },
+    "sessionsTitle": {
+      "title": "会话，各有位置。",
+      "sub": "保存、置顶、切换，随时回到原来的问题。"
+    },
+    "relayTitle": {
+      "title": "浏览器里开始，Agent 里继续。",
+      "sub": "复制同一会话 ID，在接入的 Agent 侧接着做。"
+    },
+    "storyTitles": [
+      {
+        "title": "把文章和播客，整理成一份代码笔记。",
+        "sub": "读懂规则、核对观点，再让 Codex 补一个示例。"
+      },
+      {
+        "title": "先把文章里的规则读懂。",
+        "sub": "附加这篇文章，让 AI 提炼三个要点。"
+      },
+      {
+        "title": "等等，旧视图为什么会失效？",
+        "sub": "选中这句话，在独立对话里问清原因。"
+      },
+      {
+        "title": "把刚才的规则，画出来。",
+        "sub": "公式算容量，流程图解释扩容，图表对比变化。"
+      },
+      {
+        "title": "再听听工程师怎么说。",
+        "sub": "播客关键观点按时间排列，点击 07:42 核对这条规则。"
+      },
+      {
+        "title": "现在，交给 Codex 整理笔记。",
+        "sub": "切换智能体，确认写入，把文章与播客的观点一起留住。"
+      },
+      {
+        "title": "回到这次研究，接着做。",
+        "sub": "文章、播客、代码笔记分别保存，同一任务随时找回来。"
+      },
+      {
+        "title": "笔记有了，再补一个运行示例。",
+        "sub": "复制会话 ID，在 Codex 里接着做，保留这次讨论。"
+      },
+      {
+        "title": "从一页内容，到下一步行动。",
+        "sub": "Chrome / Edge 浏览器插件 · 带上你自己的 AI。"
+      }
+    ],
+    "continueQ": "给这份笔记补一个可运行的 JavaScript 示例",
+    "artifactTitle": "代码笔记 / wasm-memory.md",
+    "storyGoal": "学习 → 笔记 → 示例",
+    "podcast": {
+      "label": "播客演示节目 · 关键观点",
+      "host": "主持人",
+      "guest": "嘉宾",
+      "topic": "扩容之后，旧视图发生了什么？"
+    },
+    "sessionNames": [
+      "WebAssembly 阅读",
+      "播客关键观点",
+      "代码笔记"
+    ],
+    "progressLabels": [
+      "整理代码笔记",
+      "核对播客观点",
+      "补全代码示例"
+    ]
+  },
+  "ja": {
+    "locale": "ja",
+    "htmlLang": "ja",
+    "brandTag": "読んでいる、その場で聞く。",
+    "chapters": [
+      {
+        "eyebrow": "読む",
+        "title": [
+          "ページを読む。",
+          "答えが見つかる。"
+        ],
+        "sub": "ページを見ながら、すぐ隣で質問。"
+      },
+      {
+        "eyebrow": "添付",
+        "title": [
+          "このページを、",
+          "会話に添える。"
+        ],
+        "sub": "読んでいる内容を添付して、知りたいことを聞く。"
+      },
+      {
+        "eyebrow": "深掘り",
+        "title": [
+          "気になる一文を、",
+          "もっと深く。"
+        ],
+        "sub": "一文を選んで、その内容を掘り下げる。"
+      },
+      {
+        "eyebrow": "見る",
+        "title": [
+          "要点を見つけ、",
+          "その場面へ。"
+        ],
+        "sub": "タイムスタンプを押して、動画の説明に戻る。"
+      },
+      {
+        "eyebrow": "残す",
+        "title": [
+          "役立つページを、",
+          "残せるノートに。"
+        ],
+        "sub": "接続したエージェントがファイルを用意し、承認を待ちます。"
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "読む。聞く。",
+          "続きを読もう。"
+        ],
+        "sub": "次の質問も、ページのすぐ隣で。"
+      }
+    ],
+    "q1": "このページの要点を3つ教えて",
+    "a1": "非共有の WebAssembly メモリでは：\n\n- 1ページは 64 KiB。\n- grow() 後、古いビューは使えなくなる。\n- 拡張後は memory.buffer からビューを作り直す。",
+    "phrase": "古いビューは使えなくなる",
+    "q2": "古いビューが使えなくなるのはなぜ？どう対処する？",
+    "a2": "非共有メモリで grow() を呼ぶと、古いバッファが切り離され、それを参照するビューは使えなくなります。\n\n拡張後に Uint8Array(memory.buffer) を作り直し、その後の読み書きには新しいビューを使います。",
+    "agentQ": "記事とポッドキャストの要点をMarkdownノートに整理して",
+    "agentTools": [
+      "ページを読む",
+      "コードを抽出",
+      "ノートを用意"
+    ],
+    "approvalDescription": "記事のコード例を含む Markdown ファイルを新規作成します。",
+    "agentA": "記事とポッドキャストの要点を `~/notes/wasm-memory.md` に保存。\n\n- 1ページは64 KiB。\n- grow()後にビューを再作成。\n- ポッドキャスト [07:42] でも確認。",
+    "videoTitle": "エンジニアが語るWebAssemblyメモリ",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "非共有の WebAssembly メモリのしくみを見ていきましょう。"
+      },
+      {
+        "time": 130,
+        "text": "メモリはページ単位です。1ページは 64 KiB です。"
+      },
+      {
+        "time": 462,
+        "text": "grow() 後、古いビューは使えなくなります。memory.buffer から作り直します。"
+      },
+      {
+        "time": 860,
+        "text": "その後の読み書きには、新しいビューを使います。"
+      }
+    ],
+    "videoQ": "メモリ拡張についての要点を時刻付きでまとめて",
+    "videoA": "- [02:10] メモリは1ページ 64 KiB 単位で拡張する。\n- [07:42] 非共有メモリでは grow() 後、memory.buffer からビューを作り直す。",
+    "lessonLabels": [
+      "拡張後、古いビューはどうなる？",
+      "grow()",
+      "ビューを再作成"
+    ],
+    "cta": "Chrome / Edge拡張機能 · 自分のAIと。",
+    "disclaimer": "デモデータ · 再生は編集済み",
+    "demoAlt": "ブラウザー拡張機能 browsa を記事の隣で開き、ページを会話に添付して、選んだ一文を掘り下げるデモ。",
+    "videoHeading": "このページに、あなたの AI。理解から実行へ。",
+    "videoDesc": "ブラウザー拡張機能 browsa を開き、自分の AI やエージェントを接続。記事の添付、一文の深掘り、動画のタイムスタンプでの確認まで。ファイル保存は接続するエージェントに依存します。応答とエージェントの結果はデモデータ、再生は編集済みです。",
+    "identity": "Chrome / Edge ブラウザー拡張機能",
+    "setupNote": "利用前に、自分の AI またはエージェントを接続してください。",
+    "badges": [
+      "PDF",
+      "Office",
+      "無料 · MIT",
+      "7言語"
+    ],
+    "article": {
+      "title": "WebAssembly メモリ：拡張後はビューを作り直す",
+      "dek": "JavaScript で非共有の WebAssembly メモリを扱うための、3つの実用ルール。",
+      "sections": [
+        {
+          "heading": "01 · バイトではなくページで数える",
+          "text": "WebAssembly メモリの単位はページです。1ページは 64 KiB（65,536 バイト）。初期値を2ページにすると 128 KiB になります。\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · 拡張でバッファが変わる",
+          "text": "非共有メモリで memory.grow() を呼ぶと、古い ArrayBuffer が切り離されます。そのバッファを参照する型付き配列のビューでは、通常の読み書きができなくなります。\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · ビューを作り直す",
+          "text": "grow() を呼んだ後は memory.buffer から新しいビューを作ります。その後の読み書きには、この新しいビューを使います。\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "この例は非共有メモリを使います。共有 WebAssembly メモリではバッファの動作が異なります。"
+    },
+    "titles": [
+      {
+        "kicker": "ブラウザー",
+        "title": "このページに、あなたの AI。",
+        "sub": "browsa を開いて、ページのすぐ隣で質問。"
+      },
+      {
+        "kicker": "接続",
+        "title": "AIもAgentも、自分で選ぶ。",
+        "sub": "Codex、Claude Code、piなどを切り替え。"
+      },
+      {
+        "kicker": "読む",
+        "title": "ひとつのページから、3つの要点。",
+        "sub": "記事を添付して、知りたいことを聞く。"
+      },
+      {
+        "kicker": "深掘り",
+        "title": "気になる一文を、もっと深く。",
+        "sub": "選んだ一文を、別の会話で掘り下げる。"
+      },
+      {
+        "kicker": "確認",
+        "title": "動画を、たどれるタイムラインに。",
+        "sub": "字幕を読み、時刻から説明へ戻る。"
+      },
+      {
+        "kicker": "実行",
+        "title": "理解を、残せるノートへ。",
+        "sub": "接続したエージェントが書き込み前に承認を求めます。"
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "読んでいる、その場で聞く。",
+        "sub": "自分の AI と、読み進めよう。"
+      }
+    ],
+    "renderTitle": {
+      "kicker": "表現",
+      "title": "答えは、文字だけじゃない。",
+      "sub": "数式、コード、フロー、グラフをそのまま表示。"
+    },
+    "sessionsTitle": {
+      "title": "会話ごとに、戻る場所。",
+      "sub": "保存・固定・切替で、いつでも元の問いへ。"
+    },
+    "relayTitle": {
+      "title": "ブラウザで始め、Agentで続ける。",
+      "sub": "同じセッションIDで、接続先のAgentへ。"
+    },
+    "storyTitles": [
+      {
+        "title": "記事とポッドキャストをコードノートに。",
+        "sub": "仕組みを理解し、発言を確かめ、Codexで例を追加。"
+      },
+      {
+        "title": "まず記事のルールを理解する。",
+        "sub": "ページを添付し、要点を3つにまとめる。"
+      },
+      {
+        "title": "古いビューが使えなくなるのはなぜ？",
+        "sub": "一文を選び、別のスレッドで理由を聞く。"
+      },
+      {
+        "title": "さっきのルールを図にする。",
+        "sub": "数式・フロー・グラフで同じ仕組みを見える形に。"
+      },
+      {
+        "title": "エンジニアの話でも確かめる。",
+        "sub": "ポッドキャストの要点を時系列で確認。07:42へ。"
+      },
+      {
+        "title": "Codexにノートをまとめてもらう。",
+        "sub": "エージェントを切り替え、保存を承認する。"
+      },
+      {
+        "title": "この調査に戻って、続きを進める。",
+        "sub": "記事・音声の要点・コードノートを別々に保存。"
+      },
+      {
+        "title": "ノートの次は、動くコード例。",
+        "sub": "セッションIDをコピーし、Codexで同じ議論を続ける。"
+      },
+      {
+        "title": "ページから、次の行動へ。",
+        "sub": "Chrome / Edge拡張機能 · 自分のAIと。"
+      }
+    ],
+    "continueQ": "このノートに動くJavaScriptの例を追加して",
+    "artifactTitle": "コードノート / wasm-memory.md",
+    "storyGoal": "学ぶ → ノート → コード例",
+    "podcast": {
+      "label": "デモ番組 · ポッドキャストの要点",
+      "host": "司会",
+      "guest": "ゲスト",
+      "topic": "拡張後、古いビューはどうなる？"
+    },
+    "sessionNames": [
+      "WebAssemblyの記事",
+      "ポッドキャストの要点",
+      "コードノート"
+    ],
+    "progressLabels": [
+      "コードノートを作る",
+      "発言を確かめる",
+      "コード例を追加"
+    ]
+  },
+  "ko": {
+    "locale": "ko",
+    "htmlLang": "ko",
+    "brandTag": "읽는 그 자리에서 질문하세요.",
+    "chapters": [
+      {
+        "eyebrow": "읽기",
+        "title": [
+          "페이지를 읽고,",
+          "답을 찾으세요."
+        ],
+        "sub": "페이지를 보면서 바로 옆에서 질문하세요."
+      },
+      {
+        "eyebrow": "첨부",
+        "title": [
+          "읽던 페이지를",
+          "대화로 가져오세요."
+        ],
+        "sub": "지금 읽는 내용을 첨부하고 궁금한 점을 물어보세요."
+      },
+      {
+        "eyebrow": "후속 질문",
+        "title": [
+          "한 문장에서,",
+          "더 깊은 이해로."
+        ],
+        "sub": "문장을 선택하고 그 내용에 대해 더 물어보세요."
+      },
+      {
+        "eyebrow": "시청",
+        "title": [
+          "핵심을 찾고,",
+          "그 순간으로."
+        ],
+        "sub": "타임스탬프를 눌러 영상 속 설명으로 돌아가세요."
+      },
+      {
+        "eyebrow": "보관",
+        "title": [
+          "유용한 페이지를",
+          "오래 남길 노트로."
+        ],
+        "sub": "연결된 에이전트가 파일을 준비하고 승인을 기다립니다."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "읽고, 질문하고,",
+          "계속 읽으세요."
+        ],
+        "sub": "다음 질문도 페이지 바로 옆에서."
+      }
+    ],
+    "q1": "이 페이지의 핵심을 3가지로 정리해 줘",
+    "a1": "비공유 WebAssembly 메모리에서는:\n\n- 한 페이지는 64 KiB입니다.\n- grow() 후 기존 뷰는 사용할 수 없습니다.\n- 확장 후 memory.buffer로 뷰를 다시 만듭니다.",
+    "phrase": "기존 뷰는 사용할 수 없습니다",
+    "q2": "기존 뷰는 왜 사용할 수 없어져? 어떻게 대처해?",
+    "a2": "비공유 메모리에서 grow()를 호출하면 기존 버퍼가 분리됩니다. 이 버퍼를 참조하던 뷰도 사용할 수 없습니다.\n\n확장 후 Uint8Array(memory.buffer)를 새로 만들고, 이후 읽기와 쓰기에는 새 뷰를 사용하세요.",
+    "agentQ": "글과 팟캐스트의 핵심을 Markdown 코드 노트로 정리해줘",
+    "agentTools": [
+      "페이지 읽는 중",
+      "코드 추출 중",
+      "노트 파일 준비 중"
+    ],
+    "approvalDescription": "글의 코드 예제를 담은 Markdown 파일을 새로 만듭니다.",
+    "agentA": "글과 팟캐스트 핵심을 `~/notes/wasm-memory.md`에 저장했습니다.\n\n- 한 페이지는 64 KiB.\n- grow() 후 뷰 재생성.\n- 팟캐스트 [07:42]에서 같은 규칙 확인.",
+    "videoTitle": "엔지니어가 이야기하는 WebAssembly 메모리",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "비공유 WebAssembly 메모리가 어떻게 작동하는지 살펴보겠습니다."
+      },
+      {
+        "time": 130,
+        "text": "메모리는 페이지 단위입니다. 한 페이지는 64 KiB입니다."
+      },
+      {
+        "time": 462,
+        "text": "grow() 후 기존 뷰는 사용할 수 없습니다. memory.buffer로 다시 만들어야 합니다."
+      },
+      {
+        "time": 860,
+        "text": "이후 읽기와 쓰기에는 새 뷰를 사용합니다."
+      }
+    ],
+    "videoQ": "메모리 확장에 대한 팟캐스트 핵심을 시간과 함께 정리해줘",
+    "videoA": "- [02:10] 메모리는 64 KiB 페이지 단위로 확장됩니다.\n- [07:42] 비공유 메모리에서는 grow() 후 memory.buffer로 뷰를 다시 만듭니다.",
+    "lessonLabels": [
+      "확장 후 이전 뷰에는 무슨 일이 생길까요?",
+      "grow()",
+      "뷰 다시 만들기"
+    ],
+    "cta": "Chrome / Edge 확장 프로그램 · 내 AI와 함께.",
+    "disclaimer": "데모 데이터 · 재생 편집됨",
+    "demoAlt": "browsa 브라우저 확장 프로그램이 글 옆에서 열리고, 페이지를 대화에 첨부한 뒤 선택한 문장에 대해 더 질문하는 데모.",
+    "videoHeading": "지금 보는 페이지에, 나의 AI. 이해에서 실행까지.",
+    "videoDesc": "browsa 브라우저 확장 프로그램을 열고 자신의 AI 또는 에이전트를 연결하세요. 글을 첨부하고 문장에 대해 더 물은 뒤, 영상 타임스탬프로 확인하세요. 파일 저장 기능은 연결된 에이전트에 따라 달라집니다. 응답과 에이전트 결과는 데모 데이터이며 재생은 편집되었습니다.",
+    "identity": "Chrome / Edge 브라우저 확장 프로그램",
+    "setupNote": "시작하려면 자신의 AI 또는 에이전트를 연결하세요.",
+    "badges": [
+      "PDF",
+      "Office",
+      "무료 · MIT",
+      "7개 언어"
+    ],
+    "article": {
+      "title": "WebAssembly 메모리: 확장 후 뷰를 다시 만들기",
+      "dek": "JavaScript에서 비공유 WebAssembly 메모리를 다루는 세 가지 실용 규칙.",
+      "sections": [
+        {
+          "heading": "01 · 바이트 대신 페이지로 계산",
+          "text": "WebAssembly 메모리는 페이지 단위입니다. 한 페이지는 64 KiB, 즉 65,536바이트입니다. 처음에 두 페이지를 할당하면 128 KiB가 됩니다.\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · 확장하면 버퍼가 바뀝니다",
+          "text": "비공유 메모리에서 memory.grow()를 호출하면 기존 ArrayBuffer가 분리됩니다. 해당 버퍼를 참조하는 타입 배열 뷰는 더 이상 일반적인 읽기와 쓰기에 사용할 수 없습니다.\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · 뷰를 다시 만드세요",
+          "text": "grow() 호출 후 memory.buffer로 새 뷰를 만드세요. 이후 읽기와 쓰기에는 이 새 뷰를 사용합니다.\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "이 예제는 비공유 메모리를 사용합니다. 공유 WebAssembly 메모리의 버퍼 동작은 다릅니다."
+    },
+    "titles": [
+      {
+        "kicker": "브라우저",
+        "title": "지금 보는 페이지에, 나의 AI.",
+        "sub": "browsa를 열고 페이지 바로 옆에서 질문하세요."
+      },
+      {
+        "kicker": "연결",
+        "title": "내 AI. 내가 선택한 Agent.",
+        "sub": "Codex, Claude Code, pi 등을 전환하세요."
+      },
+      {
+        "kicker": "읽기",
+        "title": "한 페이지에서, 세 가지 핵심으로.",
+        "sub": "글을 첨부하고 궁금한 점을 물어보세요."
+      },
+      {
+        "kicker": "더 깊이",
+        "title": "한 문장에서, 더 깊은 이해로.",
+        "sub": "선택한 문장에 대해 별도 대화에서 더 물어보세요."
+      },
+      {
+        "kicker": "확인",
+        "title": "영상, 다시 찾는 타임라인.",
+        "sub": "자막을 읽고 타임스탬프로 돌아가세요."
+      },
+      {
+        "kicker": "실행",
+        "title": "읽고 이해한 내용을, 노트로.",
+        "sub": "연결된 에이전트가 파일 쓰기 전에 승인을 요청합니다."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "읽는 그 자리에서 질문하세요.",
+        "sub": "나의 AI와 함께 계속 읽으세요."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "표현",
+      "title": "답변, 글자를 넘어서.",
+      "sub": "수식, 코드, 흐름도, 차트를 대화 안에서."
+    },
+    "sessionsTitle": {
+      "title": "대화마다, 돌아갈 자리.",
+      "sub": "저장, 고정, 전환. 원래 질문으로 돌아가세요."
+    },
+    "relayTitle": {
+      "title": "브라우저에서 시작, Agent에서 계속.",
+      "sub": "세션 ID로 연결된 Agent에서 이어가세요."
+    },
+    "storyTitles": [
+      {
+        "title": "글과 팟캐스트를 코드 노트로.",
+        "sub": "규칙을 이해하고 확인한 뒤 Codex로 예제를 만듭니다."
+      },
+      {
+        "title": "먼저 글의 규칙을 이해합니다.",
+        "sub": "페이지를 첨부하고 세 가지 핵심을 물어봅니다."
+      },
+      {
+        "title": "이전 뷰는 왜 작동하지 않을까요?",
+        "sub": "문장을 선택해 별도 대화에서 이유를 확인합니다."
+      },
+      {
+        "title": "방금 배운 규칙을 그려봅니다.",
+        "sub": "수식·흐름도·차트로 같은 원리를 설명합니다."
+      },
+      {
+        "title": "엔지니어의 이야기도 확인합니다.",
+        "sub": "팟캐스트 핵심을 타임라인에서 보고 07:42로 이동합니다."
+      },
+      {
+        "title": "이제 Codex에게 노트를 맡깁니다.",
+        "sub": "에이전트를 전환하고 글과 팟캐스트 내용을 저장합니다."
+      },
+      {
+        "title": "이 연구로 돌아와 계속합니다.",
+        "sub": "글·팟캐스트·코드 노트를 각각 저장해 찾습니다."
+      },
+      {
+        "title": "노트 다음은 실행 가능한 예제.",
+        "sub": "세션 ID로 Codex에서 같은 대화를 이어갑니다."
+      },
+      {
+        "title": "페이지에서 다음 행동으로.",
+        "sub": "Chrome / Edge 확장 프로그램 · 내 AI와 함께."
+      }
+    ],
+    "continueQ": "이 노트에 실행 가능한 JavaScript 예제를 추가해줘",
+    "artifactTitle": "코드 노트 / wasm-memory.md",
+    "storyGoal": "학습 → 노트 → 예제",
+    "podcast": {
+      "label": "데모 팟캐스트 · 핵심 요점",
+      "host": "진행자",
+      "guest": "게스트",
+      "topic": "확장 후 이전 뷰에는 무슨 일이 생길까요?"
+    },
+    "sessionNames": [
+      "WebAssembly 글",
+      "팟캐스트 핵심",
+      "코드 노트"
+    ],
+    "progressLabels": [
+      "코드 노트 정리",
+      "팟캐스트 확인",
+      "코드 예제 추가"
+    ]
+  },
+  "es": {
+    "locale": "es",
+    "htmlLang": "es",
+    "brandTag": "Pregunta donde lees.",
+    "chapters": [
+      {
+        "eyebrow": "LEE",
+        "title": [
+          "Lee una página.",
+          "Resuelve tus dudas."
+        ],
+        "sub": "La página a la vista. Tus preguntas, a su lado."
+      },
+      {
+        "eyebrow": "ADJUNTA",
+        "title": [
+          "La página,",
+          "en tu conversación."
+        ],
+        "sub": "Adjunta lo que lees y pregunta lo que te interesa."
+      },
+      {
+        "eyebrow": "PROFUNDIZA",
+        "title": [
+          "Una frase.",
+          "Más por descubrir."
+        ],
+        "sub": "Selecciona una frase y profundiza con otra pregunta."
+      },
+      {
+        "eyebrow": "MIRA",
+        "title": [
+          "Encuentra la idea.",
+          "Vuelve al momento."
+        ],
+        "sub": "Pulsa la marca de tiempo para volver a la explicación."
+      },
+      {
+        "eyebrow": "GUARDA",
+        "title": [
+          "Una buena página.",
+          "Una nota para ti."
+        ],
+        "sub": "Un agente conectado puede preparar un archivo para tu aprobación."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Lee. Pregunta.",
+          "Sigue adelante."
+        ],
+        "sub": "Tu próxima pregunta, justo al lado de la página."
+      }
+    ],
+    "q1": "Dame 3 ideas clave de esta página",
+    "a1": "En memoria WebAssembly no compartida:\n\n- Cada página tiene 64 KiB.\n- Tras grow(), las vistas anteriores quedan desconectadas.\n- Recrea las vistas desde memory.buffer al ampliar.",
+    "phrase": "las vistas anteriores quedan desconectadas",
+    "q2": "¿Por qué dejan de funcionar las vistas? ¿Cómo lo evito?",
+    "a2": "En memoria no compartida, grow() desconecta el búfer anterior. Sus vistas dejan de funcionar.\n\nTras ampliar, crea un nuevo Uint8Array(memory.buffer) y usa esa vista para las siguientes lecturas y escrituras.",
+    "agentQ": "Reúne las ideas del artículo y pódcast en una nota Markdown de código",
+    "agentTools": [
+      "Leer la página",
+      "Extraer código",
+      "Preparar el archivo"
+    ],
+    "approvalDescription": "Crear un archivo Markdown con los ejemplos de código del artículo.",
+    "agentA": "Ideas del artículo y pódcast guardadas en `~/notes/wasm-memory.md`.\n\n- Cada página ocupa 64 KiB.\n- Recrear vistas tras grow().\n- Pódcast [07:42] confirma la misma regla.",
+    "videoTitle": "Ingenieros sobre memoria WebAssembly",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Veamos cómo funciona la memoria WebAssembly no compartida."
+      },
+      {
+        "time": 130,
+        "text": "La memoria se mide en páginas. Cada página tiene 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "Tras grow(), las vistas anteriores quedan desconectadas. Recréalas desde memory.buffer."
+      },
+      {
+        "time": 860,
+        "text": "Usa la nueva vista para las siguientes lecturas y escrituras."
+      }
+    ],
+    "videoQ": "Resume los puntos clave del pódcast sobre ampliar memoria con tiempos",
+    "videoA": "- [02:10] La memoria crece en páginas de 64 KiB.\n- [07:42] En memoria no compartida, recrea las vistas desde memory.buffer tras grow().",
+    "lessonLabels": [
+      "¿Qué pasa con las vistas tras ampliar?",
+      "grow()",
+      "Recrear vistas"
+    ],
+    "cta": "Extensión Chrome / Edge · Con tu propia IA.",
+    "disclaimer": "Datos de demostración · reproducción editada",
+    "demoAlt": "La extensión browsa se abre junto a un artículo, lo adjunta a la conversación y permite profundizar en una frase seleccionada.",
+    "videoHeading": "Tu página. Tu IA. De leer a actuar.",
+    "videoDesc": "Abre la extensión browsa, conecta tu propia IA o agente, adjunta un artículo, profundiza en una frase y verifica una marca de tiempo de vídeo. Guardar archivos depende del agente conectado. Respuestas y resultados del agente de demostración; reproducción editada.",
+    "identity": "Extensión para Chrome / Edge",
+    "setupNote": "Conecta tu propia IA o agente para empezar.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Gratis · MIT",
+      "7 idiomas"
+    ],
+    "article": {
+      "title": "Memoria WebAssembly: recrea las vistas al ampliar",
+      "dek": "Tres reglas prácticas para trabajar con memoria WebAssembly no compartida en JavaScript.",
+      "sections": [
+        {
+          "heading": "01 · Cuenta páginas, no bytes",
+          "text": "La memoria WebAssembly usa páginas de 64 KiB (65.536 bytes). Dos páginas iniciales proporcionan 128 KiB.\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · Al ampliar cambia el búfer",
+          "text": "En memoria no compartida, memory.grow() desconecta el ArrayBuffer anterior. Las vistas de arrays tipados sobre ese búfer dejan de servir para las lecturas y escrituras habituales.\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · Recrea la vista",
+          "text": "Crea una vista nueva desde memory.buffer después de llamar a grow(). Usa la nueva vista para las siguientes lecturas y escrituras.\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "Este ejemplo usa memoria no compartida. La memoria WebAssembly compartida tiene un comportamiento de búfer distinto."
+    },
+    "titles": [
+      {
+        "kicker": "NAVEGADOR",
+        "title": "Tu página. Tu IA.",
+        "sub": "Abre browsa junto a la página que lees."
+      },
+      {
+        "kicker": "CONECTA",
+        "title": "Tu IA. Tu elección de Agent.",
+        "sub": "Alterna entre Codex, Claude Code, pi y más."
+      },
+      {
+        "kicker": "LEE",
+        "title": "Una página. Tres ideas clave.",
+        "sub": "Adjunta el artículo y pregunta lo que importa."
+      },
+      {
+        "kicker": "PROFUNDIZA",
+        "title": "Una frase. Más por entender.",
+        "sub": "Pregunta sobre una frase en un hilo propio."
+      },
+      {
+        "kicker": "VERIFICA",
+        "title": "Una línea de tiempo para volver.",
+        "sub": "Explora los subtítulos y vuelve a la explicación."
+      },
+      {
+        "kicker": "ACTÚA",
+        "title": "De leer a guardar una nota.",
+        "sub": "Tu agente conectado pide permiso antes de escribir."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Pregunta donde lees.",
+        "sub": "Lee, comprende y sigue adelante con tu IA."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "VISUALIZA",
+      "title": "Respuestas más allá del texto.",
+      "sub": "Fórmulas, código, diagramas y gráficos en el chat."
+    },
+    "sessionsTitle": {
+      "title": "Cada conversación, en su lugar.",
+      "sub": "Guarda, fija y cambia. Vuelve a tu pregunta."
+    },
+    "relayTitle": {
+      "title": "Empieza aquí. Sigue con tu Agent.",
+      "sub": "Copia el ID y continúa en el agente conectado."
+    },
+    "storyTitles": [
+      {
+        "title": "Del artículo y pódcast a notas de código.",
+        "sub": "Entiende la regla, contrástala y pide un ejemplo a Codex."
+      },
+      {
+        "title": "Empieza por las reglas del artículo.",
+        "sub": "Adjunta la página y pide tres ideas clave."
+      },
+      {
+        "title": "¿Por qué dejan de funcionar las vistas?",
+        "sub": "Selecciona la frase y aclárala en otro hilo."
+      },
+      {
+        "title": "Haz visible la regla.",
+        "sub": "Fórmula, diagrama y gráfico explican la misma idea."
+      },
+      {
+        "title": "Contrasta lo que dicen los ingenieros.",
+        "sub": "Los puntos clave del pódcast tienen tiempo. Salta a 07:42."
+      },
+      {
+        "title": "Ahora pide a Codex que cree la nota.",
+        "sub": "Cambia de agente y aprueba guardar las ideas reunidas."
+      },
+      {
+        "title": "Vuelve a esta investigación. Continúa.",
+        "sub": "Artículo, pódcast y notas en sesiones separadas."
+      },
+      {
+        "title": "Ya hay nota. Añade un ejemplo funcional.",
+        "sub": "Copia el ID y continúa la misma conversación en Codex."
+      },
+      {
+        "title": "De una página a tu siguiente acción.",
+        "sub": "Extensión Chrome / Edge · Con tu propia IA."
+      }
+    ],
+    "continueQ": "Añade un ejemplo ejecutable de JavaScript a esta nota",
+    "artifactTitle": "NOTAS DE CÓDIGO / wasm-memory.md",
+    "storyGoal": "Aprender → nota → ejemplo",
+    "podcast": {
+      "label": "PÓDCAST DEMO · IDEAS CLAVE",
+      "host": "PRESENTADOR",
+      "guest": "INVITADO",
+      "topic": "¿Qué pasa con las vistas tras ampliar?"
+    },
+    "sessionNames": [
+      "Lectura WebAssembly",
+      "Ideas del pódcast",
+      "Notas de código"
+    ],
+    "progressLabels": [
+      "Crear notas de código",
+      "Contrastar el pódcast",
+      "Añadir ejemplo"
+    ]
+  },
+  "pt-BR": {
+    "locale": "pt_BR",
+    "htmlLang": "pt-BR",
+    "brandTag": "Pergunte onde você lê.",
+    "chapters": [
+      {
+        "eyebrow": "LEIA",
+        "title": [
+          "Leia uma página.",
+          "Encontre respostas."
+        ],
+        "sub": "A página à vista. Suas perguntas, ao lado."
+      },
+      {
+        "eyebrow": "ANEXE",
+        "title": [
+          "Traga a página",
+          "para a conversa."
+        ],
+        "sub": "Anexe o que está lendo e pergunte o que importa."
+      },
+      {
+        "eyebrow": "APROFUNDE",
+        "title": [
+          "Uma frase.",
+          "Mais para entender."
+        ],
+        "sub": "Selecione uma frase e faça uma pergunta sobre ela."
+      },
+      {
+        "eyebrow": "ASSISTA",
+        "title": [
+          "Encontre a ideia.",
+          "Volte ao momento."
+        ],
+        "sub": "Clique no tempo indicado para voltar à explicação."
+      },
+      {
+        "eyebrow": "GUARDE",
+        "title": [
+          "Uma boa página.",
+          "Uma nota para você."
+        ],
+        "sub": "Um agente conectado pode preparar um arquivo para sua aprovação."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Leia. Pergunte.",
+          "Continue."
+        ],
+        "sub": "Sua próxima pergunta fica ao lado da página."
+      }
+    ],
+    "q1": "Resuma esta página em 3 pontos principais",
+    "a1": "Na memória WebAssembly não compartilhada:\n\n- Cada página tem 64 KiB.\n- Após grow(), as views antigas são desvinculadas.\n- Recrie as views a partir de memory.buffer após expandir.",
+    "phrase": "as views antigas são desvinculadas",
+    "q2": "Por que as views antigas param de funcionar? Como evitar isso?",
+    "a2": "Na memória não compartilhada, grow() desvincula o buffer antigo. As views dele deixam de funcionar.\n\nApós expandir, crie um novo Uint8Array(memory.buffer). Use a nova view nas próximas leituras e escritas.",
+    "agentQ": "Reúna as ideias do artigo e podcast em notas Markdown de código",
+    "agentTools": [
+      "Ler a página",
+      "Extrair o código",
+      "Preparar o arquivo"
+    ],
+    "approvalDescription": "Criar um arquivo Markdown com os exemplos de código do artigo.",
+    "agentA": "Ideias do artigo e podcast salvas em `~/notes/wasm-memory.md`.\n\n- Cada página tem 64 KiB.\n- Recrie views após grow().\n- Podcast [07:42] confirma a regra.",
+    "videoTitle": "Engenheiros falam de memória WebAssembly",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Vamos ver como funciona a memória WebAssembly não compartilhada."
+      },
+      {
+        "time": 130,
+        "text": "A memória é medida em páginas. Cada página tem 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "Após grow(), as views antigas são desvinculadas. Recrie-as a partir de memory.buffer."
+      },
+      {
+        "time": 860,
+        "text": "Use a nova view nas próximas leituras e escritas."
+      }
+    ],
+    "videoQ": "Liste os pontos-chave do podcast sobre expansão da memória com horários",
+    "videoA": "- [02:10] A memória cresce em páginas de 64 KiB.\n- [07:42] Na memória não compartilhada, recrie as views de memory.buffer após grow().",
+    "lessonLabels": [
+      "O que acontece às views após expandir?",
+      "grow()",
+      "Recriar views"
+    ],
+    "cta": "Extensão Chrome / Edge · Com sua própria IA.",
+    "disclaimer": "Dados de demonstração · reprodução editada",
+    "demoAlt": "A extensão browsa abre ao lado de um artigo, anexa a página à conversa e permite aprofundar uma frase selecionada.",
+    "videoHeading": "Sua página. Sua IA. Da leitura à ação.",
+    "videoDesc": "Abra a extensão browsa, conecte sua própria IA ou agente, anexe um artigo, aprofunde uma frase e confira um tempo indicado no vídeo. Salvar arquivos depende do agente conectado. Respostas e resultados do agente são dados de demonstração; reprodução editada.",
+    "identity": "Extensão para Chrome / Edge",
+    "setupNote": "Conecte sua própria IA ou agente para começar.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Grátis · MIT",
+      "7 idiomas"
+    ],
+    "article": {
+      "title": "Memória WebAssembly: recrie as views ao expandir",
+      "dek": "Três regras práticas para usar memória WebAssembly não compartilhada em JavaScript.",
+      "sections": [
+        {
+          "heading": "01 · Conte páginas, não bytes",
+          "text": "A memória WebAssembly usa páginas de 64 KiB (65.536 bytes). Duas páginas iniciais fornecem 128 KiB.\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · A expansão muda o buffer",
+          "text": "Na memória não compartilhada, memory.grow() desvincula o ArrayBuffer antigo. As views de arrays tipados desse buffer deixam de servir para leituras e escritas comuns.\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · Recrie a view",
+          "text": "Crie uma nova view a partir de memory.buffer após chamar grow(). Use a nova view nas próximas leituras e escritas.\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "Este exemplo usa memória não compartilhada. A memória WebAssembly compartilhada tem um comportamento de buffer diferente."
+    },
+    "titles": [
+      {
+        "kicker": "NAVEGADOR",
+        "title": "Sua página. Sua IA.",
+        "sub": "Abra o browsa ao lado da página que você lê."
+      },
+      {
+        "kicker": "CONECTE",
+        "title": "Sua IA. Seu Agent.",
+        "sub": "Alterne entre Codex, Claude Code, pi e mais."
+      },
+      {
+        "kicker": "LEIA",
+        "title": "Uma página. Três pontos-chave.",
+        "sub": "Anexe o artigo e pergunte o que importa."
+      },
+      {
+        "kicker": "APROFUNDE",
+        "title": "Uma frase. Mais para entender.",
+        "sub": "Pergunte sobre uma frase em uma conversa separada."
+      },
+      {
+        "kicker": "CONFIRA",
+        "title": "Uma linha do tempo para voltar.",
+        "sub": "Leia as legendas e volte à explicação."
+      },
+      {
+        "kicker": "AJA",
+        "title": "Da leitura a uma nota salva.",
+        "sub": "Seu agente conectado pede aprovação antes de gravar."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Pergunte onde você lê.",
+        "sub": "Leia, entenda e continue com sua IA."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "VISUALIZE",
+      "title": "Respostas além do texto.",
+      "sub": "Fórmulas, código, diagramas e gráficos na conversa."
+    },
+    "sessionsTitle": {
+      "title": "Cada conversa no seu lugar.",
+      "sub": "Salve, fixe e alterne. Volte à sua pergunta."
+    },
+    "relayTitle": {
+      "title": "Comece aqui. Continue no Agent.",
+      "sub": "Copie o ID e continue no agente conectado."
+    },
+    "storyTitles": [
+      {
+        "title": "Do artigo e podcast às notas de código.",
+        "sub": "Entenda a regra, confira a conversa e peça um exemplo ao Codex."
+      },
+      {
+        "title": "Comece pelas regras do artigo.",
+        "sub": "Anexe a página e peça três pontos principais."
+      },
+      {
+        "title": "Por que as views deixam de funcionar?",
+        "sub": "Selecione a frase e esclareça em outra conversa."
+      },
+      {
+        "title": "Torne a regra visível.",
+        "sub": "Fórmula, fluxograma e gráfico explicam a mesma ideia."
+      },
+      {
+        "title": "Confira o que dizem os engenheiros.",
+        "sub": "Os pontos do podcast têm horários. Vá até 07:42."
+      },
+      {
+        "title": "Agora peça ao Codex para criar a nota.",
+        "sub": "Troque de agente e aprove salvar as ideias reunidas."
+      },
+      {
+        "title": "Volte a esta pesquisa e continue.",
+        "sub": "Artigo, podcast e notas em sessões separadas."
+      },
+      {
+        "title": "A nota ficou pronta. Falta um exemplo.",
+        "sub": "Copie o ID e continue a mesma conversa no Codex."
+      },
+      {
+        "title": "Da página à sua próxima ação.",
+        "sub": "Extensão Chrome / Edge · Com sua própria IA."
+      }
+    ],
+    "continueQ": "Adicione um exemplo executável de JavaScript a esta nota",
+    "artifactTitle": "NOTAS DE CÓDIGO / wasm-memory.md",
+    "storyGoal": "Aprender → nota → exemplo",
+    "podcast": {
+      "label": "PODCAST DEMO · PONTOS-CHAVE",
+      "host": "HOST",
+      "guest": "CONVIDADO",
+      "topic": "O que acontece às views após expandir?"
+    },
+    "sessionNames": [
+      "Leitura WebAssembly",
+      "Pontos do podcast",
+      "Notas de código"
+    ],
+    "progressLabels": [
+      "Criar notas de código",
+      "Conferir o podcast",
+      "Adicionar exemplo"
+    ]
+  },
+  "ru": {
+    "locale": "ru",
+    "htmlLang": "ru",
+    "brandTag": "Спрашивайте там, где читаете.",
+    "chapters": [
+      {
+        "eyebrow": "ЧИТАЙТЕ",
+        "title": [
+          "Читайте страницу.",
+          "Находите ответы."
+        ],
+        "sub": "Страница перед глазами. Вопросы — рядом."
+      },
+      {
+        "eyebrow": "ПРИКРЕПЛЯЙТЕ",
+        "title": [
+          "Добавьте страницу",
+          "в разговор."
+        ],
+        "sub": "Прикрепите то, что читаете, и спросите о важном."
+      },
+      {
+        "eyebrow": "УТОЧНЯЙТЕ",
+        "title": [
+          "Одна фраза.",
+          "Больше понимания."
+        ],
+        "sub": "Выделите фразу и задайте уточняющий вопрос."
+      },
+      {
+        "eyebrow": "СМОТРИТЕ",
+        "title": [
+          "Найдите мысль.",
+          "Вернитесь к ней."
+        ],
+        "sub": "Нажмите на метку времени, чтобы вернуться к объяснению."
+      },
+      {
+        "eyebrow": "СОХРАНЯЙТЕ",
+        "title": [
+          "Полезная страница.",
+          "Заметка на потом."
+        ],
+        "sub": "Подключённый агент может подготовить файл и запросить ваше одобрение."
+      },
+      {
+        "eyebrow": "BROWSA",
+        "title": [
+          "Читайте. Спросите.",
+          "Продолжайте."
+        ],
+        "sub": "Следующий вопрос — прямо рядом со страницей."
+      }
+    ],
+    "q1": "Выдели 3 главные мысли этой страницы",
+    "a1": "Для неразделяемой памяти WebAssembly:\n\n- Одна страница — 64 KiB.\n- После grow() старые представления отсоединяются.\n- После роста пересоздайте их из memory.buffer.",
+    "phrase": "старые представления отсоединяются",
+    "q2": "Почему старые представления перестают работать? Что делать?",
+    "a2": "Для неразделяемой памяти grow() отсоединяет старый буфер. Его представления перестают работать.\n\nПосле роста создайте новый Uint8Array(memory.buffer). Дальнейшие чтение и запись выполняйте через него.",
+    "agentQ": "Объедини идеи статьи и подкаста в заметку Markdown с кодом",
+    "agentTools": [
+      "Чтение страницы",
+      "Извлечение кода",
+      "Подготовка файла"
+    ],
+    "approvalDescription": "Создать файл Markdown с примерами кода из статьи.",
+    "agentA": "Идеи статьи и подкаста сохранены в `~/notes/wasm-memory.md`.\n\n- Страница занимает 64 KiB.\n- После grow() пересоздать представления.\n- Подкаст [07:42] подтверждает правило.",
+    "videoTitle": "Инженеры о памяти WebAssembly",
+    "transcript": [
+      {
+        "time": 2,
+        "text": "Разберём, как работает неразделяемая память WebAssembly."
+      },
+      {
+        "time": 130,
+        "text": "Память измеряется страницами. Одна страница занимает 64 KiB."
+      },
+      {
+        "time": 462,
+        "text": "После grow() старые представления отсоединяются. Пересоздайте их из memory.buffer."
+      },
+      {
+        "time": 860,
+        "text": "Дальнейшие чтение и запись выполняйте через новое представление."
+      }
+    ],
+    "videoQ": "Выдели главные мысли подкаста о росте памяти с метками времени",
+    "videoA": "- [02:10] Память растёт страницами по 64 KiB.\n- [07:42] Для неразделяемой памяти после grow() пересоздайте представления из memory.buffer.",
+    "lessonLabels": [
+      "Что происходит с представлениями после роста?",
+      "grow()",
+      "Новые представления"
+    ],
+    "cta": "Расширение Chrome / Edge · С вашим ИИ.",
+    "disclaimer": "Демоданные · воспроизведение смонтировано",
+    "demoAlt": "Расширение browsa открывается рядом со статьёй, прикрепляет страницу к разговору и помогает уточнить смысл выделенной фразы.",
+    "videoHeading": "Ваша страница. Ваш ИИ. От чтения к действию.",
+    "videoDesc": "Откройте расширение browsa, подключите свою ИИ-модель или агента, прикрепите статью, уточните смысл фразы и проверьте метку времени в видео. Сохранение файлов зависит от подключённого агента. Ответы и результаты агента — демоданные; воспроизведение смонтировано.",
+    "identity": "Расширение для Chrome / Edge",
+    "setupNote": "Для начала подключите свою ИИ-модель или агента.",
+    "badges": [
+      "PDF",
+      "Office",
+      "Бесплатно · MIT",
+      "7 языков"
+    ],
+    "article": {
+      "title": "Память WebAssembly: обновляйте представления после роста",
+      "dek": "Три практических правила работы с неразделяемой памятью WebAssembly в JavaScript.",
+      "sections": [
+        {
+          "heading": "01 · Считайте страницы, а не байты",
+          "text": "Память WebAssembly измеряется страницами по 64 KiB (65 536 байт). Две начальные страницы дают 128 KiB.\n\n```js\nconst memory = new WebAssembly.Memory({ initial: 2 });\n```"
+        },
+        {
+          "heading": "02 · Рост меняет буфер",
+          "text": "Для неразделяемой памяти memory.grow() отсоединяет старый ArrayBuffer. Представления типизированных массивов поверх него больше не подходят для обычного чтения и записи.\n\n```js\nlet bytes = new Uint8Array(memory.buffer);\nmemory.grow(1);\n```"
+        },
+        {
+          "heading": "03 · Создайте новое представление",
+          "text": "После вызова grow() создайте новое представление из memory.buffer. Дальнейшие чтение и запись выполняйте через него.\n\n```js\nbytes = new Uint8Array(memory.buffer);\nbytes[0] = 42;\n```"
+        }
+      ],
+      "note": "В примере используется неразделяемая память. У разделяемой памяти WebAssembly другое поведение буфера."
+    },
+    "titles": [
+      {
+        "kicker": "БРАУЗЕР",
+        "title": "Ваша страница. Ваш ИИ.",
+        "sub": "Откройте browsa рядом с читаемой страницей."
+      },
+      {
+        "kicker": "ПОДКЛЮЧЕНИЕ",
+        "title": "Ваш ИИ. Ваш выбор Agent.",
+        "sub": "Переключайте Codex, Claude Code, pi и другие."
+      },
+      {
+        "kicker": "ЧТЕНИЕ",
+        "title": "Одна страница. Три главные мысли.",
+        "sub": "Прикрепите статью и спросите о важном."
+      },
+      {
+        "kicker": "ГЛУБЖЕ",
+        "title": "Одна фраза. Больше понимания.",
+        "sub": "Обсудите выделенную фразу в отдельной ветке."
+      },
+      {
+        "kicker": "ПРОВЕРКА",
+        "title": "Видео на удобной временной шкале.",
+        "sub": "Читайте субтитры и возвращайтесь к объяснению."
+      },
+      {
+        "kicker": "ДЕЙСТВИЕ",
+        "title": "От чтения — к сохранённой заметке.",
+        "sub": "Подключённый агент запросит разрешение перед записью."
+      },
+      {
+        "kicker": "BROWSA",
+        "title": "Спрашивайте там, где читаете.",
+        "sub": "Читайте, разбирайтесь и двигайтесь дальше со своим ИИ."
+      }
+    ],
+    "renderTitle": {
+      "kicker": "ВИЗУАЛЬНО",
+      "title": "Ответы — больше, чем текст.",
+      "sub": "Формулы, код, схемы и графики прямо в чате."
+    },
+    "sessionsTitle": {
+      "title": "У каждого диалога своё место.",
+      "sub": "Сохранить, закрепить, переключить — и вернуться."
+    },
+    "relayTitle": {
+      "title": "Начать здесь. Продолжить в Agent.",
+      "sub": "Скопируйте ID и продолжите у подключённого агента."
+    },
+    "storyTitles": [
+      {
+        "title": "Из статьи и подкаста — в заметку с кодом.",
+        "sub": "Разобраться, проверить и поручить пример Codex."
+      },
+      {
+        "title": "Начнём с правил в статье.",
+        "sub": "Прикрепите страницу и спросите о трёх главных мыслях."
+      },
+      {
+        "title": "Почему старые представления не работают?",
+        "sub": "Выделите фразу и уточните её в отдельной ветке."
+      },
+      {
+        "title": "Покажем правило наглядно.",
+        "sub": "Формула, схема и график объясняют одну идею."
+      },
+      {
+        "title": "Проверим слова инженеров.",
+        "sub": "Главные мысли подкаста с метками времени. Перейдите к 07:42."
+      },
+      {
+        "title": "Теперь поручим заметку Codex.",
+        "sub": "Смените агента и одобрите сохранение собранных идей."
+      },
+      {
+        "title": "Вернёмся к этому исследованию.",
+        "sub": "Статья, подкаст и заметки — в отдельных сеансах."
+      },
+      {
+        "title": "Заметка готова. Добавим рабочий пример.",
+        "sub": "Скопируйте ID и продолжите тот же разговор в Codex."
+      },
+      {
+        "title": "От страницы — к следующему действию.",
+        "sub": "Расширение Chrome / Edge · С вашим ИИ."
+      }
+    ],
+    "continueQ": "Добавь к заметке рабочий пример JavaScript",
+    "artifactTitle": "ЗАМЕТКИ С КОДОМ / wasm-memory.md",
+    "storyGoal": "Изучить → заметка → пример",
+    "podcast": {
+      "label": "ДЕМО-ПОДКАСТ · ГЛАВНЫЕ МЫСЛИ",
+      "host": "ВЕДУЩИЙ",
+      "guest": "ГОСТЬ",
+      "topic": "Что происходит с представлениями после роста?"
+    },
+    "sessionNames": [
+      "Статья WebAssembly",
+      "Мысли подкаста",
+      "Заметки с кодом"
+    ],
+    "progressLabels": [
+      "Создать заметку",
+      "Проверить подкаст",
+      "Добавить пример"
+    ]
+  }
+}

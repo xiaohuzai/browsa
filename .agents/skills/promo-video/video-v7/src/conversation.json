@@ -1,0 +1,877 @@
+{
+  "en": {
+    "lang": "en",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 386.484375,
+        "width": 87.9375,
+        "height": 23
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1650.953125,
+        "y": 439.0625,
+        "width": 54.796875,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 390.703125,
+        "width": 566.15625,
+        "height": 256.203125
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1189.078125,
+        "y": 452.546875,
+        "width": 482.828125,
+        "height": 120.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 483.3125,
+        "width": 236.421875,
+        "height": 60
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 522.09375,
+        "width": 605.75,
+        "height": 104.765625
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1189.078125,
+        "y": 636.859375,
+        "width": 482.828125,
+        "height": 120.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1190.078125,
+        "y": 667.625,
+        "width": 236.40625,
+        "height": 60
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 716.40625,
+        "width": 442.734375,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "Carry the conversation overthe transcript becomes its first message",
+      "New sessionarchives the current conversation, starts fresh"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Why divide the attention scores by the square root of d_k?",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Turn our explanation of attention scaling into two notes",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "zh": {
+    "lang": "zh",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 390.59375,
+        "height": 108.796875
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 363.265625,
+        "width": 62.40625,
+        "height": 26
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1439.640625,
+        "y": 415.84375,
+        "width": 50.953125,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 367.484375,
+        "width": 566.15625,
+        "height": 232.984375
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1261.859375,
+        "y": 406.109375,
+        "width": 337.265625,
+        "height": 132.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 436.875,
+        "width": 163.640625,
+        "height": 72
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 475.65625,
+        "width": 605.75,
+        "height": 81.546875
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1261.859375,
+        "y": 567.203125,
+        "width": 337.265625,
+        "height": 132.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1262.859375,
+        "y": 597.96875,
+        "width": 163.625,
+        "height": 72
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 646.75,
+        "width": 365.671875,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "带上当前对话继续对话记录作为第一条消息发给它",
+      "新建会话当前对话归档，从零开始"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "注意力得分为什么要除以 d_k 的平方根？",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "把刚才关于注意力缩放的解释，整理成两条笔记",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "ja": {
+    "lang": "ja",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 525.59375,
+        "height": 108.796875
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 363.265625,
+        "width": 96,
+        "height": 27
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1587.34375,
+        "y": 415.84375,
+        "width": 50.953125,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 367.484375,
+        "width": 566.15625,
+        "height": 232.984375
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1161.25,
+        "y": 406.109375,
+        "width": 538.484375,
+        "height": 136.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 436.875,
+        "width": 264.25,
+        "height": 76
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 475.65625,
+        "width": 605.75,
+        "height": 81.546875
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1161.25,
+        "y": 567.203125,
+        "width": 538.484375,
+        "height": 136.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1162.25,
+        "y": 597.96875,
+        "width": 264.234375,
+        "height": 76
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 646.75,
+        "width": 442.984375,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "会話を引き継ぐ会話の記録が最初のメッセージとして送られます",
+      "新しいセッション現在の会話をアーカイブして、新しく始めます"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "注意スコアを d_k の平方根で割るのはなぜ？",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "注意力のスケーリングの説明を、2つのメモにまとめて",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "ko": {
+    "lang": "ko",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 462.015625,
+        "height": 108.796875
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 363.265625,
+        "width": 91.5625,
+        "height": 23
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1504.25,
+        "y": 415.84375,
+        "width": 57.765625,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 367.484375,
+        "width": 566.15625,
+        "height": 232.984375
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1238.984375,
+        "y": 406.109375,
+        "width": 383.015625,
+        "height": 123.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 436.875,
+        "width": 186.515625,
+        "height": 63
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 475.65625,
+        "width": 605.75,
+        "height": 81.546875
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1238.984375,
+        "y": 567.203125,
+        "width": 383.015625,
+        "height": 123.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1239.984375,
+        "y": 597.96875,
+        "width": 186.5,
+        "height": 63
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 646.75,
+        "width": 394.484375,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "현재 대화 이어가기대화 내용이 첫 메시지로 전송됩니다",
+      "새 세션현재 대화를 보관하고 새로 시작합니다"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "어텐션 점수를 d_k의 제곱근으로 나누는 이유는 뭐야?",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "어텐션 스케일링 설명을 두 가지 메모로 정리해 줘",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "es": {
+    "lang": "es",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 386.484375,
+        "width": 113.46875,
+        "height": 23
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1645.234375,
+        "y": 439.0625,
+        "width": 60.515625,
+        "height": 52.5
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 390.703125,
+        "width": 566.15625,
+        "height": 279.421875
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1153.46875,
+        "y": 452.546875,
+        "width": 554.046875,
+        "height": 120.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 483.3125,
+        "width": 272.03125,
+        "height": 60
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 522.09375,
+        "width": 605.75,
+        "height": 104.765625
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1153.46875,
+        "y": 636.859375,
+        "width": 554.046875,
+        "height": 120.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1154.46875,
+        "y": 667.625,
+        "width": 272.015625,
+        "height": 60
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 716.40625,
+        "width": 401.90625,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "Continuar con la conversaciónla transcripción se convierte en su primer mensaje",
+      "Nueva sesiónarchiva la conversación actual y empieza de cero"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "¿Por qué dividir las puntuaciones de atención por la raíz cuadrada de d_k?",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Resume nuestra explicación de la escala de atención en dos notas",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "pt-BR": {
+    "lang": "pt-BR",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 155.234375
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 386.484375,
+        "width": 115.953125,
+        "height": 23
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1645.234375,
+        "y": 439.0625,
+        "width": 60.515625,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 390.703125,
+        "width": 566.15625,
+        "height": 256.203125
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1184.328125,
+        "y": 452.546875,
+        "width": 492.328125,
+        "height": 120.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.484375,
+        "y": 483.3125,
+        "width": 241.171875,
+        "height": 60
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 522.09375,
+        "width": 605.75,
+        "height": 104.765625
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1184.328125,
+        "y": 636.859375,
+        "width": 492.328125,
+        "height": 120.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1185.328125,
+        "y": 667.625,
+        "width": 241.15625,
+        "height": 60
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 716.40625,
+        "width": 398.59375,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "Levar a conversa atual juntoa transcrição se torna a primeira mensagem",
+      "Nova sessãoarquiva a conversa atual e começa do zero"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Por que dividir as pontuações de atenção pela raiz quadrada de d_k?",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Resuma nossa explicação da escala da atenção em duas notas",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  },
+  "ru": {
+    "lang": "ru",
+    "checks": [
+      "native own LLM/Ollama and Codex/Claude/pi provider options",
+      "select answer → native detail thread → SUBCHAT localized follow-up and reply",
+      "actual Agent switch → native carry context choice → next CHAT backfill flag → retained history and agent reply",
+      "Codex → Claude native carry choice; second CHAT.backfill true; earlier LLM/Codex turns stay visible",
+      "native BYOK settings: own API Base URL + masked key; three local Agent endpoints/aliases"
+    ],
+    "bounds": {
+      "provider-choices:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "answer:.msg.assistant": {
+        "x": 1115,
+        "y": 287.3125,
+        "width": 605.75,
+        "height": 178.453125
+      },
+      "follow-selected:.selection-ask-btn": {
+        "x": 1152.59375,
+        "y": 409.703125,
+        "width": 145.609375,
+        "height": 23
+      },
+      "follow-typed:.detail-thread-send": {
+        "x": 1620.875,
+        "y": 483.640625,
+        "width": 84.875,
+        "height": 32.25
+      },
+      "follow-answer:.detail-thread-card": {
+        "x": 1152.59375,
+        "y": 413.921875,
+        "width": 566.15625,
+        "height": 300.78125
+      },
+      "context-choice:.provider-switch-card": {
+        "x": 1125.859375,
+        "y": 475.765625,
+        "width": 609.28125,
+        "height": 120.671875
+      },
+      "context-choice:.provider-switch-card button": {
+        "x": 1434.5,
+        "y": 506.53125,
+        "width": 299.640625,
+        "height": 60
+      },
+      "context-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "context-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 545.3125,
+        "width": 605.75,
+        "height": 104.765625
+      },
+      "agent-before:#provider": {
+        "x": 1186.453125,
+        "y": 117,
+        "width": 444.546875,
+        "height": 40
+      },
+      "agent-menu:#provider": {
+        "x": 1189,
+        "y": 168,
+        "width": 550,
+        "height": 206
+      },
+      "agent-choice:.provider-switch-card": {
+        "x": 1125.859375,
+        "y": 660.078125,
+        "width": 609.28125,
+        "height": 120.671875
+      },
+      "agent-choice:.provider-switch-card button:first-child": {
+        "x": 1126.859375,
+        "y": 690.84375,
+        "width": 299.640625,
+        "height": 60
+      },
+      "agent-typed:#send": {
+        "x": 1702,
+        "y": 889.546875,
+        "width": 32,
+        "height": 32
+      },
+      "agent-answer:.msg.assistant": {
+        "x": 1115,
+        "y": 739.625,
+        "width": 456.703125,
+        "height": 112.171875
+      }
+    },
+    "errors": [],
+    "switchButtons": [
+      "Перенести диалогтранскрипт диалога станет его первым сообщением",
+      "Новая сессиятекущий диалог будет заархивирован, начнём с нуля"
+    ],
+    "agentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Зачем делить оценки внимания на квадратный корень из d_k?",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    },
+    "secondAgentRequest": {
+      "type": "CHAT",
+      "tabId": 7,
+      "userText": "Собери наше объяснение масштаба внимания в две заметки",
+      "stream": true,
+      "portName": "browsa-chat",
+      "images": null,
+      "backfill": true
+    }
+  }
+}

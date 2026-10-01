@@ -1,0 +1,177 @@
+{
+  "en": {
+    "tech": [
+      "Reading technical docs? Still copying and pasting?",
+      "Attach the page. Understand the key points. Ask a follow-up."
+    ],
+    "podcast": [
+      "A video note that takes you back to the source.",
+      "Click a key point. Jump to that moment."
+    ],
+    "agent": [
+      "Discuss in the browser. Continue in Codex.",
+      "Keep the context and continue the same session."
+    ],
+    "cta": "Chrome / Edge browser extension",
+    "start": "Install browsa · Connect your own AI",
+    "live": "Real Codex answer · Edited playback",
+    "demo": "Demo data · Edited playback",
+    "attach": "Attach the document. Ask your question.",
+    "followup": "Keep the context. Ask a follow-up.",
+    "session": "Continue the same session",
+    "resume": "Resume the same session in Codex",
+    "release": "Current Codex setup: quit the bridge process before resuming in another Codex CLI.",
+    "prereq": "Already connected to your AI",
+    "question": "Explain Q, K, V, scaling and the weighted sum in 3 concise points."
+  },
+  "zh": {
+    "tech": [
+      "看技术文档，还在反复复制粘贴？",
+      "附加当前页面，读懂要点，再追问。"
+    ],
+    "podcast": [
+      "这条视频笔记，可以点回原片。",
+      "点击关键观点，跳回对应的那一刻。"
+    ],
+    "agent": [
+      "浏览器里讨论，Codex 里接着做。",
+      "保留上下文，继续同一个会话。"
+    ],
+    "cta": "Chrome / Edge 浏览器插件",
+    "start": "安装 browsa · 接入你自己的 AI",
+    "live": "Codex 真实回复 · 播放经过剪辑",
+    "demo": "演示数据 · 播放经过剪辑",
+    "attach": "附加文档，问你关心的问题。",
+    "followup": "保留上下文，继续追问。",
+    "session": "继续同一个会话",
+    "resume": "在 Codex 中继续同一个会话",
+    "release": "当前 Codex 配置：先退出桥接进程，再从另一个 Codex 命令行续接。",
+    "prereq": "已接入你自己的 AI",
+    "question": "用 3 个简洁要点，解释查询 Q、键 K、值 V、缩放和加权求和。"
+  },
+  "ja": {
+    "tech": [
+      "技術文書を読むたび、コピーと貼り付け？",
+      "ページを添付。要点を理解し、さらに質問。"
+    ],
+    "podcast": [
+      "元の映像に戻れる動画ノート。",
+      "要点をクリックして、その時刻へ。"
+    ],
+    "agent": [
+      "ブラウザーで相談。Codex で続ける。",
+      "文脈を保ち、同じセッションを続ける。"
+    ],
+    "cta": "Chrome / Edge ブラウザー拡張機能",
+    "start": "browsa をインストール · 自分の AI を接続",
+    "live": "Codex の実際の回答 · 再生は編集済み",
+    "demo": "デモデータ · 再生は編集済み",
+    "attach": "文書を添付し、知りたいことを聞く。",
+    "followup": "文脈を保って、さらに質問。",
+    "session": "同じセッションを続ける",
+    "resume": "Codex で同じセッションを再開",
+    "release": "現在の Codex 構成では、ブリッジを終了してから別の Codex CLI で再開してください。",
+    "prereq": "自分の AI に接続済み",
+    "question": "Q、K、V、スケーリング、重み付き和を、簡潔な3つのポイントで説明して。"
+  },
+  "ko": {
+    "tech": [
+      "기술 문서를 읽을 때마다 복사하고 붙여넣나요?",
+      "페이지를 첨부하고, 핵심을 이해하고, 이어서 질문하세요."
+    ],
+    "podcast": [
+      "원본 영상으로 돌아가는 영상 노트.",
+      "핵심 내용을 눌러 해당 순간으로 이동하세요."
+    ],
+    "agent": [
+      "브라우저에서 논의하고, Codex에서 계속하세요.",
+      "맥락을 유지하며 같은 세션을 이어 가세요."
+    ],
+    "cta": "Chrome / Edge 브라우저 확장 프로그램",
+    "start": "browsa 설치 · 나의 AI 연결",
+    "live": "Codex 실제 답변 · 편집된 재생",
+    "demo": "시연 데이터 · 편집된 재생",
+    "attach": "문서를 첨부하고 궁금한 것을 물어보세요.",
+    "followup": "맥락을 유지하며 추가로 질문하세요.",
+    "session": "같은 세션 이어 가기",
+    "resume": "Codex에서 같은 세션 재개",
+    "release": "현재 Codex 구성에서는 브리지 프로세스를 종료한 뒤 다른 Codex CLI에서 재개하세요.",
+    "prereq": "나의 AI에 연결된 상태",
+    "question": "Q, K, V, 스케일링과 가중합을 간결한 핵심 3가지로 설명해 줘."
+  },
+  "es": {
+    "tech": [
+      "¿Lees documentación técnica y sigues copiando y pegando?",
+      "Adjunta la página. Entiende los puntos clave. Sigue preguntando."
+    ],
+    "podcast": [
+      "Una nota de vídeo que te lleva al original.",
+      "Pulsa un punto clave. Salta a ese momento."
+    ],
+    "agent": [
+      "Consulta en el navegador. Continúa en Codex.",
+      "Conserva el contexto y continúa la misma sesión."
+    ],
+    "cta": "Extensión para Chrome / Edge",
+    "start": "Instala browsa · Conecta tu propia IA",
+    "live": "Respuesta real de Codex · Reproducción editada",
+    "demo": "Datos de demostración · Reproducción editada",
+    "attach": "Adjunta el documento. Haz tu pregunta.",
+    "followup": "Conserva el contexto. Sigue preguntando.",
+    "session": "Continúa la misma sesión",
+    "resume": "Retoma la misma sesión en Codex",
+    "release": "En esta configuración de Codex, cierra el proceso puente antes de retomar la sesión en otra CLI de Codex.",
+    "prereq": "Tu IA ya está conectada",
+    "question": "Explica Q, K, V, el escalado y la suma ponderada en 3 puntos concisos."
+  },
+  "pt-BR": {
+    "tech": [
+      "Lendo documentação técnica e ainda copiando e colando?",
+      "Anexe a página. Entenda os pontos principais. Faça outra pergunta."
+    ],
+    "podcast": [
+      "Uma nota de vídeo que leva você de volta ao original.",
+      "Clique em um ponto-chave. Vá àquele momento."
+    ],
+    "agent": [
+      "Converse no navegador. Continue no Codex.",
+      "Mantenha o contexto e continue a mesma sessão."
+    ],
+    "cta": "Extensão para Chrome / Edge",
+    "start": "Instale o browsa · Conecte sua própria IA",
+    "live": "Resposta real do Codex · Reprodução editada",
+    "demo": "Dados de demonstração · Reprodução editada",
+    "attach": "Anexe o documento. Faça sua pergunta.",
+    "followup": "Mantenha o contexto. Faça outra pergunta.",
+    "session": "Continue a mesma sessão",
+    "resume": "Retome a mesma sessão no Codex",
+    "release": "Nesta configuração do Codex, encerre o processo de ponte antes de retomar a sessão em outra CLI do Codex.",
+    "prereq": "Sua IA já está conectada",
+    "question": "Explique Q, K, V, a escala e a soma ponderada em 3 pontos concisos."
+  },
+  "ru": {
+    "tech": [
+      "Читаете техническую документацию и снова копируете текст?",
+      "Прикрепите страницу. Разберитесь в главном. Задайте следующий вопрос."
+    ],
+    "podcast": [
+      "Видеозаметка, которая возвращает к оригиналу.",
+      "Нажмите на тезис и перейдите к нужному моменту."
+    ],
+    "agent": [
+      "Обсуждайте в браузере. Продолжайте в Codex.",
+      "Сохраните контекст и продолжите ту же сессию."
+    ],
+    "cta": "Расширение для Chrome / Edge",
+    "start": "Установите browsa · Подключите свой ИИ",
+    "live": "Реальный ответ Codex · Монтаж воспроизведения",
+    "demo": "Демоданные · Монтаж воспроизведения",
+    "attach": "Прикрепите документ. Задайте вопрос.",
+    "followup": "Сохраните контекст. Задайте следующий вопрос.",
+    "session": "Продолжите ту же сессию",
+    "resume": "Возобновите ту же сессию в Codex",
+    "release": "В текущей конфигурации Codex завершите процесс моста перед продолжением в другом Codex CLI.",
+    "prereq": "Ваш ИИ уже подключён",
+    "question": "Объясни Q, K, V, масштабирование и взвешенную сумму в 3 кратких пунктах."
+  }
+}

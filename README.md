@@ -24,11 +24,10 @@ browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
 <p align="center">
-  <img src="docs/assets/readme/demo-v9.gif" alt="browsa demo: attach the current page and ask, follow up on a selected phrase, explain a selection in place, and watch a 3D protein structure render inside the reply" width="720" />
+  <img src="docs/assets/readme/demo-v16-en.gif" alt="browsa opens beside a Transformer article, renders the attention equation and diagrams, jumps to podcast key points, then copies notes, downloads images and continues the same session in an Agent demo." width="720" />
 </p>
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Watch the full one-minute tour</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube</a> — attach &amp; ask · follow-up threads · selection toolbar · video timeline · live diagrams &amp; 3D · agent approvals
-</p>
+  <a href="docs/assets/promo/browsa-promo-v7-en.mp4"><strong>▶ Full video · 68 seconds</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Stay on the page. Ask beside it.</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube (previous demo)</a> — Real UI demonstration: Open browsa, choose or switch your own AI and Agents, attach an article, ask about a sentence, and see formulas, flowcharts and charts. Verify content on the video timeline, manage multiple sessions, and use the session ID to continue in your Agent. Responses, saved results and the CLI continuation illustration use demo data; playback is edited. File saving depends on the connected Agent.</p>
 
 ## Highlights
 

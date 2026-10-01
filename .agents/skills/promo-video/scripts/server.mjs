@@ -16,11 +16,27 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.BROWSA_ROOT || join(HERE, '..', '..', '..', '..');
 const FONTDIR = join(HERE, 'node_modules/@fontsource/noto-sans-sc');
 const PORT = Number(process.env.PROMO_PORT) || 8957;
+const COPY_V5_PATH = join(HERE, 'copy-v5.json');
+const COPY_V4 = JSON.parse(readFileSync(join(HERE, 'copy-v4.json'), 'utf8'));
+const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+function seedV4(scene, lang, providedCopy) {
+  if (!['v4-read', 'v4-video', 'v4-agent'].includes(scene) || !COPY_V4[lang]) throw new Error('Unknown v4 scene/language');
+  const c = providedCopy || COPY_V4[lang];
+  const video = scene === 'v4-video';
+  const meta = video ? { id: 7, title: c.videoTitle, url: 'https://www.bilibili.com/video/BV1preview' } : wasmMeta;
+  const videoSrc = { platform: 'bilibili', url: meta.url, tabId: 7 };
+  const raw = '[Page context attached by browsa]\n\n' + c.videoTitle + '\n\n' + c.transcript.map(t => '['+fmt(t.time)+'] '+t.text).join('\n');
+  return { activeProvider: scene === 'v4-agent' ? 'bridge' : 'llm1', providers: bridgeProviders,
+    pingStates: { llm1: 'reachable', bridge: 'reachable' }, uiLang: lang === 'pt-BR' ? 'pt' : lang,
+    fontSize: 18, contextMode: 'auto', replyLanguage: '', asr, __pageMeta: meta, __videoTime: 84,
+    history: video ? [{role:'user',content:raw,videoSrc},{role:'user',content:c.videoQ},{role:'assistant',content:c.videoA,videoSrc}] : [] };
+}
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.jpg': 'image/jpeg', '.gif': 'image/gif', '.mp4': 'video/mp4',
 };
 
 // ── 分镜种子 ────────────────────────────────────────────────────────────────
@@ -63,7 +79,7 @@ const SHIM_PATCH_STORAGE = `
   };`;
 const SHIM_PATCH_CASES = [
   // 真实 ATTACH_PAGE 响应形状（{ok, data:{ok, ctx}}）
-  "case 'ATTACH_PAGE': return { ok: true, data: { ok: true, ctx: { mode: (msg && msg.mode) || 'auto', meta: pageMeta, text: " + JSON.stringify([
+  "case 'ATTACH_PAGE': return { ok: true, data: { ok: true, ctx: { mode: (msg && msg.mode) || 'auto', meta: pageMeta, text: seedConfig.__attachText || " + JSON.stringify([
     '# Understanding WebAssembly Memory', '',
     'Every WebAssembly instance works with a **linear memory**: one contiguous, byte-addressable space that both the module and the host can read and write.', '',
     '## Pages, not bytes',
@@ -103,13 +119,41 @@ createServer((req, res) => {
   let p = decodeURIComponent((req.url || '/').split('?')[0]);
 
   if (p.startsWith('/fonts/')) return serveFile(res, join(FONTDIR, p.slice('/fonts/'.length)));
-  if (p === '/article.html' || p === '/wrapper.html' || p === '/page-shim.js') return serveFile(res, join(HERE, p.slice(1)));
+  if (['/article.html', '/wrapper.html', '/stage-v4.html', '/page-shim.js'].includes(p)) return serveFile(res, join(HERE, p.slice(1)));
 
+  if (p === '/browser-v7.html') return serveFile(res, join(HERE,'browser-v7.html'));
+  if (p === '/browser-v5.html') return serveFile(res, join(HERE,'browser-v5.html'));
   if (p.startsWith('/repo/')) {
     const real = join(ROOT, p.slice('/repo/'.length));
     // seed.js：按 iframe URL（referer）里的 scene 动态下发
     if (p.endsWith('/seed.js')) {
-      const scene = new URL(req.headers.referer || '', 'http://x').searchParams.get('scene');
+      const ref = new URL(req.headers.referer || '', 'http://x');
+      const scene = ref.searchParams.get('scene');
+      if (scene?.startsWith('v7-')) {
+        const lang=ref.searchParams.get('lang')||'en',c=JSON.parse(readFileSync(join(HERE,'copy-v7.json'),'utf8'))[lang];
+        const seed=seedV4(scene.replace('v7-','v4-'),lang,c);
+        seed.fontSize=20;seed.__videoTime=130;
+        seed.providers.bridge={...seed.providers.bridge,models:['http://127.0.0.1:3948'],endpointPing:{'http://127.0.0.1:3948':'reachable'}};
+        if(scene!=='v7-video')seed.__pageMeta={id:7,title:c.article.title,url:'https://browsa.demo/transformer-notes'};
+        seed.__attachText='# '+c.article.title+'\n\n'+c.article.dek+'\n\n'+c.article.sections.map(x=>'## '+x.heading+'\n'+x.text).join('\n\n');
+        res.writeHead(200,{'content-type':MIME['.js']});return res.end('window.__BROWSA_PREVIEW_SEED = '+JSON.stringify(seed)+';\n');
+      }
+      if (scene?.startsWith('v5-')) {
+        const lang = ref.searchParams.get('lang') || 'en';
+        const c = JSON.parse(readFileSync(COPY_V5_PATH,'utf8'))[lang];
+        const seed = seedV4(scene.replace('v5-','v4-'),lang,c);
+        seed.fontSize = 20;
+        seed.providers.bridge = {...seed.providers.bridge, models:['http://127.0.0.1:3948'],endpointPing:{'http://127.0.0.1:3948':'reachable'}};
+        if (scene !== 'v5-video') seed.__pageMeta = {id:7,title:c.article.title,url:'https://browsa.demo/wasm-memory'};
+        seed.__attachText = '# '+c.article.title+'\n\n'+c.article.dek+'\n\n'+c.article.sections.map(x=>'## '+x.heading+'\n'+x.text).join('\n\n');
+        res.writeHead(200, {'content-type':MIME['.js']});
+        return res.end('window.__BROWSA_PREVIEW_SEED = '+JSON.stringify(seed)+';\n');
+      }
+      if (scene?.startsWith('v4-')) {
+        const seed = seedV4(scene, ref.searchParams.get('lang') || 'en');
+        res.writeHead(200, { 'content-type': MIME['.js'] });
+        return res.end('window.__BROWSA_PREVIEW_SEED = '+JSON.stringify(seed)+';\n');
+      }
       if (scene && SEEDS[scene]) {
         res.writeHead(200, { 'content-type': MIME['.js'] });
         return res.end('window.__BROWSA_PREVIEW_SEED = ' + JSON.stringify(SEEDS[scene]) + ';\n');
@@ -119,6 +163,10 @@ createServer((req, res) => {
     // chrome-shim.js：注入可编程端口 + ATTACH_PAGE / APPROVAL_RESPOND
     if (p.endsWith('/chrome-shim.js')) {
       let src = readFileSync(real, 'utf8');
+      src = src.replace('const p = handle(msg);', 'window.__promoMessages = window.__promoMessages || []; window.__promoMessages.push(msg);\n    const p = handle(msg);');
+      src = src.replace('return new URL(p, document.baseURI).href;', "return new URL('/repo/' + p, document.baseURI).href;");
+      src = src.replace("case 'SEEK_VIDEO': return { ok: true, data: { ok: true } };", "case 'SEEK_VIDEO': seedConfig.__videoTime = msg.seconds; window.parent?.__promoSeek?.(msg.seconds); return { ok: true, data: { ok: true } };");
+      src = src.replace("return new URLSearchParams(location.search).get('lang') === 'en' ? 'en-US' : 'zh-CN';", "const lang = new URLSearchParams(location.search).get('lang') || 'zh'; return lang === 'zh' ? 'zh-CN' : lang;");
       if (!src.includes("case 'ATTACH_PAGE'")) {
         src = src.replace('default: return', SHIM_PATCH_CASES + '\n      default: return');
         src = src.replace(

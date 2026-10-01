@@ -1,0 +1,1 @@
+{"name":"browsa-promo-v5","private":true,"type":"module","scripts":{"studio":"remotion studio src/index.ts","render":"remotion render src/index.ts BrowsaPromo"},"dependencies":{"@remotion/cli":"4.0.372","remotion":"4.0.372","react":"19.1.0","react-dom":"19.1.0","zod":"3.25.76"},"devDependencies":{"typescript":"5.8.3","@types/react":"19.1.0"}}
