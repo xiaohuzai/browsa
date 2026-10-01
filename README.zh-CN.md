@@ -27,7 +27,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
   <img src="docs/assets/readme/demo-v16-zh.gif" alt="browsa 在 Transformer 文章旁打开，呈现注意力公式和图示，点击播客要点跳转，再复制笔记、下载图片，并演示在智能体侧继续同一会话。" width="720" />
 </p>
 <p align="center">
-  <a href="docs/assets/promo/browsa-promo-v7-zh.mp4"><strong>▶ 完整视频 · 68 秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 读到哪里，问到哪里。</strong></a> · <a href="https://www.youtube.com/watch?v=c3lt2dG4T_I">YouTube（旧版演示）</a> — 真实界面演示：打开 browsa 浏览器插件，选择或切换自己的 AI 与智能体，附加文章、追问一句话，再把回答呈现为公式、流程图和图表。用视频时间线核对内容，管理多份会话，并通过会话 ID 在智能体侧继续。回复、保存结果与命令行接续画面使用演示数据，播放经过剪辑；保存能力取决于接入的智能体。</p>
+  <a href="https://www.youtube.com/watch?v=b5DiTpR7VMk"><strong>▶ 完整视频 · 68 秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 读到哪里，问到哪里。</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-zh.mp4">下载 MP4</a> — 真实界面演示：打开 browsa 浏览器插件，选择或切换自己的 AI 与智能体，附加文章、追问一句话，再把回答呈现为公式、流程图和图表。用视频时间线核对内容，管理多份会话，并通过会话 ID 在智能体侧继续。回复、保存结果与命令行接续画面使用演示数据，播放经过剪辑；保存能力取决于接入的智能体。</p>
 
 ## 亮点
 
