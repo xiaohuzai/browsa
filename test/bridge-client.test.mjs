@@ -72,6 +72,44 @@ test('bridgeStream: POST /turns body, auth header, event → callback mapping', 
   assert.equal(r.sessionId, 'thread-9');
 });
 
+test('bridgeStream: note events ride the tool-progress line; done.full overrides the delta concat', async () => {
+  // The 2026-10-06 codex narration leak: interim messages ("I'm using the X
+  // skill…") stream as deltas like any other text, so the client-side concat
+  // contains them; the daemon's note events surface them as agent process and
+  // done.full (the agent's final message, commentary excluded) is what the
+  // reply body must keep.
+  const calls = captureFetch(() => sseResponse([
+    'data: {"type":"start","sessionId":"thread-n","turnId":"t1"}\n\n',
+    'data: {"type":"delta","text":"I\'m using the skill "}', '\n',
+    'data: {"type":"delta","text":"to check workflows.\\n"}\n\n',
+    'data: {"type":"tool","name":"command","status":"started","detail":"skill"}\n\n',
+    'data: {"type":"note","text":"I\'m using the skill to check workflows.","phase":"commentary"}\n\n',
+    'data: {"type":"delta","text":"Hi!"}\n\n',
+    'data: {"type":"done","full":"Hi!"}\n\n',
+  ]));
+  const seen = { deltas: [], tools: [] };
+  const r = await bridgeStream({
+    baseUrl: 'http://127.0.0.1:3948', text: 'hi',
+    onDelta: (t) => seen.deltas.push(t),
+    onToolProgress: (s) => seen.tools.push(s),
+  });
+  assert.deepEqual(seen.tools, [
+    '▶ command: skill',
+    '💬 I\'m using the skill to check workflows.',
+  ], 'note must ride the tool-progress surface with a 💬 marker');
+  assert.equal(r.full, 'Hi!', 'done.full (final message) must replace the narration-polluted concat');
+});
+
+test('bridgeStream: empty done.full keeps the client concat (no-message turns)', async () => {
+  captureFetch(() => sseResponse([
+    'data: {"type":"delta","text":"partial "}\n\n',
+    'data: {"type":"delta","text":"text"}\n\n',
+    'data: {"type":"done","full":""}\n\n',
+  ]));
+  const r = await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 'hi', onDelta: () => {} });
+  assert.equal(r.full, 'partial text');
+});
+
 test('bridgeStream: first turn (no sessionId) captures it from the start event', async () => {
   captureFetch(() => sseResponse([
     'data: {"type":"start","sessionId":"thread-first","turnId":"t1"}\n\n',
