@@ -49,7 +49,7 @@ One browsa card connects to several agents at once; the sidebar dropdown switche
 
 ### 2. Reads the whole web — videos included
 
-- **Videos**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too
+- **Videos & podcasts**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too; Xiaoyuzhou podcast episodes transcribe with one attach
 - **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
 - **Office documents**: direct links to `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… are converted to Markdown fully on-device (docling compiled to WASM) — tables, headings and lists survive
 - **Articles & messy pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
@@ -268,7 +268,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
 | PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
 | Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
-| Videos | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — Volcengine Ark key in Settings) or visually analyzed together with the speech |
+| Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
 | GitHub file pages | raw source from `raw.githubusercontent.com` — markdown and code keep their structure |
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
 | Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more) |
@@ -341,7 +341,7 @@ Everyday settings are shown directly: interface language, providers, system prom
 | **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
 | **Thinking level** | per-model reasoning depth (`auto` sends nothing; then the model's own ladder — GLM/Qwen-class is an on/off toggle, GPT/Claude-class is low→max effort). The choices follow the model id you filled in, and the request fields adapt to each API dialect (`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`…) automatically |
 | **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
-| **ASR** | the speech-to-text provider for subtitle-less videos (Volcengine Ark by default): API key, language, subtitle source |
+| **Multimodal video understanding** | the provider for subtitle-less videos (Alibaba Cloud Bailian by default; Volcengine Ark also supported): API key, language, hotwords, subtitle source — with a one-click Test-connection button |
 | **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
 | **Deep extract** | on by default — before attaching, browsa expands collapsed sections and pages through paginated content so far more of the page reaches the model; it all runs quietly in background tabs, never scrolling or clicking the page you are viewing |
 

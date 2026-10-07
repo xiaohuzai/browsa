@@ -140,12 +140,12 @@
 
         <section class="card">
           <div class="card-header">
-            <h2 data-i18n="asrHeading">ASR 字幕识别</h2>
+            <h2 data-i18n="asrHeading">多模态视频理解</h2>
           </div>
           <div class="card-body">
             <label class="toggle-row">
               <input type="checkbox" id="asrEnabled" />
-              <span><span data-i18n="asrEnableLabel">启用 ASR</span><span class="tip" tabindex="0">?<span class="tip-bubble" data-i18n="asrEnableTip">视频页附加时自动转写/解析。平台：仅支持 B 站。</span></span></span>
+              <span><span data-i18n="asrEnableLabel">启用视频理解</span><span class="tip" tabindex="0">?<span class="tip-bubble" data-i18n="asrEnableTip">附加视频/播客页时自动转写字幕或视听精读（B 站 / YouTube / 小宇宙）。</span></span></span>
             </label>
 
             <div class="fields">
@@ -201,20 +201,27 @@
               </div>
               <div class="field field-full">
                 <label for="asrModel">
-                  <span class="field-title" data-i18n="asrModelLabel">模型 ID（音频转写）</span>
+                  <span class="field-title" data-i18n="asrModelLabel">音频转写模型 ID（字幕）</span>
                   <input id="asrModel" name="asrModel" type="text" autocomplete="off" spellcheck="false" />
                 </label>
               </div>
               <div class="field field-full">
                 <label for="asrVideoModel">
-                  <span class="field-title" data-i18n="asrVideoModelLabel">视频模型 ID（视频解析用，留空则用上面的模型）</span>
-                  <input id="asrVideoModel" name="asrVideoModel" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="asrVideoModelPlaceholder" placeholder="留空 = 同转写模型" />
+                  <span class="field-title" data-i18n="asrVideoModelLabel">音视频精读模型 ID（画面＋语音；留空 = 同音频转写模型）</span>
+                  <input id="asrVideoModel" name="asrVideoModel" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="asrVideoModelPlaceholder" placeholder="留空 = 同音频转写模型" />
+                </label>
+              </div>
+              <div class="field field-full">
+                <label for="asrHotwords">
+                  <span class="field-title" data-i18n="asrHotwordsLabel">热词（可选）<span class="tip" tabindex="0">?<span class="tip-bubble" data-i18n="asrHotwordsTip">专有名词列表，提升识别准确率（人名/品牌/术语）。仅阿里云百炼 Qwen-Audio 系录音转写模型生效。</span></span></span>
+                  <textarea id="asrHotwords" name="asrHotwords" rows="2" spellcheck="false" data-i18n-placeholder="asrHotwordsPlaceholder" placeholder="逗号或换行分隔，如：英博博士, OpenViking, browsa"></textarea>
                 </label>
               </div>
             </div>
 
             <div class="card-actions">
               <button data-act="save-asr" class="primary" data-i18n="saveBtn">Save</button>
+              <button data-act="test-asr" data-i18n="asrTestBtn">测试连接</button>
               <span id="asr-status" class="card-status"></span>
             </div>
             <a class="doc-link" id="asrDocLink" target="_blank" rel="noopener noreferrer" data-i18n="asrDocLink">

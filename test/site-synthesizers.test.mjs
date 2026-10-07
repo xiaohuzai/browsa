@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult } from '../lib/site-synthesizers.js';
+import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult, synthesizeXiaoyuzhouResult } from '../lib/site-synthesizers.js';
 
 const fakeMeta = (url) => ({ url, title: 'Test', articleTitle: 'Test' });
 
@@ -139,4 +139,18 @@ test('synthesizeSiteCache: rejects a cache whose source site does not match the 
   assert.equal(res, null, 'zhihu cache must not serve a bilibili page');
   const res2 = synthesizeSiteCache({ source: 'bilibili', data: { foo: 'bar' } }, { url: 'https://zhihu.com/question/1' });
   assert.equal(res2, null, 'bilibili cache must not serve a zhihu page');
+});
+
+// 小宇宙：节目页从不自带字幕文本——noTranscript 是 background ASR 移交条件的
+// 结构化信号（播客恒可转写），与 youtube/bilibili 合成器同一契约。
+test('xiaoyuzhou: synthesizes podcast meta and always sets noTranscript', () => {
+  const meta = { url: 'https://www.xiaoyuzhoufm.com/episode/abc123', title: 'Ep 42' };
+  const r = synthesizeXiaoyuzhouResult({
+    podcast: '实验电台', title: '聊聊浏览器扩展', description: '本期聊了……', duration: 3725,
+  }, meta);
+  assert.equal(r.mode, 'xiaoyuzhou');
+  assert.equal(r.articleTitle, '聊聊浏览器扩展');
+  assert.ok(r.text.includes('**播客**: 实验电台'));
+  assert.ok(r.text.includes('**时长**: 62:05'));
+  assert.equal(r.noTranscript, true);
 });

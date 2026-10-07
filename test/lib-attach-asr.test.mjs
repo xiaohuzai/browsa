@@ -553,9 +553,14 @@ test('formatAsrTranscript: keeps speaker-labelled + punctuated sentence lines', 
 
 // ---- ASR_DEFAULTS + extFromMime ----
 
-test('ASR_DEFAULTS: baseUrl is the Ark /api/v3 endpoint (NOT openspeech)', () => {
-  assert.equal(ASR_DEFAULTS.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3');
-  assert.equal(ASR_DEFAULTS.model, 'doubao-seed-2-1-lite-260915');
+test('ASR_DEFAULTS: provider default flipped to Bailian (2026-10-07); ark endpoint still the ark normalizer fallback', () => {
+  assert.equal(ASR_DEFAULTS.provider, 'qwen');
+  assert.equal(ASR_DEFAULTS.baseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+  assert.equal(ASR_DEFAULTS.model, 'qwen-audio-3.1-asr-flash-filetrans');
+  assert.equal(ASR_DEFAULTS.videoModel, 'qwen3.8-omni-flash');
+  // 方舟端点兜底只属于 normalizeArkBaseUrl（老配置推断仍回落 ark，见 attach-asr-pending）
+  assert.equal(normalizeArkBaseUrl(''), 'https://ark.cn-beijing.volces.com/api/v3');
+  assert.equal(normalizeArkBaseUrl('https://ark.cn-beijing.volces.com/api/plan/v3'), 'https://ark.cn-beijing.volces.com/api/v3');
   assert.equal(ASR_DEFAULTS.language, 'zh');
   assert.equal(ASR_DEFAULTS.subtitleSource, 'original', 'subtitle source must default to prefer the video\'s own subtitles');
   assert.equal(ASR_SUBTITLE_SOURCE.ORIGINAL, 'original');
@@ -1125,4 +1130,27 @@ test('formatStampSec: mm:ss / h:mm:ss 两种形态', () => {
   assert.equal(formatStampSec(967), '16:07');
   assert.equal(formatStampSec(4879), '1:21:19');
   assert.equal(formatStampSec(0), '00:00');
+});
+
+// ---- 小宇宙直链：白名单 + 资产 ID（xy-* 进方舟文件缓存 key，不能为空串） ----
+
+test('isXiaoyuzhouMediaUrl: accepts official media hosts and the OSS audio host over https only', async () => {
+  const { isXiaoyuzhouMediaUrl } = await import('../lib/handlers/attach-asr.js');
+  assert.equal(isXiaoyuzhouMediaUrl('https://media.xiaoyuzhoufm.com/episode/abc.m4a'), true);
+  assert.equal(isXiaoyuzhouMediaUrl('https://www.xiaoyuzhoufm.com/a.m4a'), true);
+  assert.equal(isXiaoyuzhouMediaUrl('https://audioclip.oss-cn-shanghai.aliyuncs.com/ep/a.m4a'), true);
+  assert.equal(isXiaoyuzhouMediaUrl('http://media.xiaoyuzhoufm.com/a.m4a'), false, 'https only');
+  assert.equal(isXiaoyuzhouMediaUrl('https://evil.example.com/a.m4a'), false);
+  assert.equal(isXiaoyuzhouMediaUrl('https://xiaoyuzhoufm.com.evil.example.com/a.m4a'), false, 'suffix must be a real subdomain, not a string tail');
+  assert.equal(isXiaoyuzhouMediaUrl(''), false);
+  assert.equal(isXiaoyuzhouMediaUrl(null), false);
+  assert.equal(isXiaoyuzhouMediaUrl('not a url'), false);
+});
+
+test('videoAssetId: xiaoyuzhou derives xy-<eid> from the episode path; other platforms unchanged', async () => {
+  const { videoAssetId } = await import('../lib/handlers/attach-asr.js');
+  assert.equal(videoAssetId('xiaoyuzhou', 'https://www.xiaoyuzhoufm.com/episode/66f5ac71e4185dc4d3d43a27?s=xyz'), 'xy-66f5ac71e4185dc4d3d43a27');
+  assert.equal(videoAssetId('xiaoyuzhou', 'https://www.xiaoyuzhoufm.com/podcast/abc'), '', 'non-episode pages have no asset id');
+  assert.equal(videoAssetId('youtube', 'https://www.youtube.com/watch?v=abc123'), 'yt-abc123');
+  assert.equal(videoAssetId('bilibili', 'https://www.bilibili.com/video/BV1xx411c7mD?p=3'), 'bili-BV1xx411c7mD-p3');
 });

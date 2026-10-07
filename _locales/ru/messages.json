@@ -488,11 +488,11 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "ASR-субтитры и видео",
+    "message": "Мультимодальное понимание видео",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "Включить ASR",
+    "message": "Включить понимание видео",
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
@@ -947,8 +947,12 @@
     "message": "Использованы метаданные видео",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "Использована информация о выпуске",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ У этого видео нет субтитров — оставлено как есть (только метаданные видео). Чтобы транскрибировать автоматически, включите ASR в настройках и прикрепите заново.",
+    "message": "⚠️ У этого видео/аудио нет субтитров — оставлено как есть (только информация о странице). Для автоматической расшифровки включите понимание видео в настройках и прикрепите снова.",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "Xiaoyuzhou FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "Ссылка на воспроизведение $1 истекла, автоматическое обновление не удалось ($2) — обновите страницу с видео и прикрепите заново",
     "description": "Attach pipeline error"
@@ -1618,6 +1626,10 @@
     "message": "(нет субтитров — вместо них прикреплена информация о видео)",
     "description": "Attach chip fallback label"
   },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "(ошибка транскрипции — вместо них прикреплена информация о выпуске)",
+    "description": "Attach chip fallback label"
+  },
   "chipAttachedAsr": {
     "message": "📎 Прикреплено: $1 — «$2» ($3)",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
@@ -1651,5 +1663,49 @@
   },
   "renameSession": {
     "message": "Переименовать диалог"
+  },
+  "asrLabel_qwen": {
+    "message": "Alibaba Cloud Bailian (Alibaba Cloud Bailian)",
+    "description": "ASR registry: qwen label"
+  },
+  "asrApiKeyPlaceholder_qwen": {
+    "message": "Bailian API key (begins with sk-)",
+    "description": "ASR registry: qwen api key placeholder"
+  },
+  "asrBaseUrlTip_qwen": {
+    "message": "Используйте endpoint compatible-mode из вашей консоли (<code>*.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code> или стандартный <code>dashscope.aliyuncs.com/compatible-mode/v1</code>); «Проверить соединение» также проверяет канал загрузки временных файлов (<code>/api/v1/uploads</code>).",
+    "description": "ASR registry: qwen base url tip (controlled HTML)"
+  },
+  "asrDocLabel_qwen": {
+    "message": "Зачем такая настройка? → Документация Bailian по аудиопониманию Qwen-Omni",
+    "description": "ASR registry: qwen doc link label"
+  },
+  "asrTestBtn": {
+    "message": "Проверить соединение",
+    "description": "Options: ASR test-connection button"
+  },
+  "asrTesting": {
+    "message": "Проверка…",
+    "description": "Options: ASR ping in progress"
+  },
+  "asrPingOk": {
+    "message": "✓ Соединение OK — модель доступна ($1s).",
+    "description": "Options: ASR ping success ($1 = seconds)"
+  },
+  "asrPingFail": {
+    "message": "✗ $1",
+    "description": "Options: ASR ping failure ($1 = error)"
+  },
+  "asrHotwordsLabel": {
+    "message": "Горячие слова (необязательно)",
+    "description": "Options: ASR hotwords label"
+  },
+  "asrHotwordsTip": {
+    "message": "Список имён собственных для повышения точности распознавания (имена/бренды/термины). Применяется только к моделям транскрипции Qwen-Audio Alibaba Cloud Bailian.",
+    "description": "Options: ASR hotwords tip"
+  },
+  "asrHotwordsPlaceholder": {
+    "message": "Через запятую или с новой строки, напр.: Dr. Yingbo, OpenViking, browsa",
+    "description": "Options: ASR hotwords placeholder"
   }
 }

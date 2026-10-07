@@ -182,7 +182,7 @@ function loadContentScript(name) {
 // youtube-content-script.js
 // ============================================================================
 {
-  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, triggerCaptionTranscript, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
+  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, innertubeCaptionTracks, fetchInnertubeTranscript, triggerCaptionTranscript, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
     loadContentScript('youtube-content-script.js');
 
   test('youtube: isYouTubePlayerUrl matches both apex and www hosts, prefix-matches the path', () => {
@@ -689,6 +689,127 @@ function loadContentScript(name) {
     } finally {
       if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
       if (prevChrome === undefined) delete globalThis.chrome; else globalThis.chrome = prevChrome;
+    }
+  });
+
+  // ---- InnerTube mobile-client caption route (stage 2b2) ----
+  // WEB-client caption URLs are PO-token-gated (empty bodies); the MOBILE
+  // clients' /player responses carry URLs that serve real bodies to plain
+  // fetches. Three clients are tried in order; exp=xpe token-gated tracks are
+  // filtered; an OK response with zero tracks is the authoritative
+  // "no captions" verdict (a refusal is not).
+
+  function innertubeFetchMock(responsesByClient, calls) {
+    return async (url, init) => {
+      calls.push({ url: String(url), client: JSON.parse(init?.body || '{}')?.context?.client?.clientName || '' });
+      const client = JSON.parse(init?.body || '{}')?.context?.client?.clientName || '';
+      const spec = responsesByClient[client];
+      if (!spec) return { ok: false, status: 500 };
+      return { ok: true, status: 200, json: async () => spec };
+    };
+  }
+
+  test('youtube: innertubeCaptionTracks tries clients in order, filters exp=xpe tracks', async () => {
+    const prevWindow = globalThis.window, prevFetch = globalThis.fetch;
+    globalThis.window = { ytcfg: { get: (k) => (k === 'INNERTUBE_API_KEY' ? 'test-key' : undefined) } };
+    const calls = [];
+    globalThis.fetch = innertubeFetchMock({
+      ANDROID: { playabilityStatus: { status: 'OK' }, captions: { playerCaptionsTracklistRenderer: { captionTracks: [
+        { baseUrl: 'https://www.youtube.com/api/timedtext?exp=xpe&sig=1', languageCode: 'en', kind: 'asr' },
+      ] } } },
+      ANDROID_VR: { playabilityStatus: { status: 'OK' }, captions: { playerCaptionsTracklistRenderer: { captionTracks: [
+        { baseUrl: 'https://www.youtube.com/api/timedtext?v=abc&lang=en', languageCode: 'en', kind: 'asr' },
+      ] } } },
+    }, calls);
+    try {
+      const r = await innertubeCaptionTracks('abc123');
+      assert.equal(r.noCaptions, false);
+      assert.equal(r.tracks.length, 1, 'the exp=xpe gated track must be filtered out');
+      assert.equal(r.tracks[0].baseUrl, 'https://www.youtube.com/api/timedtext?v=abc&lang=en');
+      assert.equal(calls[0].client, 'ANDROID');
+      assert.equal(calls[1].client, 'ANDROID_VR', 'ANDROID yielded no usable track -> fall through to the next client');
+      assert.ok(calls[0].url.includes('/youtubei/v1/player?prettyPrint=false&key=test-key'), `got ${calls[0].url}`);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
+  test('youtube: innertubeCaptionTracks noCaptions verdict — OK with zero tracks yes, refusal no', async () => {
+    const prevWindow = globalThis.window, prevFetch = globalThis.fetch;
+    globalThis.window = { ytcfg: { get: () => undefined } };
+    try {
+      const calls1 = [];
+      globalThis.fetch = innertubeFetchMock({
+        ANDROID: { playabilityStatus: { status: 'OK' } },
+        ANDROID_VR: { playabilityStatus: { status: 'OK' } },
+        IOS: { playabilityStatus: { status: 'OK' } },
+      }, calls1);
+      const okEmpty = await innertubeCaptionTracks('abc123');
+      assert.deepEqual(okEmpty, { tracks: null, noCaptions: true }, 'an OK player response with no caption tracks is the authoritative no-captions verdict');
+
+      const calls2 = [];
+      globalThis.fetch = innertubeFetchMock({
+        ANDROID: { playabilityStatus: { status: 'LOGIN_REQUIRED' } },
+        ANDROID_VR: { playabilityStatus: { status: 'LOGIN_REQUIRED' } },
+        IOS: { playabilityStatus: { status: 'LOGIN_REQUIRED' } },
+      }, calls2);
+      const refused = await innertubeCaptionTracks('abc123');
+      assert.deepEqual(refused, { tracks: null, noCaptions: false }, 'a refusal is NOT the no-captions verdict — the caller must still try other stages');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
+  test('youtube: fetchInnertubeTranscript prefers manual en, tries fmt=json3 before the plain baseUrl', async () => {
+    const prevFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      if (String(url) === 'https://www.youtube.com/api/timedtext?v=abc&lang=en&fmt=json3') {
+        return { ok: true, text: async () => 'not json at all' };
+      }
+      if (String(url) === 'https://www.youtube.com/api/timedtext?v=abc&lang=en') {
+        return { ok: true, text: async () => JSON.stringify({ events: [{ tStartMs: 2000, segs: [{ utf8: 'inner tube' }] }] }) };
+      }
+      return { ok: false, status: 404, text: async () => '' };
+    };
+    try {
+      const lines = await fetchInnertubeTranscript([
+        { baseUrl: 'https://www.youtube.com/api/timedtext?v=abc&lang=fr', languageCode: 'fr', kind: 'asr' },
+        { baseUrl: 'https://www.youtube.com/api/timedtext?v=abc&lang=en&fmt=srv3', languageCode: 'en', kind: 'asr' },
+        { baseUrl: 'https://www.youtube.com/api/timedtext?v=abc&lang=en', languageCode: 'en' },
+      ]);
+      assert.equal(lines, '[00:02] inner tube');
+      assert.deepEqual(calls, [
+        'https://www.youtube.com/api/timedtext?v=abc&lang=en&fmt=json3',
+        'https://www.youtube.com/api/timedtext?v=abc&lang=en',
+      ], 'manual en track wins over asr en; fmt=json3 is stripped-and-appended first, plain baseUrl second; the fr track is never fetched');
+    } finally {
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
+  test('youtube: fetchTranscript never picks an exp=xpe (token-gated) track', async () => {
+    const prevFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      return { ok: true, text: async () => JSON.stringify({ events: [{ tStartMs: 1000, segs: [{ utf8: 'hello' }] }] }) };
+    };
+    try {
+      const transcript = await fetchTranscript([
+        { languageCode: 'en', baseUrl: 'https://www.youtube.com/api/timedtext?exp=xpe&v=1' },
+        { languageCode: 'fr', baseUrl: 'https://www.youtube.com/api/timedtext?lang=fr&v=2' },
+      ]);
+      assert.equal(transcript, '[00:01] hello');
+      assert.deepEqual(calls, ['https://www.youtube.com/api/timedtext?lang=fr&v=2'],
+        'the gated English track must be skipped in favor of the ungated French one');
+      assert.equal(await fetchTranscript([{ languageCode: 'en', baseUrl: 'https://www.youtube.com/api/timedtext?exp=xpe&v=1' }]), null,
+        'all-gated track lists fetch nothing at all');
+    } finally {
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
     }
   });
 }

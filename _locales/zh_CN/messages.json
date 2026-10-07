@@ -488,15 +488,15 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "ASR 字幕识别",
+    "message": "多模态视频理解",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "启用 ASR",
-    "description": "Options: ASR enable label"
+    "message": "启用视频理解",
+    "description": "Options: enable label"
   },
   "asrEnableTip": {
-    "message": "视频页附加时自动转写/解析。支持平台：YouTube 与 B 站。",
+    "message": "附加视频/播客页时自动转写字幕或视听精读（B 站 / YouTube / 小宇宙）。",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -524,16 +524,16 @@
     "description": "Options: ASR auto-detect option"
   },
   "asrModelLabel": {
-    "message": "模型 ID（音频转写）",
-    "description": "Options: ASR model label"
+    "message": "音频转写模型 ID（字幕）",
+    "description": "Options: audio transcription model id label"
   },
   "asrVideoModelLabel": {
-    "message": "视频模型 ID（视频解析用，留空则用上面的模型）",
-    "description": "Options: ASR video model label"
+    "message": "音视频精读模型 ID（画面＋语音；留空 = 同音频转写模型）",
+    "description": "Options: audiovisual reading model id label"
   },
   "asrVideoModelPlaceholder": {
-    "message": "留空 = 同转写模型",
-    "description": "Options: ASR video model placeholder"
+    "message": "留空 = 同音频转写模型",
+    "description": "Options: video model placeholder"
   },
   "asrDocLabelDefault": {
     "message": "配置文档",
@@ -772,8 +772,8 @@
     "description": "Options: llms.txt off flash"
   },
   "asrNeedApiKey": {
-    "message": "启用 ASR 需要填写 API Key。",
-    "description": "Options: ASR needs api key error"
+    "message": "请先填写 API Key。",
+    "description": "Options: ASR save/ping validation"
   },
   "asrPlanUrlRewritten": {
     "message": "已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。",
@@ -932,7 +932,7 @@
     "description": "Sidepanel: unknown error fallback"
   },
   "asrAuthHint": {
-    "message": "——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → ASR 字幕识别 换成平台 API Key（UUID 或 ark- 前缀）",
+    "message": "——ASR 配置里的 API Key 像是 Agent Plan 专属 key，与方舟平台 key 不通用，请到 设置 → 多模态视频理解 换成平台 API Key（UUID 或 ark- 前缀）",
     "description": "Sidepanel: ASR agent-plan key auth hint"
   },
   "asrFallbackOriginal": {
@@ -947,12 +947,16 @@
     "message": "已回退为视频信息",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "已回退为节目信息",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ 该视频无字幕：已保持现状（仅保存视频信息）。如需自动转写为字幕，请到 设置 → ASR 字幕识别 启用后重新附加。",
+    "message": "⚠️ 该视频/音频无字幕：已保持现状（仅保存页面信息）。如需自动转写为字幕，请到 设置 → 多模态视频理解 启用后重新附加。",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
-    "message": "复用上次上传的音频文件（30 天内有效），跳过下载与上传…",
+    "message": "复用上次上传的音频文件，跳过下载与上传…",
     "description": "Sidepanel: attach progress"
   },
   "progressDownloadAudio": {
@@ -960,7 +964,7 @@
     "description": "Sidepanel: attach progress"
   },
   "progressReuseVideo": {
-    "message": "复用上次上传的视频文件（30 天内有效），跳过上传…",
+    "message": "复用上次上传的视频文件，跳过上传…",
     "description": "Sidepanel: attach progress"
   },
   "progressKeyframes": {
@@ -1566,6 +1570,10 @@
     "message": "B站",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "小宇宙",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "$1播放地址已过期且自动刷新失败（$2）——请刷新视频页面后重新附加",
     "description": "Attach pipeline error"
@@ -1618,6 +1626,10 @@
     "message": "（无字幕，已用视频信息代替）",
     "description": "Attach chip fallback label"
   },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "（转写失败，已用节目信息代替）",
+    "description": "Attach chip fallback label"
+  },
   "chipAttachedAsr": {
     "message": "📎 已附加 $1：\"$2\"（$3）",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
@@ -1651,5 +1663,49 @@
   },
   "renameSession": {
     "message": "重命名会话"
+  },
+  "asrLabel_qwen": {
+    "message": "阿里云百炼",
+    "description": "ASR registry: qwen label"
+  },
+  "asrApiKeyPlaceholder_qwen": {
+    "message": "百炼 API Key（sk- 开头）",
+    "description": "ASR registry: qwen api key placeholder"
+  },
+  "asrBaseUrlTip_qwen": {
+    "message": "用控制台给的兼容模式端点（形如 <code>*.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code>，或标准 <code>dashscope.aliyuncs.com/compatible-mode/v1</code>）；「测试连接」会一并验证临时文件上传通道（<code>/api/v1/uploads</code>）。",
+    "description": "ASR registry: qwen base url tip (controlled HTML)"
+  },
+  "asrDocLabel_qwen": {
+    "message": "为什么要这样配置？→ 百炼 Qwen-Omni 音频理解文档",
+    "description": "ASR registry: qwen doc link label"
+  },
+  "asrTestBtn": {
+    "message": "测试连接",
+    "description": "Options: ASR test-connection button"
+  },
+  "asrTesting": {
+    "message": "测试中…",
+    "description": "Options: ASR ping in progress"
+  },
+  "asrPingOk": {
+    "message": "✓ 连接成功，模型可用（$1s）。",
+    "description": "Options: ASR ping success ($1 = seconds)"
+  },
+  "asrPingFail": {
+    "message": "✗ $1",
+    "description": "Options: ASR ping failure ($1 = error)"
+  },
+  "asrHotwordsLabel": {
+    "message": "热词（可选）",
+    "description": "Options: ASR hotwords label"
+  },
+  "asrHotwordsTip": {
+    "message": "专有名词列表，提升识别准确率（人名/品牌/术语）。仅阿里云百炼 Qwen-Audio 系录音转写模型生效。",
+    "description": "Options: ASR hotwords tip"
+  },
+  "asrHotwordsPlaceholder": {
+    "message": "逗号或换行分隔，如：英博博士, OpenViking, browsa",
+    "description": "Options: ASR hotwords placeholder"
   }
 }

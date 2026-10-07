@@ -101,7 +101,7 @@ test('plain bilibili attach with no subtitles + ASR disabled renders the ASR hin
   const hint = attachMsg.querySelector('.attach-hint');
   assert.ok(hint, 'must render a .attach-hint element when ctx.noTranscriptHint is set');
   assert.match(hint.textContent, /无字幕/);
-  assert.match(hint.textContent, /ASR 字幕识别/);
+  assert.match(hint.textContent, /多模态视频理解/);
 
   // Must NOT have gone down the asr-pending pipeline.
   assert.ok(!sent.includes('ATTACH_ASR_CONFIRM'), 'no ASR confirm when ASR is disabled');

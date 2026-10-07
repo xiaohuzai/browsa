@@ -35,6 +35,9 @@ test('asrAdapterFor：ark 适配器 = 本文件的 transcribeAudio/analyzeVideo�
   assert.equal(asrAdapterFor('nope'), asrAdapterFor('ark'), '未知 id 回退 ark');
 });
 
-test('ASR_DEFAULTS.provider 默认 ark（与 storage.js 的 asr DEFAULTS 同步）', () => {
-  assert.equal(ASR_DEFAULTS.provider, 'ark');
+test('ASR_DEFAULTS.provider 默认 qwen（2026-10-07 用户定调翻为百炼；与 storage.js 同步）', () => {
+  assert.equal(ASR_DEFAULTS.provider, 'qwen');
+  assert.equal(ASR_DEFAULTS.baseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1', '默认块端点与供应商一致');
+  assert.equal(ASR_DEFAULTS.model, 'qwen-audio-3.1-asr-flash-filetrans');
+  assert.equal(ASR_DEFAULTS.videoModel, 'qwen3.8-omni-flash', '精读模型有显式默认（模式卡视频选项保持可用）');
 });

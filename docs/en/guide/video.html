@@ -85,10 +85,13 @@
       <h2>Videos without subtitles</h2>
       <p>Many Bilibili and YouTube videos have no subtitles. When you attach one, a choice card appears with two paths:</p>
       <ul>
-        <li><strong>Audio transcription (ASR)</strong>: the audio stream is fetched and transcribed locally — needs a <strong>Volcengine Ark key</strong> in Settings (pay-as-you-go; a 20-minute video typically costs a few cents). Fast, and light on chat tokens.</li>
+        <li><strong>Audio transcription (ASR)</strong>: the audio stream is fetched and transcribed locally — needs an <strong>ASR key</strong> in Settings (Volcengine Ark or Alibaba Cloud Bailian) (pay-as-you-go; a 20-minute video typically costs a few cents). Fast, and light on chat tokens.</li>
         <li><strong>Visual analysis (视频精读)</strong>: the visuals (slides, on-screen code) and the speech are understood <strong>together</strong> — right for lectures and demos. More accurate, but slower and heavier on tokens.</li>
       </ul>
       <div class="tip"><b>Audio transcription is always the default</b> — visual analysis is a deliberate trade of tokens for visual information, never something that happens on its own.</div>
+
+      <h2>Podcasts transcribe too</h2>
+      <p>Xiaoyuzhou episode pages support ASR the same way: click 📎 on an episode and the audio direct link is fetched and transcribed into timestamped subtitles — audio only, no visual analysis, no choice card.</p>
 
       <h2>Long videos</h2>
       <p>For hour-plus videos the transcript is compacted into key points at attach time, timestamps preserved — summaries and seeking keep working while the context stays small. See "Auto-summarize long attachments" in <a href="settings.html">Settings &amp; privacy</a>.</p>

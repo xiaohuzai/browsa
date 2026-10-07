@@ -488,15 +488,15 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "ASR Subtitles & Video",
+    "message": "Multimodal video understanding",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "Enable ASR",
-    "description": "Options: ASR enable label"
+    "message": "Enable video understanding",
+    "description": "Options: enable label"
   },
   "asrEnableTip": {
-    "message": "Attach a video page to auto-transcribe/analyze. Supported platforms: YouTube and Bilibili.",
+    "message": "Attach a video/podcast page to auto-transcribe captions or run audiovisual reading (Bilibili / YouTube / Xiaoyuzhou).",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -524,16 +524,16 @@
     "description": "Options: ASR auto-detect option"
   },
   "asrModelLabel": {
-    "message": "Model ID (audio transcription)",
-    "description": "Options: ASR model label"
+    "message": "Audio transcription model ID (captions)",
+    "description": "Options: audio transcription model id label"
   },
   "asrVideoModelLabel": {
-    "message": "Video model ID (video analysis; empty = use the model above)",
-    "description": "Options: ASR video model label"
+    "message": "Audiovisual reading model ID (frames + speech; empty = same as audio transcription model)",
+    "description": "Options: audiovisual reading model id label"
   },
   "asrVideoModelPlaceholder": {
-    "message": "Leave empty = same as transcription model",
-    "description": "Options: ASR video model placeholder"
+    "message": "Empty = same as audio transcription model",
+    "description": "Options: video model placeholder"
   },
   "asrDocLabelDefault": {
     "message": "Docs",
@@ -772,8 +772,8 @@
     "description": "Options: llms.txt off flash"
   },
   "asrNeedApiKey": {
-    "message": "Enabling ASR requires an API key.",
-    "description": "Options: ASR needs api key error"
+    "message": "Enter an API key first.",
+    "description": "Options: ASR save/ping validation"
   },
   "asrPlanUrlRewritten": {
     "message": "Base URL auto-corrected from the Agent Plan endpoint to the standard $1 (api/plan/v3 has no file upload).",
@@ -932,7 +932,7 @@
     "description": "Sidepanel: unknown error fallback"
   },
   "asrAuthHint": {
-    "message": "— the ASR API key looks like an Agent Plan key, which is not interchangeable with the standard Ark platform key. Switch to a platform API key (UUID or ark- prefixed) in Settings → ASR.",
+    "message": "— the ASR API key looks like an Agent Plan key, which is not interchangeable with the standard Ark platform key. Switch to a platform API key (UUID or ark- prefixed) in Settings → Multimodal video understanding.",
     "description": "Sidepanel: ASR agent-plan key auth hint"
   },
   "asrFallbackOriginal": {
@@ -947,12 +947,16 @@
     "message": "Fell back to video metadata",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "Fell back to episode info",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ This video has no captions — kept as-is (video metadata only). To auto-transcribe, enable ASR in Settings and attach again.",
+    "message": "⚠️ This video/audio has no captions — kept as-is (page info only). To auto-transcribe, enable video understanding in Settings and attach again.",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
-    "message": "Reusing previously uploaded audio (valid for 30 days) — skipping download & upload…",
+    "message": "Reusing previously uploaded audio — skipping download & upload…",
     "description": "Sidepanel: attach progress"
   },
   "progressDownloadAudio": {
@@ -960,7 +964,7 @@
     "description": "Sidepanel: attach progress"
   },
   "progressReuseVideo": {
-    "message": "Reusing previously uploaded video (valid for 30 days) — skipping upload…",
+    "message": "Reusing previously uploaded video — skipping upload…",
     "description": "Sidepanel: attach progress"
   },
   "progressKeyframes": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "Xiaoyuzhou FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "The $1 playback URL expired and auto-refresh failed ($2) — reload the video page, then attach again",
     "description": "Attach pipeline error"
@@ -1618,6 +1626,10 @@
     "message": "(no captions — video info attached instead)",
     "description": "Attach chip fallback label"
   },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "(transcription failed — episode info attached instead)",
+    "description": "Attach chip fallback label"
+  },
   "chipAttachedAsr": {
     "message": "📎 $1 attached: \"$2\" ($3)",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
@@ -1651,5 +1663,49 @@
   },
   "renameSession": {
     "message": "Rename session"
+  },
+  "asrLabel_qwen": {
+    "message": "Alibaba Cloud Bailian",
+    "description": "ASR registry: qwen label"
+  },
+  "asrApiKeyPlaceholder_qwen": {
+    "message": "Bailian API key (sk- prefixed)",
+    "description": "ASR registry: qwen api key placeholder"
+  },
+  "asrBaseUrlTip_qwen": {
+    "message": "Use the compatible-mode endpoint from your console (<code>*.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code>, or the standard <code>dashscope.aliyuncs.com/compatible-mode/v1</code>); Test connection also verifies the temp-file upload path (<code>/api/v1/uploads</code>).",
+    "description": "ASR registry: qwen base url tip (controlled HTML)"
+  },
+  "asrDocLabel_qwen": {
+    "message": "Why this config? → Bailian Qwen-Omni audio understanding docs",
+    "description": "ASR registry: qwen doc link label"
+  },
+  "asrTestBtn": {
+    "message": "Test connection",
+    "description": "Options: ASR test-connection button"
+  },
+  "asrTesting": {
+    "message": "Testing…",
+    "description": "Options: ASR ping in progress"
+  },
+  "asrPingOk": {
+    "message": "✓ Connection OK — model reachable ($1s).",
+    "description": "Options: ASR ping success ($1 = seconds)"
+  },
+  "asrPingFail": {
+    "message": "✗ $1",
+    "description": "Options: ASR ping failure ($1 = error)"
+  },
+  "asrHotwordsLabel": {
+    "message": "Hotwords (optional)",
+    "description": "Options: ASR hotwords label"
+  },
+  "asrHotwordsTip": {
+    "message": "Proper-noun list that boosts recognition accuracy (names/brands/jargon). Only applies to Bailian Qwen-Audio file-transcription models.",
+    "description": "Options: ASR hotwords tip"
+  },
+  "asrHotwordsPlaceholder": {
+    "message": "Comma- or newline-separated, e.g. Dr. Yingbo, OpenViking, browsa",
+    "description": "Options: ASR hotwords placeholder"
   }
 }

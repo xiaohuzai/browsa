@@ -6,7 +6,7 @@ import { pingOpencode } from './lib/opencode-client.js';
 import { pingSquilla } from './lib/squilla-client.js';
 import { reasoningLevelOptions } from './lib/reasoning-levels.js';
 import { pingBridge, normalizeBridgeUrl } from './lib/bridge-client.js';
-import { normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
+import { asrAdapterFor, normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
 import { providerModelList, resolveBridgeApiKey } from './lib/handlers/provider-resolver.js';
 import { BRIDGE_CARD_LABEL } from './lib/provider-display.js';
@@ -79,12 +79,24 @@ async function init() {
   applyReplyLanguage();
 
   document.querySelector('button[data-act="save-asr"]')?.addEventListener('click', saveAsr);
-  // 切换服务商：Base URL 为空时预填该家默认值，提示/占位符/文档链接随动。
+  document.querySelector('button[data-act="test-asr"]')?.addEventListener('click', testAsr);
+  // 切换服务商：Base URL / 模型若是【空】或【任何注册表默认值】，跟随换到新服务商的
+  // 默认——否则切了供应商端点还指上一家（用户实测踩到：ark 默认 URL 留在框里，模型
+  // 却是百炼的）。用户手填的自定义端点（如工作区专属 maas URL）不是任何默认值，保留。
   document.getElementById('asrProvider')?.addEventListener('change', () => {
     const sel = document.getElementById('asrProvider');
     const p = getAsrProvider(sel?.value);
-    const baseEl = document.getElementById('asrBaseUrl');
-    if (baseEl && !baseEl.value.trim()) baseEl.value = p.defaultBaseUrl;
+    const isRegisteredDefault = (v) => Object.values(ASR_PROVIDERS).some((x) =>
+      x.defaultBaseUrl === v || x.defaultModel === v || x.defaultVideoModel === v);
+    const swapIfDefault = (el, def) => {
+      if (!el) return;
+      const v = el.value.trim();
+      if (!v || isRegisteredDefault(v)) el.value = def;
+    };
+    swapIfDefault(document.getElementById('asrBaseUrl'), p.defaultBaseUrl);
+    swapIfDefault(document.getElementById('asrModel'), p.defaultModel);
+    // 音视频精读模型：目标供应商没有 defaultVideoModel 时清空（回落「同音频转写模型」语义）
+    swapIfDefault(document.getElementById('asrVideoModel'), p.defaultVideoModel || '');
     syncAsrProviderUI();
   });
 
@@ -161,7 +173,7 @@ function syncAsrProviderUI() {
     // 注册表带 defaultVideoModel 的供应商（转写/视频拆成两个模型）给出推荐值；单模型则提示留空回退
     videoModelEl.placeholder = p.defaultVideoModel
       ? `${p.defaultVideoModel}${_t('videoModelRecommended', '（推荐）')}`
-      : _t('asrVideoModelPlaceholder', '留空 = 同转写模型');
+      : _t('asrVideoModelPlaceholder', '留空 = 同音频转写模型');
   }
   const tip = document.getElementById('asrBaseUrlTip');
   if (tip) {
@@ -190,12 +202,13 @@ function applyAsr(cfg) {
   const provSel = document.getElementById('asrProvider');
   if (provSel) {
     syncAsrProviderUI(); // 先填充选项，再回填已存值
-    provSel.value = known ? (a.provider || 'ark') : 'ark';
+    provSel.value = known ? (a.provider || 'qwen') : 'ark'; // 空值 = 新默认百炼；未知供应商（storage 已归一）兜底回 ark
   }
   set('asrApiKey', known ? a.apiKey : '');
   set('asrBaseUrl', known ? a.baseUrl : '');
   set('asrModel', known ? a.model : '');
   set('asrVideoModel', known ? a.videoModel : '');
+  set('asrHotwords', known ? (a.hotwords || '') : '');
   const langSel = document.getElementById('asrLanguage');
   if (langSel) {
     const v = a.language || 'auto';
@@ -212,9 +225,38 @@ function applyAsr(cfg) {
   }
 }
 
+// 「测试连接」：用当前表单值（不必先保存）对所选服务商做轻探针，证明 key / 端点 /
+// 模型三者可用。qwen 会连上传策略（getPolicy）一起验——那是生产上传链路的第一段，
+// 工作区专属端点是否支持上传也由这一跳直接回答。结果写卡片状态位。
+async function testAsr() {
+  const provider = document.getElementById('asrProvider')?.value || 'qwen';
+  const p = getAsrProvider(provider);
+  const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
+  const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
+  const model = (document.getElementById('asrModel')?.value || '').trim() || p.defaultModel;
+  const asrCard = document.querySelector('button[data-act="test-asr"]')?.closest('.card');
+  const btn = document.querySelector('button[data-act="test-asr"]');
+  if (!apiKey) {
+    flashCard(asrCard, 'err', _t('asrNeedApiKey', '请先填写 API Key。'));
+    return;
+  }
+  btn.disabled = true;
+  flashCard(asrCard, 'ok', _t('asrTesting', '测试中…'));
+  try {
+    const r = await asrAdapterFor(provider).ping({ baseUrl, apiKey, model });
+    if (r?.ok) {
+      flashCard(asrCard, 'ok', tSub('asrPingOk', '✓ 连接成功，模型可用（$1s）。', (r.ms / 1000).toFixed(1)));
+    } else {
+      flashCard(asrCard, 'err', tSub('asrPingFail', '✗ $1', r?.error || 'unknown'));
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function saveAsr() {
   const enabled = !!document.getElementById('asrEnabled')?.checked;
-  const provider = document.getElementById('asrProvider')?.value || 'ark';
+  const provider = document.getElementById('asrProvider')?.value || 'qwen';
   const p = getAsrProvider(provider);
   const apiKey = (document.getElementById('asrApiKey')?.value || '').trim();
   const baseUrl = (document.getElementById('asrBaseUrl')?.value || '').trim() || p.defaultBaseUrl;
@@ -222,13 +264,14 @@ async function saveAsr() {
   // 视频解析（视听精读）模型；留空回退注册表推荐值（defaultVideoModel），再不行才用
   // 转写模型（runVideoAnalysisPipeline 兜底）。
   const videoModel = (document.getElementById('asrVideoModel')?.value || '').trim() || p.defaultVideoModel || '';
+  const hotwords = (document.getElementById('asrHotwords')?.value || '').trim();
   const language = document.getElementById('asrLanguage')?.value || 'auto';
   const subtitleSource = document.getElementById('asrSubtitleSource')?.value || 'original';
   // ASR 卡自己的提示位（审计 P3-4）：此前走页底全局 flash，短视口下整段在
   // 视口外，表现为「保存没反应」；其余卡都是卡内 flashCard，唯独这里漏配。
   const asrCard = document.querySelector('button[data-act="save-asr"]')?.closest('.card');
   if (enabled && !apiKey) {
-    flashCard(asrCard, 'err', _t('asrNeedApiKey', '启用 ASR 需要填写 API Key。'));
+    flashCard(asrCard, 'err', _t('asrNeedApiKey', '请先填写 API Key。'));
     return;
   }
   // 方舟 Agent Plan 专属端点（api/plan/v3）没有 Files API（上传 /files 会 404）。
@@ -244,7 +287,7 @@ async function saveAsr() {
     // 覆盖前者，警告存活 0 帧。合并成一条输出（err 级保住作者要的「醒目」）。
     rewriteNote = tSub('asrPlanUrlRewritten', `已把 Base URL 从 Agent Plan 端点自动改为标准版 $1（api/plan/v3 没有文件上传）。`, savedBaseUrl) + ' ';
   }
-  cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, subtitleSource };
+  cachedCfg.asr = { provider, enabled, apiKey, baseUrl: savedBaseUrl, model, videoModel, language, hotwords, subtitleSource };
   await persist({ asr: cachedCfg.asr });
   flashCard(asrCard, rewriteNote ? 'err' : 'ok', rewriteNote + tSub('asrSaveOk', `ASR $1（$2，模型 $3）。`, enabled ? _t('asrOn', '已启用') : _t('asrOff', '已停用'), p.label, model));
 }

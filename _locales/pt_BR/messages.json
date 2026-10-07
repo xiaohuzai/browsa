@@ -488,11 +488,11 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "Legendas ASR e vídeo",
+    "message": "Compreensão de vídeo multimodal",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "Ativar ASR",
+    "message": "Ativar compreensão de vídeo",
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
@@ -947,8 +947,12 @@
     "message": "Usando os metadados do vídeo",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "Retornou para as informações do episódio",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ Este vídeo não tem legendas — mantido como está (apenas metadados do vídeo). Para transcrever automaticamente, ative o ASR nas Configurações e anexe novamente.",
+    "message": "⚠️ Este vídeo/áudio não tem legendas — mantido como está (apenas informações da página). Para transcrever automaticamente, ative a compreensão de vídeo nas Configurações e anexe novamente.",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "Xiaoyuzhou FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "A URL de reprodução do $1 expirou e a renovação automática falhou ($2) — recarregue a página do vídeo e anexe novamente",
     "description": "Attach pipeline error"
@@ -1618,6 +1626,10 @@
     "message": "(sem legendas — informações do vídeo anexadas)",
     "description": "Attach chip fallback label"
   },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "(falha na transcrição — informações do episódio anexadas)",
+    "description": "Attach chip fallback label"
+  },
   "chipAttachedAsr": {
     "message": "📎 Anexado: $1 — \"$2\" ($3)",
     "description": "Attach chip（JS 侧把多段标签拼接后再传 $N——消息里两个数字占位符紧邻会被 Chrome 清单校验器当成未声明的成对占位符而拒绝加载整个扩展）"
@@ -1651,5 +1663,49 @@
   },
   "renameSession": {
     "message": "Renomear conversa"
+  },
+  "asrLabel_qwen": {
+    "message": "Alibaba Cloud Bailian",
+    "description": "ASR registry: qwen label"
+  },
+  "asrApiKeyPlaceholder_qwen": {
+    "message": "Chave de API da Bailian (começa com sk-)",
+    "description": "ASR registry: qwen api key placeholder"
+  },
+  "asrBaseUrlTip_qwen": {
+    "message": "Use o endpoint compatible-mode do seu console (<code>*.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code>, ou o padrão <code>dashscope.aliyuncs.com/compatible-mode/v1</code>); \"Testar conexão\" também verifica o canal de upload de arquivos temporários (<code>/api/v1/uploads</code>).",
+    "description": "ASR registry: qwen base url tip (controlled HTML)"
+  },
+  "asrDocLabel_qwen": {
+    "message": "Por que essa configuração? → Documentação de compreensão de áudio Qwen-Omni da Bailian",
+    "description": "ASR registry: qwen doc link label"
+  },
+  "asrTestBtn": {
+    "message": "Testar conexão",
+    "description": "Options: ASR test-connection button"
+  },
+  "asrTesting": {
+    "message": "Testando…",
+    "description": "Options: ASR ping in progress"
+  },
+  "asrPingOk": {
+    "message": "✓ Conexão OK — modelo acessível ($1s).",
+    "description": "Options: ASR ping success ($1 = seconds)"
+  },
+  "asrPingFail": {
+    "message": "✗ $1",
+    "description": "Options: ASR ping failure ($1 = error)"
+  },
+  "asrHotwordsLabel": {
+    "message": "Palavras-chave (opcional)",
+    "description": "Options: ASR hotwords label"
+  },
+  "asrHotwordsTip": {
+    "message": "Lista de nomes próprios que melhora a precisão do reconhecimento (nomes/marcas/jargões). Aplica-se apenas aos modelos de transcrição Qwen-Audio da Alibaba Cloud Bailian.",
+    "description": "Options: ASR hotwords tip"
+  },
+  "asrHotwordsPlaceholder": {
+    "message": "Separadas por vírgulas ou quebras de linha, ex.: Dr. Yingbo, OpenViking, browsa",
+    "description": "Options: ASR hotwords placeholder"
   }
 }
