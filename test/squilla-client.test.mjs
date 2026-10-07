@@ -503,6 +503,124 @@ test('squillaStream: attachments + failure WITHOUT a reason string still retries
   MockWebSocket.respond = null;
 });
 
+// ---------------------------------------------------------------------------
+// Delivery-directive stripping. OpenSquilla models embed channel-routing
+// directives ([[reply_to_current]] / [[reply_to: <target>]]) in the reply;
+// the gateway's WS event stream carries the raw text (its channel layer only
+// strips on app delivery — the official webui strips client-side too). The
+// filter ports upstream TUI cli/tui/backend/directives.py semantics.
+
+test('createSquillaDirectiveFilter: complete tag + one trailing newline disappear', async () => {
+  const { createSquillaDirectiveFilter } = await import('../lib/squilla-client.js');
+  const out = [];
+  const f = createSquillaDirectiveFilter((t) => out.push(t));
+  f.feed('[[reply_to_current]]\nHi! 🦊 I\'m OpenSquilla — what are we working on?');
+  f.flush();
+  assert.equal(out.join(''), 'Hi! 🦊 I\'m OpenSquilla — what are we working on?');
+});
+
+test('createSquillaDirectiveFilter: a tag split across deltas never flashes', async () => {
+  const { createSquillaDirectiveFilter } = await import('../lib/squilla-client.js');
+  const out = [];
+  const f = createSquillaDirectiveFilter((t) => out.push(t));
+  f.feed('[[reply_to_cu');   // plausible prefix — held back, nothing emitted
+  assert.equal(out.join(''), '');
+  f.feed('rrent]]\nHi');     // completes into a tag → stripped wholesale
+  f.flush();
+  assert.equal(out.join(''), 'Hi');
+});
+
+test('createSquillaDirectiveFilter: reply_to:<target> variant and trailing spaces eaten', async () => {
+  const { createSquillaDirectiveFilter } = await import('../lib/squilla-client.js');
+  const out = [];
+  const f = createSquillaDirectiveFilter((t) => out.push(t));
+  f.feed('[[reply_to:');
+  assert.equal(out.join(''), '', 'open target still held back');
+  f.feed(' 123]]  ');
+  f.feed('answer text');
+  f.flush();
+  assert.equal(out.join(''), 'answer text');
+});
+
+test('createSquillaDirectiveFilter: single-bracket spelling strips too, ordinary brackets stay', async () => {
+  const { createSquillaDirectiveFilter } = await import('../lib/squilla-client.js');
+  // Upstream's terminal filter accepts the one-bracket typo form.
+  const out1 = [];
+  const f1 = createSquillaDirectiveFilter((t) => out1.push(t));
+  f1.feed('[reply_to_current] Hi');
+  f1.flush();
+  assert.equal(out1.join(''), 'Hi');
+
+  // Ordinary bracket text must survive byte-for-byte.
+  const out2 = [];
+  const f2 = createSquillaDirectiveFilter((t) => out2.push(t));
+  f2.feed('arr[');
+  f2.feed('[0]] = x; see [1] note');
+  f2.flush();
+  assert.equal(out2.join(''), 'arr[[0]] = x; see [1] note');
+});
+
+test('createSquillaDirectiveFilter: unfinished tag prefix at flush is ordinary text', async () => {
+  const { createSquillaDirectiveFilter } = await import('../lib/squilla-client.js');
+  const out = [];
+  const f = createSquillaDirectiveFilter((t) => out.push(t));
+  f.feed('see [[reply');
+  assert.equal(out.join(''), 'see ');
+  f.flush();
+  assert.equal(out.join(''), 'see [[reply');
+});
+
+test('squillaStream: field case — the reply opens with [[reply_to_current]] and the panel never sees it', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '[[reply_to_current]]\n' }, seq: 2 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: 'Hi! 🦊 I\'m OpenSquilla — what are we working on?' }, seq: 3 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 4 },
+    ],
+  });
+
+  const deltas = [];
+  const resultP = squillaStream({
+    baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k', onDelta: (d) => deltas.push(d),
+  });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  gw.pushEvents();
+  const result = await resultP;
+
+  const joined = deltas.join('');
+  assert.ok(!joined.includes('reply_to'), 'live deltas must not carry the directive');
+  assert.ok(!joined.startsWith('\n'), 'no leading newline leaks from the stripped tag');
+  assert.equal(result.full, 'Hi! 🦊 I\'m OpenSquilla — what are we working on?');
+  gw.restore();
+});
+
+test('squillaStream: directive split across deltas still never reaches full', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '[[reply_to' }, seq: 2 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '_current]]\n\n' }, seq: 3 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '回答正文' }, seq: 4 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 5 },
+    ],
+  });
+
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.ok(!result.full.includes('reply_to'), JSON.stringify(result.full));
+  assert.ok(result.full.endsWith('回答正文'), JSON.stringify(result.full));
+  gw.restore();
+});
+
 test('uploadSquillaFile: posts multipart to the HTTP origin and returns file_uuid', async () => {
   const { uploadSquillaFile } = await import('../lib/squilla-client.js');
   const calls = [];
