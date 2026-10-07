@@ -1042,3 +1042,138 @@ test('detail-thread.js routes quote through selectionTextWithMath + renderMathIn
   assert.match(src, /renderMathInPlainText\(quoteEl\)/,
     'the quote block must render $…$/$$…$$ as KaTeX');
 });
+
+// ── 图形文本贴合 + timeline CJK 断行（2026-10-07） ──────────────────────────
+// 根因：两条图管线都在布局期用内建字体表估宽，CJK 全宽字符被系统性低估
+// （viz-js ~0.86em/字 vs 实际 1.0em/字）；mermaid timeline 盒宽硬编码 150px
+// 且换行只认 \s+|<br>，CJK 长句完全无法换行。修法：dot/mermaid 落地后按
+// 浏览器真实度量撑形状（fitSvgShapesToText）；timeline 渲染前给不可断串插
+// <br>（timelineBreakLongRuns）。
+
+const {
+  timelineBreakLongRuns, fitSvgShapesToText
+} = await import('../lib/sidepanel/render.js');
+
+test('timelineBreakLongRuns: title 不动、短段不动、超限 CJK 串按 ~10 全宽字插 <br>', () => {
+  const src = [
+    'timeline',
+    '    title 电到电器：应用出现的时间差',
+    '    1892 : 电灯泡照亮曼哈顿约一平房大小的区域',
+    '    1930 : 电视机',
+  ].join('\n');
+  const out = timelineBreakLongRuns(src);
+  const lines = out.split('\n');
+  assert.equal(lines[1], '    title 电到电器：应用出现的时间差', 'title 不动');
+  assert.equal(lines[3], '    1930 : 电视机', '短 event 不动');
+  assert.ok(lines[2].includes('电灯泡照亮曼哈顿约一<br>'), JSON.stringify(lines[2]));
+  assert.ok(!lines[2].includes('曼哈顿约一平房大小的区域'), '长串被切开');
+});
+
+test('timelineBreakLongRuns: 多事件行逐段处理、既有 <br> 是断点、幂等', () => {
+  const src = 'timeline\n    1910 : 电网覆盖美国主要城市 : 建成全世界第一条由电驱动的铁路\n    1925 : 第三个离不开的家用电器走进厨房，彻底改变了家务的结构与节奏';
+  const once = timelineBreakLongRuns(src);
+  assert.ok(once.includes('电网覆盖美国主要城市 : 建成全世界第一条由电<br>'), '第二段独立断行，第一段短串不动\n' + JSON.stringify(once));
+  assert.ok(!once.split('\n')[1].includes(': <br>'), '不断出悬空断点');
+  assert.equal(timelineBreakLongRuns(once), once, '幂等');
+});
+
+test('timelineBreakLongRuns: 非 timeline 原样返回；前导注释行后仍可识别', () => {
+  const flow = 'flowchart TD\n    A[电网覆盖美国主要城市] --> B';
+  assert.equal(timelineBreakLongRuns(flow), flow);
+  assert.equal(timelineBreakLongRuns(''), '');
+  const commented = '%% 注释\ntimeline\n    1892 : 电灯泡照亮曼哈顿约一平房大小的区域';
+  assert.ok(timelineBreakLongRuns(commented).includes('<br>'), '注释行不是 anchor 障碍');
+  void 0;
+});
+
+// ── fitSvgShapesToText：jsdom + getBBox/getCTM 桩 ──────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function fitMakeSvg(markup) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.innerHTML = markup;
+  document.body.appendChild(svg);
+  svg.getScreenCTM = () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+  return svg;
+}
+const fitStubBox = (el, x, y, w, h) => { el.getBBox = () => ({ x, y, width: w, height: h }); };
+const fitStubCtm = (el, e = 0, f = 0, a = 1) => { el.getCTM = () => ({ a, b: 0, c: 0, d: a, e, f }); };
+
+test('fitSvgShapesToText: mermaid 式嵌套 translate 标签——rect 撑到包住文本，只动形状', () => {
+  const svg = fitMakeSvg('<g class="node"><rect x="100" y="50" width="80" height="40"/><g transform="translate(140,70)"><text>标签</text></g></g>');
+  const rect = svg.querySelector('rect');
+  const text = svg.querySelector('text');
+  fitStubBox(text, -60, -10, 120, 20); fitStubCtm(text, 140, 70); // 根坐标 [80..200]×[60..80]
+  fitStubBox(rect, 100, 50, 80, 40); fitStubCtm(rect, 0, 0);      // 根坐标 [100..180]×[50..90]
+  fitSvgShapesToText(svg);
+  // 需要 120+8=128 宽（pad 4×2）：x=100-24=76, width=128；高 40 已够不动
+  assert.equal(rect.getAttribute('x'), '76');
+  assert.equal(rect.getAttribute('width'), '128');
+  assert.equal(rect.getAttribute('y'), '50');
+  assert.equal(rect.getAttribute('height'), '40');
+  svg.remove();
+});
+
+test('fitSvgShapesToText: 已容纳则不动；graphviz 无变换 polygon 绕中心缩放；ellipse 涨 rx/ry', () => {
+  const svg = fitMakeSvg(
+    '<g class="node a"><polygon points="100,50 180,50 180,90 100,90"/><text x="140" y="74">fits</text></g>'
+    + '<g class="node b"><polygon points="300,50 380,50 380,90 300,90"/><text x="340" y="74">超宽文本节点标签文字</text></g>'
+    + '<g class="node c"><ellipse cx="520" cy="70" rx="40" ry="20"/><text x="520" y="74">超出椭圆的中文标签文本</text></g>');
+  const [p1, p2] = svg.querySelectorAll('polygon');
+  const [t1, t2] = svg.querySelectorAll('text');
+  const ell = svg.querySelector('ellipse');
+  const t3 = svg.querySelectorAll('text')[2];
+  fitStubBox(t1, 125, 64, 30, 14); fitStubCtm(t1, 0, 0);
+  fitStubBox(p1, 100, 50, 80, 40); fitStubCtm(p1, 0, 0);
+  fitStubBox(t2, 270, 64, 140, 14); fitStubCtm(t2, 0, 0);
+  fitStubBox(p2, 300, 50, 80, 40); fitStubCtm(p2, 0, 0);
+  fitStubBox(ell, 480, 50, 80, 40); fitStubCtm(ell, 0, 0);
+  fitStubBox(t3, 480, 64, 120, 14); fitStubCtm(t3, 0, 0);
+  fitSvgShapesToText(svg);
+  assert.equal(p1.getAttribute('points'), '100,50 180,50 180,90 100,90', '已容纳：polygon 不动');
+  // p2: 需要 140+8=148，dw=68，fx=1.85，中心 (340,70)：(300,50)→(266,50)... 只验 x 端点与宽
+  const pts = p2.getAttribute('points').split(' ').map((s) => s.split(',').map(Number));
+  const xs = pts.map((p) => p[0]);
+  const w2 = Math.max(...xs) - Math.min(...xs);
+  assert.ok(Math.abs(w2 - 148) < 0.01, 'polygon 宽 = 文本+pad，实得 ' + w2);
+  assert.ok(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 340) < 0.01, '绕原中心缩放');
+  assert.ok(Math.abs(pts[0][1] - 50) < 0.01, '高度不动');
+  const rx = parseFloat(ell.getAttribute('rx'));
+  assert.ok(Math.abs(rx - (40 + 24)) < 0.01, 'ellipse rx 涨到包住文本（dw=(120+8)-80=48 → rx 40+24=64），实得 ' + rx);
+  svg.remove();
+});
+
+test('fitSvgShapesToText: 集群（嵌套含形状）跳过、双形状边跳过、增幅 2× 封顶、旋转矩阵放弃', () => {
+  const svg = fitMakeSvg(
+    '<g class="cluster"><rect id="cr" x="0" y="0" width="400" height="200"/><g class="node"><rect id="nr" x="10" y="10" width="60" height="30"/><text>集群内节点文本超出很多很多</text></g></g>'
+    + '<g class="edge"><path d="M0 0 L10 10"/><polygon points="0,0 5,5"/><text>edge label</text></g>'
+    + '<g class="node cap"><rect id="cap" x="0" y="0" width="50" height="20"/><text>文本远远远远远远远远远远远远远远远远远远远远超出框</text></g>'
+    + '<g class="node rot"><rect id="rot" x="0" y="0" width="50" height="20"/><text>旋转文本</text></g>');
+  const cr = svg.querySelector('#cr'), nr = svg.querySelector('#nr');
+  const clusterText = svg.querySelectorAll('text')[0];
+  const edgePoly = svg.querySelector('.edge polygon');
+  const cap = svg.querySelector('#cap'), capText = svg.querySelectorAll('text')[2];
+  const rot = svg.querySelector('#rot'), rotText = svg.querySelectorAll('text')[3];
+  fitStubBox(cr, 0, 0, 400, 200); fitStubCtm(cr, 0, 0);
+  fitStubBox(nr, 10, 10, 60, 30); fitStubCtm(nr, 0, 0);
+  fitStubBox(clusterText, 0, 0, 380, 20); fitStubCtm(clusterText, 0, 0);
+  fitStubBox(cap, 0, 0, 50, 20); fitStubCtm(cap, 0, 0);
+  fitStubBox(capText, -80, 2, 200, 16); fitStubCtm(capText, 0, 0);
+  fitStubBox(rot, 0, 0, 50, 20); fitStubCtm(rot, 0, 0);
+  fitStubBox(rotText, -10, 2, 80, 16);
+  rotText.getCTM = () => ({ a: 0.8, b: 0.6, c: -0.6, d: 0.8, e: 0, f: 0 }); // 旋转
+  fitSvgShapesToText(svg);
+  assert.equal(cr.getAttribute('width'), '400', '集群 rect 不动');
+  // 节点文本桩 380 宽：需要 380+8-60=328 > 封顶 2×60=120 → 涨满封顶
+  assert.equal(nr.getAttribute('width'), '180', '集群内叶子节点正常贴合且受封顶');
+  assert.ok(edgePoly.getAttribute('points').startsWith('0,0'), '边箭头不动');
+  assert.equal(cap.getAttribute('width'), '150', '增幅封顶 2× 原宽（50→150）');
+  assert.equal(rot.getAttribute('width'), '50', '旋转矩阵放弃');
+  svg.remove();
+});
+
+test('fitSvgShapesToText: 无 getBBox 环境（纯 jsdom）静默跳过，不抛错', () => {
+  const svg = fitMakeSvg('<g><rect x="0" y="0" width="10" height="10"/><text>hi</text></g>');
+  assert.doesNotThrow(() => fitSvgShapesToText(svg));
+  assert.equal(svg.querySelector('rect').getAttribute('width'), '10');
+  svg.remove();
+});

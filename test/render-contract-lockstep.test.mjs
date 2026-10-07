@@ -104,3 +104,19 @@ test('lockstep: user-pasted images are lightbox-zoomable (2026-10-01 拍板, clo
   assert.match(css, /\.msg-image\s*\{[^}]*cursor:\s*zoom-in/, 'thumbnails carry a clickable affordance');
 });
 
+
+// ─── 3. think body 限高内滚 + 宽内容收口（2026-10-07 用户报告）──────────────
+// 思考过长把会话撑长 → .think-body 限高内滚（静态/流式共用）；4 空格缩进行被
+// marked 判成代码块后 white-space:pre 原样横穿块边框 → .think-body pre 强制
+// 换行 + 宽度收口。流式贴底跟随在 makeStreamRenderer（render.js），无布局
+// 环境（jsdom）下是 no-op。
+test('lockstep: think body is height-capped, internally scrollable, and its pre is contained', () => {
+  const body = css.match(/\.think-body\s*\{[^}]*\}/);
+  assert.ok(body, '.think-body block is gone');
+  assert.match(body[0], /max-height:\s*min\(60vh,\s*480px\)/, 'lost the height cap — long thinking stretches the whole conversation again');
+  assert.match(body[0], /overflow-y:\s*auto/, 'lost the internal scrollbar');
+  const pre = css.match(/\.think-body pre\s*\{[^}]*\}/);
+  assert.ok(pre, '.think-body pre containment rule is gone');
+  assert.match(pre[0], /white-space:\s*pre-wrap/, 'pre must wrap — indented pseudo-code overflowed the block border');
+  assert.match(pre[0], /max-width:\s*100%/, 'pre must be width-contained');
+});

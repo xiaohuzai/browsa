@@ -626,3 +626,72 @@ test('Enter confirming an IME candidate must NOT send the half-typed card questi
   // SW_PING interval so the test process can exit.
   card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
 });
+
+test('SUBCHAT_DONE.full (squilla fold-corrected text) overrides the streamed chunks in the final render', async () => {
+  // squillaStream retroactively folds pre-tool preamble / applies generation
+  // resets to its returned full; the card streamed the un-corrected chunks,
+  // so DONE.full — when the handler provides it — must win the final render
+  // AND the next turn's transcript (finalize's finalRaw feeds subMessages).
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'explain';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'Leaked preface text.' });
+  lastPort.emit({ type: 'SUBCHAT_DONE', full: '<thinking>\nLeaked preface text.\n</thinking>\nThe real answer.' });
+  await new Promise((r) => setTimeout(r, 20));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.ok(liveAi, 'finalized assistant bubble must exist');
+  assert.equal(liveAi.classList.contains('done'), true);
+  const think = liveAi.querySelector('details.think-block');
+  assert.ok(think, 'the fold-corrected full must render its preamble as a think block');
+  assert.match(think.textContent, /Leaked preface text/);
+  assert.match(liveAi.textContent, /The real answer\./);
+});
+
+test('追问卡继承宿主 videoSrc：卡内时间戳渲染为可点胶囊（2026-10-07 用户报告）', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('视频讲解正文。');
+  // 与主聊天相同的盖章形状（onTimestampClick 里 JSON.parse 后喂 seekVideo）
+  bubble.dataset.videoSrc = JSON.stringify({ platform: 'youtube', url: 'https://youtu.be/x', tabId: 7 });
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = '展开这段';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: '本段从 [1:06:15] 开始展开。' });
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await new Promise((r) => setTimeout(r, 20));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.equal(liveAi.dataset.videoSrc, bubble.dataset.videoSrc, '卡内 AI 气泡继承宿主盖章');
+  const pill = liveAi.querySelector('.browsa-ts');
+  assert.ok(pill, '卡内时间戳必须渲染为胶囊');
+  assert.equal(pill.dataset.s, '3975', 'data-s = 1:06:15 的秒数');
+});
+
+test('追问卡宿主无 videoSrc：卡内时间戳维持纯文本不链接（误报越少越好）', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('普通文本正文。');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = '展开这段';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: '本段从 [1:06:15] 开始。' });
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await new Promise((r) => setTimeout(r, 20));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.ok(!liveAi.dataset.videoSrc, '无宿主盖章则卡内不盖章');
+  assert.equal(liveAi.querySelectorAll('.browsa-ts').length, 0, '非视频会话卡内时间戳不链接');
+});
