@@ -809,3 +809,109 @@ test('buildSquillaTurn: forwards page context exactly when the attach is the lat
   assert.equal(flushed, '总结这一页');
   assert.ok(!flushed.includes('Some page content'));
 });
+
+// ── Process-text routing (2026-10-07) ──────────────────────────────────────
+// The wire marks step narration with TextDeltaEvent.presentation:'intermediate'
+// (upstream webui renders it as a process line, never reply text), streams
+// pre-tool preamble as 'answer' on purpose (live-output trade-off, issue #358),
+// and revokes revoked generations via session.event.answer_generation_reset.
+// browsa folds narration + preamble into <thinking> and applies resets to the
+// returned full; the live bubble corrects at DONE.
+
+test('squillaStream: presentation:intermediate narration lands in the thinking fold, never the answer', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '组织回答中', presentation: 'intermediate' }, seq: 2 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '最终回答正文' }, seq: 3 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 4 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.equal(result.full, '<thinking>\n组织回答中\n</thinking>\n最终回答正文');
+  gw.restore();
+});
+
+test('squillaStream: pre-tool preamble (answer-marked) is folded at the tool boundary; directives are stripped first', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '[[reply_to_current]]\n我先读取附件全文，再基于它给你讲解。' }, seq: 2 },
+      { type: 'event', event: 'session.event.tool_use_start', payload: { task_id: 'task-1', tool_name: 'shell' }, seq: 3 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '（步骤间叙述）', presentation: 'intermediate' }, seq: 4 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '这是最终回答。' }, seq: 5 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 6 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.equal(
+    result.full,
+    '<thinking>\n我先读取附件全文，再基于它给你讲解。\n</thinking>\n\n'
+    + '<thinking>\n（步骤间叙述）\n</thinking>\n这是最终回答。',
+    JSON.stringify(result.full),
+  );
+  assert.ok(!result.full.includes('reply_to'), 'directive must not survive into the fold');
+  gw.restore();
+});
+
+test('squillaStream: plain Q&A (no tools, all answer) stays byte-identical', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '你好！' }, seq: 2 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '有什么可以帮你？' }, seq: 3 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 4 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.equal(result.full, '你好！有什么可以帮你？');
+  assert.ok(!result.full.includes('<thinking>'), 'no fold may appear without process text');
+  gw.restore();
+});
+
+test('squillaStream: answer_generation_reset drops the stale run and splices the authoritative snapshot', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '候选A的回答' }, seq: 2 },
+      { type: 'event', event: 'session.event.answer_generation_reset', payload: { task_id: 'task-1', authoritative_text_snapshot: '融合后的最终回答', safe_reason: 'provider fallback' }, seq: 3 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '（续写）' }, seq: 4 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 5 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.equal(result.full, '融合后的最终回答（续写）', JSON.stringify(result.full));
+  assert.ok(!result.full.includes('候选A'), 'revoked text must not survive');
+  gw.restore();
+});
+
+test('squillaStream: whitespace-only preamble is not folded into an empty think block', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '\n\n' }, seq: 2 },
+      { type: 'event', event: 'session.event.tool_use_start', payload: { task_id: 'task-1', tool_name: 'shell' }, seq: 3 },
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '正文' }, seq: 4 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 5 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  gw.pushEvents();
+  const result = await resultP;
+  assert.equal(result.full, '\n\n正文', JSON.stringify(result.full));
+  assert.ok(!result.full.includes('<thinking>'), 'no empty fold');
+  gw.restore();
+});

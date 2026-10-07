@@ -30,7 +30,7 @@ globalThis.DOMParser = dom.window.DOMParser;
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 0);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-const { findStreamingBlockBoundary, makeStreamRenderer, renderStreamingSafe } =
+const { findStreamingBlockBoundary, makeStreamRenderer, renderStreamingSafe, setThoughtAutoCollapse } =
   await import('../lib/sidepanel/render.js');
 const marked = (await import('../lib/vendor/marked.bundle.js')).default;
 
@@ -341,5 +341,81 @@ test('closing the fence hands the block back to the normal commit path (parse re
     el.remove();
   } finally {
     marked.parse = origParse;
+  }
+});
+
+// ── Live think collapse policy (2026-10-07) ────────────────────────────────
+// splitThink used to write thinkEl.open=false on EVERY rescan of an already-
+// closed tag — i.e. every delta frame after the first close tag — so a user
+// expand was snapped back within one frame. The policy now is: auto-collapse
+// is edge-triggered (once per completed block, only while unpinned + setting
+// on), a summary click pins the user's choice for the turn, and DONE carries
+// a pin into the static think-blocks.
+
+const clickSummary = (details) =>
+  details.querySelector('summary').dispatchEvent(
+    new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+
+test('live think: user expand survives streaming deltas and the close edge (pin beats auto)', async () => {
+  setThoughtAutoCollapse(true);
+  const el = document.createElement('div');
+  document.body.appendChild(el);
+  try {
+    const render = makeStreamRenderer(el, {});
+    render('<thinking>abc ', false);
+    await until(() => document.querySelector('.live-think'), 30000);
+    const think = document.querySelector('.live-think');
+    assert.equal(think.open, false, 'auto-collapse default starts the live block closed');
+    clickSummary(think);
+    assert.equal(think.open, true, 'summary click expands (and pins) the block');
+    // Close tag + answer deltas: the pre-2026-10-07 code re-collapsed here on
+    // every revealed frame, so this expand could never survive.
+    render('def</thinking>\n\nAnswer ', false);
+    await until(() => el.textContent.includes('Answer'), 30000);
+    assert.equal(think.open, true, 'expand survives the close edge while pinned');
+    render('more', false);
+    await until(() => el.textContent.includes('more'), 30000);
+    assert.equal(think.open, true, 'expand survives further answer deltas');
+    // DONE: the pin crosses the live→static phase boundary.
+    await render('<thinking>abc def</thinking>\n\nAnswer more', true);
+    await until(() => el.classList.contains('done'), 30000);
+    assert.equal(document.querySelector('.live-think'), null, 'DONE removes the live block');
+    const staticThink = el.querySelector('details.think-block');
+    assert.ok(staticThink, 'static think block rendered');
+    assert.equal(staticThink.open, true, 'DONE inherits the pinned open state');
+  } finally {
+    setThoughtAutoCollapse(true);
+    el.remove();
+  }
+});
+
+test('live think: thoughtAutoCollapse=false never auto-collapses mid-stream; pinned collapse inherits into DONE', async () => {
+  setThoughtAutoCollapse(false);
+  const el = document.createElement('div');
+  document.body.appendChild(el);
+  try {
+    const render = makeStreamRenderer(el, {});
+    render('<thinking>abc ', false);
+    await until(() => document.querySelector('.live-think'), 30000);
+    const think = document.querySelector('.live-think');
+    assert.equal(think.open, true, 'setting off starts the live block open');
+    // Old unconditional close-tag collapse fired even with the setting off.
+    render('def</thinking>\n\nAnswer ', false);
+    await until(() => el.textContent.includes('Answer'), 30000);
+    assert.equal(think.open, true, 'setting off: close edge must not collapse');
+    // User collapses it deliberately; the pin must hold through DONE.
+    clickSummary(think);
+    assert.equal(think.open, false, 'summary click collapses (and pins)');
+    render('more', false);
+    await until(() => el.textContent.includes('more'), 30000);
+    assert.equal(think.open, false, 'pinned collapse survives further deltas');
+    await render('<thinking>abc def</thinking>\n\nAnswer more', true);
+    await until(() => el.classList.contains('done'), 30000);
+    const staticThink = el.querySelector('details.think-block');
+    assert.ok(staticThink, 'static think block rendered');
+    assert.equal(staticThink.open, false, 'DONE inherits the pinned collapsed state');
+  } finally {
+    setThoughtAutoCollapse(true); // other tests in this file assume the default
+    el.remove();
   }
 });

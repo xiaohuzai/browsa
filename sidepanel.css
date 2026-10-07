@@ -1052,6 +1052,22 @@ math[display="block"] {
   color: var(--fg-2);
   font-size: 12px;
   line-height: 1.5;
+  /* 2026-10-07 用户要求：思考过长时限高内滚，不把会话撑长（静态/流式块共用；
+     流式中的贴底跟随在 makeStreamRenderer 里）。contain 防边界滚轮链进面板
+     滚动（同 .detail-thread-messages 语义）。 */
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 缩进伪代码/长 URL 等宽子元素按词断行，不越过块边框 */
+  overflow-wrap: break-word;
+}
+.think-body pre {
+  /* 4 空格缩进行会被 marked 判成代码块，white-space:pre 原样横穿块边框
+     （2026-10-07 用户报告「thinking 文字超出 block」）。pre-wrap 让伪代码
+     正常换行，超长不可断 token 仍有横向滚动兜底。 */
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-x: auto;
 }
 .think-body p:first-child { margin-top: 0; }
 .think-body p:last-child { margin-bottom: 0; }
