@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono,
+  downloadAndUploadAudio, downloadAudioBytes, uploadBlobToArk, transcodeAudioBlob, encodePcmToWav, resampleToMono, mp4DurationSec,
   pollFileStatus, transcribeAudio, formatAsrTranscript, normalizeAsrTimestamps, transcriptEndSec,
   largestTranscriptGapSec, TRANSCRIPT_GAP_LIMIT_SEC, formatStampSec,
   ASR_DEFAULTS, ASR_SUBTITLE_SOURCE, extFromMime, normalizeArkBaseUrl, splitMp4Fragments
@@ -1155,4 +1155,41 @@ test('videoAssetId: xiaoyuzhou derives xy-<eid> from the episode path; other pla
   assert.equal(videoAssetId('xiaoyuzhou', 'https://www.xiaoyuzhoufm.com/podcast/abc'), '', 'non-episode pages have no asset id');
   assert.equal(videoAssetId('youtube', 'https://www.youtube.com/watch?v=abc123'), 'yt-abc123');
   assert.equal(videoAssetId('bilibili', 'https://www.bilibili.com/video/BV1xx411c7mD?p=3'), 'bili-BV1xx411c7mD-p3');
+});
+
+// ── mp4DurationSec：mvhd 元数据时长（原始直传路径的截断校验，不解码）────────────
+
+function makeMp4({ version = 0, timescale = 1000, duration = 8000000, moovAtEnd = false, truncate = false } = {}) {
+  const enc = new TextEncoder();
+  const box = (type, payload) => {
+    const size = 8 + payload.length;
+    const b = new Uint8Array(size);
+    new DataView(b.buffer).setUint32(0, size);
+    b.set(enc.encode(type), 4);
+    b.set(payload, 8);
+    return b;
+  };
+  const u32 = (v) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v); return b; };
+  const u64 = (v) => { const b = new Uint8Array(8); const dv = new DataView(b.buffer); dv.setUint32(0, Math.floor(v / 4294967296)); dv.setUint32(4, v >>> 0); return b; };
+  const mvhdPayload = version === 1
+    ? new Uint8Array([1, 0, 0, 0, ...u64(0), ...u64(0), ...u32(timescale), ...u64(duration)])
+    : new Uint8Array([0, 0, 0, 0, ...u32(0), ...u32(0), ...u32(timescale), ...u32(duration)]);
+  const ftyp = box('ftyp', enc.encode('isom'));
+  const moov = box('moov', box('mvhd', mvhdPayload));
+  const mdat = box('mdat', new Uint8Array(64));
+  const parts = moovAtEnd ? [ftyp, mdat, moov] : [ftyp, moov, mdat];
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(truncate ? total - 16 : total); // 截断版砍掉尾巴
+  let o = 0;
+  for (const p of parts) { if (o + p.length <= out.length) out.set(p, o); o += p.length; }
+  return out.buffer;
+}
+
+test('mp4DurationSec: mvhd v0/v1、moov 前置/后置、截断与非 MP4', () => {
+  assert.equal(mp4DurationSec(makeMp4({ version: 0, timescale: 1000, duration: 8000000 })), 8000, 'v0：8_000_000/1000 = 8000s');
+  assert.equal(mp4DurationSec(makeMp4({ version: 1, timescale: 48000, duration: 48000 * 3723 })), 3723, 'v1 u64 时长');
+  assert.equal(mp4DurationSec(makeMp4({ moovAtEnd: true })), 8000, 'moov 在尾部也找得到');
+  assert.equal(mp4DurationSec(makeMp4({ moovAtEnd: true, truncate: true })), 0, 'moov 被截掉的流 → 0（调用方放行，任务侧响亮兜底）');
+  assert.equal(mp4DurationSec(new ArrayBuffer(16)), 0, '空/垃圾 buffer');
+  assert.equal(mp4DurationSec(new TextEncoder().encode('not an mp4 at all').buffer), 0, '非 MP4');
 });
