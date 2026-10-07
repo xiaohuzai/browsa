@@ -91,19 +91,20 @@ test('getAll() never overwrites a user-set bridge alias', async () => {
   assert.equal(all.providers.bridge.alias, 'My Local Bridge');
 });
 
-test('getAll() normalizes an ASR config saved for an uninstalled provider back to ark defaults', async () => {
+test('getAll() normalizes an ASR config saved for an uninstalled provider back to the default provider (qwen) defaults', async () => {
+  // 'qwen' 已于 2026-10-06 回归注册表——已卸载样本改用 qianwenai（2026-08-31 移除）。
   reset();
   localArea.set({ asr: {
-    enabled: true, provider: 'qwen', apiKey: 'sk-qwen-old',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    enabled: true, provider: 'qianwenai', apiKey: 'sk-qianwenai-old',
+    baseUrl: 'https://maas.qianwenaiapi.com/compatible-mode/v1',
     model: 'qwen-audio-3.0-asr-flash-filetrans', videoModel: 'qwen3.8-flash',
     language: 'zh', timeoutMs: 150000, subtitleSource: 'asr',
   } });
   const all = await storage.getAll();
-  assert.equal(all.asr.provider, 'ark', '已卸载供应商回落 ark');
-  assert.equal(all.asr.baseUrl, 'https://ark.cn-beijing.volces.com/api/v3', '连接字段归一到方舟默认');
-  assert.equal(all.asr.model, 'doubao-seed-2-1-lite-260915');
-  assert.equal(all.asr.videoModel, '');
+  assert.equal(all.asr.provider, 'qwen', '已卸载供应商回落当前默认（百炼）');
+  assert.equal(all.asr.baseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1', '连接字段归一到默认供应商端点');
+  assert.equal(all.asr.model, 'qwen-audio-3.1-asr-flash-filetrans');
+  assert.equal(all.asr.videoModel, 'qwen3.8-omni-flash');
   assert.equal(all.asr.apiKey, '', '别家 key 不保留');
   assert.equal(all.asr.enabled, true, '开关与偏好保留');
   assert.equal(all.asr.language, 'zh');

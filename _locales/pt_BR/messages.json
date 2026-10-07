@@ -1663,5 +1663,49 @@
   },
   "renameSession": {
     "message": "Renomear conversa"
+  },
+  "asrLabel_qwen": {
+    "message": "Alibaba Cloud Bailian",
+    "description": "ASR registry: qwen label"
+  },
+  "asrApiKeyPlaceholder_qwen": {
+    "message": "Chave de API da Bailian (começa com sk-)",
+    "description": "ASR registry: qwen api key placeholder"
+  },
+  "asrBaseUrlTip_qwen": {
+    "message": "Use o endpoint compatible-mode do seu console (<code>*.cn-beijing.maas.aliyuncs.com/compatible-mode/v1</code>, ou o padrão <code>dashscope.aliyuncs.com/compatible-mode/v1</code>); \"Testar conexão\" também verifica o canal de upload de arquivos temporários (<code>/api/v1/uploads</code>).",
+    "description": "ASR registry: qwen base url tip (controlled HTML)"
+  },
+  "asrDocLabel_qwen": {
+    "message": "Por que essa configuração? → Documentação de compreensão de áudio Qwen-Omni da Bailian",
+    "description": "ASR registry: qwen doc link label"
+  },
+  "asrTestBtn": {
+    "message": "Testar conexão",
+    "description": "Options: ASR test-connection button"
+  },
+  "asrTesting": {
+    "message": "Testando…",
+    "description": "Options: ASR ping in progress"
+  },
+  "asrPingOk": {
+    "message": "✓ Conexão OK — modelo acessível ($1s).",
+    "description": "Options: ASR ping success ($1 = seconds)"
+  },
+  "asrPingFail": {
+    "message": "✗ $1",
+    "description": "Options: ASR ping failure ($1 = error)"
+  },
+  "asrHotwordsLabel": {
+    "message": "Palavras-chave (opcional)",
+    "description": "Options: ASR hotwords label"
+  },
+  "asrHotwordsTip": {
+    "message": "Lista de nomes próprios que melhora a precisão do reconhecimento (nomes/marcas/jargões). Aplica-se apenas aos modelos de transcrição Qwen-Audio da Alibaba Cloud Bailian.",
+    "description": "Options: ASR hotwords tip"
+  },
+  "asrHotwordsPlaceholder": {
+    "message": "Separadas por vírgulas ou quebras de linha, ex.: Dr. Yingbo, OpenViking, browsa",
+    "description": "Options: ASR hotwords placeholder"
   }
 }
