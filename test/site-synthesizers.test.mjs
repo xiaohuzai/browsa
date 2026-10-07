@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult, synthesizeXiaoyuzhouResult } from '../lib/site-synthesizers.js';
+import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult, synthesizeXiaoyuzhouResult, isXiaoyuzhouEpisodeUrl } from '../lib/site-synthesizers.js';
 
 const fakeMeta = (url) => ({ url, title: 'Test', articleTitle: 'Test' });
 
@@ -153,4 +153,25 @@ test('xiaoyuzhou: synthesizes podcast meta and always sets noTranscript', () => 
   assert.ok(r.text.includes('**播客**: 实验电台'));
   assert.ok(r.text.includes('**时长**: 62:05'));
   assert.equal(r.noTranscript, true);
+});
+
+// ── 小宇宙 URL 兜底判定（拦截器缺席时 page-extractor 仍能认出节目页）──────────
+
+test('isXiaoyuzhouEpisodeUrl: 节目 URL 判定矩阵（www/裸域、eid 长度、非节目路径、坏 URL）', () => {
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://www.xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b'), true);
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b'), true, '裸域也认');
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://www.xiaoyuzhoufm.com/episode/abc123'), false, 'eid 过短');
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://www.xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b/'), false, '带尾斜杠不是节目路径的精确形态');
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://www.xiaoyuzhoufm.com/podcast/abc123456789012345678'), false, '播客主页不是单集');
+  assert.equal(isXiaoyuzhouEpisodeUrl('https://evil.com/episode/6a97f287f03e74ee6b03ea5b'), false, '白名单外域名拒绝');
+  assert.equal(isXiaoyuzhouEpisodeUrl(''), false);
+  assert.equal(isXiaoyuzhouEpisodeUrl(null), false);
+});
+
+test('synthesizeXiaoyuzhouResult: 拦截器缺席时的最小数据（仅 eid）也产出 noTranscript 交接形态', () => {
+  const r = synthesizeXiaoyuzhouResult({ eid: '6a97f287f03e74ee6b03ea5b' }, { url: 'https://www.xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b', title: '某期节目' });
+  assert.equal(r.mode, 'xiaoyuzhou');
+  assert.equal(r.noTranscript, true, '播客恒无字幕 → ASR 移交条件恒成立');
+  assert.equal(r.articleTitle, '');
+  assert.equal(r.meta?.url, 'https://www.xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b', 'meta.url 透传——og:audio 兜底与 xy-<eid> 缓存键靠它');
 });
