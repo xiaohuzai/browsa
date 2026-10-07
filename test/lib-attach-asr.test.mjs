@@ -1139,6 +1139,8 @@ test('isXiaoyuzhouMediaUrl: accepts official media hosts and the OSS audio host 
   assert.equal(isXiaoyuzhouMediaUrl('https://media.xiaoyuzhoufm.com/episode/abc.m4a'), true);
   assert.equal(isXiaoyuzhouMediaUrl('https://www.xiaoyuzhoufm.com/a.m4a'), true);
   assert.equal(isXiaoyuzhouMediaUrl('https://audioclip.oss-cn-shanghai.aliyuncs.com/ep/a.m4a'), true);
+  assert.equal(isXiaoyuzhouMediaUrl('https://media.xyzcdn.net/626b46ea9cbbf0451cf5a962/luZvhPtdKotbkVR-SHFRKVVUiM2P.m4a'), true, '自家 CDN xyzcdn.net——真机实测 enclosure/og:audio 都指向它（2026-10-07）');
+  assert.equal(isXiaoyuzhouMediaUrl('https://xyzcdn.net.evil.example.com/a.m4a'), false, 'suffix must be a real subdomain, not a string tail');
   assert.equal(isXiaoyuzhouMediaUrl('http://media.xiaoyuzhoufm.com/a.m4a'), false, 'https only');
   assert.equal(isXiaoyuzhouMediaUrl('https://evil.example.com/a.m4a'), false);
   assert.equal(isXiaoyuzhouMediaUrl('https://xiaoyuzhoufm.com.evil.example.com/a.m4a'), false, 'suffix must be a real subdomain, not a string tail');
