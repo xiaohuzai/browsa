@@ -756,10 +756,14 @@ test('chat-handler.js wires the agent-session naming into the hermes success pat
     'chat-handler must import the title helper');
   assert.ok(src.includes('import { runsApiStream, patchHermesSession }'),
     'patchHermesSession rides the llm-client import');
-  assert.ok(/kind === 'hermes' && turn\.hermesSessionId\) \|\| \(kind === 'bridge' && turn\.bridgeSessionId\)/.test(src),
-    'the naming call must cover hermes AND bridge/codex, gated on a session id');
+  assert.ok(/kind === 'hermes' && turn\.hermesSessionId\) \|\| \(kind === 'bridge' && turn\.bridgeSessionId\) \|\| \(kind === 'squilla' && turn\.squillaSessionKey\)/.test(src),
+    'the naming call must cover hermes AND bridge/codex AND squilla, gated on a session id');
   assert.ok(src.includes('renameBridgeSession'),
     'bridge naming must ride bridge-client renameBridgeSession (daemon /threads/:id/title)');
+  assert.ok(src.includes('renameSquillaSession'),
+    'squilla naming must ride squilla-client renameSquillaSession (v4 WS sessions.rename)');
+  assert.ok(/kind === 'squilla'\s*\n?\s*\?\s*renameSquillaSession\(\{ baseUrl: provider\.baseUrl, apiKey: provider\.apiKey, sessionKey: sessionId, title \}\)/.test(src),
+    'the squilla rename must pass the session key as sessionKey (the gateway-side key IS the session id)');
   assert.ok(src.includes('resolveBridgeApiKey(provider, endpoint)'),
     'bridge naming must authenticate with the PER-ENDPOINT key (never another bridge\'s token)');
   assert.ok(src.includes('userText: msg.userText'),
