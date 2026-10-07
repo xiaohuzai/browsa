@@ -162,7 +162,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // is often just that one word — not the user's actual selection.
   // The content script's contextmenu event handler re-sends the original
   // selection to selectionCache just before this callback fires.
-  const text = (selectionCache.get(tab.id) || info.selectionText || '').trim();
+  const cached = selectionCache.get(tab.id);
+  const text = ((typeof cached === 'string' ? cached : cached?.text) || info.selectionText || '').trim();
   if (!text) return;
 
   const actionMap = {
@@ -174,7 +175,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const action = actionMap[info.menuItemId];
   if (!action) return;
 
-  selectionCache.set(tab.id, text);
+  selectionCache.set(tab.id, {
+    text,
+    html: (typeof cached === 'object' && cached?.html) || '',
+  });
   syncTabPurgeListener(); // 菜单路径不走 handle()，selectionCache 增长要自己武装 purge 监听
   await relaySelectionAction(tab.id, action, text);
 });
@@ -259,6 +263,24 @@ async function siteCacheCtx(t) {
   await siteCacheRestorePromise(); // ensure session-storage restore finished (lazy, shared)
   if (typeof t !== 'number') return { xhsXhrNote: null, siteCache: null };
   return { xhsXhrNote: xhsXhrCache.get(t) || null, siteCache: getSiteCache(t) };
+}
+
+// 选区 HTML 的存储上限（selectionCache 的 html 字段；整页误选的极端情形也不至于
+// 把 SW 内存拖爆——超限截断的尾部丢失可接受，text 字段不受影响）。
+const SELECTION_HTML_CAP = 300_000;
+
+// 选区 HTML → Markdown（页面 MAIN world）。Turndown/GFM 由 ensureReadabilityInjected
+// 注入为页面全局（未注入成功时 TurndownService undefined → 抛错，调用方回退纯文本）。
+// 自包含：executeScript func 序列化只带函数本体。转换在分离容器上进行，只读传入
+// 的 HTML 字符串——导航后的页面也能转换。
+function selectionHtmlToMarkdownInPage(html) {
+  const div = document.createElement('div');
+  div.innerHTML = String(html || '');
+  div.querySelectorAll('script, style, noscript, button, input, select, textarea').forEach((el) => el.remove());
+  if (typeof TurndownService === 'undefined') throw new Error('turndown not injected');
+  const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-', linkStyle: 'inlined' });
+  if (typeof TurndownPluginGfm !== 'undefined' && TurndownPluginGfm && TurndownPluginGfm.gfm) td.use(TurndownPluginGfm.gfm);
+  return td.turndown(div);
 }
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -550,8 +572,15 @@ async function handle(msg, sender) {
       // non-empty selections — clicking elsewhere clears the visual selection
       // but we deliberately keep the cache so the user can still use 📎
       // or the floating toolbar after clicking into the side panel.
+      // html carries the same selection's structure (capped) for the
+      // selected-attach Markdown upgrade; text stays the source of truth.
       const tabId = sender?.tab?.id;
-      if (tabId && msg.text) selectionCache.set(tabId, msg.text);
+      if (tabId && msg.text) {
+        selectionCache.set(tabId, {
+          text: msg.text,
+          html: typeof msg.html === 'string' ? msg.html.slice(0, SELECTION_HTML_CAP) : '',
+        });
+      }
       return { ok: true };
     }
 
@@ -711,8 +740,12 @@ async function handle(msg, sender) {
           // Prefer the live cache; fall back to msg.text (passed explicitly by
           // handleSelectionAction when the SW was sleeping and SELECTION_CACHE
           // was dropped — right-click / toolbar path always has the text).
-          const cachedText = selectionCache.get(tabId) || msg.text || '';
-          if (cachedText) selectionCache.set(tabId, cachedText); // keep in sync
+          // Cache values are {text, html} since the selection-structure pass;
+          // a bare string means a pre-upgrade in-memory entry (same SW life).
+          const cached = selectionCache.get(tabId);
+          const cachedText = (typeof cached === 'string' ? cached : cached?.text) || msg.text || '';
+          const cachedHtml = (typeof cached === 'object' && cached?.html) || '';
+          if (cachedText && cached) selectionCache.set(tabId, cached); // keep in sync
           const tab = await chrome.tabs.get(tabId).catch(() => null);
           const meta = tab ? { url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || '' } : { url: '', title: '', favIconUrl: '' };
           if (!cachedText) return { ok: false, error: 'No text selected. Select some text on the page first, then click 📎.' };
@@ -721,6 +754,27 @@ async function handle(msg, sender) {
             text: cachedText,
             truncated: { rawTextLength: cachedText.length, textLength: cachedText.length, wasCapped: false }
           };
+          // 选区附加保留结构（2026-10-07，移植自 EdgeEver 的 selection clip）：捕获时
+          // 存的选区 HTML 在页面 MAIN world 里经 Turndown（ensureReadabilityInjected
+          // 注入的页面全局）转 Markdown——表格/列表/链接结构进上下文，纯文本全部丢失
+          // 的那类信息不再丢。转换在分离容器上进行，与当前页面内容无关（导航过也能转）；
+          // 任何一步失败都保持纯文本（md 长度 sanity 门：明显短于纯文本视为转换失真）。
+          if (cachedHtml) {
+            try {
+              await ensureReadabilityInjected(tabId).catch(() => {});
+              const [res] = await chrome.scripting.executeScript({
+                target: { tabId },
+                world: 'MAIN',
+                func: selectionHtmlToMarkdownInPage,
+                args: [cachedHtml]
+              });
+              const md = String(res?.result || '').trim();
+              if (md && md.length >= cachedText.length * 0.5) {
+                ctx.text = md;
+                ctx.selectedFormat = 'markdown';
+              }
+            } catch (_) { /* fail-open: plain text stands */ }
+          }
         } else if (mode === 'jina') {
           // Jina Reader: fetch clean Markdown from r.jina.ai/{url}
           // Runs in the service worker — no CORS restrictions, no cookies sent.

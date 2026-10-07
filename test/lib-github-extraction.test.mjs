@@ -143,3 +143,100 @@ test('empty body returns null', async () => {
   const out = await withFetch(mock, () => tryGithubExtraction(tab, META, 1_000_000));
   assert.equal(out, null);
 });
+
+// ── tryGithubRepoExtraction (2026-10-07, repo metadata + raw README) ────────
+
+import { githubRepoTarget, formatGithubRepoText, tryGithubRepoExtraction } from '../lib/page-extractor.js';
+
+test('github repo URL: target accepts root and /tree/, rejects every other section', () => {
+  assert.deepEqual(githubRepoTarget('https://github.com/volcengine/OpenViking'), { owner: 'volcengine', name: 'OpenViking', canonicalUrl: 'https://github.com/volcengine/OpenViking' });
+  assert.deepEqual(githubRepoTarget('https://github.com/volcengine/OpenViking/'), { owner: 'volcengine', name: 'OpenViking', canonicalUrl: 'https://github.com/volcengine/OpenViking' });
+  assert.deepEqual(githubRepoTarget('https://github.com/o/n/tree/main/lib'), { owner: 'o', name: 'n', canonicalUrl: 'https://github.com/o/n' });
+  assert.equal(githubRepoTarget('https://github.com/o/n/blob/main/README.md'), null, '/blob/ has its own fast path');
+  assert.equal(githubRepoTarget('https://github.com/o/n/issues'), null);
+  assert.equal(githubRepoTarget('https://github.com/o'), null);
+  assert.equal(githubRepoTarget('https://example.com/o/n'), null);
+  assert.equal(githubRepoTarget('not a url'), null);
+});
+
+test('github repo URL: formatGithubRepoText builds metadata + README and reports capping', () => {
+  const out = formatGithubRepoText({
+    fullName: 'volcengine/OpenViking', description: 'An agent runtime.', homepage: 'https://example.com',
+    language: 'TypeScript', licenseSpdx: 'MIT', stars: 12734, forks: 56, topics: ['ai', 'agents'],
+  }, '# README body\n', 1_000_000);
+  assert.ok(out.text.startsWith('# volcengine/OpenViking\n\n'));
+  assert.ok(out.text.includes('**Description**: An agent runtime.'));
+  assert.ok(out.text.includes('Language: TypeScript · License: MIT'));
+  assert.ok(out.text.includes('Stars: 12,734'));
+  assert.ok(out.text.includes('**Topics**: ai, agents'));
+  assert.ok(out.text.includes('## README\n\n# README body'));
+  assert.equal(out.wasCapped, false);
+
+  const capped = formatGithubRepoText({ fullName: 'o/n' }, 'x'.repeat(300), 100);
+  assert.equal(capped.wasCapped, true);
+  assert.ok(capped.text.length < 300, 'README capped to textCap');
+
+  // Either input missing → null (caller falls through to the generic cascade).
+  assert.equal(formatGithubRepoText(null, '# r', 1000), null);
+  assert.equal(formatGithubRepoText({ fullName: 'o/n' }, '   ', 1000), null);
+});
+
+function mockRepoFetch({ repoBody, repoStatus = 200, readmeBody, readmeStatus = 200 }) {
+  const calls = [];
+  return {
+    calls,
+    fn: async (url, opts) => {
+      calls.push({ url, opts });
+      const isRepo = url.endsWith('/readme') === false;
+      const status = isRepo ? repoStatus : readmeStatus;
+      const body = isRepo ? repoBody : readmeBody;
+      if (status !== 200) return { ok: false, status, headers: { get: () => '' }, json: async () => null, text: async () => '' };
+      return {
+        ok: true,
+        headers: { get: () => (isRepo ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8') },
+        json: async () => JSON.parse(body),
+        text: async () => body,
+      };
+    },
+  };
+}
+
+test('github repo: fetches repo API + raw README, both credentials omitted', async () => {
+  const mock = mockRepoFetch({
+    repoBody: JSON.stringify({ full_name: 'volcengine/OpenViking', description: 'An agent runtime.', homepage: '', language: 'TypeScript', license: { spdx_id: 'MIT' }, stargazers_count: 5, forks_count: 1, topics: ['ai'] }),
+    readmeBody: '# OpenViking\n\nbody\n',
+  });
+  const out = await withFetch(mock.fn, () => tryGithubRepoExtraction(
+    { url: 'https://github.com/volcengine/OpenViking/tree/main' },
+    { url: 'https://github.com/volcengine/OpenViking/tree/main', title: 't' },
+    1_000_000
+  ));
+  assert.equal(out.mode, 'github-repo');
+  assert.equal(out.articleTitle, 'volcengine/OpenViking');
+  assert.ok(out.text.includes('# volcengine/OpenViking'));
+  assert.ok(out.text.includes('## README'));
+  assert.equal(mock.calls.length, 2);
+  assert.equal(mock.calls[0].url, 'https://api.github.com/repos/volcengine/OpenViking');
+  assert.equal(mock.calls[1].url, 'https://api.github.com/repos/volcengine/OpenViking/readme');
+  assert.equal(mock.calls[0].opts.credentials, 'omit', 'api.github.com sends no ACA-Credentials — include would be blocked');
+  assert.equal(mock.calls[1].opts.credentials, 'omit');
+  assert.equal(mock.calls[1].opts.headers.Accept, 'application/vnd.github.raw', 'README rides the raw media type — no filename probing');
+  assert.equal(out.truncated.wasCapped, false);
+});
+
+test('github repo: any failure returns null (generic cascade keeps the logged-in DOM)', async () => {
+  const tab = { url: 'https://github.com/o/n' };
+  const meta = { url: tab.url, title: 't' };
+  // Repo API rate-limited (403 — the real unauthenticated ceiling).
+  assert.equal(await withFetch(mockRepoFetch({ repoBody: '{}', repoStatus: 403, readmeBody: 'x' }).fn, () => tryGithubRepoExtraction(tab, meta, 1000)), null);
+  // README endpoint failed.
+  assert.equal(await withFetch(mockRepoFetch({ repoBody: '{"full_name":"o/n"}', readmeStatus: 404, readmeBody: '' }).fn, () => tryGithubRepoExtraction(tab, meta, 1000)), null);
+  // Network throw.
+  assert.equal(await withFetch(async () => { throw new Error('offline'); }, () => tryGithubRepoExtraction(tab, meta, 1000)), null);
+  // Binary README (null byte in first 4KB).
+  assert.equal(await withFetch(mockRepoFetch({ repoBody: '{"full_name":"o/n"}', readmeBody: 'PK\x00\x03\x04 rest' }).fn, () => tryGithubRepoExtraction(tab, meta, 1000)), null);
+  // Non-repo URL never fetches.
+  let calls = 0;
+  await withFetch(async (url) => { calls += 1; throw new Error('should not fetch'); }, () => tryGithubRepoExtraction({ url: 'https://github.com/o/n/blob/main/x.md' }, meta, 1000));
+  assert.equal(calls, 0);
+});

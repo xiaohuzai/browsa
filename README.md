@@ -269,9 +269,10 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
 | Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
 | Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
-| GitHub file pages | raw source from `raw.githubusercontent.com` — markdown and code keep their structure |
+| GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
-| Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more) |
+| Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"); long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
+| Selected text | structure preserved — tables, lists and links convert to Markdown on attach, not bare plain text |
 
 Highlight text on a page and the **floating toolbar** appears: **Explain** and **Translate** answer inline — a streaming card right next to the selection, no panel needed — while **Ask** and **Summarize** (and the right-click menu) ride into the panel. No need to click 📎.
 
