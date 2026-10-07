@@ -488,11 +488,11 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "ASR 자막 및 동영상",
+    "message": "멀티모달 비디오 이해",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "ASR 사용",
+    "message": "비디오 이해 활성화",
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
@@ -947,8 +947,12 @@
     "message": "동영상 메타데이터로 대체했습니다",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "에피소드 정보로 대체되었습니다",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ 이 동영상에는 자막이 없습니다 — 그대로 유지합니다(동영상 메타데이터만 첨부됨). 자동 전사를 원하면 설정에서 ASR을 사용 설정한 뒤 다시 첨부하세요.",
+    "message": "⚠️ 이 영상/오디오에는 자막이 없습니다 — 그대로 유지합니다(페이지 정보만 저장). 자동 전사를 하려면 설정에서 비디오 이해를 활성화한 후 다시 첨부하세요.",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "小宇宙 FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "$1 재생 URL이 만료되었고 자동 새로고침에 실패했습니다($2) — 동영상 페이지를 새로고침한 뒤 다시 첨부하세요",
     "description": "Attach pipeline error"
@@ -1616,6 +1624,10 @@
   },
   "chipNoCaptionsVideoInfo": {
     "message": "(자막 없음 — 대신 동영상 정보 첨부됨)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "(전사 실패 — 대신 에피소드 정보 첨부됨)",
     "description": "Attach chip fallback label"
   },
   "chipAttachedAsr": {

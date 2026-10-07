@@ -488,11 +488,11 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "ASR 字幕と動画",
+    "message": "マルチモーダル動画理解",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "ASR を有効にする",
+    "message": "動画理解を有効化",
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
@@ -947,8 +947,12 @@
     "message": "動画メタデータへフォールバックしました",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "番組情報にフォールバックしました",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ この動画には字幕がありません — 現状のまま保持します（動画メタデータのみ）。自動文字起こしするには、設定で ASR を有効にしてから再度添付してください。",
+    "message": "⚠️ この動画/音声には字幕がありません：現状のまま保存しました（ページ情報のみ）。自動文字起こしするには、設定で動画理解を有効にしてから再度添付してください。",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "小宇宙 FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "$1の再生 URL の有効期限が切れ、自動更新に失敗しました（$2）— 動画ページを再読み込みしてから、もう一度添付してください",
     "description": "Attach pipeline error"
@@ -1616,6 +1624,10 @@
   },
   "chipNoCaptionsVideoInfo": {
     "message": "（字幕なし — 代わりに動画情報を添付）",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "（文字起こし失敗 — 代わりに番組情報を添付）",
     "description": "Attach chip fallback label"
   },
   "chipAttachedAsr": {

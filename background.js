@@ -831,10 +831,16 @@ async function handle(msg, sender) {
         // subtitles over low-quality originals — the strip/replace happens in the
         // sidepanel at ATTACH_ASR_CONFIRM time, keeping ctx.text intact for the
         // fail-open fallback).
-        const isVideoPlatform = ctx.mode === 'bilibili' || ctx.mode === 'youtube';
+        // xiaoyuzhou (podcast) joins the ASR handoff too — episodes never carry
+        // transcripts, so synthesizeXiaoyuzhouResult always sets noTranscript.
+        const isVideoPlatform = ctx.mode === 'bilibili' || ctx.mode === 'youtube' || ctx.mode === 'xiaoyuzhou';
         if (isVideoPlatform && all.asr?.enabled && (ctx.noTranscript || all.asr.subtitleSource === ASR_SUBTITLE_SOURCE.ASR)) {
           const asrCtx = await buildAsrPendingCtx(tabId, ctx);
           if (asrCtx) return { ok: true, ctx: asrCtx };
+          // ASR 已启用但 ctx 构建失败（小宇宙 enclosure/og:audio 两路都拿不到、
+          // 视频平台拿不到流等）：与 ASR 未启用同样降级为「页面信息 + 无字幕
+          // 提示」，不要无声无息地只存页面信息。
+          ctx.noTranscriptHint = true;
         } else if (isVideoPlatform && ctx.noTranscript) {
           // Video WITHOUT subtitles AND ASR not enabled: keep the
           // current behavior (plain video-info attach) but flag the ctx so

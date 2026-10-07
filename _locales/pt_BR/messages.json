@@ -488,11 +488,11 @@
     "description": "Options: auto-collapse thinking label"
   },
   "asrHeading": {
-    "message": "Legendas ASR e vídeo",
+    "message": "Compreensão de vídeo multimodal",
     "description": "Options: ASR card heading"
   },
   "asrEnableLabel": {
-    "message": "Ativar ASR",
+    "message": "Ativar compreensão de vídeo",
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
@@ -947,8 +947,12 @@
     "message": "Usando os metadados do vídeo",
     "description": "Sidepanel: ASR fallback to video metadata"
   },
+  "asrFallbackEpisodeInfo": {
+    "message": "Retornou para as informações do episódio",
+    "description": "Attach pipeline error fallback label"
+  },
   "noTranscriptHint": {
-    "message": "⚠️ Este vídeo não tem legendas — mantido como está (apenas metadados do vídeo). Para transcrever automaticamente, ative o ASR nas Configurações e anexe novamente.",
+    "message": "⚠️ Este vídeo/áudio não tem legendas — mantido como está (apenas informações da página). Para transcrever automaticamente, ative a compreensão de vídeo nas Configurações e anexe novamente.",
     "description": "Sidepanel: no transcript hint on attach"
   },
   "progressReuseAudio": {
@@ -1566,6 +1570,10 @@
     "message": "Bilibili",
     "description": "Platform display name"
   },
+  "platformXiaoyuzhou": {
+    "message": "Xiaoyuzhou FM",
+    "description": "Platform display name"
+  },
   "errPlayurlExpired": {
     "message": "A URL de reprodução do $1 expirou e a renovação automática falhou ($2) — recarregue a página do vídeo e anexe novamente",
     "description": "Attach pipeline error"
@@ -1616,6 +1624,10 @@
   },
   "chipNoCaptionsVideoInfo": {
     "message": "(sem legendas — informações do vídeo anexadas)",
+    "description": "Attach chip fallback label"
+  },
+  "chipNoCaptionsEpisodeInfo": {
+    "message": "(falha na transcrição — informações do episódio anexadas)",
     "description": "Attach chip fallback label"
   },
   "chipAttachedAsr": {

@@ -577,3 +577,107 @@ test('ASR_FRESH_URLS returns a FLAT {ok, streams} so the onMessage data: wrap le
   assert.ok(wrapped.data.streams.length > 0, 'must return the fresh audio streams');
   assert.equal(wrapped.data.streams[0].type, 'audio');
 });
+
+// ---- 小宇宙播客：ASR 全链路移交（enclosure 直链 / og:audio 回退 / 白名单拒绝）----
+
+const XY_URL = 'https://www.xiaoyuzhoufm.com/episode/66f5ac71e4185dc4d3d43a27';
+const XY_ENCLOSURE = 'https://media.xiaoyuzhoufm.com/episode/aabbcc.m4a';
+
+function primeXiaoyuzhouCache(tabId, episode) {
+  // site-cache-store 的公开写入口（真实推送消息走同一条路：XIAOYUZHOU_EPISODE
+  // → recordSiteMessage → SITE_CACHES + session 持久化）。
+  return import('../lib/handlers/site-cache-store.js').then(({ recordSiteMessage }) => {
+    recordSiteMessage({ type: 'XIAOYUZHOU_EPISODE', episode }, tabId);
+  });
+}
+
+test('ATTACH_PAGE on a xiaoyuzhou episode page + ASR enabled: asr-pending with the enclosure direct URL, no injected stream probes, no cookies', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  const chromeMock = makeChrome(localArea, { pageUrl: XY_URL });
+  chromeMock.scripting.executeScript = ((orig) => async (opts) => {
+    chromeMock.__execBodies.push(opts.func?.toString() || `files:${opts.files}`);
+    return orig(opts);
+  })(chromeMock.scripting.executeScript);
+  chromeMock.__execBodies = [];
+  Object.defineProperty(globalThis, 'chrome', { value: chromeMock, writable: true, configurable: true });
+  const tabId = nextTabId++;
+  await primeXiaoyuzhouCache(tabId, {
+    eid: '66f5ac71e4185dc4d3d43a27', title: '聊聊浏览器扩展', podcast: '实验电台',
+    description: '本期聊了……', duration: 3725, mediaUrl: XY_ENCLOSURE,
+  });
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('og:audio fallback must NOT fire when the cache carries a mediaUrl'); };
+  try {
+    const { handle } = await import('../background.js');
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'asr-pending');
+    assert.equal(res.ctx.asrPlatform, 'xiaoyuzhou');
+    assert.equal(res.ctx.audioUrl, XY_ENCLOSURE);
+    assert.equal(res.ctx.videoDurationSec, 3725, 'episode duration drives the post-transcode truncation guard');
+    assert.equal(res.ctx.videoCandidates.length, 0, 'podcasts are audio-only — no mode-selection card');
+    assert.equal(res.ctx.biliCookie, '', 'OSS direct links need no platform cookies — chrome.cookies must not be read');
+    assert.ok(chromeMock.__execBodies.every((b) => !b.includes('__browsa')), 'xiaoyuzhou needs no MAIN-world stream probes (static direct URL)');
+    const history = await localArea.get('history');
+    assert.equal((history.history || []).length, 0, 'asr-pending must not be stored to history yet');
+  } finally {
+    if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+  }
+});
+
+test('ATTACH_PAGE xiaoyuzhou: cache without mediaUrl falls back to the og:audio meta (whitelist-checked)', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, { pageUrl: XY_URL }), writable: true, configurable: true });
+  const tabId = nextTabId++;
+  await primeXiaoyuzhouCache(tabId, { eid: '66f5ac71e4185dc4d3d43a27', title: '无直链缓存', duration: 1800 });
+  const prevFetch = globalThis.fetch;
+  const ogUrl = 'https://audioclip.oss-cn-shanghai.aliyuncs.com/ep/xyz.m4a';
+  globalThis.fetch = async (url) => {
+    assert.equal(String(url), XY_URL, 'the og fallback fetches the episode page itself');
+    return { ok: true, text: async () => `<html><meta property="og:audio" content="${ogUrl.replace('&', '&amp;')}" /></html>` };
+  };
+  try {
+    const { handle } = await import('../background.js');
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'asr-pending');
+    assert.equal(res.ctx.audioUrl, ogUrl);
+  } finally {
+    if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+  }
+});
+
+test('ATTACH_PAGE xiaoyuzhou: no direct URL anywhere degrades to plain attach + hint (never asr-pending)', async () => {
+  const localArea = makeStorageArea({
+    activeProvider: 'compatible',
+    providers: { compatible: { type: 'llm', baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' } },
+    autoSummarizeAttachments: false,
+    asr: { enabled: true, apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'm', language: 'zh', format: 'audio/x-m4a' },
+  });
+  Object.defineProperty(globalThis, 'chrome', { value: makeChrome(localArea, { pageUrl: XY_URL }), writable: true, configurable: true });
+  const tabId = nextTabId++;
+  await primeXiaoyuzhouCache(tabId, { eid: '66f5ac71e4185dc4d3d43a27', title: '两路都没有', duration: 1800 });
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, text: async () => '<meta property="og:audio" content="https://cdn.evil.example.com/a.mp3" />' });
+  try {
+    const { handle } = await import('../background.js');
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.notEqual(res.ctx.mode, 'asr-pending', 'a non-whitelisted og:audio URL must not enter the ASR pipeline');
+    assert.equal(res.ctx.noTranscriptHint, true, 'degrades to the plain attach with the enable-ASR hint');
+    const history = await localArea.get('history');
+    assert.equal((history.history || []).length, 1, 'plain attach stores immediately');
+  } finally {
+    if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+  }
+});
