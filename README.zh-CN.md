@@ -186,7 +186,7 @@ hermes gateway
 <details>
 <summary><b>🦑 OpenSquilla Agent</b>——网关 WebSocket 直连的本地智能体（桌面版或命令行）</summary>
 
-[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。
+[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。browsa 的会话会以「browsa：…」的名字出现在应用的侧边栏里——之后随时打开桌面应用，就能从面板聊到一半的地方接着聊。
 
 网关用**桌面版**或**命令行**二选一跑起来即可——browsa 对两者的接法完全一样，两条路线只有一处差别：网关读哪份配置文件（各自方式的第 2 步）。改错文件是「配了却连不上」的最常见原因。
 

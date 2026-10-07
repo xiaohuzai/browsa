@@ -186,7 +186,7 @@ hermes gateway
 <details>
 <summary><b>🦑 OpenSquilla Agent</b> — local agent over gateway WebSocket (desktop app or CLI)</summary>
 
-[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local agent (gateway + Web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation.
+[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local agent (gateway + Web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation. Conversations show up in the app's sidebar under a `browsa：…` name, so you can open the desktop app later and pick any of them up right where the panel left off.
 
 Run the gateway **either** as the desktop app **or** from the command line — browsa connects to both the same way. The tracks differ in exactly one thing: which config file the gateway reads (step 2 in each track). Editing the wrong file is the most common reason the connection silently fails.
 

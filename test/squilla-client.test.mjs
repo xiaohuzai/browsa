@@ -65,8 +65,10 @@ const flush = () => new Promise(r => setTimeout(r, 0));
 globalThis.WebSocket = MockWebSocket;
 
 // A scripted gateway: auto-answers connect/subscribe/send and pushes
-// `events` (frames) after the send is accepted.
-function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4' } = {}) {
+// `events` (frames) after the send is accepted. `renameReply` overrides the
+// sessions.rename answer (default: ok); a function form receives the request
+// frame so the res id can echo it.
+function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4', renameReply } = {}) {
   MockWebSocket.instances = [];
   let accepted = false;
   MockWebSocket.respond = (ws, frame) => {
@@ -74,7 +76,11 @@ function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4' 
       return [{ type: 'hello-ok', protocol: 4, server: { version: helloVersion, conn_id: 'c1' }, features: { methods: ['sessions.send'] } }];
     }
     if (frame.method === 'sessions.create') {
-      return [{ type: 'res', id: frame.id, ok: true, payload: { key: 'agent:main:cli:deadbeef', sessionId: 'deadbeef' } }];
+      return [{ type: 'res', id: frame.id, ok: true, payload: { key: 'agent:main:webchat:deadbeef', sessionId: 'deadbeef' } }];
+    }
+    if (frame.method === 'sessions.rename') {
+      const reply = typeof renameReply === 'function' ? renameReply(frame) : (renameReply || { type: 'res', id: frame.id, ok: true, payload: { key: frame.params.key, updated: ['display_name'] } });
+      return [reply];
     }
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: { subscribed: true, current_stream_seq: 1 } }];
@@ -523,7 +529,7 @@ test('uploadSquillaFile: posts multipart to the HTTP origin and returns file_uui
   }
 });
 
-test('createSquillaSession: returns the gateway-assigned cli session key', async () => {
+test('createSquillaSession: defaults to a webchat-kind session (sidebar-visible in the OpenSquilla app)', async () => {
   const { createSquillaSession } = await import('../lib/squilla-client.js');
   const gw = scriptGateway();
   const resultP = createSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws' });
@@ -532,11 +538,73 @@ test('createSquillaSession: returns the gateway-assigned cli session key', async
   await flush();
   await flush();
   const key = await resultP;
-  assert.equal(key, 'agent:main:cli:deadbeef', 'the gateway-assigned session key must be returned');
+  assert.equal(key, 'agent:main:webchat:deadbeef', 'the gateway-assigned session key must be returned');
   const create = lastSocket().sent.find(f => f.method === 'sessions.create');
   assert.equal(create.params.agentId, 'main');
+  assert.equal(create.params.kind, 'webchat');
+  gw.restore();
+});
+
+test('createSquillaSession: kind is opt-out-able — the detail thread passes cli explicitly', async () => {
+  const { createSquillaSession } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway();
+  const resultP = createSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', kind: 'cli' });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  await resultP;
+  const create = lastSocket().sent.find(f => f.method === 'sessions.create');
   assert.equal(create.params.kind, 'cli');
   gw.restore();
+});
+
+test('renameSquillaSession: v4 sessions.rename {key, displayName} — ok answer → {ok:true, status:200}', async () => {
+  const { renameSquillaSession } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway();
+  const resultP = renameSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', sessionKey: 'agent:main:webchat:ab12cd34', title: 'browsa：讲讲量子纠缠' });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  const res = await resultP;
+  assert.deepEqual(res, { ok: true, status: 200 });
+  const ws = lastSocket();
+  const methods = ws.sent.filter(f => f.type === 'req').map(f => f.method);
+  assert.deepEqual(methods, ['connect', 'sessions.rename'], 'rename opens its own short-lived connection — no subscribe/send');
+  const rename = ws.sent.find(f => f.method === 'sessions.rename');
+  assert.deepEqual(rename.params, { key: 'agent:main:webchat:ab12cd34', displayName: 'browsa：讲讲量子纠缠' });
+  gw.restore();
+});
+
+test('renameSquillaSession: a gateway error res is an ANSWERED refusal → status 400 (stamps as permanent)', async () => {
+  const { renameSquillaSession } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    renameReply: (frame) => ({ type: 'res', id: frame.id, ok: false, payload: null, error: { code: 'INVALID_PARAMS', message: 'unknown session' } }),
+  });
+  const resultP = renameSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', sessionKey: 'agent:main:webchat:ab12cd34', title: 'browsa：x' });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  const res = await resultP;
+  assert.deepEqual(res, { ok: false, status: 400 });
+  gw.restore();
+});
+
+test('renameSquillaSession: transport failure / missing args → status 0 (unstamped, retried next turn)', async () => {
+  const { renameSquillaSession } = await import('../lib/squilla-client.js');
+  // Dead gateway: the handshake never completes.
+  const gw = scriptGateway();
+  const deadP = renameSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', sessionKey: 'agent:main:webchat:ab12cd34', title: 'browsa：x' });
+  lastSocket().serverFail();
+  assert.deepEqual(await deadP, { ok: false, status: 0 });
+  gw.restore();
+  // Missing baseUrl / sessionKey / title never opens a socket.
+  assert.deepEqual(await renameSquillaSession({ baseUrl: '', sessionKey: 'k', title: 't' }), { ok: false, status: 0 });
+  assert.deepEqual(await renameSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', sessionKey: '', title: 't' }), { ok: false, status: 0 });
+  assert.deepEqual(await renameSquillaSession({ baseUrl: 'ws://127.0.0.1:18791/ws', sessionKey: 'k', title: '' }), { ok: false, status: 0 });
+  assert.equal(MockWebSocket.instances.length, 1, 'no socket opened for the missing-arg guards');
 });
 
 test('buildSquillaTurn: prepends the language directive, trims, and joins', async () => {
