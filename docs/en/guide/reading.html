@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>Reading pages · browsa guide</title>
-<meta name="description" content="Attaching the current tab with 📎: Auto and Screenshot modes, asking about a text selection, images, PDFs, GitHub files, and deep extraction on 12 sites.">
+<meta name="description" content="Attaching the current tab with 📎: Auto and Screenshot modes, asking about a text selection, images, PDFs, GitHub repos & files, and deep extraction on 12 sites.">
 <link rel="icon" type="image/png" href="../../icon48.png">
 <link rel="stylesheet" href="../../site.css">
 <link rel="stylesheet" href="../../docs.css">
@@ -96,20 +96,20 @@
         <figcaption>Papers: figure regions are cropped, captioned, and sent to vision models — the answer points at the figure.</figcaption>
       </figure>
 
-      <h2>GitHub file pages</h2>
-      <p>On <code>github.com</code> file pages, browsa fetches the raw source from <code>raw.githubusercontent.com</code> directly — Markdown and code keep their structure instead of the rendered page.</p>
+      <h2>GitHub repos &amp; file pages</h2>
+      <p>On <code>github.com</code> file pages, browsa fetches the raw source from <code>raw.githubusercontent.com</code> directly — Markdown and code keep their structure instead of the rendered page. On a repository page, the attach is structured metadata (description, topics, license, stars) plus the raw README — the About sidebar stops being discarded as nav chrome.</p>
 
       <h2>Deep extraction on known sites</h2>
-      <p>For the sites below, browsa observes the requests the browser itself makes and reads the page's already-loaded structured data — subtitles, comments, note text — rather than guessing. No re-authentication, nothing sent to third parties.</p>
+      <p>For the sites below, browsa observes the requests the browser itself makes and reads the page's already-loaded structured data — subtitles, comments, note text — rather than guessing; when interception misses, the site's own API is queried on demand. No re-authentication, nothing sent to third parties.</p>
       <div class="site-strip">
         <span class="site-chip">YouTube<span class="en">transcripts/chapters</span></span>
-        <span class="site-chip">Bilibili<span class="en">transcripts/ASR/stats</span></span>
-        <span class="site-chip">Xiaohongshu<span class="en">notes/comments</span></span>
+        <span class="site-chip">Bilibili<span class="en">transcripts/chapters/ASR/stats</span></span>
+        <span class="site-chip">Xiaohongshu<span class="en">notes/photos/comments</span></span>
         <span class="site-chip">Feishu / Lark<span class="en">docs/tables</span></span>
         <span class="site-chip">Juejin<span class="en">article source</span></span>
         <span class="site-chip">Zhihu<span class="en">posts/answers</span></span>
-        <span class="site-chip">X / Twitter<span class="en">tweets/replies</span></span>
-        <span class="site-chip">Reddit<span class="en">posts/comments</span></span>
+        <span class="site-chip">X / Twitter<span class="en">posts/photos/replies</span></span>
+        <span class="site-chip">Reddit<span class="en">posts/photos/comments</span></span>
         <span class="site-chip">Xueqiu<span class="en">quotes/posts</span></span>
         <span class="site-chip">Xiaoyuzhou<span class="en">podcasts</span></span>
         <span class="site-chip">Dedao<span class="en">articles</span></span>

@@ -178,6 +178,68 @@ function loadContentScript(name) {
   });
 }
 
+// bilibili: multi-page (?p=) selection + view_points chapters (2026-10-07 —
+// the old `pages?.[0]?.cid || cid` always took P1's cid, feeding P1's
+// subtitles to P2+ attaches).
+{
+  const { extractBilibiliVideo, bilibiliPageFromUrl, pickBilibiliPageCid, extractBilibiliViewPoints } =
+    loadContentScript('bilibili-content-script.js');
+
+  test('bilibili: bilibiliPageFromUrl parses ?p= and defaults invalid values to 1', () => {
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1?p=2'), 2);
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1'), 1);
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1?p=0'), 1);
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1?p=abc'), 1);
+    assert.equal(bilibiliPageFromUrl(''), 1);
+    assert.equal(bilibiliPageFromUrl(null), 1);
+  });
+
+  test('bilibili: pickBilibiliPageCid picks the ?p= page, clamps out-of-range, falls back to meta.cid', () => {
+    const meta = { cid: 100, pages: [{ cid: 11, part: 'P1', duration: 60 }, { cid: 22, part: 'P2', duration: 120 }] };
+    assert.deepEqual(pickBilibiliPageCid(meta, 2), { p: 2, cid: 22, part: 'P2', duration: 120, pageCount: 2 });
+    assert.equal(pickBilibiliPageCid(meta, 1).cid, 11);
+    // Out of range clamps to the LAST page.
+    assert.equal(pickBilibiliPageCid(meta, 9).cid, 22);
+    // No pages array → meta.cid (SSR videoData.cid is the current page's).
+    assert.deepEqual(pickBilibiliPageCid({ cid: 7 }, 3), { p: 1, cid: 7, part: '', duration: 0, pageCount: 1 });
+    assert.equal(pickBilibiliPageCid(null, 1).cid, 0);
+  });
+
+  test('bilibili: extractBilibiliVideo resolves cid/part/page from the page URL', () => {
+    const data = {
+      data: {
+        bvid: 'BV1xx411c7mD', title: 'T', duration: 500,
+        pages: [{ cid: 11, part: '上', duration: 240 }, { cid: 22, part: '下', duration: 260 }],
+        stat: {}
+      }
+    };
+    const p2 = extractBilibiliVideo(data, 'https://www.bilibili.com/video/BV1xx411c7mD?p=2');
+    assert.equal(p2.cid, 22);
+    assert.equal(p2.page, 2);
+    assert.equal(p2.pageCount, 2);
+    assert.equal(p2.part, '下');
+    assert.equal(p2.duration, 260, 'duration is the CURRENT page\'s, not the whole-video total');
+    // No href (Node call) → page 1, same object as before the fix.
+    const p1 = extractBilibiliVideo(data);
+    assert.equal(p1.cid, 11);
+    assert.equal(p1.duration, 240);
+  });
+
+  test('bilibili: extractBilibiliViewPoints normalizes creator chapters, needs >1 entry', () => {
+    const vp = extractBilibiliViewPoints([
+      { from: 65.4, content: ' 开场 ' },
+      { from: 130, content: '正题' },
+      { from: 130, content: '正题' }, // dedup by second
+      { from: 0, content: '' },       // empty content dropped
+    ]);
+    assert.deepEqual(vp, ['[01:05] 开场', '[02:10] 正题']);
+    assert.equal(extractBilibiliViewPoints([{ from: 1, content: 'only one' }]), null);
+    assert.equal(extractBilibiliViewPoints([]), null);
+    assert.equal(extractBilibiliViewPoints(null), null);
+    assert.equal(extractBilibiliViewPoints('nope'), null);
+  });
+}
+
 // ============================================================================
 // youtube-content-script.js
 // ============================================================================
@@ -1021,13 +1083,134 @@ function loadContentScript(name) {
       if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
     }
   });
+
+  // Long tweets + photos (2026-10-07): legacy.full_text truncates note_tweet
+  // bodies, and extendedEntities.media was never read.
+  {
+    const { tweetPhotosFromLegacy, upgradeTweetPhotoUrl } = loadContentScript('twitter-content-script.js');
+
+    test('twitter: extractTweetFromResult prefers note_tweet text and extracts photos', () => {
+      const tweet = extractTweetFromResult({
+        legacy: {
+          id_str: '555', full_text: 'short prefix… https://t.co/abc',
+          favorite_count: 1, retweet_count: 0, reply_count: 0, quote_count: 0,
+          extendedEntities: { media: [
+            { type: 'photo', media_url_https: 'https://pbs.twimg.com/media/aaa.jpg' },
+            { type: 'video', media_url_https: 'https://pbs.twimg.com/media/vid.jpg' },
+            { type: 'photo', media_url_https: 'https://pbs.twimg.com/media/bbb.jpg' },
+          ] },
+        },
+        note_tweet: { note_tweet_results: { result: { text: 'the full long-form body of the tweet' } } },
+      });
+      assert.equal(tweet.text, 'the full long-form body of the tweet', 'note_tweet body must win over truncated full_text');
+      assert.deepEqual(tweet.photos, ['https://pbs.twimg.com/media/aaa.jpg', 'https://pbs.twimg.com/media/bbb.jpg'], 'videos skipped, photos in order');
+    });
+
+    test('twitter: extractTweetFromResult falls back to full_text and defaults photos to []', () => {
+      const tweet = extractTweetFromResult({ legacy: { id_str: '1', full_text: 'plain' } });
+      assert.equal(tweet.text, 'plain');
+      assert.deepEqual(tweet.photos, []);
+    });
+
+    test('twitter: tweetPhotosFromLegacy caps at 4 and dedupes', () => {
+      const media = Array.from({ length: 6 }, (_, i) => ({ type: 'photo', media_url_https: `https://pbs.twimg.com/media/p${i}.jpg` }));
+      media.push({ type: 'photo', media_url_https: 'https://pbs.twimg.com/media/p0.jpg' });
+      const photos = tweetPhotosFromLegacy({ extendedEntities: { media } });
+      assert.equal(photos.length, 4);
+      assert.deepEqual(photos, media.slice(0, 4).map((m) => m.media_url_https));
+      assert.deepEqual(tweetPhotosFromLegacy(null), []);
+    });
+
+    test('twitter: upgradeTweetPhotoUrl lifts placeholder sizes to medium', () => {
+      assert.equal(upgradeTweetPhotoUrl('https://pbs.twimg.com/media/x?format=jpg&name=small'), 'https://pbs.twimg.com/media/x?format=jpg&name=medium');
+      assert.equal(upgradeTweetPhotoUrl('https://pbs.twimg.com/media/x.jpg:small'), 'https://pbs.twimg.com/media/x.jpg?name=medium');
+      assert.equal(upgradeTweetPhotoUrl('https://pbs.twimg.com/media/x?format=jpg&name=large'), 'https://pbs.twimg.com/media/x?format=jpg&name=large', 'non-small sizes untouched');
+      assert.equal(upgradeTweetPhotoUrl(''), '');
+    });
+
+    test('twitter: quotedTweetFromArticle picks the tweetText inside the quote card', () => {
+      const { quotedTweetFromArticle } = loadContentScript('twitter-content-script.js');
+      const mainNode = { textContent: 'main body', closest: () => null };
+      const card = { querySelector: (sel) => (sel === '[data-testid="User-Name"]' ? { textContent: 'Bob\n@bob\n·\n2h' } : null) };
+      const quotedNode = { textContent: 'quoted body', closest: (sel) => (sel === '[role="link"]' ? card : null) };
+      const el = { querySelectorAll: (sel) => (sel === '[data-testid="tweetText"]' ? [mainNode, quotedNode] : []) };
+      assert.deepEqual(quotedTweetFromArticle(el), { author: 'Bob', screenName: 'bob', text: 'quoted body' });
+      // No quote card → null; guarded against mock/odd DOM shapes.
+      assert.equal(quotedTweetFromArticle({ querySelectorAll: (sel) => (sel === '[data-testid="tweetText"]' ? [mainNode] : []) }), null);
+      assert.equal(quotedTweetFromArticle({}), null);
+    });
+
+    test('twitter: activeXFetch carries the quoted tweet through to the result', async () => {
+      const prev = globalThis.window;
+      const card = { querySelector: (sel) => (sel === '[data-testid="User-Name"]' ? { textContent: 'Bob\n@bob' } : null) };
+      const mkArticle = (authorLine, text, statusHref) => ({
+        querySelector: (sel) => {
+          if (sel === '[data-testid="tweetText"]') return { textContent: text };
+          if (sel === '[data-testid="User-Name"]') return { textContent: authorLine };
+          if (sel === 'time') return { closest: () => ({ getAttribute: () => statusHref }) };
+          return null;
+        },
+        querySelectorAll: (sel) => (sel === '[data-testid="tweetText"]'
+          ? [{ textContent: text, closest: () => null }, { textContent: 'quoted body', closest: (s) => (s === '[role="link"]' ? card : null) }]
+          : []),
+      });
+      globalThis.window = {
+        location: { pathname: '/alice/status/111' },
+        __INITIAL_STATE__: {
+          entities: {
+            tweets: { '111': { id_str: '111', full_text: 'main + t.co/quote-link', user_id_str: 'u1' } },
+            users: { u1: { id_str: 'u1', name: 'Alice', screen_name: 'alice' } },
+          }
+        },
+        document: { querySelectorAll: () => [mkArticle('Alice\n@alice', 'main + t.co/quote-link', '/alice/status/111')] },
+      };
+      try {
+        const result = await activeXFetch();
+        assert.deepEqual(result.quoted, { author: 'Bob', screenName: 'bob', text: 'quoted body' });
+      } finally {
+        if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+      }
+    });
+
+    test('twitter: activeXFetch adopts the longer DOM rendering of the main tweet (note_tweet case)', async () => {
+      const prev = globalThis.window;
+      const mkTweet = (authorLine, text, statusHref) => ({
+        querySelector: (sel) => {
+          if (sel === '[data-testid="tweetText"]') return { textContent: text };
+          if (sel === '[data-testid="User-Name"]') return { textContent: authorLine };
+          if (sel === 'time') return { closest: () => ({ getAttribute: () => statusHref }) };
+          return null;
+        },
+        querySelectorAll: () => [],
+      });
+      globalThis.window = {
+        location: { pathname: '/alice/status/111' },
+        __INITIAL_STATE__: {
+          entities: {
+            tweets: { '111': { id_str: '111', full_text: 'truncated… https://t.co/x', user_id_str: 'u1' } },
+            users: { u1: { id_str: 'u1', name: 'Alice', screen_name: 'alice' } },
+          }
+        },
+        document: { querySelectorAll: () => [
+          mkTweet('Alice\n@alice', 'the full long-form body rendered by the DOM', '/alice/status/111'),
+        ] },
+      };
+      try {
+        const result = await activeXFetch();
+        assert.equal(result.text, 'the full long-form body rendered by the DOM', 'DOM text longer than the state entity wins');
+      } finally {
+        if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+      }
+    });
+  }
 }
 
 // ============================================================================
 // reddit-content-script.js
 // ============================================================================
 {
-  const { activeRedditFetch, postFromState, postFromDom, postFromGenericDom, commentsFromState, commentsFromDom, stripSmlNoise } =
+  const { activeRedditFetch, postFromState, postFromDom, postFromGenericDom, commentsFromState, commentsFromDom, stripSmlNoise,
+          postFromRedditJson, commentsFromRedditJson, redditPostIdFromUrl, redditImagesFromJson } =
     loadContentScript('reddit-content-script.js');
 
   test('reddit: stripSmlNoise removes the SML.load([...]) module-loader leak from comment summaries', () => {
@@ -1175,15 +1358,92 @@ function loadContentScript(name) {
       if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
     }
   });
+
+  // Public JSON API first (2026-10-07, ported from EdgeEver): canonical data
+  // that survives UI redesigns; state/DOM stay as fallbacks.
+  test('reddit: redditPostIdFromUrl pulls the base36 id from comments URLs', () => {
+    assert.equal(redditPostIdFromUrl('https://www.reddit.com/r/x/comments/abc123/title/'), 'abc123');
+    assert.equal(redditPostIdFromUrl('https://old.reddit.com/r/x/comments/abc123'), 'abc123');
+    assert.equal(redditPostIdFromUrl('https://www.reddit.com/r/x/'), '');
+    assert.equal(redditPostIdFromUrl(''), '');
+    assert.equal(redditPostIdFromUrl(null), '');
+  });
+
+  test('reddit: postFromRedditJson / commentsFromRedditJson map the public JSON shape', () => {
+    const json = [
+      { data: { children: [
+        { kind: 't3', data: { id: 'abc123', title: ' Big issue ', subreddit: 'opencodeCLI', author: 'Meshyai', selftext: 'the body', score: 9, num_comments: 2, permalink: '/r/x/comments/abc123/', created_utc: 100 } },
+      ] } },
+      { data: { children: [
+        { kind: 't1', data: { author: 'Alice', body: 'top comment', score: 3, created_utc: 101, replies: { data: { children: [
+          { kind: 't1', data: { author: 'Bob', body: 'nested reply', score: 1, created_utc: 102 } },
+        ] } } } },
+        { kind: 'more', data: { children: ['zzz'] } },
+      ] } },
+    ];
+    const post = postFromRedditJson(json);
+    assert.equal(post.postId, 'abc123');
+    assert.equal(post.title, 'Big issue');
+    assert.equal(post.subreddit, 'opencodeCLI');
+    assert.equal(post.numComments, 2);
+    const comments = commentsFromRedditJson(json);
+    assert.deepEqual(comments.map((c) => [c.author, c.depth]), [['Alice', 0], ['Bob', 1]], 'nested replies flatten with depth; `more` nodes skipped');
+    assert.deepEqual(postFromRedditJson([]), null);
+    assert.deepEqual(commentsFromRedditJson(null), []);
+    assert.deepEqual(commentsFromRedditJson([{}, { data: {} }]), []);
+  });
+
+  test('reddit: activeRedditFetch prefers the JSON API and falls back to state on failure', async () => {
+    const prev = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    const json = [
+      { data: { children: [
+        { kind: 't3', data: { id: 'abc123', title: 'From JSON API', subreddit: 'x', author: 'u', selftext: 'b', score: 1, num_comments: 1 } },
+      ] } },
+      { data: { children: [{ kind: 't1', data: { author: 'A', body: 'c', score: 1 } }] } },
+    ];
+    globalThis.window = {
+      location: { hostname: 'www.reddit.com', protocol: 'https:', href: 'https://www.reddit.com/r/x/comments/abc123/post/' },
+      __INITIAL_STATE__: { posts: { posts: { abc123: { post: { id: 'abc123', title: 'From STATE', author: 'u' } } } } },
+    };
+    try {
+      globalThis.fetch = async () => ({ ok: true, json: async () => json });
+      const viaApi = await activeRedditFetch();
+      assert.equal(viaApi.via, 'json-api');
+      assert.equal(viaApi.post.title, 'From JSON API', 'API result wins over the SSR state');
+      assert.equal(viaApi.comments[0].author, 'A');
+      globalThis.fetch = async () => { throw new Error('network down'); };
+      const viaState = await activeRedditFetch();
+      assert.equal(viaState.post.title, 'From STATE', 'fetch failure falls through to the state path');
+      assert.ok(!viaState.via, 'state path sets no via marker');
+    } finally {
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
 }
 
 // ============================================================================
 // zhihu-content-script.js
 // ============================================================================
 {
-  const { isZhihuArticleUrl, isZhihuAnswersUrl, extractZhihuArticle, extractZhihuAnswers, installZhihuInterceptor } =
+  const { isZhihuArticleUrl, isZhihuAnswersUrl, extractZhihuArticle, extractZhihuAnswers, installZhihuInterceptor, zhihuTargetFromUrl } =
     loadContentScript('zhihu-content-script.js');
   const identityToText = (html) => (html || '').replace(/<[^>]+>/g, ''); // stand-in for the real DOM-based htmlToText
+
+  // Active fallback URL targeting (2026-10-07): single-answer and zhuanlan
+  // pages are SSR-rendered and often fire no interceptable XHR.
+  test('zhihu: zhihuTargetFromUrl names the article / single answer a page URL points at', () => {
+    assert.deepEqual(zhihuTargetFromUrl('https://zhuanlan.zhihu.com/p/123456'), { kind: 'article', id: '123456' });
+    assert.deepEqual(zhihuTargetFromUrl('https://www.zhihu.com/question/999/answer/888'), { kind: 'answer', id: '888', questionId: '999' });
+    assert.deepEqual(zhihuTargetFromUrl('https://www.zhihu.com/answer/777'), { kind: 'answer', id: '777' });
+    // Question page WITHOUT an answer id: nothing for the active path to fetch.
+    assert.equal(zhihuTargetFromUrl('https://www.zhihu.com/question/999'), null);
+    assert.equal(zhihuTargetFromUrl('https://www.zhihu.com/feed'), null);
+    assert.equal(zhihuTargetFromUrl('https://example.com/question/1/answer/2'), null);
+    assert.equal(zhihuTargetFromUrl(''), null);
+    assert.equal(zhihuTargetFromUrl(null), null);
+  });
 
   test('zhihu: isZhihuArticleUrl / isZhihuAnswersUrl match their respective numeric-id paths', () => {
     assert.equal(isZhihuArticleUrl('https://www.zhihu.com/api/v4/articles/12345'), true);
@@ -1451,5 +1711,54 @@ function loadContentScript(name) {
 
   test('xiaoyuzhou: installXiaoyuzhouInterceptor is a no-op outside a browser context', () => {
     assert.equal(installXiaoyuzhouInterceptor(), false);
+  });
+}
+
+// Reddit gallery images (2026-10-07, ported from EdgeEver's reddit clip —
+// gallery_data/media_metadata + url_overridden_by_dest + preview ladder).
+// Own block: sits after the file's site sections, loads the script itself.
+{
+  const { redditImagesFromJson, postFromRedditJson } = loadContentScript('reddit-content-script.js');
+
+  test('reddit: redditImagesFromJson walks gallery_data → url_overridden_by_dest → preview', () => {
+    const galleryJson = [
+      { data: { children: [{ data: {
+        id: 'abc123', title: 'Gallery post',
+        gallery_data: { items: [{ media_id: 'm1', caption: ' first pic ' }, { media_id: 'm2' }, { media_id: 'missing' }] },
+        media_metadata: {
+          m1: { s: { u: 'https://preview.redd.it/one.jpg?width=108&amp;crop=smart' } },
+          m2: { s: { u: 'https://i.redd.it/two.webp' } },
+        },
+      } }] } },
+      { data: { children: [] } },
+    ];
+    const images = redditImagesFromJson(galleryJson);
+    assert.deepEqual(images, [
+      { url: 'https://preview.redd.it/one.jpg?width=108&crop=smart', alt: 'first pic' },
+      { url: 'https://i.redd.it/two.webp', alt: '' },
+    ], 'HTML-escaped URLs decoded, captions kept, missing ids skipped');
+    // Single image post: url_overridden_by_dest, alt from title.
+    const single = redditImagesFromJson([
+      { data: { children: [{ data: { id: 'x', title: 'Cat pic', url_overridden_by_dest: 'https://i.redd.it/cat.jpg' } }] } },
+      { data: { children: [] } },
+    ]);
+    assert.deepEqual(single, [{ url: 'https://i.redd.it/cat.jpg', alt: 'Cat pic' }]);
+    // No images at all → [].
+    assert.deepEqual(redditImagesFromJson(null), []);
+    assert.deepEqual(redditImagesFromJson([{}, {}]), []);
+    // Foreign hosts / non-https rejected.
+    const foreign = redditImagesFromJson([
+      { data: { children: [{ data: { id: 'x', url_overridden_by_dest: 'https://evil.com/a.jpg' } }] } },
+      { data: { children: [] } },
+    ]);
+    assert.deepEqual(foreign, []);
+  });
+
+  test('reddit: postFromRedditJson attaches the images array to the post', () => {
+    const post = postFromRedditJson([
+      { data: { children: [{ data: { id: 'abc123', title: 'T', url_overridden_by_dest: 'https://i.redd.it/p.jpg', score: 1 } }] } },
+      { data: { children: [] } },
+    ]);
+    assert.deepEqual(post.images, [{ url: 'https://i.redd.it/p.jpg', alt: 'T' }]);
   });
 }

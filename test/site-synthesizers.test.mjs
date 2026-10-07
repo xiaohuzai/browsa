@@ -175,3 +175,87 @@ test('synthesizeXiaoyuzhouResult: 拦截器缺席时的最小数据（仅 eid）
   assert.equal(r.articleTitle, '');
   assert.equal(r.meta?.url, 'https://www.xiaoyuzhoufm.com/episode/6a97f287f03e74ee6b03ea5b', 'meta.url 透传——og:audio 兜底与 xy-<eid> 缓存键靠它');
 });
+
+// ── 2026-10-07 批次：B站分P标注 + view_points 章节；推特配图 ─────────────────
+
+import { synthesizeBilibiliResult, synthesizeZhihuResult } from '../lib/site-synthesizers.js';
+
+test('synthesizeBilibiliResult: multi-page video labels the current P and renders view_points chapters', () => {
+  const r = synthesizeBilibiliResult({
+    bvid: 'BV1', title: '合集', author: 'UP', cid: 22, page: 2, pageCount: 3, part: '下',
+    duration: 260, desc: '简介', stat: {},
+    viewPoints: ['[01:05] 开场', '[02:10] 正题'],
+  }, fakeMeta('https://www.bilibili.com/video/BV1?p=2'));
+  assert.ok(r.text.includes('**分P**: P2 下'), 'current page label present');
+  assert.ok(r.text.includes('## 章节'), 'view_points render as a 章节 section');
+  assert.ok(r.text.includes('[01:05] 开场'));
+  // Single-page video: no P label, no empty 章节 section.
+  const single = synthesizeBilibiliResult({ bvid: 'BV1', title: 'T', author: 'UP', cid: 1, duration: 60, desc: '', stat: {} }, fakeMeta('https://www.bilibili.com/video/BV1'));
+  assert.ok(!single.text.includes('分P'));
+  assert.ok(!single.text.includes('章节'));
+});
+
+test('synthesizeTwitterResult: photo URLs render as [图N] lines, fetched bytes render as a count', () => {
+  const urlOnly = synthesizeTwitterResult({
+    author: 'Alice', screenName: 'alice', text: 'hi', photos: ['https://pbs.twimg.com/media/a.jpg', 'https://pbs.twimg.com/media/b.jpg'],
+  }, fakeMeta('https://x.com/a/status/1'));
+  assert.ok(urlOnly.text.includes('## 配图'));
+  assert.ok(urlOnly.text.includes('[图1] https://pbs.twimg.com/media/a.jpg'));
+  assert.ok(urlOnly.text.includes('[图2] https://pbs.twimg.com/media/b.jpg'));
+
+  const withBytes = synthesizeTwitterResult({
+    author: 'Alice', screenName: 'alice', text: 'hi',
+    photos: ['https://pbs.twimg.com/media/a.jpg'], imageBase64List: ['data:image/jpeg;base64,xxx'],
+  }, fakeMeta('https://x.com/a/status/1'));
+  assert.ok(withBytes.text.includes('**配图**: 1 张（图片数据已随消息附上）'));
+  assert.ok(!withBytes.text.includes('pbs.twimg.com'), 'URL list suppressed when bytes ride along');
+
+  const plain = synthesizeTwitterResult({ author: 'A', screenName: 'a', text: 'no photos' }, fakeMeta('https://x.com/a/status/1'));
+  assert.ok(!plain.text.includes('配图'));
+});
+
+test('synthesizeZhihuResult: single-answer shape (active fallback) renders question as heading with author/text/stats', () => {
+  const r = synthesizeZhihuResult({
+    type: 'answer', id: '888', title: '如何评价 X？', text: '长答案正文……',
+    author: '答主', voteupCount: 120, commentCount: 9,
+  }, fakeMeta('https://www.zhihu.com/question/999/answer/888'));
+  assert.equal(r.mode, 'zhihu');
+  assert.ok(r.text.includes('# 如何评价 X？'));
+  assert.ok(r.text.includes('长答案正文……'));
+  assert.ok(r.text.includes('👍 120'));
+  assert.ok(!r.text.includes('高赞回答'), 'answer shape must not trigger the question-pages answer list');
+});
+
+test('synthesizeTwitterResult: quoted tweet renders as an 引用 block; absent quote adds nothing', () => {
+  const withQuote = synthesizeTwitterResult({
+    author: 'Alice', screenName: 'alice', text: '看看这个',
+    quoted: { author: 'Bob', screenName: 'bob', text: '被引用的原推\n第二行' },
+  }, fakeMeta('https://x.com/a/status/1'));
+  assert.ok(withQuote.text.includes('## 引用'));
+  assert.ok(withQuote.text.includes('**Bob @bob**'));
+  assert.ok(withQuote.text.includes('> 被引用的原推'));
+  assert.ok(withQuote.text.includes('> 第二行'), 'multi-line quote keeps blockquote markers');
+
+  const noQuote = synthesizeTwitterResult({ author: 'A', screenName: 'a', text: 'plain' }, fakeMeta('https://x.com/a/status/1'));
+  assert.ok(!noQuote.text.includes('引用'));
+});
+
+test('synthesizeRedditResult: gallery images render as [图N] lines, bytes render as a count', () => {
+  const urlOnly = synthesizeRedditResult({
+    post: { title: 'Gallery', subreddit: 'x', author: 'u', selftext: 'body',
+            images: [{ url: 'https://i.redd.it/a.jpg', alt: 'first' }, { url: 'https://i.redd.it/b.jpg', alt: '' }] },
+  }, fakeMeta('https://www.reddit.com/r/x/comments/abc/'));
+  assert.ok(urlOnly.text.includes('## 配图'));
+  assert.ok(urlOnly.text.includes('[图1] https://i.redd.it/a.jpg first'));
+  assert.ok(urlOnly.text.includes('[图2] https://i.redd.it/b.jpg'));
+
+  const withBytes = synthesizeRedditResult({
+    post: { title: 'T', images: [{ url: 'https://i.redd.it/a.jpg', alt: '' }] },
+    imageBase64List: ['data:image/jpeg;base64,xxx'],
+  }, fakeMeta('https://www.reddit.com/r/x/comments/abc/'));
+  assert.ok(withBytes.text.includes('**配图**: 1 张（图片数据已随消息附上）'));
+  assert.ok(!withBytes.text.includes('i.redd.it'), 'URL list suppressed when bytes ride along');
+
+  const plain = synthesizeRedditResult({ post: { title: 'T' } }, fakeMeta('https://www.reddit.com/r/x/comments/abc/'));
+  assert.ok(!plain.text.includes('配图'));
+});

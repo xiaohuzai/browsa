@@ -645,6 +645,45 @@ test('content script: extractNoteSummary produces the shape background expects',
   assert.ok(typeof summary.rawAt === 'number');
 });
 
+test('content script: extractNoteSummary carries per-image candidate URLs, best scene wins', () => {
+  const summary = extractNoteSummary({
+    data: { noteList: [{
+      noteId: 'n1', title: 't', desc: 'd',
+      imageList: [
+        // Flat url is the RENDERED variant — the WB_DFT watermark-free default wins.
+        { url: 'https://sns-webpic-qc.xhscdn.com/rendered', infoList: [{ imageScene: 'WB_DFT', url: 'https://sns-webpic-qc.xhscdn.com/dft' }, { imageScene: 'WB_PRV', url: 'https://sns-webpic-qc.xhscdn.com/prv' }] },
+        // ORG (original) beats everything.
+        { infoList: [{ imageScene: 'WB_DFT', url: 'https://sns-webpic-qc.xhscdn.com/b-dft' }, { imageScene: 'WB_ORG', url: 'https://sns-webpic-qc.xhscdn.com/b-org' }] },
+        // No usable candidate (avatar filtered) → fileId assembly fallback.
+        { fileId: 'c', url: 'https://sns-webpic-qc.xhscdn.com/avatar-c' },
+        null,
+      ],
+    }] }
+  });
+  assert.deepEqual(summary.imageUrls, [
+    'https://sns-webpic-qc.xhscdn.com/dft',
+    'https://sns-webpic-qc.xhscdn.com/b-org',
+    'https://sns-webpic-qc.xhscdn.com/c',
+  ]);
+  // Same photo under several scene variants occupies ONE slot (hostname+pathname dedupe).
+  const dedup = extractNoteSummary({
+    data: { noteList: [{ noteId: 'n2', title: 't', desc: 'd', imageList: [
+      { urlDefault: 'https://sns-webpic-qc.xhscdn.com/same' },
+      { url: 'https://sns-webpic-qc.xhscdn.com/same!nd_dft_jpg' },
+    ] }] }
+  });
+  assert.deepEqual(dedup.imageUrls, ['https://sns-webpic-qc.xhscdn.com/same']);
+  // Non-XHS CDN hosts / video files never ride along.
+  const foreign = extractNoteSummary({
+    data: { noteList: [{ noteId: 'n3', title: 't', desc: 'd', imageList: [{ url: 'https://evil.com/a.jpg' }, { url: 'https://sns-webpic-qc.xhscdn.com/v.mp4' }] }] }
+  });
+  assert.deepEqual(foreign.imageUrls, []);
+  // Notes without images (or legacy payloads) keep an empty list — the xhr
+  // fast path's image fetch is fail-open on this field.
+  const bare = extractNoteSummary({ data: { noteList: [{ noteId: 'n4', title: 't', desc: 'd', imageList: [] }] } });
+  assert.deepEqual(bare.imageUrls, []);
+});
+
 test('content script: maybeExtract returns null for non-feed URLs', () => {
   const payload = { success: true, data: { noteList: [{ noteId: 'x', title: 't', desc: 'd' }] } };
   assert.equal(maybeExtract('https://example.com/api/feed', payload), null);

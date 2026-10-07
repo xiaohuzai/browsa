@@ -105,6 +105,25 @@ test('selection toolbar: selectionchange caches the selected text to the backgro
   dom.window.close();
 });
 
+// The selection's HTML rides along (same selection's structure) for the
+// selected-attach Markdown upgrade — background converts it in the page MAIN
+// world at attach time (Turndown), plain text stays the source of truth.
+test('selection toolbar: SELECTION_CACHE carries the selection HTML next to the text', async () => {
+  const { dom, w, sent } = setup();
+  w.eval(SRC);
+  sent.length = 0;
+
+  selectAll(w, 'Hello brave new world of toolbars');
+  w.document.dispatchEvent(new w.Event('selectionchange'));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS));
+
+  const cache = sent.find((m) => m.type === 'SELECTION_CACHE');
+  assert.ok(typeof cache.html === 'string' && cache.html.length > 0, 'html must ride along when a selection exists');
+  assert.ok(cache.html.includes('Hello brave'), 'html holds the selected content');
+  assert.ok(cache.html.length <= 300_000, 'html is capped');
+  dom.window.close();
+});
+
 // Empty selections are skipped AT THE SOURCE: background's SELECTION_CACHE
 // case has always ignored empty text (`if (tabId && msg.text)` — the cache
 // deliberately survives deselection so 📎 keeps working), so sending the
