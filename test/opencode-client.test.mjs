@@ -179,6 +179,38 @@ test('opencodeStream — happy path: prompt, deltas, active-poll completion, fin
   } finally { ff.restore(); }
 });
 
+test('opencodeStream — reasoning deltas fold into <thinking>; final message re-wraps reasoning parts', async () => {
+  const ff = installFetch({
+    '/prompt': () => jsonResponse({ data: { id: 'msg_u' } }),
+    '/api/event': () => sseResponse([
+      ev('session.next.reasoning.delta', { reasoningID: 'r1', delta: '思考中' }),
+      ev('session.next.reasoning.delta', { reasoningID: 'r1', delta: '…' }),
+      ev('session.next.text.delta', { delta: '答' }),
+      ev('session.next.step.ended', { finish: 'stop' }),
+    ]),
+    '/api/session/active': () => jsonResponse({ data: {} }),
+    "/message": () => jsonResponse({ data: [
+      { type: 'assistant', content: [
+        { type: 'reasoning', text: '思考中…' },
+        { type: 'text', text: '答' },
+      ], tokens: { input: 10, output: 5 }, finish: 'stop' },
+    ] }),
+  });
+  const deltas = [];
+  try {
+    const r = await opencodeStream({
+      baseUrl: 'http://127.0.0.1:4096', sessionId: SES, text: 'q',
+      onDelta: (d) => deltas.push(d),
+      signal: new AbortController().signal,
+      _pollIntervalMs: 5,
+    });
+    // live: the text delta closes the open thinking run
+    assert.equal(deltas.join(''), '<thinking>\n思考中…\n</thinking>\n答');
+    // final message is authoritative: reasoning parts ride wrapped in tags
+    assert.equal(r.full, '<thinking>\n思考中…\n</thinking>\n\n答');
+  } finally { ff.restore(); }
+});
+
 test('opencodeStream — permission.asked surfaces as approval payload', async () => {
   let approval = null;
   const ff = installFetch({
