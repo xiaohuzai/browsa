@@ -308,3 +308,83 @@ test('selection actions preserve German and French reply settings offered by Set
     assert.ok(buildSelectionActionPrompt('translate', 'text', lang, 'zh').includes(`into ${name}`));
   }
 });
+
+// ─── agent one-shot 的 think 剥离（stream-dispatch.js createThinkStripper）───
+// agent 协议把推理以 <thinking>…</thinking> 内联在 delta 流里（主聊天据此渲染
+// 折叠思考块），一次性消费方（float bar 解释/翻译、mermaid 修复）要干净文本——
+// 与 openSseStream 的 omit 默认契约对齐。标签词表与 render.js splitThink /
+// selection-toolbar stripThinkRuns lockstep。
+
+test('createThinkStripper: drops inline think runs, keeps visible text across pushes', async () => {
+  const { createThinkStripper } = await import('../lib/handlers/stream-dispatch.js');
+  const out = [];
+  const s = createThinkStripper((t) => out.push(t));
+  s.push('<thinking>\n');
+  s.push('deep reasoning here');
+  s.push('\n</thinking>\nThe answer');
+  s.push(' continues.');
+  assert.deepEqual(out.join(''), '\nThe answer continues.');
+  s.flush();
+  assert.deepEqual(out.join(''), '\nThe answer continues.');
+});
+
+test('createThinkStripper: a tag split across pushes never leaks a fragment; held-back plain text flushes', async () => {
+  const { createThinkStripper } = await import('../lib/handlers/stream-dispatch.js');
+  const out = [];
+  const s = createThinkStripper((t) => out.push(t));
+  s.push('hello <th');
+  assert.equal(out.join(''), 'hello ', 'a partial open tag is held back, prior text passes');
+  s.push('inking>secret</thin');
+  assert.equal(out.join(''), 'hello ', 'still inside the think run');
+  s.push('king>visible < tail');
+  assert.equal(out.join(''), 'hello visible ', 'close completes; the trailing lone < is held back');
+  s.flush();
+  assert.equal(out.join(''), 'hello visible < tail', 'flush delivers the held plain-text tail');
+});
+
+test('createThinkStripper: unclosed think run at stream end stays dropped, flush is idempotent', async () => {
+  const { createThinkStripper } = await import('../lib/handlers/stream-dispatch.js');
+  const out = [];
+  const s = createThinkStripper((t) => out.push(t));
+  s.push('答案<thinking>推理中');
+  assert.equal(out.join(''), '答案');
+  s.flush();
+  s.flush();
+  assert.equal(out.join(''), '答案', 'flush emits nothing for an unclosed think run and never duplicates');
+});
+
+test('createThinkStripper: works with no sink (mermaid-repair style callers pass their own accumulator)', async () => {
+  const { createThinkStripper } = await import('../lib/handlers/stream-dispatch.js');
+  const s = createThinkStripper(null);
+  assert.doesNotThrow(() => {
+    s.push('<thinking>x</thinking>y');
+    s.flush();
+  });
+});
+
+test('handleExplainPort: opencode provider — inline <thinking> runs are stripped before EXPLAIN_CHUNK', async () => {
+  const calls = [];
+  const agentStreams = {
+    bridgeStream: async () => { calls.push({ fn: 'bridge' }); },
+    opencodeStream: async (args) => {
+      calls.push({ fn: 'opencode', args });
+      args.onDelta('<thinking>\n');
+      args.onDelta('智能体内部推理过程');
+      args.onDelta('\n</thinking>\n解释正文');
+    },
+    createOpencodeSession: async () => 'ses_think',
+  };
+  const port = makeFakePort();
+  handleExplainPort(port, {
+    getAll: async () => ({
+      activeProvider: 'o1',
+      providers: { o1: { baseUrl: 'http://127.0.0.1:4096', apiKey: '', isOpencode: true, apiStyle: 'chat' } },
+    }),
+    agentStreams,
+  });
+  port.emit({ type: 'EXPLAIN_REQUEST', text: 'catalyze', lang: 'zh' });
+  await flush();
+  const chunks = port.sent.filter((m) => m.type === 'EXPLAIN_CHUNK');
+  assert.deepEqual(chunks.map((m) => m.delta), ['\n解释正文'], 'the popover must receive clean text only');
+  assert.deepEqual(port.sent.at(-1), { type: 'EXPLAIN_DONE' });
+});
