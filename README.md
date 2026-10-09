@@ -41,7 +41,7 @@ Connect your existing CLI agent through Agent Bridge, using its configured sign-
 | **Claude Code** (Anthropic) | agent-bridge local daemon | Existing CLI authentication |
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
-| **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek account or API key |
+| **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek API key |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 | OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |

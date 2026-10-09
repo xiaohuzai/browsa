@@ -39,7 +39,7 @@ browsa — расширение с боковой панелью для Chrome /
 | **Claude Code** (Anthropic) | локальный демон agent-bridge | Существующая аутентификация CLI |
 | **pi** (earendil-works) | локальный демон agent-bridge | Любая модель, настроенная в pi |
 | **Gemini CLI** (Google) | локальный демон agent-bridge | Существующая аутентификация CLI |
-| **dsh** (DeepSeek Harness) | локальный демон agent-bridge | Аккаунт DeepSeek или API-ключ |
+| **dsh** (DeepSeek Harness) | локальный демон agent-bridge | API-ключ DeepSeek |
 | opencode | официальный headless-сервер, напрямую | любая модель, настроенная в opencode |
 | Hermes | собственный сервер, протокол `/v1/runs` | собственный сервер |
 | OpenSquilla | собственный шлюз, WebSocket (`/ws`) | модели, на которые маршрутизирует шлюз |

@@ -39,7 +39,7 @@ Conecta tu agente CLI existente a través de Agent Bridge, usando su inicio de s
 | **Claude Code** (Anthropic) | demonio local agent-bridge | Autenticación CLI existente |
 | **pi** (earendil-works) | demonio local agent-bridge | El modelo que le configures a pi |
 | **Gemini CLI** (Google) | demonio local agent-bridge | Autenticación CLI existente |
-| **dsh** (DeepSeek Harness) | demonio local agent-bridge | Cuenta de DeepSeek o clave de API |
+| **dsh** (DeepSeek Harness) | demonio local agent-bridge | Clave API de DeepSeek |
 | opencode | servidor headless oficial, conexión directa | el modelo que le configures |
 | Hermes | autoalojado, protocolo `/v1/runs` | autoalojado |
 | OpenSquilla | gateway autoalojado, WebSocket (`/ws`) | los modelos que el gateway enrute |
