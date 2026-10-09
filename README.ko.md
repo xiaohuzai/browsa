@@ -17,7 +17,7 @@
 
 **페이지에 머무르고, 곁에서 물어보세요.**
 
-browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트를 복사하거나 페이지를 떠나지 않고도 기사, 동영상, PDF를 **나만의 AI**와의 대화로 가져오세요. Agent Bridge를 통해 **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)**를 연결하거나, **opencode / Hermes / OpenSquilla**를 사용하거나, OpenAI, Anthropic, Ollama 같은 모델 API를 구성할 수 있습니다.
+browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트를 복사하거나 페이지를 떠나지 않고도 기사, 동영상, PDF를 **나만의 AI**와의 대화로 가져오세요. Agent Bridge를 통해 **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy**를 연결하거나, **opencode / Hermes / OpenSquilla**를 사용하거나, OpenAI, Anthropic, Ollama 같은 모델 API를 구성할 수 있습니다.
 
 **무료, MIT 라이선스 확장 프로그램입니다.** 모델이나 에이전트는 직접 준비해서 연결하세요. API 키는 로컬에 저장되며, 구성한 서비스를 인증할 때 사용됩니다.
 
@@ -31,7 +31,7 @@ browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트
 
 ### 1. 이미 사용 중인 에이전트 연결하기
 
-Agent Bridge를 통해 기존 CLI 에이전트를 연결하면, 에이전트가 구성해 둔 로그인과 도구를 그대로 사용합니다. browsa는 웹 콘텐츠를 에이전트에 전달하고, 도구 진행 상황을 스트리밍으로 보여 주며, 에이전트가 보내는 승인 요청을 표시합니다. 사용 가능한 도구와 권한은 에이전트의 설정에 따라 달라집니다.
+Agent Bridge를 통해 기존 로컬 에이전트를 연결하면, 에이전트가 구성해 둔 로그인과 도구를 그대로 사용합니다. browsa는 웹 콘텐츠를 에이전트에 전달하고, 도구 진행 상황을 스트리밍으로 보여 주며, 에이전트가 보내는 승인 요청을 표시합니다. 사용 가능한 도구와 권한은 에이전트의 설정에 따라 달라집니다.
 
 | 에이전트 | 연결 방법 | 로그인 |
 |---|---|---|
@@ -40,6 +40,7 @@ Agent Bridge를 통해 기존 CLI 에이전트를 연결하면, 에이전트가 
 | **pi** (earendil-works) | agent-bridge 로컬 데몬 | pi에 구성한 모델 |
 | **Gemini CLI** (Google) | agent-bridge 로컬 데몬 | 기존 CLI 인증 사용 |
 | **dsh** (DeepSeek Harness) | agent-bridge 로컬 데몬 | DeepSeek API 키 |
+| **workbuddy** (WorkBuddy AI 데스크톱 앱) | agent-bridge 로컬 데몬 | WorkBuddy 앱 로그인(앱을 실행 상태로 유지) |
 | opencode | 공식 헤드리스 서버, 직접 연결 | 구성해 둔 모델 |
 | Hermes | 셀프호스팅, `/v1/runs` 프로토콜 | 셀프호스팅 |
 | OpenSquilla | 셀프호스팅 게이트웨이, WebSocket (`/ws`) | 게이트웨이가 라우팅하는 모델 |
@@ -62,7 +63,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -118,9 +119,9 @@ npm run package      # → browsa-v<version>.zip
 에이전트와의 대화는 에이전트 측에 저장됩니다. browsa는 세션 이름을 자동으로 붙입니다("browsa:" + 첫 메시지) — 에이전트 고유의 인터페이스에서 그 이름으로 찾아 이어서 작업할 수 있습니다. 세션 ID는 세션 드로어 상단에 표시되며 복사할 수 있습니다. 저장한 browsa 대화는 각 Agent와 연결 주소별 세션 ID를 함께 보관하고 복원합니다. ID가 기록되지 않은 이전 대화는 첫 메시지를 보낼 때 새 Agent 세션을 만들고 기존 텍스트 기록을 전달합니다.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — 로컬 CLI 에이전트 브리지(<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — 로컬 에이전트 브리지(<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge)는 CLI 에이전트(codex, claude, pi, gemini, dsh)를 하나의 로컬 HTTP 프로토콜로 변환해 주는 독립 실행형 로컬 데몬입니다. CLI에 구성된 인증을 그대로 사용합니다:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge)는 로컬 에이전트(codex, claude, pi, gemini, dsh, workbuddy)를 하나의 로컬 HTTP 프로토콜로 변환해 주는 독립 실행형 로컬 데몬입니다. 에이전트에 구성된 인증을 그대로 사용합니다:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -128,7 +129,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-⚙ 설정을 열어 **Agent Bridge** 카드를 선택하고, **＋ 에이전트 추가**를 클릭한 뒤 브리지 주소를 한 줄에 하나씩 채우세요 — 주소 하나당 에이전트 하나이며, 별칭(비워 두면 Ping이 에이전트 이름을 자동으로 찾습니다)과 그 브리지 자체의 API 키(브리지마다 달라도 됩니다)를 넣을 수 있습니다. 사이드바 드롭다운에는 "Agent Bridge · codex" 형태로 표시되며, 각 에이전트는 자신만의 독립적인 세션 스레드와 ping 상태(행의 ⟳는 해당 에이전트만 ping합니다)를 갖습니다. 위험한 작업의 승인 카드는 패널에 바로 나타납니다. 스크린샷, 붙여넣은 이미지, PDF 그림도 메시지와 함께 전송됩니다(턴당 ≤8개). 다중 턴 컨텍스트는 에이전트 자체에 저장됩니다.
+⚙ 설정을 열어 **Agent Bridge** 카드를 선택하고, **＋ 에이전트 추가**를 클릭한 뒤 브리지 주소를 한 줄에 하나씩 채우세요 — 주소 하나당 에이전트 하나이며, 별칭(비워 두면 Ping이 에이전트 이름을 자동으로 찾습니다)과 그 브리지 자체의 API 키(브리지마다 달라도 됩니다)를 넣을 수 있습니다. 사이드바 드롭다운에는 "Agent Bridge · codex" 형태로 표시되며, 각 에이전트는 자신만의 독립적인 세션 스레드와 ping 상태(행의 ⟳는 해당 에이전트만 ping합니다)를 갖습니다. 위험한 작업의 승인 카드는 패널에 바로 나타납니다. 스크린샷, 붙여넣은 이미지, PDF 그림도 메시지와 함께 전송됩니다(턴당 ≤8개). 다중 턴 컨텍스트는 에이전트 자체에 저장됩니다. workbuddy는 WorkBuddy AI 데스크톱 앱을 통해 동작합니다 — 앱에 로그인해 실행 상태로 유지하세요(브리지가 앱의 로컬 워커 게이트웨이를 자동으로 찾습니다). 대화는 앱의 메모리에 저장되므로 앱을 다시 시작하면 다음 턴에 새 에이전트 세션이 시작되고, browsa 쪽 기록은 영향을 받지 않습니다.
 
 
 </details>

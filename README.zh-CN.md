@@ -19,7 +19,7 @@
 
 **读到哪里，问到哪里。**
 
-browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
@@ -33,7 +33,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 
 ### 一、接你正在用的 Agent
 
-通过 Agent Bridge 连接已有的 CLI 智能体，沿用它配置好的登录方式和工具。browsa 把网页内容交给 agent，实时展示工具进度，并在面板里呈现它发出的审批请求。具体工具能力与权限取决于 agent 的配置。
+通过 Agent Bridge 连接已有的本地智能体，沿用它配置好的登录方式和工具。browsa 把网页内容交给 agent，实时展示工具进度，并在面板里呈现它发出的审批请求。具体工具能力与权限取决于 agent 的配置。
 
 | Agent | 接入方式 | 登录 |
 |---|---|---|
@@ -42,6 +42,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek API key |
+| **workbuddy**（WorkBuddy AI 桌面应用） | agent-bridge 本地桥 | WorkBuddy 应用登录（保持运行） |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 | OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
@@ -64,7 +65,7 @@ flowchart LR
     P["当前标签页<br/>文章 · 视频 · PDF · 乱页面"]
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
     subgraph Y["你的后端 —— 云端、本机或自托管"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>agent-bridge 桥 · 沿用 CLI 认证"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>agent-bridge 桥 · 沿用本地登录"]
         A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -120,9 +121,9 @@ npm run package      # → browsa-v<version>.zip
 与智能体的对话本体保存在智能体一侧：browsa 会自动给会话命名（「browsa：」+ 你的第一条消息），在智能体自己的界面里按名字就能找到它接着聊；会话 ID 在会话抽屉顶部随时可查、可复制。保存的 browsa 对话会保留各智能体、各连接地址对应的会话 ID，恢复时一起切回；未记录 ID 的旧存档会在首次发消息时创建独立的智能体会话，并带上已有文字记录。
 
 <details>
-<summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）</summary>
+<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh、workbuddy 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
@@ -130,7 +131,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # 每个 entry 一座桥，端口写在 agents.json 里
 ```
 
-打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。agent 在工具调用前的过程自述（codex 宣告使用某技能）会折进步骤历史，不会混进回复正文。
+打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。agent 在工具调用前的过程自述（codex 宣告使用某技能）会折进步骤历史，不会混进回复正文。workbuddy 走 WorkBuddy AI 桌面应用——保持登录并运行即可（桥会自动发现它本地的 worker 网关）；其对话存在应用内存里，重启应用后下一轮自动开新会话，browsa 侧历史不受影响。
 
 
 </details>

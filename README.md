@@ -19,7 +19,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -33,7 +33,7 @@ browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF 
 
 ### 1. Connect the agent you already use
 
-Connect your existing CLI agent through Agent Bridge, using its configured sign-in and tools. browsa feeds it web content, streams tool progress, and displays the approval requests it sends. Available tools and permissions depend on the agent's configuration.
+Connect your existing local agents through Agent Bridge, using their configured sign-in and tools. browsa feeds them web content, streams tool progress, and displays the approval requests they send. Available tools and permissions depend on the agent's configuration.
 
 | Agent | How to connect | Sign-in |
 |---|---|---|
@@ -42,6 +42,7 @@ Connect your existing CLI agent through Agent Bridge, using its configured sign-
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
 | **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek API key |
+| **workbuddy** (WorkBuddy AI desktop app) | agent-bridge local daemon | WorkBuddy app sign-in (keep the app running) |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 | OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
@@ -64,7 +65,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -120,9 +121,9 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer. Saved browsa conversations retain their own Agent thread IDs, separately for each provider and bridge address; restoring a conversation restores those IDs too. Older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi, gemini, dsh) to one local HTTP protocol. It uses the CLI's configured authentication:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh, workbuddy) to one local HTTP protocol. It uses the agent's configured authentication:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -130,7 +131,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself. If the agent narrates before tool calls (codex announcing a skill), that narration folds into the step history instead of the reply.
+Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself. If the agent narrates before tool calls (codex announcing a skill), that narration folds into the step history instead of the reply. workbuddy rides the WorkBuddy AI desktop app — keep it signed in and running (the bridge auto-discovers its local worker gateway); its conversations live in the app's memory, so restarting the app starts a fresh agent session on the next turn, with your browsa history unaffected.
 
 
 </details>
