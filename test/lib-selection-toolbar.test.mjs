@@ -30,6 +30,7 @@ function setup({ uiLang, dictionaries = {} } = {}) {
   const sent = [];
   const listeners = [];
   const roots = [];
+  const ports = [];
   const w = dom.window;
   const attach = w.Element.prototype.attachShadow;
   w.Element.prototype.attachShadow = function (opts) { const root = attach.call(this, opts); roots.push(root); return root; };
@@ -37,10 +38,21 @@ function setup({ uiLang, dictionaries = {} } = {}) {
     runtime: {
       getURL: (p) => 'chrome-extension://test/' + p,
       sendMessage: (m) => { sent.push(m); },
-      connect: () => ({
-        postMessage() {}, disconnect() {},
-        onMessage: { addListener() {} }, onDisconnect: { addListener() {} },
-      }),
+      connect: () => {
+        const msgListeners = [];
+        const discListeners = [];
+        const port = {
+          sent: [],
+          disconnected: false,
+          postMessage: (m) => { port.sent.push(m); },
+          disconnect() { port.disconnected = true; for (const f of [...discListeners]) f(); },
+          onMessage: { addListener: (f) => msgListeners.push(f) },
+          onDisconnect: { addListener: (f) => discListeners.push(f) },
+          emit(msg) { for (const f of [...msgListeners]) f(msg); },
+        };
+        ports.push(port);
+        return port;
+      },
       lastError: null,
     },
     storage: {
@@ -51,7 +63,7 @@ function setup({ uiLang, dictionaries = {} } = {}) {
   };
   // jsdom has no fetch; the script's async locale refresh calls it.
   w.fetch = async url => ({ json: async () => dictionaries[String(url).split('/').at(-2)] || {} });
-  return { dom, w, sent, roots, getOnChanged: () => (changes, area) => listeners.forEach(fn => fn(changes, area)) };
+  return { dom, w, sent, roots, ports, getOnChanged: () => (changes, area) => listeners.forEach(fn => fn(changes, area)) };
 }
 
 function selectAll(w, text) {
@@ -195,5 +207,78 @@ test('toolbar labels, confirmation and dynamic waiting text follow live UI langu
     getOnChanged()({ uiLang: { newValue: 'auto' } }, 'local');
     await flush();
     assert.equal(shadow.querySelector('[data-action="explain"]').title, 'Explain');
+  } finally { dom.window.close(); }
+});
+
+// ─── 浮层不显示思考内容 ──────────────────────────────────────────────────────
+// agent 协议把推理以 <thinking>…</thinking> 内联在 delta 里推给消费方（主聊天
+// 折叠成思考块），部分模型还把裸 <think> 写进正文——浮层一小张卡，只呈现答案
+// 正文。走真实点击链路（mouseup → place → explain click → browsa-explain 端口）。
+
+async function openExplainPopover(w, shadow) {
+  selectAll(w);
+  const range = w.getSelection().getRangeAt(0);
+  range.getBoundingClientRect = () => ({ top: 100, bottom: 120, left: 100, right: 220, width: 120, height: 20 });
+  w.document.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
+  await new Promise(r => setTimeout(r, SELECTION_DEBOUNCE_MS));
+  shadow.querySelector('[data-action="explain"]').click();
+}
+
+test('explain popover: inline thinking runs are never rendered — visible answer only, waiting state while inside think', async () => {
+  const { dom, w, roots, ports } = setup();
+  w.eval(SRC);
+  try {
+    const popShadow = roots[1];
+    await openExplainPopover(w, roots[0]);
+    const port = ports.at(-1);
+    assert.equal(port.sent[0].type, 'EXPLAIN_REQUEST', 'the click must open a browsa-explain port session');
+
+    // 思考段开始：整段推理不可见，浮层保持等待态（不闪空白卡）
+    port.emit({ type: 'EXPLAIN_CHUNK', delta: '<thinking>\n' });
+    port.emit({ type: 'EXPLAIN_CHUNK', delta: '模型正在推理推理推理\n' });
+    let body = popShadow.querySelector('#pop-body');
+    assert.ok(body.querySelector('.pop-wait'), 'while inside an open think run the popover stays in the waiting state');
+    assert.equal(body.textContent.includes('推理推理'), false, 'thinking content must not be shown');
+
+    // 思考段闭合后答案上屏，思考内容不再出现
+    port.emit({ type: 'EXPLAIN_CHUNK', delta: '</thinking>\n核心释义：**serendipity** 指不期而遇的惊喜。' });
+    body = popShadow.querySelector('#pop-body');
+    assert.equal(body.querySelector('.pop-wait'), null, 'waiting state must clear once the answer streams');
+    assert.ok(body.textContent.includes('核心释义'), 'the visible answer must render');
+    assert.ok(body.querySelector('b'), 'minimal markdown (bold) still renders');
+    assert.equal(body.textContent.includes('推理推理'), false, 'thinking content stays hidden after the run closes');
+
+    port.emit({ type: 'EXPLAIN_DONE' });
+    assert.equal(popShadow.querySelector('#pop-body .pop-err'), null, 'a real answer must not turn into an error card');
+  } finally { dom.window.close(); }
+});
+
+test('explain popover: bare <think> tags embedded in model content are stripped too', async () => {
+  const { dom, w, roots, ports } = setup();
+  w.eval(SRC);
+  try {
+    const popShadow = roots[1];
+    await openExplainPopover(w, roots[0]);
+    const port = ports.at(-1);
+    port.emit({ type: 'EXPLAIN_CHUNK', delta: '<think>reasoning about it</think>译文：**hello**' });
+    const body = popShadow.querySelector('#pop-body');
+    assert.ok(body.textContent.includes('译文'), 'content after a bare <think> run renders');
+    assert.equal(body.textContent.includes('reasoning about it'), false);
+    assert.equal(body.textContent.includes('<think'), false, 'no tag fragment may leak');
+  } finally { dom.window.close(); }
+});
+
+test('explain popover: a reply that is ALL thinking lands as the empty-reply error', async () => {
+  const { dom, w, roots, ports } = setup();
+  w.eval(SRC);
+  try {
+    const popShadow = roots[1];
+    await openExplainPopover(w, roots[0]);
+    let port = ports.at(-1);
+    port.emit({ type: 'EXPLAIN_CHUNK', delta: '<thinking>只有思考没有答案</thinking>' });
+    port.emit({ type: 'EXPLAIN_DONE' });
+    const err = popShadow.querySelector('#pop-body .pop-err');
+    assert.ok(err, 'an all-think reply is an empty reply');
+    assert.ok(err.textContent.includes('(empty reply)'));
   } finally { dom.window.close(); }
 });
