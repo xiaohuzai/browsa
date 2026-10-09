@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — ブラウザサイドパネル AI</title>
-<meta name="description" content="browsa は Chrome / Edge のサイドパネル拡張機能：現在のページ — 記事・字幕・PDF — を会話に取り込み、そのそばで返信をストリーミング表示します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント、agent-bridge 経由であなたの Codex / Claude Code / pi / Gemini CLI に対応。">
+<meta name="description" content="browsa は Chrome / Edge のサイドパネル拡張機能：現在のページ — 記事・字幕・PDF — を会話に取り込み、そのそばで返信をストリーミング表示します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント、agent-bridge 経由であなたの Codex / Claude Code / pi / Gemini CLI / dsh に対応。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — ブラウザサイドパネル AI">
@@ -314,7 +314,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>返信をストリーミング表示 <span class="tag">どのバックエンドでも</span></h3>
-          <p>返信は単語ごとにストリーミング表示され、Markdown・数式・チャートに対応します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント — サブスクリプションでログイン済みの Codex / Claude Code、Google ログインの Gemini CLI（agent-bridge 経由）、自分でモデルを設定した pi を接続できます。UI はブラウザの言語に追従 — English・中文・日本語・한국어・Español・Português・Русский — 設定で切り替えられます。</p>
+          <p>返信は単語ごとにストリーミング表示され、Markdown・数式・チャートに対応します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント — サブスクリプションでログイン済みの Codex / Claude Code、Google ログインの Gemini CLI（agent-bridge 経由）、自分でモデルを設定した pi、DeepSeek アカウントまたは API キーでログインする dsh を接続できます。UI はブラウザの言語に追従 — English・中文・日本語・한국어・Español・Português・Русский — 設定で切り替えられます。</p>
         </div>
       </div>
       <p class="site-note">インストール済みですか？<a href="../en/guide/quickstart.html">クイックスタート</a>で最初の質問まで案内します。<a href="../en/guide/">完全ガイド</a>では、読み取り・動画・レンダリング・セッション・バックエンド・設定を解説しています。</p>
@@ -380,7 +380,7 @@
             <li>Hermes エージェント：ツール実行、危険な操作の承認、進捗表示</li>
             <li>OpenCode エージェント：opencode CLI エージェントへの直通 — 同じツール実行と承認フロー</li>
             <li>OpenSquilla エージェント：ゲートウェイ WebSocket 経由でローカルデスクトップエージェントと接続 — サーバー側セッションメモリ、思考出力、サーバー側キャンセル</li>
-            <li>Agent Bridge：ローカル CLI エージェントをブリッジ接続 — サブスクリプションでログイン済みの Codex / Claude Code（モデル側はあなたのサブスクリプションで動作）、Google ログインの Gemini CLI、任意のモデルを設定した pi。1 枚のカードで複数エージェントを同時接続し、それぞれが独自のセッションと Ping 状態を持ちます</li>
+            <li>Agent Bridge：ローカル CLI エージェントをブリッジ接続 — サブスクリプションでログイン済みの Codex / Claude Code（モデル側はあなたのサブスクリプションで動作）、Google ログインの Gemini CLI、任意のモデルを設定した pi、DeepSeek アカウントまたは API キーでログインする dsh。1 枚のカードで複数エージェントを同時接続し、それぞれが独自のセッションと Ping 状態を持ちます</li>
             <li>エージェントとの会話はエージェント側に残ります：browsa がセッション名を自動で付け（「browsa:」+ 最初のメッセージ）、エージェント側のインターフェースで続きを行えます。セッション ID はセッションドロワーで表示・コピーできます</li>
             <li>OpenAI 互換 API なら何でも：OpenAI、Ollama、LiteLLM…</li>
             <li>カードに複数のモデルを追加 — サイドバーの「別名 · モデル」で切り替え</li>
@@ -503,7 +503,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini · ローカル CLI エージェントを接続</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · ローカル CLI エージェントを接続</span></span>
             <span class="prov-badge pb-idle">ブリッジ</span>
           </div>
         </div>

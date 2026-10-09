@@ -28,7 +28,13 @@ if (!chromium) {
   console.error('playwright-core not found — run `npm i` in .agents/skills/promo-video/scripts first');
   process.exit(1);
 }
-const exe = '/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome';
+// Pick the newest installed chromium build — the hardcoded pin (chromium-1234)
+// broke silently when playwright updated its cache (2026-10-09: 1243).
+const exe = fs.readdirSync('/root/.cache/ms-playwright')
+  .filter((d) => /^chromium-\d+$/.test(d))
+  .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+  .map((d) => `/root/.cache/ms-playwright/${d}/chrome-linux64/chrome`)
+  .find((p) => fs.existsSync(p));
 const FONT = 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf';
 const PORT = 8947;
 

@@ -19,7 +19,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -41,6 +41,7 @@ Connect your existing CLI agent through Agent Bridge, using its configured sign-
 | **Claude Code** (Anthropic) | agent-bridge local daemon | Existing CLI authentication |
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
+| **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek account or API key |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 | OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
@@ -63,7 +64,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -119,9 +120,9 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer. Saved browsa conversations retain their own Agent thread IDs, separately for each provider and bridge address; restoring a conversation restores those IDs too. Older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — bridge local CLI agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi, gemini) to one local HTTP protocol. It uses the CLI's configured authentication:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts CLI agents (codex, claude, pi, gemini, dsh) to one local HTTP protocol. It uses the CLI's configured authentication:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
