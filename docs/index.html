@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — 浏览器侧边栏 AI</title>
-<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API，接 Hermes / opencode / OpenSquilla 智能体，或经 agent-bridge 桥接你的 Codex / Claude Code / pi / Gemini CLI / dsh。读到哪里，问到哪里。">
+<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API，接 Hermes / opencode / OpenSquilla 智能体，或经 agent-bridge 桥接你的 Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy。读到哪里，问到哪里。">
 <link rel="icon" type="image/png" href="icon48.png">
 <link rel="stylesheet" href="site.css">
 <meta property="og:title" content="browsa — 浏览器侧边栏 AI">
@@ -309,7 +309,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>流式回答 <span class="tag">任意后端</span></h3>
-          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes / opencode / OpenSquilla 智能体，也可以用 agent-bridge 桥接订阅登录的 Codex / Claude Code、Google 登录的 Gemini CLI、自带模型配置的 pi，或用 DeepSeek API key 的 dsh。界面文字跟随浏览器语言，也可在设置中切换中、英、日、韩、西、葡、俄七语。</p>
+          <p>回答逐字流式渲染，Markdown、公式、图表一应俱全。连接你自己的 API：OpenAI、Anthropic、Ollama、LiteLLM…或 Hermes / opencode / OpenSquilla 智能体，也可以用 agent-bridge 桥接订阅登录的 Codex / Claude Code、Google 登录的 Gemini CLI、自带模型配置的 pi、用 DeepSeek API key 的 dsh，或保持登录运行的 WorkBuddy 桌面应用。界面文字跟随浏览器语言，也可在设置中切换中、英、日、韩、西、葡、俄七语。</p>
         </div>
       </div>
       <p class="site-note">装好了？<a href="guide/quickstart.html">快速上手</a>带你完成第一次提问；<a href="guide/">完整使用指南</a>覆盖读取、视频、渲染、会话、后端与设置。</p>
@@ -377,7 +377,7 @@
             <li>Hermes Agent：工具执行、危险操作审批、进度展示</li>
             <li>OpenCode Agent：opencode CLI 智能体直连，同样是完整的工具与审批流</li>
             <li>OpenSquilla Agent：本地桌面智能体，网关 WebSocket 直连——服务端会话记忆、思考过程输出、服务端取消</li>
-            <li>Agent Bridge：桥接本机 CLI 智能体——订阅登录的 Codex / Claude Code、Google 登录的 Gemini CLI、自带模型配置的 pi，或 DeepSeek API key 的 dsh；一张卡可同时连多个 agent，各自有独立的会话与连通状态</li>
+            <li>Agent Bridge：桥接本机智能体——订阅登录的 Codex / Claude Code、Google 登录的 Gemini CLI、自带模型配置的 pi、DeepSeek API key 的 dsh，或保持登录运行的 WorkBuddy 桌面应用；一张卡可同时连多个 agent，各自有独立的会话与连通状态</li>
             <li>与智能体的对话保存在智能体侧：browsa 自动给会话命名，在智能体自己的界面里按名字接着聊；会话 ID 在会话抽屉可查、可复制</li>
             <li>多协议接入：OpenAI（Chat / Responses）、Anthropic Messages、Ollama、LiteLLM…</li>
             <li>一张卡可添加多个模型，侧边栏按「别名 · 模型」逐个切换</li>
@@ -502,7 +502,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · 连接本地 CLI 智能体</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / workbuddy · 连接本地智能体</span></span>
             <span class="prov-badge pb-idle">bridge</span>
           </div>
         </div>

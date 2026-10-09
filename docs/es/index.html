@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — IA en panel lateral para tu navegador</title>
-<meta name="description" content="browsa es una extensión de panel lateral para Chrome / Edge: lleva la página actual a la conversación — artículos, subtítulos, PDF — y recibe las respuestas en streaming justo al lado. Cualquier API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla, o tu Codex / Claude Code / pi / Gemini CLI / dsh vía agent-bridge.">
+<meta name="description" content="browsa es una extensión de panel lateral para Chrome / Edge: lleva la página actual a la conversación — artículos, subtítulos, PDF — y recibe las respuestas en streaming justo al lado. Cualquier API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla, o tu Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy vía agent-bridge.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — IA en panel lateral para tu navegador">
@@ -316,7 +316,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>Respuestas en streaming <span class="tag">cualquier backend</span></h3>
-          <p>Las respuestas llegan en streaming palabra a palabra, con Markdown, matemáticas y gráficos. Conecta tu propia API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla — tu Codex / Claude Code con la sesión de tu suscripción, el Gemini CLI con login de Google vía agent-bridge, pi con sus propios modelos configurados, o dsh con tu clave API de DeepSeek. La interfaz sigue el idioma de tu navegador — English, 中文, 日本語, 한국어, Español, Português, Русский — y se puede cambiar en Ajustes.</p>
+          <p>Las respuestas llegan en streaming palabra a palabra, con Markdown, matemáticas y gráficos. Conecta tu propia API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla — tu Codex / Claude Code con la sesión de tu suscripción, el Gemini CLI con login de Google vía agent-bridge, pi con sus propios modelos configurados, dsh con tu clave API de DeepSeek, o la app de escritorio WorkBuddy con la sesión iniciada y en ejecución. La interfaz sigue el idioma de tu navegador — English, 中文, 日本語, 한국어, Español, Português, Русский — y se puede cambiar en Ajustes.</p>
         </div>
       </div>
       <p class="site-note">¿Ya lo tienes instalado? La <a href="../en/guide/quickstart.html">guía rápida</a> te acompaña hasta tu primera pregunta; la <a href="../en/guide/">guía completa</a> cubre lectura, vídeo, renderizado, sesiones, backends y ajustes.</p>
@@ -382,7 +382,7 @@
             <li>Agente Hermes: ejecución de herramientas, aprobación de acciones de riesgo, progreso visible</li>
             <li>Agente OpenCode: línea directa con el agente CLI de opencode — el mismo flujo completo de herramientas y aprobaciones</li>
             <li>Agente OpenSquilla: agente de escritorio local vía su gateway WebSocket — memoria de sesión en el servidor, salida del razonamiento, cancelación en el servidor</li>
-            <li>Agent Bridge: conecta agentes CLI locales — Codex / Claude Code con la sesión de tu suscripción (el lado del modelo funciona con tu suscripción), el Gemini CLI con login de Google, pi con el modelo que le configures, o dsh con tu clave API de DeepSeek; una sola tarjeta conecta varios agentes a la vez, cada uno con su propia sesión y estado de Ping</li>
+            <li>Agent Bridge: conecta agentes locales — Codex / Claude Code con la sesión de tu suscripción (el lado del modelo funciona con tu suscripción), el Gemini CLI con login de Google, pi con el modelo que le configures, dsh con tu clave API de DeepSeek, o la app de escritorio WorkBuddy con la sesión iniciada y en ejecución; una sola tarjeta conecta varios agentes a la vez, cada uno con su propia sesión y estado de Ping</li>
             <li>Las conversaciones con agentes viven en el lado del agente: browsa nombra la sesión automáticamente («browsa:» + tu primer mensaje) para que puedas retomarla en la propia interfaz del agente; el ID de sesión se muestra y se puede copiar en el historial de sesiones</li>
             <li>Cualquier API compatible con OpenAI: OpenAI, Ollama, LiteLLM…</li>
             <li>Añade varios modelos por tarjeta — cambia mediante «Alias · modelo» en la barra lateral</li>
@@ -505,7 +505,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · conecta agentes CLI locales</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / workbuddy · conecta agentes locales</span></span>
             <span class="prov-badge pb-idle">puente</span>
           </div>
         </div>

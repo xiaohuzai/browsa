@@ -17,7 +17,7 @@
 
 **ページから離れず、その隣で尋ねる。**
 
-browsa は Chrome / Edge のサイドパネル拡張機能です。テキストをコピーしたりページを離れたりすることなく、記事・動画・PDF を**自分の AI** との会話に取り込みます。Agent Bridge 経由で **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** をつなぎ、**opencode / Hermes / OpenSquilla** を利用するか、OpenAI・Anthropic・Ollama などのモデル API を設定できます。
+browsa は Chrome / Edge のサイドパネル拡張機能です。テキストをコピーしたりページを離れたりすることなく、記事・動画・PDF を**自分の AI** との会話に取り込みます。Agent Bridge 経由で **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy** をつなぎ、**opencode / Hermes / OpenSquilla** を利用するか、OpenAI・Anthropic・Ollama などのモデル API を設定できます。
 
 **無料・MIT ライセンスの拡張機能です。** モデルやエージェントはご自身で用意します。API キーはローカルに保存され、設定したサービスへの認証に使用されます。
 
@@ -31,7 +31,7 @@ browsa は Chrome / Edge のサイドパネル拡張機能です。テキスト�
 
 ### 1. いつも使っているエージェントに接続
 
-Agent Bridge 経由で、お使いの CLI エージェントに、設定済みのサインインとツールのままで接続します。browsa はウェブコンテンツをエージェントに渡し、ツールの進行状況をストリーミング表示し、エージェントが送ってくる承認リクエストを表示します。利用できるツールと権限はエージェント側の設定によります。
+Agent Bridge 経由で、お使いのローカルエージェントに、設定済みのサインインとツールのままで接続します。browsa はウェブコンテンツをエージェントに渡し、ツールの進行状況をストリーミング表示し、エージェントが送ってくる承認リクエストを表示します。利用できるツールと権限はエージェント側の設定によります。
 
 | エージェント | 接続方法 | サインイン |
 |---|---|---|
@@ -40,6 +40,7 @@ Agent Bridge 経由で、お使いの CLI エージェントに、設定済み�
 | **pi** (earendil-works) | agent-bridge ローカルデーモン | pi に設定したモデル |
 | **Gemini CLI** (Google) | agent-bridge ローカルデーモン | 既存の CLI 認証 |
 | **dsh** (DeepSeek Harness) | agent-bridge ローカルデーモン | DeepSeek API キー |
+| **workbuddy** (WorkBuddy AI デスクトップアプリ) | agent-bridge ローカルデーモン | WorkBuddy アプリのログイン（アプリを起動したまま） |
 | opencode | 公式ヘッドレスサーバーに直接接続 | 設定したモデル |
 | Hermes | セルフホスト、`/v1/runs` プロトコル | セルフホスト |
 | OpenSquilla | セルフホストゲートウェイ、WebSocket（`/ws`） | ゲートウェイが振り分けるモデル |
@@ -62,7 +63,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -118,9 +119,9 @@ npm run package      # → browsa-v<version>.zip
 エージェントとの会話はエージェント側に置かれます: browsa はセッションに自動で名前を付け（「browsa:」 + 最初のメッセージ）、エージェント自身のインターフェースから続きを行えます。セッション ID はセッションドロワーの上部に表示され、コピーもできます。 保存した browsa の会話には、各 Agent・各接続先のセッション ID も保存され、復元時に一緒に切り替わります。ID が記録されていない古い会話は、最初の送信時に新しい Agent セッションを作成し、既存のテキスト履歴を引き継ぎます。
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — ローカル CLI エージェント（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）をブリッジ</summary>
+<summary><b>🔧 Agent Bridge</b> — ローカルエージェント（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）をブリッジ</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) は、CLI エージェント（codex、claude、pi、gemini、dsh）を 1 つのローカル HTTP プロトコルに適合させるスタンドアロンのローカルデーモンです。CLI に設定済みの認証を使います:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) は、ローカルエージェント（codex、claude、pi、gemini、dsh、workbuddy）を 1 つのローカル HTTP プロトコルに適合させるスタンドアロンのローカルデーモンです。エージェントに設定済みの認証を使います:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -128,7 +129,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-⚙ 設定を開いて **Agent Bridge** カードを選び、**＋ Add agent** をクリックして、ブリッジのアドレスを 1 行に 1 つずつ入力します — 1 アドレスに 1 エージェントで、必要ならエイリアス（空のままにすれば Ping がエージェント名を自動検出します）と、そのブリッジ専用の API キー（ブリッジごとに異なるキーも可）を設定します。サイドバーのドロップダウンには「Agent Bridge · codex」のように並び、それぞれが独立したセッションスレッドと固有の ping 状態（行の ⟳ はそのエージェントだけを ping します）を持ちます。危険な操作の承認カードはパネル内に表示されます。スクリーンショット・貼り付けた画像・PDF の図はメッセージに同乗します（1 ターンにつき ≤8 枚）。マルチターンの文脈はエージェント自身が保持します。
+⚙ 設定を開いて **Agent Bridge** カードを選び、**＋ Add agent** をクリックして、ブリッジのアドレスを 1 行に 1 つずつ入力します — 1 アドレスに 1 エージェントで、必要ならエイリアス（空のままにすれば Ping がエージェント名を自動検出します）と、そのブリッジ専用の API キー（ブリッジごとに異なるキーも可）を設定します。サイドバーのドロップダウンには「Agent Bridge · codex」のように並び、それぞれが独立したセッションスレッドと固有の ping 状態（行の ⟳ はそのエージェントだけを ping します）を持ちます。危険な操作の承認カードはパネル内に表示されます。スクリーンショット・貼り付けた画像・PDF の図はメッセージに同乗します（1 ターンにつき ≤8 枚）。マルチターンの文脈はエージェント自身が保持します。workbuddy は WorkBuddy AI デスクトップアプリ経由で動きます — アプリにログインし、起動したままにしておいてください（ブリッジがアプリのローカルワーカーゲートウェイを自動検出します）。workbuddy の会話はアプリのメモリ内に置かれるため、アプリを再起動すると次のターンから新しいセッションが始まります。browsa 側の履歴には影響しません。
 
 
 </details>

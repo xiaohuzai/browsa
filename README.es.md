@@ -17,7 +17,7 @@
 
 **Quédate en la página. Pregunta a su lado.**
 
-browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
+browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
 
 **Extensión gratuita, con licencia MIT.** Trae tu propio modelo o agente. Las claves de API se guardan localmente y se usan para autenticarte con los servicios que configures.
 
@@ -31,7 +31,7 @@ browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo,
 
 ### 1. Conecta el agente que ya usas
 
-Conecta tu agente CLI existente a través de Agent Bridge, usando su inicio de sesión y sus herramientas ya configurados. browsa le entrega contenido web, transmite el progreso de las herramientas y muestra las solicitudes de aprobación que envía. Las herramientas y los permisos disponibles dependen de la configuración del agente.
+Conecta tus agentes locales existentes a través de Agent Bridge, usando su inicio de sesión y sus herramientas ya configurados. browsa les entrega contenido web, transmite el progreso de las herramientas y muestra las solicitudes de aprobación que envían. Las herramientas y los permisos disponibles dependen de la configuración del agente.
 
 | Agente | Cómo conectarlo | Inicio de sesión |
 |---|---|---|
@@ -40,6 +40,7 @@ Conecta tu agente CLI existente a través de Agent Bridge, usando su inicio de s
 | **pi** (earendil-works) | demonio local agent-bridge | El modelo que le configures a pi |
 | **Gemini CLI** (Google) | demonio local agent-bridge | Autenticación CLI existente |
 | **dsh** (DeepSeek Harness) | demonio local agent-bridge | Clave API de DeepSeek |
+| **workbuddy** (aplicación de escritorio WorkBuddy AI) | demonio local agent-bridge | Inicio de sesión de la app WorkBuddy (mantén la app en ejecución) |
 | opencode | servidor headless oficial, conexión directa | el modelo que le configures |
 | Hermes | autoalojado, protocolo `/v1/runs` | autoalojado |
 | OpenSquilla | gateway autoalojado, WebSocket (`/ws`) | los modelos que el gateway enrute |
@@ -62,7 +63,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -118,9 +119,9 @@ Abre ⚙ Ajustes, rellena la dirección y pulsa **Ping** — se verifica la cone
 Las conversaciones con agentes viven del lado del agente: browsa nombra la sesión automáticamente ("browsa:" + tu primer mensaje) para que puedas retomarla en la propia interfaz del agente. El ID de sesión se muestra — y se puede copiar — en la parte superior del cajón de sesiones. Las conversaciones guardadas de browsa conservan y restauran los ID de sesión de cada Agent y dirección de conexión. Las conversaciones antiguas sin ID registrado crean una sesión de Agent nueva al enviar el primer mensaje y trasladan su historial de texto.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — puente para agentes CLI locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — puente para agentes locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes CLI (codex, claude, pi, gemini, dsh) a un único protocolo HTTP local. Usa la autenticación ya configurada del CLI:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes locales (codex, claude, pi, gemini, dsh, workbuddy) a un único protocolo HTTP local. Usa la autenticación ya configurada del agente:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -128,7 +129,7 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Abre ⚙ Ajustes, selecciona la tarjeta **Agent Bridge**, haz clic en **＋ Añadir agente** y rellena las direcciones de bridge, una por fila — un agente por dirección, con un alias opcional (déjalo vacío y Ping descubrirá el nombre del agente automáticamente) y la clave de API propia de ese bridge (las claves pueden diferir entre bridges). El desplegable de la barra lateral los muestra como "Agent Bridge · codex", cada uno con su propio hilo de sesión independiente y su propio estado de ping (⟳ en la fila hace ping solo a ese agente). Las tarjetas de aprobación para acciones peligrosas aparecen directamente en el panel; las capturas de pantalla, las imágenes pegadas y las figuras de PDF viajan junto con tu mensaje (≤8 por turno). El contexto multi-turno vive en el propio agente.
+Abre ⚙ Ajustes, selecciona la tarjeta **Agent Bridge**, haz clic en **＋ Añadir agente** y rellena las direcciones de bridge, una por fila — un agente por dirección, con un alias opcional (déjalo vacío y Ping descubrirá el nombre del agente automáticamente) y la clave de API propia de ese bridge (las claves pueden diferir entre bridges). El desplegable de la barra lateral los muestra como "Agent Bridge · codex", cada uno con su propio hilo de sesión independiente y su propio estado de ping (⟳ en la fila hace ping solo a ese agente). Las tarjetas de aprobación para acciones peligrosas aparecen directamente en el panel; las capturas de pantalla, las imágenes pegadas y las figuras de PDF viajan junto con tu mensaje (≤8 por turno). El contexto multi-turno vive en el propio agente. workbuddy funciona sobre la aplicación de escritorio WorkBuddy AI — mantenla con la sesión iniciada y en ejecución (el bridge descubre automáticamente su gateway de worker local); sus conversaciones viven en la memoria de la app, así que reiniciar la app inicia una sesión de agente nueva en el siguiente turno, y tu historial del lado de browsa no se ve afectado.
 
 
 </details>
