@@ -17,7 +17,7 @@
 
 **페이지에 머무르고, 곁에서 물어보세요.**
 
-browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트를 복사하거나 페이지를 떠나지 않고도 기사, 동영상, PDF를 **나만의 AI**와의 대화로 가져오세요. Agent Bridge를 통해 **Codex / Claude Code / pi / Gemini CLI**를 연결하거나, **opencode / Hermes / OpenSquilla**를 사용하거나, OpenAI, Anthropic, Ollama 같은 모델 API를 구성할 수 있습니다.
+browsa는 Chrome / Edge 사이드 패널 확장 프로그램입니다. 텍스트를 복사하거나 페이지를 떠나지 않고도 기사, 동영상, PDF를 **나만의 AI**와의 대화로 가져오세요. Agent Bridge를 통해 **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)**를 연결하거나, **opencode / Hermes / OpenSquilla**를 사용하거나, OpenAI, Anthropic, Ollama 같은 모델 API를 구성할 수 있습니다.
 
 **무료, MIT 라이선스 확장 프로그램입니다.** 모델이나 에이전트는 직접 준비해서 연결하세요. API 키는 로컬에 저장되며, 구성한 서비스를 인증할 때 사용됩니다.
 
@@ -39,6 +39,7 @@ Agent Bridge를 통해 기존 CLI 에이전트를 연결하면, 에이전트가 
 | **Claude Code** (Anthropic) | agent-bridge 로컬 데몬 | 기존 CLI 인증 사용 |
 | **pi** (earendil-works) | agent-bridge 로컬 데몬 | pi에 구성한 모델 |
 | **Gemini CLI** (Google) | agent-bridge 로컬 데몬 | 기존 CLI 인증 사용 |
+| **dsh** (DeepSeek Harness) | agent-bridge 로컬 데몬 | DeepSeek 계정 또는 API 키 |
 | opencode | 공식 헤드리스 서버, 직접 연결 | 구성해 둔 모델 |
 | Hermes | 셀프호스팅, `/v1/runs` 프로토콜 | 셀프호스팅 |
 | OpenSquilla | 셀프호스팅 게이트웨이, WebSocket (`/ws`) | 게이트웨이가 라우팅하는 모델 |
@@ -61,7 +62,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -117,9 +118,9 @@ npm run package      # → browsa-v<version>.zip
 에이전트와의 대화는 에이전트 측에 저장됩니다. browsa는 세션 이름을 자동으로 붙입니다("browsa:" + 첫 메시지) — 에이전트 고유의 인터페이스에서 그 이름으로 찾아 이어서 작업할 수 있습니다. 세션 ID는 세션 드로어 상단에 표시되며 복사할 수 있습니다. 저장한 browsa 대화는 각 Agent와 연결 주소별 세션 ID를 함께 보관하고 복원합니다. ID가 기록되지 않은 이전 대화는 첫 메시지를 보낼 때 새 Agent 세션을 만들고 기존 텍스트 기록을 전달합니다.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — 로컬 CLI 에이전트 브리지(<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — 로컬 CLI 에이전트 브리지(<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge)는 CLI 에이전트(codex, claude, pi, gemini)를 하나의 로컬 HTTP 프로토콜로 변환해 주는 독립 실행형 로컬 데몬입니다. CLI에 구성된 인증을 그대로 사용합니다:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge)는 CLI 에이전트(codex, claude, pi, gemini, dsh)를 하나의 로컬 HTTP 프로토콜로 변환해 주는 독립 실행형 로컬 데몬입니다. CLI에 구성된 인증을 그대로 사용합니다:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)

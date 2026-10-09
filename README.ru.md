@@ -17,7 +17,7 @@
 
 **Оставайтесь на странице. Спрашивайте рядом.**
 
-browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
+browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
 
 **Бесплатное расширение под лицензией MIT.** Модель или агент — ваши собственные. API-ключи хранятся локально и используются для аутентификации в настраиваемых вами сервисах.
 
@@ -39,6 +39,7 @@ browsa — расширение с боковой панелью для Chrome /
 | **Claude Code** (Anthropic) | локальный демон agent-bridge | Существующая аутентификация CLI |
 | **pi** (earendil-works) | локальный демон agent-bridge | Любая модель, настроенная в pi |
 | **Gemini CLI** (Google) | локальный демон agent-bridge | Существующая аутентификация CLI |
+| **dsh** (DeepSeek Harness) | локальный демон agent-bridge | Аккаунт DeepSeek или API-ключ |
 | opencode | официальный headless-сервер, напрямую | любая модель, настроенная в opencode |
 | Hermes | собственный сервер, протокол `/v1/runs` | собственный сервер |
 | OpenSquilla | собственный шлюз, WebSocket (`/ws`) | модели, на которые маршрутизирует шлюз |
@@ -61,7 +62,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · messy pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI<br/>via agent-bridge · existing CLI authentication"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing CLI authentication"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -117,9 +118,9 @@ npm run package      # → browsa-v<version>.zip
 Беседы с агентами живут на стороне агента: browsa автоматически называет сессию («browsa:» + ваше первое сообщение), чтобы её можно было продолжить в собственном интерфейсе агента. ID сессии показан — и его можно скопировать — вверху панели сессий. Сохранённые диалоги browsa сохраняют и восстанавливают ID сессий для каждого Agent и адреса подключения. Старые диалоги без записанного ID при первой отправке создают новую сессию Agent и передают в неё имеющуюся текстовую историю.
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — мост к локальным CLI-агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — мост к локальным CLI-агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит CLI-агентов (codex, claude, pi, gemini) к одному локальному HTTP-протоколу. Использует настроенную в CLI аутентификацию:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит CLI-агентов (codex, claude, pi, gemini, dsh) к одному локальному HTTP-протоколу. Использует настроенную в CLI аутентификацию:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)

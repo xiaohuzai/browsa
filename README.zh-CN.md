@@ -19,7 +19,7 @@
 
 **读到哪里，问到哪里。**
 
-browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
@@ -41,6 +41,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **Claude Code**（Anthropic） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
+| **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek 账号或 API key |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 | OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
@@ -63,7 +64,7 @@ flowchart LR
     P["当前标签页<br/>文章 · 视频 · PDF · 乱页面"]
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
     subgraph Y["你的后端 —— 云端、本机或自托管"]
-        A1["Codex · Claude Code · pi · Gemini CLI<br/>agent-bridge 桥 · 沿用 CLI 认证"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>agent-bridge 桥 · 沿用 CLI 认证"]
         A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -119,9 +120,9 @@ npm run package      # → browsa-v<version>.zip
 与智能体的对话本体保存在智能体一侧：browsa 会自动给会话命名（「browsa：」+ 你的第一条消息），在智能体自己的界面里按名字就能找到它接着聊；会话 ID 在会话抽屉顶部随时可查、可复制。保存的 browsa 对话会保留各智能体、各连接地址对应的会话 ID，恢复时一起切回；未记录 ID 的旧存档会在首次发消息时创建独立的智能体会话，并带上已有文字记录。
 
 <details>
-<summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>…）</summary>
+<summary><b>🔧 Agent Bridge</b>——桥接本地 CLI 智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh 等 CLI 智能体适配成统一的本地 HTTP 协议。它沿用 CLI 配置的认证方式：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
