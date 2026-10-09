@@ -41,7 +41,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **Claude Code**（Anthropic） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
-| **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek 账号或 API key |
+| **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek API key |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 | OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |

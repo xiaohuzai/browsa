@@ -39,7 +39,7 @@ Agent Bridge를 통해 기존 CLI 에이전트를 연결하면, 에이전트가 
 | **Claude Code** (Anthropic) | agent-bridge 로컬 데몬 | 기존 CLI 인증 사용 |
 | **pi** (earendil-works) | agent-bridge 로컬 데몬 | pi에 구성한 모델 |
 | **Gemini CLI** (Google) | agent-bridge 로컬 데몬 | 기존 CLI 인증 사용 |
-| **dsh** (DeepSeek Harness) | agent-bridge 로컬 데몬 | DeepSeek 계정 또는 API 키 |
+| **dsh** (DeepSeek Harness) | agent-bridge 로컬 데몬 | DeepSeek API 키 |
 | opencode | 공식 헤드리스 서버, 직접 연결 | 구성해 둔 모델 |
 | Hermes | 셀프호스팅, `/v1/runs` 프로토콜 | 셀프호스팅 |
 | OpenSquilla | 셀프호스팅 게이트웨이, WebSocket (`/ws`) | 게이트웨이가 라우팅하는 모델 |

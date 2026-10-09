@@ -39,7 +39,7 @@ Agent Bridge 経由で、お使いの CLI エージェントに、設定済み�
 | **Claude Code** (Anthropic) | agent-bridge ローカルデーモン | 既存の CLI 認証 |
 | **pi** (earendil-works) | agent-bridge ローカルデーモン | pi に設定したモデル |
 | **Gemini CLI** (Google) | agent-bridge ローカルデーモン | 既存の CLI 認証 |
-| **dsh** (DeepSeek Harness) | agent-bridge ローカルデーモン | DeepSeek アカウントまたは API キー |
+| **dsh** (DeepSeek Harness) | agent-bridge ローカルデーモン | DeepSeek API キー |
 | opencode | 公式ヘッドレスサーバーに直接接続 | 設定したモデル |
 | Hermes | セルフホスト、`/v1/runs` プロトコル | セルフホスト |
 | OpenSquilla | セルフホストゲートウェイ、WebSocket（`/ws`） | ゲートウェイが振り分けるモデル |
