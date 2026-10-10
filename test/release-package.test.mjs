@@ -26,7 +26,7 @@ test('distribution ZIP includes extension files and excludes every translated RE
     await writeFile(join(dir, 'manifest.json'), JSON.stringify({ version: '0.42.0', key: 'test-install-key' }));
     await writeFile(join(dir, 'sidepanel.js'), 'export const ready = true;');
     await writeFile(join(dir, 'LICENSE'), 'MIT');
-    for (const name of ['README.md', 'README.zh-CN.md', 'README.ja.md', 'README.ko.md', 'README.es.md', 'README.pt-BR.md', 'README.ru.md']) {
+    for (const name of ['README.md', 'README.en.md', 'README.ja.md', 'README.ko.md', 'README.es.md', 'README.pt-BR.md', 'README.ru.md']) {
       await writeFile(join(dir, name), 'Developer documentation');
     }
     await mkdir(join(dir, '.agents'));

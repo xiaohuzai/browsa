@@ -1,222 +1,222 @@
 <p align="center">
-  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a>
+  <a href="./README.en.md">English</a> · <strong>简体中文</strong> · <a href="./README.ja.md">日本語</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.es.md">Español</a> · <a href="./README.pt-BR.md">Português</a> · <a href="./README.ru.md">Русский</a>
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="Install from the Chrome Web Store" /></a>&nbsp;
+  <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
-  <a href="#install"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
+  <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
   <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>&nbsp;
-  <a href="https://github.com/xiaohuzai/browsa/discussions"><img src="https://img.shields.io/badge/Discussions-Community-8250df?style=flat-square&logo=github" alt="GitHub Discussions" /></a>
+  <a href="https://github.com/xiaohuzai/browsa/discussions"><img src="https://img.shields.io/badge/Discussions-%E4%BA%A4%E6%B5%81%E7%A4%BE%E5%8C%BA-8250df?style=flat-square&logo=github" alt="GitHub Discussions" /></a>
 </p>
 
 <p align="center">
-  <a href="https://xiaohuzai.github.io/browsa/en/"><strong>Website</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/guide/quickstart.html"><strong>Quick start</strong></a> · <a href="#install"><strong>Install</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>Issues</strong></a>
+  <a href="https://xiaohuzai.github.io/browsa/"><strong>官网</strong></a> · <a href="https://xiaohuzai.github.io/browsa/guide/quickstart.html"><strong>快速开始</strong></a> · <a href="#安装"><strong>安装</strong></a> · <a href="https://github.com/xiaohuzai/browsa/issues"><strong>提 Issue</strong></a>
 </p>
 
 ---
 
 # browsa
 
-**Stay on the page. Ask beside it.**
+**读到哪里，问到哪里。**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
-**Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
+**扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
 <p align="center">
-  <img src="docs/assets/readme/demo-v16-en.gif" alt="browsa opens beside a Transformer article, renders the attention equation and diagrams, jumps to podcast key points, then copies notes, downloads images and continues the same session in an Agent demo." width="720" />
+  <img src="docs/assets/readme/demo-v16-zh.gif" alt="browsa 在 Transformer 文章旁打开，呈现注意力公式和图示，点击播客要点跳转，再复制笔记、下载图片，并演示在智能体侧继续同一会话。" width="720" />
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=YOZ5cs0W1og"><strong>▶ Full video · 68 seconds</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Stay on the page. Ask beside it.</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-en.mp4">Download MP4</a> — Real UI demonstration: Open browsa, choose or switch your own AI and Agents, attach an article, ask about a sentence, and see formulas, flowcharts and charts. Verify content on the video timeline, manage multiple sessions, and use the session ID to continue in your Agent. Responses, saved results and the CLI continuation illustration use demo data; playback is edited. File saving depends on the connected Agent.</p>
+  <a href="https://www.youtube.com/watch?v=b5DiTpR7VMk"><strong>▶ 完整视频 · 68 秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 读到哪里，问到哪里。</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-zh.mp4">下载 MP4</a> — 真实界面演示：打开 browsa 浏览器插件，选择或切换自己的 AI 与智能体，附加文章、追问一句话，再把回答呈现为公式、流程图和图表。用视频时间线核对内容，管理多份会话，并通过会话 ID 在智能体侧继续。回复、保存结果与命令行接续画面使用演示数据，播放经过剪辑；保存能力取决于接入的智能体。</p>
 
-## Highlights
+## 亮点
 
-### 1. Connect the agent you already use
+### 一、接你正在用的 Agent
 
-Connect your existing local agents through Agent Bridge, using their configured sign-in and tools. browsa feeds them web content, streams tool progress, and displays the approval requests they send. Available tools and permissions depend on the agent's configuration.
+通过 Agent Bridge 连接已有的本地智能体，沿用它配置好的登录方式和工具。browsa 把网页内容交给 agent，实时展示工具进度，并在面板里呈现它发出的审批请求。具体工具能力与权限取决于 agent 的配置。
 
-| Agent | How to connect | Sign-in |
+| Agent | 接入方式 | 登录 |
 |---|---|---|
-| **Codex** (OpenAI) | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) local daemon | Existing CLI authentication |
-| **Claude Code** (Anthropic) | agent-bridge local daemon | Existing CLI authentication |
-| **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
-| **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
-| **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek API key |
-| **workbuddy** (WorkBuddy AI desktop app) | agent-bridge local daemon | WorkBuddy app sign-in (keep the app running) |
-| opencode | official headless server, direct | whatever model you configure it with |
-| Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
-| OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
+| **Codex**（OpenAI） | [agent-bridge](https://github.com/xiaohuzai/agent-bridge) 本地桥 | 沿用 CLI 已配置的认证 |
+| **Claude Code**（Anthropic） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
+| **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
+| **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
+| **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek API key |
+| **workbuddy**（WorkBuddy AI 桌面应用） | agent-bridge 本地桥 | WorkBuddy 应用登录（保持运行） |
+| opencode | 官方无头服务器直连 | 你给它配置的模型 |
+| Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
+| OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
 
-One browsa card connects to several agents at once; the sidebar dropdown switches between them.
+一张 browsa 卡可以同时连多个 agent，侧边栏下拉逐个切换。
 
-### 2. Reads the whole web — videos included
+### 二、读得动整个网页——视频也行
 
-- **Videos & podcasts**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too; Xiaoyuzhou podcast episodes transcribe with one attach
-- **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
-- **Office documents**: direct links to `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… are converted to Markdown fully on-device (docling compiled to WASM) — tables, headings and lists survive
-- **Articles & messy pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
+- **视频与播客**：字幕或自动转写（ASR）→ 带可点击 `[mm:ss]` 时间戳的笔记，点一下跳回原时刻；无字幕的视频还能直接「看」画面，小宇宙单集附加即转写
+- **PDF / 论文**：全程本机解析——表格、多栏、标题原样重建，插图区域裁出来发给视觉模型
+- **Office 文档**：`.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… 直链在本机转换为 Markdown（docling 编译为 WASM）——表格、标题、列表原样保留
+- **文章与乱页面**：读出干净正文；信息流页面直接读页面自己的数据（YouTube、Bilibili、小红书…）
 
-Full list under "What browsa reads" below.
+完整清单见下方「browsa 读什么」。
 
-## Architecture
+## 架构
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
-    B["browsa side panel<br/>read · chat · approvals"]
-    subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
-        A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
-        A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
+    P["当前标签页<br/>文章 · 视频 · PDF · 乱页面"]
+    B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
+    subgraph Y["你的后端 —— 云端、本机或自托管"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>agent-bridge 桥 · 沿用本地登录"]
+        A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
+        A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
-    P -->|"📎 attach: text / subtitles / tables / figures"| B
-    B -->|"page content + your question"| Y
-    Y -->|"streamed reply · tool progress · approvals"| B
+    P -->|"📎 读出正文 / 字幕 / 表格 / 插图"| B
+    B -->|"页面内容 + 你的问题"| Y
+    Y -->|"流式回复 · 工具进度 · 审批"| B
 ```
 
-A developer-level tour of the codebase — message flow, the rendering pipeline, storage model, providers and agents, ASR, and the security model — lives in the [project wiki](https://github.com/xiaohuzai/browsa/wiki) (7 languages).
+面向开发者的代码库导览——消息流、渲染管线、存储模型、Provider 层与 Agent 接入、ASR、安全模型——在[项目 Wiki](https://github.com/xiaohuzai/browsa/wiki)（双语）。
 
-## Install
+## 安装
 
-Choose one installation method:
+选择一种安装方式即可：
 
-**Chrome Web Store — recommended, automatic updates.** [Add browsa to Chrome](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho). Store review may lag behind GitHub releases.
+**Chrome 应用商店 —— 推荐，自动更新。** [点这里添加 browsa](https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho)。商店审核可能晚于 GitHub 发布。
 
-**GitHub — manual installation and updates.**
+**GitHub —— 手动安装与更新。**
 
-1. Download and extract the extension ZIP from [Releases](https://github.com/xiaohuzai/browsa/releases). To work on the code, clone or download this repository instead.
-2. Open `chrome://extensions` (or `edge://extensions`) and enable **Developer mode**.
-3. Click **Load unpacked** → select the extracted folder containing `manifest.json`, not the ZIP or its parent folder. Its name depends on how you downloaded it.
+1. 从 [Releases](https://github.com/xiaohuzai/browsa/releases) 下载扩展 ZIP 并解压。如果需要修改代码，也可以克隆或下载本仓库。
+2. 打开 `chrome://extensions`（或 `edge://extensions`），开启**开发者模式**。
+3. 点击**加载已解压的扩展程序** → 选择解压后包含 `manifest.json` 的目录，而不是 ZIP 文件或外层目录。文件夹名称取决于下载方式。
 
-**Then, either way:**
+**接下来两种方式都一样：**
 
-1. Open an article and click the extension toolbar icon, or press `Ctrl+Shift+H` (`Command+Shift+H` on macOS).
-2. Open **⚙ Settings**, configure an LLM or Agent provider, and click **Ping** to verify the connection.
-3. Select the model or agent in the side-panel dropdown, click **📎** to attach the page, and ask your first question.
+1. 打开一篇文章，点击扩展工具栏图标，或按 `Ctrl+Shift+H`（macOS 为 `Command+Shift+H`）打开侧边栏。
+2. 进入 **⚙ 设置**，配置一个 LLM 或 Agent 服务商，点 **Ping** 验证连接。
+3. 在侧边栏下拉框选择模型或 agent，点 **📎** 附加当前页面，再问第一个问题。
 
-See the [quick-start guide](https://xiaohuzai.github.io/browsa/en/guide/quickstart.html) for the full walkthrough. Advanced settings can keep their defaults while you get connected.
+完整步骤见[快速开始指南](https://xiaohuzai.github.io/browsa/guide/quickstart.html)。首次使用先连通服务即可，高级设置可以保留默认值。
 
 <details>
-<summary><b>Build & package</b></summary>
+<summary><b>构建与打包</b></summary>
 
 ```bash
-npm install          # first time only
-npm test             # run the test suite
+npm install          # 仅首次需要
+npm test             # 运行测试套件
 npm run package      # → browsa-v<version>.zip
 ```
 
-`npm version patch|minor` bumps the version in both `package.json` and `manifest.json` automatically.
+`npm version patch|minor` 会自动把版本号同步到 `package.json` 和 `manifest.json`。
 
-On memory-constrained machines, run tests serially: `node --test --test-concurrency=1 test/*.test.mjs`.
+内存较小的机器建议串行运行测试：`node --test --test-concurrency=1 test/*.test.mjs`。
 
 </details>
 
-## Connect a provider
+## 连接 Provider
 
-Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verified and capabilities auto-detected; the first provider you verify becomes active. Two kinds of backends:
+打开 ⚙ 设置，填好地址、点 **Ping**——验证连通性并自动检测能力；第一个验证通过的 provider 自动设为激活。两类后端：
 
-- **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
-- **LLM providers** — plain chat endpoints for conversation. Model ID required.
+- **Agent Provider（智能体）**——完整的智能体后端，在服务端执行工具（bash、文件操作、联网搜索……）。AI 真的能*做事*。
+- **LLM Provider（纯语言模型）**——仅用于对话的聊天端点。需填写模型 ID。
 
-Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer. Saved browsa conversations retain their own Agent thread IDs, separately for each provider and bridge address; restoring a conversation restores those IDs too. Older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message.
+与智能体的对话本体保存在智能体一侧：browsa 会自动给会话命名（「browsa：」+ 你的第一条消息），在智能体自己的界面里按名字就能找到它接着聊；会话 ID 在会话抽屉顶部随时可查、可复制。保存的 browsa 对话会保留各智能体、各连接地址对应的会话 ID，恢复时一起切回；未记录 ID 的旧存档会在首次发消息时创建独立的智能体会话，并带上已有文字记录。
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh, workbuddy) to one local HTTP protocol. It uses the agent's configured authentication:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh、workbuddy 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
 
 ```bash
-npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
+npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
 cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
-agent-bridge serve                                # one bridge per entry; ports live in agents.json
+agent-bridge serve                                # 每个 entry 一座桥，端口写在 agents.json 里
 ```
 
-Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤8 per turn). Multi-turn context lives in the agent itself. If the agent narrates before tool calls (codex announcing a skill), that narration folds into the step history instead of the reply. workbuddy rides the WorkBuddy AI desktop app — keep it signed in and running (the bridge auto-discovers its local worker gateway); its conversations live in the app's memory, so restarting the app starts a fresh agent session on the next turn, with your browsa history unaffected.
+打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤8 张）。多轮上下文由 agent 自己维护。agent 在工具调用前的过程自述（codex 宣告使用某技能）会折进步骤历史，不会混进回复正文。workbuddy 走 WorkBuddy AI 桌面应用——保持登录并运行即可（桥会自动发现它本地的 worker 网关）；其对话存在应用内存里，重启应用后下一轮自动开新会话，browsa 侧历史不受影响。
 
 
 </details>
 
 <details>
-<summary><b>🔧 OpenCode Agent</b> — connect the <code>opencode</code> CLI agent</summary>
+<summary><b>🔧 OpenCode Agent</b>——连接 <code>opencode</code> 命令行智能体</summary>
 
-[opencode](https://opencode.ai) ships a first-party headless server — browsa connects to it directly (sessions, streaming, tool progress, and approval prompts for dangerous actions like shell commands). Browsa can connect to **any** `opencode serve` address — but bare `opencode serve` picks a random port that changes on every restart, so the set-and-forget move is to pin one:
+[opencode](https://opencode.ai) 自带官方无头服务器——browsa 直连即可（会话、流式回复、工具进度，以及危险操作——比如执行 shell 命令——的审批卡片）。browsa 能连**任意** `opencode serve` 地址——但裸 `opencode serve` 会随机选端口且每次重启都变，所以省心的做法是固定一个：
 
 ```bash
 opencode serve --port 4096
 ```
 
-Open ⚙ Settings, select the **OpenCode Agent** provider, fill Base URL `http://127.0.0.1:4096` (the placeholder suggests it), **Ping**, done. Multi-turn context lives in the opencode session; browsa just sends your turns. When opencode asks to run a dangerous command, the approval card appears right in the panel. Works from any directory — start the server in the project you want it to work on.
+打开 ⚙ 设置，选择 **OpenCode Agent** provider，Base URL 填 `http://127.0.0.1:4096`（占位符即此建议值），**Ping** 通即用。多轮上下文由 opencode 会话自己维护，browsa 只发送你的每一句话。当 opencode 请求执行危险命令时，审批卡片直接出现在面板里。服务器在哪个目录启动，agent 就在哪个项目上干活。
 
 </details>
 
 <details>
-<summary><b>🤖 Hermes Agent</b> — self-hosted agent with built-in tools</summary>
+<summary><b>🤖 Hermes Agent</b>——自托管、内置工具的智能体</summary>
 
-Hermes is a self-hosted AI agent with built-in tools (web search, terminal, file ops, memory, skills). browsa uses its `/v1/runs` API — richer than plain chat completions (tool progress, approval/clarification prompts for dangerous actions) — with a stable `X-Hermes-Session-Id` per conversation so Hermes can maintain session continuity server-side. Falls back to plain `/v1/chat/completions` automatically if a Hermes deployment doesn't advertise `/v1/runs` support.
+Hermes 是一个自托管的 AI 智能体，内置工具（联网搜索、终端、文件操作、记忆、技能）。browsa 使用它的 `/v1/runs` API——比普通 chat completions 更丰富（工具进度、危险操作的审批/澄清提示），并且每个会话使用稳定的 `X-Hermes-Session-Id`，让 Hermes 能在服务端维持会话连续性。如果某个 Hermes 部署不支持 `/v1/runs`，会自动回退到普通的 `/v1/chat/completions`。
 
-**1. Install Hermes**
+**1. 安装 Hermes**
 
 ```bash
-pip install hermes-agent   # or follow the official install guide
+pip install hermes-agent   # 或按官方安装指南
 ```
 
-**2. Enable the API server** — add to `~/.hermes/.env`:
+**2. 启用 API 服务**——在 `~/.hermes/.env` 中添加：
 
 ```bash
 API_SERVER_ENABLED=true
 API_SERVER_KEY=your-secret-key
 ```
 
-**3. Start Hermes**
+**3. 启动 Hermes**
 
 ```bash
 hermes gateway
 # → [API Server] API server listening on http://127.0.0.1:8642
 ```
 
-**4. Configure browsa** — open ⚙ Settings, select the **Hermes Agent** provider. It only needs a Base URL and API key — its own `/v1/runs` protocol is used automatically (no API-type dropdown).
+**4. 配置 browsa**——打开 ⚙ 设置，选择 **Hermes Agent** provider。只需 Base URL 和 API key——它自己的 `/v1/runs` 协议会自动启用（无需选择 API 类型）。
 
-| Field | Value |
+| 字段 | 值 |
 |---|---|
 | Base URL | `http://<server-ip>:8642` |
-| API Key | value of `API_SERVER_KEY` |
+| API Key | `API_SERVER_KEY` 的值 |
 
-**5. Ping** to verify. `/v1/runs` support is auto-detected and enabled automatically.
+**5. 点击 Ping 验证**。会自动检测并启用 `/v1/runs` 支持。
 
 </details>
 
 <details>
-<summary><b>🦑 OpenSquilla Agent</b> — local agent over gateway WebSocket (desktop app or CLI)</summary>
+<summary><b>🦑 OpenSquilla Agent</b>——网关 WebSocket 直连的本地智能体（桌面版或命令行）</summary>
 
-[OpenSquilla](https://github.com/opensquilla/opensquilla) is a local agent (gateway + Web UI + desktop app) with a token-efficient microkernel design, model routing, and skills. browsa talks to its **gateway WebSocket** (`/ws`) — the same channel its own Web UI uses — so you get the full agent experience: server-side session memory, streaming deltas, thinking output, and server-side cancellation. Conversations show up in the app's sidebar under a `browsa：…` name, so you can open the desktop app later and pick any of them up right where the panel left off.
+[OpenSquilla](https://github.com/opensquilla/opensquilla) 是一个本地智能体（网关 + 网页界面 + 桌面应用），主打省 token 的微内核设计、模型路由与技能系统。browsa 走它的**网关 WebSocket**（`/ws`）——与其自有网页界面同一条通道——因此拿到的是完整智能体体验：服务端会话记忆、流式增量、思考过程输出、服务端取消。browsa 的会话会以「browsa：…」的名字出现在应用的侧边栏里——之后随时打开桌面应用，就能从面板聊到一半的地方接着聊。
 
-Run the gateway **either** as the desktop app **or** from the command line — browsa connects to both the same way. The tracks differ in exactly one thing: which config file the gateway reads (step 2 in each track). Editing the wrong file is the most common reason the connection silently fails.
+网关用**桌面版**或**命令行**二选一跑起来即可——browsa 对两者的接法完全一样，两条路线只有一处差别：网关读哪份配置文件（各自方式的第 2 步）。改错文件是「配了却连不上」的最常见原因。
 
-**Way A — Desktop app (no terminal)**
+**方式 A：桌面版（无需终端）**
 
-1. **Install & launch** the OpenSquilla desktop app, v0.5.5 or newer (older builds bundle a gateway whose origin guard doesn't accept extensions). The app starts its own gateway automatically — open the app's settings and note the **gateway URL** it shows (typically `http://127.0.0.1:18791`; it takes the first free port in 18791–18830).
-2. **Let the extension in** — the desktop app does **not** read `~/.opensquilla/config.toml`; it reads a config in its own app-data directory. The most accurate source is the app itself: **Settings → Advanced → Config file** shows the exact path (with a copy button). Common defaults: macOS official package `~/Library/Application Support/OpenSquilla/opensquilla/config.toml`; self-built package `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml` (the two data directories are fully separate). The path contains spaces — escape them in a terminal (wrap the whole path in quotes, or backslash-escape each space), or the shell splits it at the space and you edit the wrong file:
+1. **安装并启动** OpenSquilla 桌面应用，v0.5.5 或更新（更旧的包内嵌的网关来源守卫不认扩展）。应用会自动拉起自己的网关——打开应用设置，记下它显示的**网关地址**（通常是 `http://127.0.0.1:18791`；自动取 18791–18830 里第一个空闲端口）。
+2. **放行扩展**——桌面版**不读** `~/.opensquilla/config.toml`，读的是自己应用数据目录里的配置。最准的入口在应用自己这里：**设置 → 高级 → 配置文件**，直接显示本机 config.toml 的完整路径（带一键复制）。常见默认值：macOS 官方包 `~/Library/Application Support/OpenSquilla/opensquilla/config.toml`；源码自建包 `~/Library/Application Support/@opensquilla/desktop-electron/opensquilla/config.toml`（两套数据完全隔离）。路径里有空格——终端里必须转义（整条路径包进引号，或每个空格前加反斜杠），否则 shell 会在空格处把路径截断，编辑到错误的文件：
 
 ```bash
-open -e "<paste the path copied from Settings → Advanced → Config file>"   # opens in macOS TextEdit
+open -e "<粘贴 设置 → 高级 → 配置文件 里复制的完整路径>"   # 用 macOS「文本编辑」打开
 ```
 
-Add:
+写入：
 
 ```toml
 [cors]
-# The value below covers the Chrome Web Store build. A sideloaded build
-# (zip / repo folder) has a DIFFERENT extension ID — see the fine print below.
+# 下面这个值对应 Chrome 商店安装版。解包加载的版本（zip / 仓库目录）扩展 ID
+# 不同——见下方「来源守卫细则」。
 allowed_origins = ["chrome-extension://kghjmmajnpbkljankbbjbmnhfdocaeho"]
 ```
 
-3. **Fully quit and reopen the app** (closing the window is not enough) — the gateway reads this config once at startup. Models / API keys for the desktop app are configured inside the app (its setup window), not via shell env vars. Advanced: the app can also attach to an externally-run CLI gateway via `OPENSQUILLA_DESKTOP_GATEWAY_URL`.
-4. Jump to **Configure browsa** below.
+3. **完全退出并重新打开应用**（只关窗口不算）——网关只在启动时读一次配置。桌面版的模型 / API key 在应用内配置（引导设置窗口），不读 shell 环境变量。进阶：桌面应用也能挂外部命令行网关——设 `OPENSQUILLA_DESKTOP_GATEWAY_URL`。
+4. 跳到下方「配置 browsa」。
 
-**Way B — Command line**
+**方式 B：命令行**
 
-1. **Install & start** the gateway (uv provides Python 3.12):
+1. **安装并启动**网关（uv 提供 Python 3.12）：
 
 ```bash
 uv tool install --python 3.12 "opensquilla[recommended] @ https://github.com/opensquilla/opensquilla/releases/download/v0.5.5/opensquilla-0.5.5-py3-none-any.whl"
@@ -224,191 +224,199 @@ opensquilla gateway start
 # → running: http://127.0.0.1:18791
 ```
 
-2. **Let the extension in** — the CLI gateway reads `~/.opensquilla/config.toml`. Add the same `[cors]` block as in Way A. The gateway's model routing is configured here too (see OpenSquilla's own docs; LLM keys typically come from the environment the gateway is started with).
-3. **Restart the gateway** (`Ctrl+C`, then `opensquilla gateway start` again) — the config is read once at startup.
-4. Jump to **Configure browsa** below.
+2. **放行扩展**——命令行网关读 `~/.opensquilla/config.toml`，写入与方式 A 相同的 `[cors]` 块。网关的模型路由也在这份配置里设（见 OpenSquilla 自身文档；LLM key 通常随启动时的环境变量注入）。
+3. **重启网关**（`Ctrl+C` 停掉，再 `opensquilla gateway start`）——配置只在启动时读一次。
+4. 跳到下方「配置 browsa」。
 
-**Configure browsa (same for both)** — open ⚙ Settings, select the **OpenSquilla** tab:
+**配置 browsa（两种方式相同）**——打开 ⚙ 设置，切到 **OpenSquilla** 标签：
 
-| Field | Value |
+| 字段 | 值 |
 |---|---|
-| Base URL | `ws://127.0.0.1:18791/ws` — use the URL your gateway actually shows (desktop: its settings; CLI: the `running:` line) |
-| API Key | only if your gateway requires a token (optional) |
+| Base URL | `ws://127.0.0.1:18791/ws`——以网关实际显示的地址为准（桌面版看应用设置；命令行看 `running:` 那行） |
+| API Key | 仅当网关配置了令牌时填写（可选） |
 
-**Ping** to verify — it performs the real WebSocket handshake, so a green ping proves both connectivity and the origin allowlist.
+**点击 Ping 验证**——会执行真实的 WebSocket 握手，绿色即同时证明连通性和来源白名单都已就绪。
 
-Origin-guard fine print (both ways): the listing is an exact string match (`*` does nothing). The snippet value covers the **Chrome Web Store build**; a **sideloaded build has a different ID** — loading the repo folder directly always shows `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn` (pinned by the repo manifest's key), while a build unpacked from the release zip gets an ID derived from its folder path on your machine. Either way, read the live value at `chrome://extensions` → browsa → **ID** and append that origin to the list (multiple entries are fine). Since v0.5.5 the guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
+来源守卫细则（两种方式通用）：白名单是**逐字精确匹配**（`*` 无效）。上面片段的值对应**商店安装版**；**解包加载的版本 ID 不同**——直接以「加载已解压的扩展程序」加载仓库目录时恒为 `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn`（由仓库 manifest 的 key 字段锁定），从发行 zip 解包加载则按本机解压根目录路径派生（每台机器不同）。无论哪种，以 `chrome://extensions` → browsa → **ID** 实际显示的值为准，把它追加进白名单即可（可并列多条）。v0.5.5 起，守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
 
-Notes: each browsa conversation maps to one gateway session (gateway-assigned key, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); a huge page (over 60k chars) is uploaded as a `page-context.md` document the agent reads with its own tools. Page figures ride along as image attachments (a text-only router model degrades to text automatically). Pasted screenshots stay in browsa's own history and are not forwarded yet. The reply-language preference is prepended to the message since this protocol has no system-prompt field.
+说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次，之后就住在网关自己的对话记录里）；超大页面（超过 6 万字符）会作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读。页面插图会以图片附件随行（路由器若选到纯文字模型会自动降级为纯文字）。粘贴的截图保留在 browsa 自己的历史里，暂不转发。此协议没有系统提示词字段，语言偏好以普通指令拼在消息开头。
 
 </details>
 
 <details>
-<summary><b>💬 LLM providers</b> — OpenAI · Anthropic · Ollama · Groq · LiteLLM · any compatible endpoint</summary>
+<summary><b>💬 LLM Providers</b>——OpenAI · Anthropic · Ollama · Groq · LiteLLM · 任意兼容端点</summary>
 
-Any endpoint that speaks OpenAI **Chat Completions** (`/v1/chat/completions`), OpenAI **Responses** (`/v1/responses`), or **Anthropic Messages** (`/v1/messages`).
+任何支持 OpenAI **Chat Completions**（`/v1/chat/completions`）、OpenAI **Responses**（`/v1/responses`）或 **Anthropic Messages**（`/v1/messages`）的端点。
 
-Open ⚙ Settings → **LLM Providers**. An empty **LLM 1** slot is reserved for you — fill it in and hit **Save**. Providers live as tabs on one card; add more anytime with the **＋** tab at the end of the tab bar:
+打开 ⚙ 设置 → **LLM Providers**。系统会为你预留一个空的 **LLM 1** 槽位——填入信息后点 **Save**。服务商以标签形式收在一张卡里，随时点标签栏末尾的 **＋** 新建：
 
-| Field | Value |
+| 字段 | 值 |
 |---|---|
-| Alias | a name you choose (e.g. "My OpenAI", "本地模型") — shown in the sidebar dropdown so multiple providers stay distinguishable |
-| Base URL | e.g. `https://api.openai.com` |
-| API Key | your API key |
-| Model ID | Required. Enter a model ID and press **Enter** or **＋** to add it; **✕** removes a model. Comma-separated input adds several at once. Each appears as "Alias · model" in the sidebar dropdown |
-| API | the protocol this endpoint speaks: Chat Completions / Responses / Anthropic |
+| Alias | 你起的名字（例如「My OpenAI」「本地模型」）——显示在侧边栏下拉框中，方便区分多个 provider |
+| Base URL | 例如 `https://api.openai.com` |
+| API Key | 你的 API key |
+| Model ID | **必填**——输入模型 ID 后按 **Enter** 或点 **＋** 添加，点 **✕** 移除；也支持一次输入多个逗号分隔的 ID。侧边栏下拉按「Alias · 模型」逐个选择 |
+| API | 端点使用的协议：Chat Completions / Responses / Anthropic |
 
-Add as many LLM providers as you like; each picks its own protocol and carries its own alias. A single card can also carry several Model IDs — one card covers an entire gateway hosting dozens of models. Use the **✕** on a card to remove it (the built-in agent cards — Hermes, OpenSquilla, OpenCode, Agent Bridge — are fixed and not removable).
+想加多少 LLM provider 都行；每个可各自选择协议并带上自己的 Alias。一张卡也可填多个模型 ID——托管几十个模型的聚合网关一张卡就够。用卡片上的 **✕** 删除（内置的 Hermes / OpenSquilla / OpenCode / Agent Bridge 智能体卡片固定不可删）。
 
 </details>
 
-## What browsa reads
+## browsa 读什么
 
-Click 📎 to attach the current tab — **Auto** mode (clean article text, falling back to DOM tree, then full page text) or **📷 Screenshot** mode (the visible tab, for multimodal models). Attaching a PDF or Office document — or a page that turns out to be one — is automatic; no mode to pick.
+点击 📎 附加当前标签页——**自动**模式（先读出干净正文，失败后回退 DOM 树、再回退全文）或 **📷 截图**模式（当前可见画面，给多模态模型）。附加 PDF 或 Office 文档——或一个其实是这类文件的页面——是自动的，无需单独选模式。
 
-| You're reading | What browsa sends |
+| 你在读 | browsa 发送 |
 |---|---|
-| Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
-| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
-| Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
-| Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
-| GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |
-| Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
-| Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"); long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
-| Selected text | structure preserved — tables, lists and links convert to Markdown on attach, not bare plain text |
+| 文章与文档 | 干净的正文；站点 `llms.txt` 指令一并烘入上下文 |
+| PDF 与论文 | 完整版式——表格、标题、多栏——本机解析；插图区域裁出作为图片发给视觉模型（回答后在历史中压缩为带标签的占位符） |
+| Office 文档（`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…） | 经 docling-wasm 本机转换为 Markdown——标题、列表、表格保持结构 |
+| 视频 / 播客单集 | 带可点击 `[mm:ss]` 时间戳的字幕/转写；无字幕视频自动转写（ASR，可选——设置中填 ASR Key：火山方舟或阿里云百炼）或画面与语音一起精读；小宇宙单集同样一键转写 |
+| GitHub 仓库与文件页 | 文件页直接抓 `raw.githubusercontent.com` 原始源码——markdown 与代码保持结构；仓库页附加结构化元数据（描述、topics、license、星数）加 README 原文，侧栏信息不再被当作导航丢掉 |
+| 飞书 / Lark 文档 | 直接解析页面编辑器的块结构——标题、列表与**表格行列**完整保留 |
+| 乱糟糟的页面 | 观察并直接读页面自身的网络请求——字幕、评论、文章源码（YouTube、Bilibili、小红书等）。小红书笔记连**配图**一起附加（按场景挑最优变体）；知乎回答与专栏读 API **全文**（长答案不被「展开阅读全文」折叠截断）；X 长推文取**全文与配图**（引用的原推内容一并保留）；Reddit 优先读帖子自己的 JSON API，**图集帖子连图一起附加**；B站分P视频按所在分P取字幕，UP主章节一并附带 |
+| 选中的文字 | 保留结构——表格、列表、链接在附加时转成 Markdown，不只是纯文本 |
 
-Highlight text on a page and the **floating toolbar** appears: **Explain** and **Translate** answer inline — a streaming card right next to the selection, no panel needed — while **Ask** and **Summarize** (and the right-click menu) ride into the panel. No need to click 📎.
+划选网页文字会出现**浮动工具栏**：**解释**和**翻译**就地作答——流式卡片展开在选区旁，不用打开侧栏；**提问**和**总结**（以及右键菜单）把选区送进侧栏。不用点 📎。
 
-## Features
+## 功能
 
-The full reference lives here:
+完整清单收在这里：
 
 <details>
-<summary><b>Chat</b> — streaming, thinking blocks, diagrams, follow-up…</summary>
+<summary><b>聊天</b>——流式回复、思考块、图表、追问……</summary>
 
-Switching sessions mid-reply never kills the reply: it keeps running in the background and is saved to the session it started in (marked with a pulsing dot in the drawer until it lands). Stopping a reply yourself keeps whatever already streamed, marked as interrupted — long thinking never evaporates.
+回复进行中切换会话不会杀掉它：回复转入后台继续跑，完成后写回它所属的会话（抽屉里以跳动的圆点标记进行中）。手动停止则保留已流出的部分并标记「已中断」——长时间的思考永不白费。
 
-| Feature | What you get |
+| 功能 | 说明 |
 |---|---|
-| **Streaming replies** | tokens appear as they arrive; click **■** in the composer or press `Esc` to stop |
-| **Think blocks** | `<think>` / `<thinking>` content in a collapsible block, auto-collapsed after streaming |
-| **Markdown & highlighting** | full GFM (tables, code blocks, lists); 40+ languages via highlight.js; `diff` blocks color `+` green / `-` red |
-| **Your code renders too** | paste a ```` ``` ```` fenced block in the composer and your own bubble shows it as a highlighted code block with a copy button; no language tag needed (auto-detected). Everything else in your message stays byte-for-byte as typed — no markdown re-interpretation of your words |
-| **LaTeX** | inline `$...$` and display `$$...$$` via KaTeX — formula-heavy messages offloaded to a Web Worker so the panel doesn't jank |
-| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` code blocks render inline, each with a zoom / copy / export-PNG toolbar; just ask for a chart or mind map — the model knows the format. If a Mermaid block fails to parse, one click sends it back to your model for a fix — the repaired diagram is validated locally before it replaces the broken one |
-| **Molecules · Proteins · Graphs** | ```smiles / ```pdb / ```dot code blocks render live too — 2D structure and reaction diagrams drawn by RDKit with a molecular property line (MW, logP, TPSA, H-bond donors/acceptors; chemically invalid SMILES are rejected with the source kept), interactive protein 3D from a PDB ID or an AlphaFold ID (Mol* viewer: hover any residue for its identity, sequence strip included, AlphaFold models colored by pLDDT confidence), and Graphviz DOT figures (neural-network architectures, dataflow, dependency graphs); each with copy / export controls |
-| **Follow-up ("追问")** | select any text inside a reply to open a scoped side-conversation about just that excerpt, without touching the main history; fully resizable; paste images into the card, same as the main composer; the input's ↑/↓ recalls follow-up questions only; quoted formulas render as math; in video conversations, timestamps generated inside the card are clickable too |
-| **Outline rail** | from 4 turns on, a quiet tick rail tracks the conversation — click to jump, hover to preview |
-| **Edit & resend · Regenerate** | ✏ edits and resends any user message; ⟳ re-runs any assistant reply |
-| **Queued follow-ups** | typing while a reply streams queues your message; it sends automatically once the stream ends |
-| **Error cards** | provider errors classified into plain language (auth / rate-limit / timeout / network / 5xx), raw error expandable and copyable |
-| **Copy & timestamps** | ⎘ copies the full raw Markdown; hover any message to see its send time |
-| **Reply source labels** | every reply is stamped with the provider / agent that produced it (same name as the sidebar dropdown); switching to an agent asks whether to carry the conversation over as its first message or start a new session (sending without choosing continues without context) |
-
-</details>
-
-<details>
-<summary><b>History & sessions</b> — drawers, search, export…</summary>
-
-| Feature | What you get |
-|---|---|
-| **Sessions** | save the conversation as a named session; browse and restore from the 🕐 drawer; pin favorites above the list |
-| **Search everywhere** | `Ctrl+F` across all messages in a conversation; the drawer filters sessions by title **and** message content (content-only hits flagged) |
-| **Export** | any session as a Markdown file |
-| **Safe deletion** | two-step armed delete for sessions; multi-select messages for batch deletion; clearing all messages requires confirmation |
+| **流式回复** | token 逐字出现；点击输入框中的 **■** 或按 `Esc` 停止 |
+| **思考块** | ` thinking` / `<thinking>` 内容显示为可折叠块，流式结束后自动收起 |
+| **Markdown 渲染与高亮** | 完整 GFM（表格、代码块、列表）；40+ 种语言（highlight.js）；`diff` 代码块 `+` 标绿 / `-` 标红 |
+| **你输入的代码也会渲染** | 在输入框贴一段 ``` 围栏代码，你自己的气泡里就是带高亮和复制按钮的代码块；不写语言标签也能自动检测。消息里的其他文字逐字保持原样——你写的内容不会被再解释一遍 |
+| **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿 |
+| **Mermaid · ECharts · Markmap** | ` ```mermaid ` / ` ```echarts ` / ` ```markmap ` 代码块内联渲染，各带缩放/复制/导出 PNG 工具栏；直接说要一张图表或思维导图——模型懂这个格式。Mermaid 解析失败时，一键让 AI 修复重绘——修复后的图先经本地解析校验再替换 |
+| **分子式 · 蛋白质 · 关系图** | ` ```smiles ` / ` ```pdb ` / ` ```dot ` 代码块同样内联实时渲染——2D 结构式与化学反应式由 RDKit 绘制并附分子性质条（分子量、logP、TPSA、氢键供体/受体；化学上不成立的结构直接判废、保留原文），按 PDB ID 或 AlphaFold ID 交互查看蛋白质 3D 结构（Mol* 查看器：悬停即出残基信息、自带序列条、AlphaFold 模型按 pLDDT 置信度着色）、Graphviz DOT 架构图（神经网络、数据流、依赖关系）；各带复制/导出工具栏 |
+| **追问（Follow-up）** | 选中回复中的任意文本，打开仅针对这段摘录的独立侧边对话，不碰主历史；大小可调；可直接粘贴图片，与主输入框一致；输入框 ↑/↓ 只召回追问里发过的问题；引用里的公式照常渲染成公式；视频会话里卡内生成的时间戳同样可点击跳转 |
+| **大纲导航** | 对话满 4 轮后出现刻度导航条——点击跳转、悬停预览 |
+| **编辑并重发 · 重新生成** | ✏ 编辑并重发任意用户消息；⟳ 重新运行任意回复 |
+| **排队追问** | 流式回答期间继续输入会自动排队，回答结束后依次发出 |
+| **错误说明卡** | provider 报错归类成大白话标题（鉴权 / 限流 / 超时 / 网络 / 5xx），原始错误可展开、可复制 |
+| **复制与时间戳** | ⎘ 复制完整原始 Markdown；悬停任意消息查看发送时间 |
+| **回复来源标注** | 每条回复标注生成它的 provider / agent（与侧栏下拉同名）；切换到智能体时会询问：把当前对话作为第一条消息带给它，或新建会话从零开始（直接发送则不带上下文） |
 
 </details>
 
 <details>
-<summary><b>Input</b> — images, drafts, quick actions…</summary>
+<summary><b>历史与会话</b>——抽屉、搜索、导出……</summary>
 
-| Feature | What you get |
+| 功能 | 说明 |
 |---|---|
-| **Image attachments** | drag-and-drop or paste images into the composer (for multimodal models) |
-| **Input history & drafts** | ↑/↓ recalls previously sent messages for editing; ↓ past the newest entry restores your draft; an unsent draft survives closing the panel |
-| **Slash commands** | type `/` for completions — see the table below |
-| **Quick actions** | one-click Summarize / Key Points / Explain / → 中文 / Outline above the composer |
-| **Selection toolbar & context menu** | highlight text on any page: Ask · Explain · Translate · Summarize — Explain / Translate answer inline (streaming, in place); Ask / Summarize and the right-click menu go to the panel |
+| **会话** | 把当前对话保存为命名会话；从 🕐 抽屉浏览和恢复；置顶的会话悬浮在列表上方 |
+| **处处搜索** | `Ctrl+F` 在对话内跨全部消息搜索；抽屉按标题**与**消息内容过滤会话（仅内容命中会有标记） |
+| **导出** | 任意会话导出为 Markdown 文件 |
+| **安全删除** | 会话两步确认删除；消息多选批量删除；清空全部消息前需确认 |
 
 </details>
 
 <details>
-<summary><b>Settings</b> — system prompt, languages, llms.txt, auto-summarize…</summary>
+<summary><b>输入</b>——图片、草稿、快捷操作……</summary>
 
-Everyday settings are shown directly: interface language, providers, system prompt / reply language, and chat preferences. **Advanced** holds options for the selection toolbar, `llms.txt`, deep extraction, and ASR; leave it collapsed if you don't need them. LLM and Agent provider groups also collapse independently — switching agents keeps a collapsed LLM group closed.
-
-| Setting | What it does |
+| 功能 | 说明 |
 |---|---|
-| **System prompt** | prepended to every conversation as `role: system` — set reply language, tone, and format rules here |
-| **Reply language** | force replies in a specific language regardless of page language. Selection actions also follow this preference; in Auto they use the UI language. |
-| **UI language** | English, 中文, 日本語, 한국어, Español, Português, Русский, or Auto (follows the browser) — applies immediately to the panel, floating toolbar and right-click menu, no page reload |
-| **Selection toolbar & llms.txt** | toggle the floating toolbar on text selection; on 📎, the site's LLM instructions are fetched once and baked into the attached page context — kept out of the system prompt so the prompt prefix stays byte-stable across turns (prompt-cache friendly) |
-| **Thinking level** | per-model reasoning depth (`auto` sends nothing; then the model's own ladder — GLM/Qwen-class is an on/off toggle, GPT/Claude-class is low→max effort). The choices follow the model id you filled in, and the request fields adapt to each API dialect (`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`…) automatically |
-| **Reading preferences** | message font size, send shortcut (Enter / Shift+Enter), thinking-block auto-collapse |
-| **Multimodal video understanding** | the provider for subtitle-less videos (Alibaba Cloud Bailian by default; Volcengine Ark also supported): API key, language, hotwords, subtitle source — with a one-click Test-connection button |
-| **Auto-summarize long attachments** | automatic — pages or transcripts over the threshold (default 100,000 chars) are chunked, summarized in parallel, and merged in the background; `[mm:ss]` markers are preserved so seek links keep working; any error fails open to the original text |
-| **Deep extract** | on by default — before attaching, browsa expands collapsed sections and pages through paginated content so far more of the page reaches the model; it all runs quietly in background tabs, never scrolling or clicking the page you are viewing |
+| **图片附件** | 直接把图片拖入或粘贴到输入框（用于多模态模型） |
+| **输入历史与草稿** | ↑/↓ 召回之前发送过的消息并继续编辑；↓ 越过最新一条恢复原草稿；未发送的草稿在面板关闭后仍在 |
+| **斜杠命令** | 输入 `/` 查看补全——见下表 |
+| **快捷操作** | 输入框上方的「总结 / 要点 / 解释 / → 中文 / 大纲」一键按钮 |
+| **浮动工具栏与右键菜单** | 在任意页面划选文字：提问 · 解释 · 翻译 · 总结——解释 / 翻译就地流式作答；提问 / 总结与右键菜单送侧栏 |
 
 </details>
-
-### Slash commands
-
-Type `/` in the composer to see autocomplete. All commands accept extra instructions — `/summarize focus on the methodology`:
-
-| Command | Prompt sent to the model |
-|---|---|
-| `/summarize` | 3–5 bullet summary |
-| `/translate` | Translate to Chinese |
-| `/rewrite` | More concise rewrite, keeping all facts |
-| `/explain` | Explain for a beginner in simple language |
-| `/outline` | Nested outline of headings only |
-| `/keypoints` | Top 5 takeaways |
-| `/prompt` | Show the current active system prompt (not sent to the model) |
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+Shift+H` | Open / close side panel |
-| `Enter` | Send message (configurable in Settings) |
-| `Shift+Enter` | New line |
-| `Ctrl+K` | Clear messages (with confirmation) |
-| `Ctrl+/` | Cycle context mode (Auto ↔ Screenshot) |
-| `Ctrl+F` | Open in-conversation search |
-| `Esc` | Cancel stream / close search / close drawer |
-
-## How it works
 
 <details>
-<summary><b>Code map</b></summary>
+<summary><b>设置</b>——系统提示词、语言、llms.txt、长附件自动总结……</summary>
 
-- **`background.js`** — MV3 service worker, single message router; streaming via per-turn ports, auto-summarize for oversized attachments.
-- **`sidepanel.js`** — chat UI orchestrator; rendering (Markdown/Mermaid/Markmap/KaTeX/ECharts), sessions, search, follow-up each live in `lib/sidepanel/`.
-- **`lib/`** — page extraction (Readability cascade + XHR interception), SSE streaming clients (`/v1/chat/completions`, Hermes `/v1/runs`, the opencode / agent-bridge agent clients), `chrome.storage.local` wrapper, content scripts.
+常用设置直接展示：界面语言、服务商、系统提示词／回复语言和聊天偏好。**高级设置**里放划词工具栏、`llms.txt`、深读和 ASR 等选项；不使用这些功能时无需展开。LLM 与 Agent 服务商也可分别折叠，切换 agent 不会展开已折叠的 LLM 分组。
 
-The [wiki](https://github.com/xiaohuzai/browsa/wiki) expands each of these into a full chapter — Architecture, Rendering Pipeline, Storage Model, Providers and Agents, ASR, Security Model, Design Decisions, Contributing.
+| 设置 | 说明 |
+|---|---|
+| **系统提示词** | 每轮对话以 `role: system` 注入——回复语言、语气与格式规则在这里定 |
+| **回复语言** | 无论页面语言，强制用指定语言回复。划词操作也遵循此偏好；自动模式使用界面语言。 |
+| **界面语言** | 中文 / English / 日本語 / 한국어 / Español / Português / Русский / Auto（跟随浏览器语言）——侧栏、浮动工具栏与右键菜单即时生效，无需刷新网页 |
+| **划词工具栏与 llms.txt** | 开关划选文字时的浮动工具栏；附加页面（📎）时抓取一次 `<origin>/llms.txt`，把站点 LLM 指令烘入页面上下文——放在系统提示词之外，保证提示词前缀跨轮次字节稳定（对 prompt 缓存友好） |
+| **思考档位** | 按模型设置思考深度（`auto` 不发送；其余按模型自带的档位——GLM/Qwen 类是开关档，GPT/Claude 类是低→最高力度梯）。可选项跟着你填的模型 id 自适应，请求字段按各家 API 方言自动适配（`reasoning.effort` / `thinking`+`output_config` / `enable_thinking`……） |
+| **阅读偏好** | 消息字号、发送快捷键（Enter / Shift+Enter）、思考块自动折叠 |
+| **多模态视频理解** | 无字幕视频的转写/精读服务商（默认阿里云百炼，也可用火山方舟）：API Key、语言、热词、字幕来源，支持一键「测试连接」 |
+| **长附件自动总结** | 自动进行——超过阈值（默认 100,000 字符）的页面或字幕会分块、并行总结、后台合并；`[mm:ss]` 标记显式保留，跳转链接继续可用；任何错误都安全失败、静默保留原文 |
+| **深读（Deep extract）** | 默认开启——附加前自动展开折叠区块、翻页抓取后续内容，让更多页面内容进入模型；全程在后台标签页静默进行，不滚动、不点击你正在看的页面 |
 
 </details>
 
-## Browser compatibility
+### 斜杠命令
 
-Chrome / Edge 116+ (primary target); Brave 1.56+ should work (same Chromium surface). Firefox is not supported (no `side_panel` API).
+在输入框输入 `/` 查看自动补全。所有命令都可以跟额外指令——`/summarize focus on the methodology`：
 
-## Security
+| 命令 | 发送给模型的提示词 |
+|---|---|
+| `/summarize` | 3–5 条要点总结 |
+| `/translate` | 翻译成中文 |
+| `/rewrite` | 更简洁的改写，保留全部事实 |
+| `/explain` | 用简单语言向新手解释 |
+| `/outline` | 仅标题的嵌套大纲 |
+| `/keypoints` | 前 5 条要点 |
+| `/prompt` | 显示当前生效的系统提示词（不发送给模型） |
 
-- API keys are stored locally in `chrome.storage.local` and used to authenticate with your configured services. Local storage does not mean the keys are never transmitted.
-- Attached page content, questions, and conversation context are sent to your selected model or agent. Optional transcription / audiovisual analysis also sends media to the configured analysis service.
-- Before page context is sent, browsa masks recognized credentials in URLs (such as token, password, signature, and session parameters). This is not a general-purpose scrubber for sensitive page text. URLs browsa itself fetches (media, images) are untouched.
-- PDFs are parsed locally (WASM + pdf.js); extracted text and figure images can be sent to your configured provider. Local parsing does not mean all extracted content stays on the device.
-- LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources; Mermaid's SVG output is stripped of `<script>` / event-handler attributes).
-- Content scripts only observe network requests; they never modify or block them.
+## 键盘快捷键
 
-## License
+| 快捷键 | 动作 |
+|---|---|
+| `Ctrl+Shift+H` | 打开 / 关闭侧边栏 |
+| `Enter` | 发送消息（可在设置中配置） |
+| `Shift+Enter` | 换行 |
+| `Ctrl+K` | 清空消息（需确认） |
+| `Ctrl+/` | 循环切换上下文模式（自动 ↔ 截图） |
+| `Ctrl+F` | 打开对话内搜索 |
+| `Esc` | 取消流式 / 关闭搜索 / 关闭抽屉 |
 
-[MIT](LICENSE) — free to use, modify, and distribute.
+## 工作原理
+
+<details>
+<summary><b>代码地图</b></summary>
+
+- **`background.js`**——MV3 服务工作线程，单一消息路由器；通过每轮端口流式传输，超大附件自动总结。
+- **`sidepanel.js`**——聊天 UI 编排器；渲染（Markdown/Mermaid/Markmap/KaTeX/ECharts）、会话、搜索、追问各在 `lib/sidepanel/` 下。
+- **`lib/`**——页面提取（Readability 级联 + XHR 拦截）、SSE 流式客户端（`/v1/chat/completions`、Hermes `/v1/runs`、opencode / agent-bridge agent 客户端）、`chrome.storage.local` 封装、内容脚本。
+
+[Wiki](https://github.com/xiaohuzai/browsa/wiki) 把每一行展开成整章——架构总览、渲染管线、存储模型、Provider 层与 Agent 接入、ASR 与视听精读、安全模型、设计决策、参与开发。
+
+</details>
+
+## 浏览器兼容性
+
+Chrome / Edge 116+（主要目标）；Brave 1.56+ 应可运行（相同的 Chromium 内核）。Firefox 不支持（没有 `side_panel` API）。
+
+## 安全
+
+- API Key 保存在本地 `chrome.storage.local`，用于向你配置的服务进行身份验证；本地保存不代表密钥不会通过网络发送。
+- 附加的页面内容、问题和对话上下文会发送给你选择的模型或 agent。可选的语音转写／视听分析也会把媒体发送给配置的分析服务。
+- 页面上下文发送前，browsa 会在本地隐去 URL 中可识别的凭据（如令牌、密码、签名、会话参数）；这不等于对页面正文中的敏感信息进行全面脱敏。browsa 自己要拉取的 URL（媒体、图片）不受影响。
+- PDF 在本地解析（WASM + pdf.js），提取出的文字和图片可以发送给配置的 provider；本地解析不代表所有提取内容都留在设备上。
+- LLM 回复在渲染前用 DOMPurify 净化（拦截 `data:image/svg+xml` 来源；Mermaid 的 SVG 输出会移除 `<script>` / 事件处理器属性）。
+- 内容脚本只观察网络请求，从不修改或阻断它们。
+
+## 交流群
+
+扫码加好友（备注「browsa」），拉你进微信 / 飞书交流群——使用技巧、问题反馈、更新动态都在群里；也欢迎到 [GitHub Discussions](https://github.com/xiaohuzai/browsa/discussions) 发帖讨论。
+
+| 微信（备注「browsa」） | 飞书（备注「browsa」） |
+|:---:|:---:|
+| <img src="docs/assets/community/wechat.png" width="200" alt="微信个人二维码，扫码备注 browsa" /> | <img src="docs/assets/community/feishu.png" width="200" alt="飞书个人二维码，扫码备注 browsa" /> |
+
+## 许可证
+
+[MIT](LICENSE) —— 免费使用、修改与分发。
 
 ---
 
 <p align="center">
-  <sub><b>browsa</b> — read anywhere, ask anywhere.</sub>
+  <sub><b>browsa</b> —— 读到哪里，问到哪里。</sub>
 </p>
