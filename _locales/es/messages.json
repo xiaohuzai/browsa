@@ -671,10 +671,6 @@
     "message": "Tarjeta vacía — configura y guarda",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ Los proveedores de LLM requieren un ID de modelo",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Haciendo Ping…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Separadas por comas o saltos de línea, p. ej.: Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "Obligatorio",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-... (déjelo vacío para endpoints locales)",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "Rellene primero: $1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "No se puede conectar con el endpoint: comprueba la URL y que el servicio esté en ejecución",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "Tiempo de conexión agotado: el servicio no responde",
+    "description": "Options: friendly ping timeout error"
   }
 }

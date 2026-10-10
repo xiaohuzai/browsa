@@ -32,6 +32,11 @@ const ICON_EYE = '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24
 const ICON_EYE_OFF = '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3 3.5M6.4 6.4A19 19 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.6-1.4"/></svg>';
 const ICON_REFRESH = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>';
 
+// 必填标记：只标少数派（Base URL / 模型 ID / 桥地址），未标即选填——
+// ping 缺失时的报错逐字段点名（pingMissingFields），两处措辞由 requiredMarkTitle 兜底。
+const REQ_TITLE = () => _t('requiredMarkTitle', 'Required');
+const reqMark = () => `<span class="req" title="${REQ_TITLE()}" aria-label="${REQ_TITLE()}">*</span>`;
+
 // Template for a freshly-added LLM provider card (user fills in url/key/
 // model/alias and picks the protocol, then hits Save).
 const BLANK_LLM = { type: 'llm', alias: '', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: false, apiStyle: 'chat', temperature: null, maxTokens: 0 };
@@ -676,7 +681,7 @@ function buildProviderCard(name, cfg, opts = {}) {
   const baseUrlField = isAgent && cfg.isBridge
     ? `
       <div class="field field-full">
-        <label><span>Base URL${agentBaseUrlTip}</span>
+        <label><span>Base URL${agentBaseUrlTip}${reqMark()}</span>
           <div class="bridge-endpoints" data-bridge-endpoints>
             ${bridgeEndpointRows(cfg).map(({ url, alias, apiKey, state }) => bridgeRowHtml(url, alias, apiKey, state)).join('')}
             <div class="bridge-actions">
@@ -687,7 +692,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       </div>`
     : `
       <div class="field">
-        <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}</span>` : _t('baseUrlLabel', 'Base URL')}
+        <label>${isAgent ? `<span>Base URL${agentBaseUrlTip}${reqMark()}</span>` : `<span>${_t('baseUrlLabel', 'Base URL')}${reqMark()}</span>`}
           <input data-k="baseUrl" type="text" value="${escapeAttr(cfg.baseUrl)}" placeholder="${isAgent ? agentPlaceholder : ''}" />
         </label>
       </div>`;
@@ -699,7 +704,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       <div class="field">
         <label>${_t('apiKeyLabel', 'API key')}
           <div class="apikey-wrap">
-            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+            <input data-k="apiKey" type="password" value="${escapeAttr(cfg.apiKey || '')}" placeholder="${_t('apiKeyPlaceholder', 'sk-... (leave empty for local endpoints)')}" autocomplete="off" spellcheck="false" />
             <button type="button" class="apikey-toggle" title="${_t('apiKeyToggleTitle', 'Show / hide key')}" aria-label="${_t('apiKeyToggleAria', 'Toggle API key visibility')}">${ICON_EYE}</button>
           </div>
         </label>
@@ -727,7 +732,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${apiKeyField}
       ${showModel ? `
       <div class="field">
-        <label>${_t('modelIdLabel', 'Model ID')}
+        <label><span>${_t('modelIdLabel', 'Model ID')}${reqMark()}</span>
           <div class="model-chips" data-model-chips>
             ${(cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean).map((id) => `
               <span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="${_t('chipRemoveTitle', 'Remove model')}" aria-label="${_t('chipRemoveAria', 'Remove')} ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`).join('')}
@@ -1046,9 +1051,17 @@ async function pingCard(name, card) {
   // flashed) — there is nothing to ping.
   if (!cfg) return;
 
-  // Only LLM providers require a model ID
-  if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) {
-    flashCard(card, 'err', _t('modelRequiredErr', '❌ Model ID is required for LLM providers'));
+  // Preflight gate: name EVERY missing required field in one message instead
+  // of letting each provider layer reject with a bare technical string
+  // (llm-client: "baseUrl is required"). Agent cards only require a Base
+  // URL; LLM cards additionally require a Model ID. Labels resolve through
+  // _t so the message names the fields exactly as the card labels them.
+  const missing = [];
+  if (!(cfg.baseUrl || '').trim()) missing.push(_t('baseUrlLabel', 'Base URL'));
+  if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) missing.push(_t('modelIdLabel', 'Model ID'));
+  if (missing.length) {
+    flashCard(card, 'err', `❌ ${tSub('pingMissingFields', 'Please fill in: $1', missing.join(', '))}`);
+    setBadge(card, 'unreachable', name);
     return;
   }
 
@@ -1142,9 +1155,23 @@ async function pingCard(name, card) {
     }
     setBadge(card, 'reachable', name);
   } catch (e) {
-    flashCard(card, 'err', `❌ ${e.message}`);
+    flashCard(card, 'err', `❌ ${friendlyPingError(e.message)}`);
     setBadge(card, 'unreachable', name);
   }
+}
+
+// Ping 失败文案：浏览器原生的网络错误是英文技术串（Failed to fetch /
+// signal timed out），映射成面向用户的提示；识别不了的原文透传——各协议
+// 自己的错误（审批 401、handshake 失败等）保持可见，不做有损改写。
+function friendlyPingError(msg) {
+  const m = String(msg || '');
+  if (/Failed to fetch|NetworkError|Load failed|fetch failed/i.test(m)) {
+    return _t('pingNetErr', "Can't reach the endpoint — check the URL and that the service is running");
+  }
+  if (/timed?[\s-]?out|TimeoutError/i.test(m)) {
+    return _t('pingTimeoutErr', 'Connection timed out — the service is not responding');
+  }
+  return m;
 }
 
 function setBadge(card, state, name) {
