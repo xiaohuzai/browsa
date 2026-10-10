@@ -6,7 +6,8 @@
   <a href="https://chromewebstore.google.com/detail/browsa/kghjmmajnpbkljankbbjbmnhfdocaeho"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-%E5%AE%89%E8%A3%85-4285F4?style=flat-square&logo=googlechrome&logoColor=white" alt="从 Chrome 应用商店安装" /></a>&nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-14171f?style=flat-square" alt="MIT License" /></a>&nbsp;
   <a href="#安装"><img src="https://img.shields.io/badge/Chrome%20%7C%20Edge-116%2B-c2410c?style=flat-square" alt="Chrome / Edge 116+" /></a>&nbsp;
-  <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>
+  <a href="https://github.com/xiaohuzai/browsa/pulls"><img src="https://img.shields.io/badge/PRs-welcome-926c0d?style=flat-square" alt="PRs welcome" /></a>&nbsp;
+  <a href="https://github.com/xiaohuzai/browsa/discussions"><img src="https://img.shields.io/badge/Discussions-%E4%BA%A4%E6%B5%81%E7%A4%BE%E5%8C%BA-8250df?style=flat-square&logo=github" alt="GitHub Discussions" /></a>
 </p>
 
 <p align="center">
@@ -401,6 +402,14 @@ Chrome / Edge 116+（主要目标）；Brave 1.56+ 应可运行（相同的 Chro
 - PDF 在本地解析（WASM + pdf.js），提取出的文字和图片可以发送给配置的 provider；本地解析不代表所有提取内容都留在设备上。
 - LLM 回复在渲染前用 DOMPurify 净化（拦截 `data:image/svg+xml` 来源；Mermaid 的 SVG 输出会移除 `<script>` / 事件处理器属性）。
 - 内容脚本只观察网络请求，从不修改或阻断它们。
+
+## 交流群
+
+扫码加好友（备注「browsa」），拉你进微信 / 飞书交流群——使用技巧、问题反馈、更新动态都在群里；也欢迎到 [GitHub Discussions](https://github.com/xiaohuzai/browsa/discussions) 发帖讨论。
+
+| 微信（备注「browsa」） | 飞书（备注「browsa」） |
+|:---:|:---:|
+| <img src="docs/assets/community/wechat.png" width="200" alt="微信个人二维码，扫码备注 browsa" /> | <img src="docs/assets/community/feishu.png" width="200" alt="飞书个人二维码，扫码备注 browsa" /> |
 
 ## 许可证
 
