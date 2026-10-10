@@ -671,10 +671,6 @@
     "message": "빈 슬롯 — 구성 후 저장",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ LLM 프로바이더에는 모델 ID가 필요합니다",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Ping 중…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Separated by commas or line breaks, e.g.: Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "필수",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-...(로컬 엔드포인트는 비워 두세요)",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "먼저 입력하세요: $1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "엔드포인트에 연결할 수 없습니다——URL과 서비스 실행 여부를 확인하세요",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "연결 시간 초과——서비스가 응답하지 않습니다",
+    "description": "Options: friendly ping timeout error"
   }
 }

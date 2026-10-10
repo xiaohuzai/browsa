@@ -334,6 +334,15 @@ details.provider-group[open] > .provider-group-header::before {
 .provider-badge.reachable    { background: var(--ok-bg); color: var(--ok); }
 .provider-badge.unreachable  { background: var(--err-bg); color: var(--err); }
 
+/* 必填星号：只出现在必填字段（Base URL / 模型 ID），未标即选填；与标签文字
+ * 同包一个 span（.field label 是 flex-column，裸 span 会折成单独一行） */
+.req {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 3px;
+  user-select: none;
+}
+
 /* ── Form rows ───────────────────────────────────────────────────────────── */
 .row {
   display: flex;

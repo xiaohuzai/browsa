@@ -671,10 +671,6 @@
     "message": "Espaço vazio — configure e salve",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ O ID do modelo é obrigatório para provedores de LLM",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Executando ping…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Separadas por vírgulas ou quebras de linha, ex.: Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "Obrigatório",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-... (deixe vazio para endpoints locais)",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "Preencha primeiro: $1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "Não foi possível conectar ao endpoint: confira a URL e se o serviço está em execução",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "Tempo de conexão esgotado: o serviço não responde",
+    "description": "Options: friendly ping timeout error"
   }
 }

@@ -671,10 +671,6 @@
     "message": "Пустой слот — заполните и сохраните",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ Для LLM-провайдеров требуется ID модели",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Ping…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Через запятую или с новой строки, напр.: Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "Обязательное поле",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-... (можно оставить пустым для локальных endpoint)",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "Сначала заполните: $1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "Не удаётся подключиться к endpoint — проверьте адрес и что служба запущена",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "Истекло время ожидания — служба не отвечает",
+    "description": "Options: friendly ping timeout error"
   }
 }

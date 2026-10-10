@@ -485,7 +485,55 @@ test('options.js: pinging an LLM provider with no Model ID set is rejected befor
   await new Promise((r) => setTimeout(r, 20));
 
   assert.equal(fetchCalled, false, 'must not ping when an LLM provider has no Model ID');
-  assert.match(card.querySelector('.card-status').textContent, /Model ID is required/);
+  assert.match(card.querySelector('.card-status').textContent, /Please fill in: Model ID/);
+});
+
+test('options.js: ping preflight names EVERY missing required field at once (Base URL + Model ID)', async () => {
+  const card = await addLlmCard();
+  card.querySelector('[data-k="baseUrl"]').value = '';
+  card.querySelector('[data-k="model"]').value = '';
+  let fetchCalled = false;
+  globalThis.fetch = async () => { fetchCalled = true; return { ok: true }; };
+
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(fetchCalled, false, 'must not ping when required fields are empty');
+  assert.match(
+    card.querySelector('.card-status').textContent,
+    /Please fill in: Base URL, Model ID/,
+    'both missing fields must be named in one message'
+  );
+});
+
+test('options.js: ping preflight names the Base URL alone for agent providers (no model requirement)', async () => {
+  const card = findProviderCard('Hermes Agent');
+  card.querySelector('[data-k="baseUrl"]').value = '';
+  let fetchCalled = false;
+  globalThis.fetch = async () => { fetchCalled = true; return { ok: true }; };
+
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(fetchCalled, false, 'must not ping when the agent Base URL is empty');
+  assert.match(card.querySelector('.card-status').textContent, /Please fill in: Base URL/);
+  assert.doesNotMatch(card.querySelector('.card-status').textContent, /Model ID/, 'agents never require a Model ID');
+});
+
+test('options.js: required-field markers render on LLM Base URL + Model ID and the API Key placeholder hints optionality', async () => {
+  const card = await addLlmCard();
+  const labels = [...card.querySelectorAll('.fields > .field > label')].map((l) => l.textContent);
+  const baseUrlLabel = labels.find((t) => t.includes('Base URL'));
+  const modelLabel = labels.find((t) => t.includes('Model ID'));
+  const aliasLabel = labels.find((t) => t.includes('Alias'));
+  assert.ok(baseUrlLabel.includes('*'), 'Base URL must carry the required marker');
+  assert.ok(modelLabel.includes('*'), 'Model ID must carry the required marker');
+  assert.ok(aliasLabel && !aliasLabel.includes('*'), 'Alias is optional — no marker');
+  const apiKeyInput = card.querySelector('[data-k="apiKey"]');
+  assert.match(apiKeyInput.placeholder, /leave empty for local endpoints/);
+  const reqEls = [...card.querySelectorAll('.req')];
+  assert.equal(reqEls.length, 2, 'exactly two required markers on an LLM card');
+  assert.ok(reqEls.every((el) => el.getAttribute('title') === 'Required'), 'markers carry an accessible title');
 });
 
 test('options.js: pinging an agent provider (Hermes) with no model set proceeds anyway (no Model ID requirement)', async () => {

@@ -671,10 +671,6 @@
     "message": "空きスロット — 設定して保存",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ LLM プロバイダにはモデル ID が必要です",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Ping 中…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Separated by commas or line breaks, e.g.: Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "必須",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-...（ローカルエンドポイントは空欄可）",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "先に入力してください：$1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "エンドポイントに接続できません——URL とサービスの起動を確認してください",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "接続がタイムアウトしました——サービスが応答していません",
+    "description": "Options: friendly ping timeout error"
   }
 }

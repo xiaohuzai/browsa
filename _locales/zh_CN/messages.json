@@ -671,10 +671,6 @@
     "message": "空卡——填写并保存",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ LLM 服务商必须填模型 ID",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Ping 中…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "逗号或换行分隔，如：英博博士, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "必填",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-...（本地端点可留空）",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "请先填写：$1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "连不上端点——确认地址正确且服务正在运行",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "连接超时——服务没有响应",
+    "description": "Options: friendly ping timeout error"
   }
 }

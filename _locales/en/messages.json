@@ -671,10 +671,6 @@
     "message": "Empty slot — configure and Save",
     "description": "Options: reserved slot status"
   },
-  "modelRequiredErr": {
-    "message": "❌ Model ID is required for LLM providers",
-    "description": "Options: model required error"
-  },
   "pingingFlash": {
     "message": "Pinging…",
     "description": "Options: pinging status"
@@ -1707,5 +1703,25 @@
   "asrHotwordsPlaceholder": {
     "message": "Comma- or newline-separated, e.g. Dr. Yingbo, OpenViking, browsa",
     "description": "Options: ASR hotwords placeholder"
+  },
+  "requiredMarkTitle": {
+    "message": "Required",
+    "description": "Options: required-field marker title"
+  },
+  "apiKeyPlaceholder": {
+    "message": "sk-... (leave empty for local endpoints)",
+    "description": "Options: API key placeholder (conditional requirement hint)"
+  },
+  "pingMissingFields": {
+    "message": "Please fill in: $1",
+    "description": "Options: ping preflight — lists missing required fields"
+  },
+  "pingNetErr": {
+    "message": "Can't reach the endpoint — check the URL and that the service is running",
+    "description": "Options: friendly ping network error"
+  },
+  "pingTimeoutErr": {
+    "message": "Connection timed out — the service is not responding",
+    "description": "Options: friendly ping timeout error"
   }
 }
