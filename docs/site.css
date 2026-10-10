@@ -800,3 +800,13 @@ html[data-md-color-scheme="slate"] .pb-idle{color:#d4a72c;background:rgba(212,16
 .demo-video figcaption{
   margin-top:12px;text-align:center;font-size:12px;color:var(--md-fg-light);line-height:1.7;
 }
+
+/* ── 社区交流群（README/官网同款双码）──────────────────────────────── */
+.community-qr{display:flex;justify-content:center;gap:56px;margin-top:8px}
+.community-qr figure{margin:0;text-align:center}
+.community-qr img{
+  width:190px;height:190px;display:block;padding:10px;box-sizing:content-box;
+  border-radius:14px;background:#fff;
+  border:1px solid var(--md-fg-lightest);
+}
+.community-qr figcaption{margin-top:10px;font-size:12.5px;color:var(--md-fg-light)}
