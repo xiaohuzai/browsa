@@ -209,9 +209,25 @@ test('synthesizeTwitterResult: photo URLs render as [图N] lines, fetched bytes 
   }, fakeMeta('https://x.com/a/status/1'));
   assert.ok(withBytes.text.includes('**配图**: 1 张（图片数据已随消息附上）'));
   assert.ok(!withBytes.text.includes('pbs.twimg.com'), 'URL list suppressed when bytes ride along');
+  assert.deepEqual(withBytes.imageBase64List, ['data:image/jpeg;base64,xxx'], 'bytes survive synthesis → ATTACH_PAGE siteImageBytes conversion');
+  assert.deepEqual(urlOnly.imageBase64List, [], 'URL-only path carries no byte list');
 
   const plain = synthesizeTwitterResult({ author: 'A', screenName: 'a', text: 'no photos' }, fakeMeta('https://x.com/a/status/1'));
   assert.ok(!plain.text.includes('配图'));
+});
+
+test('synthesizeRedditResult: gallery bytes ride the result as imageBase64List (URL-only stays list-only)', () => {
+  const withBytes = synthesizeRedditResult({
+    post: { title: 'T', subreddit: 'r/x', images: [{ url: 'https://i.redd.it/a.jpg' }] },
+    imageBase64List: ['data:image/jpeg;base64,yyy'],
+  }, fakeMeta('https://www.reddit.com/r/x/comments/1/t/'));
+  assert.ok(withBytes.text.includes('**配图**: 1 张（图片数据已随消息附上）'));
+  assert.deepEqual(withBytes.imageBase64List, ['data:image/jpeg;base64,yyy']);
+
+  const urlOnly = synthesizeRedditResult({
+    post: { title: 'T', images: [{ url: 'https://i.redd.it/a.jpg' }] },
+  }, fakeMeta('https://www.reddit.com/r/x/comments/1/t/'));
+  assert.deepEqual(urlOnly.imageBase64List, []);
 });
 
 test('synthesizeZhihuResult: single-answer shape (active fallback) renders question as heading with author/text/stats', () => {

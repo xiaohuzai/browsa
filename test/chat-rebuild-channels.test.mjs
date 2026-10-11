@@ -910,3 +910,112 @@ test('long legacy Squilla history uses document upload instead of exceeding the 
     assert.equal(turn.squillaAttachments[0].file_uuid, 'history-doc');
   } finally { globalThis.fetch = previousFetch; }
 });
+
+// =============================================================================
+// Channel 0: attach-entry image parts must reach the wire (2026-10-11 floor).
+//
+// The severed-wire incident: site byte-images (小红书/推特/Reddit 的
+// ctx.imageBase64List) were fetched in the page MAIN world since v0.20.0, but
+// the request-side outlet died in v0.21.0 when assembly moved to history
+// rebuilds — buildMessages' pageContext vision branch still claimed to be the
+// XHS path while every call site passed null. Four months of text-only XHS
+// attaches. These tests pin the STORAGE→WIRE half of the chain: an entry in
+// the exact shape ATTACH_PAGE stores (interleaveImageParts no-anchor shape —
+// the storage half is pinned by test/attach-site-images.test.mjs through the
+// real handle()) must surface its pixels in EVERY stateless provider's request
+// body. If a refactor reroutes request assembly again, these go red.
+// =============================================================================
+
+const { interleaveImageParts, buildPageContextText } = await import('../lib/message-builder.js');
+
+const SITE_D1 = 'data:image/jpeg;base64,AAAA1111';
+const SITE_D2 = 'data:image/jpeg;base64,BBBB2222';
+
+// The exact shape ATTACH_PAGE's contentFrom produces for site byte-images
+// (buildPageContextText → interleaveImageParts, no [图N] anchors → [text, ...images]).
+function siteImageAttachEntry() {
+  const ctx = {
+    meta: { url: 'https://www.xiaohongshu.com/explore/abc', title: '苏州两日行程', favIconUrl: '' },
+    mode: 'xiaohongshu',
+    text: '# 苏州两日行程\n\n这份攻略包含了完整的路线图和预算表，都在图片里。\n\n👍 100  ·  🖼 2 图',
+    truncated: { rawTextLength: 60, textLength: 60, wasCapped: false },
+  };
+  return {
+    role: 'user',
+    attachId: 'site-image-attach',
+    content: interleaveImageParts(buildPageContextText(ctx), [SITE_D1, SITE_D2]),
+  };
+}
+
+const countImageParts = (content, type) => (Array.isArray(content) ? content : [])
+  .filter((p) => p?.type === type).length;
+
+test('site-image attach entry: /chat/completions body carries the image_url parts', async () => {
+  await seedProvider(CHAT_PROVIDER);
+  await localArea.set({ history: [siteImageAttachEntry()] });
+  const { calls, restore } = installFetch(() => chatLeg({ text: '图里是苏州行程' }));
+  const cap = captureChunks(60);
+  try {
+    const result = await handleChat({ tabId: 60, userText: '图片里有什么？' }, HINTS, '');
+    assert.ok(result.full);
+    const attach = calls[0].body.messages.find((m) => Array.isArray(m.content)
+      && m.content.some((p) => p?.type === 'text' && p.text.startsWith(PAGE_CONTEXT_PREFIX)));
+    assert.ok(attach, 'attach entry must ride the request');
+    assert.match(textOf(attach), /苏州两日行程/, 'attach text rides with the images');
+    assert.equal(countImageParts(attach.content, 'image_url'), 2, 'both image parts must reach the wire');
+    assert.ok(JSON.stringify(calls[0].body).includes(SITE_D1) && JSON.stringify(calls[0].body).includes(SITE_D2));
+  } finally { cap.release(); restore(); }
+});
+
+test('site-image attach entry: /v1/responses input carries input_image parts', async () => {
+  await seedProvider(RESPONSES_PROVIDER);
+  await localArea.set({ history: [siteImageAttachEntry()] });
+  const { calls, restore } = installFetch(() => responsesLeg({ text: 'ok' }));
+  const cap = captureChunks(61);
+  try {
+    await handleChat({ tabId: 61, userText: '图片里有什么？' }, HINTS, '');
+    const body = calls[0].body;
+    const attach = body.input.find((m) => Array.isArray(m.content)
+      && m.content.some((p) => p?.type === 'input_text' && p.text.startsWith(PAGE_CONTEXT_PREFIX)));
+    assert.ok(attach, 'attach entry must ride the responses input');
+    assert.equal(countImageParts(attach.content, 'input_image'), 2, 'pixels must convert to input_image');
+    assert.deepEqual(
+      attach.content.filter((p) => p?.type === 'input_image').map((p) => p.image_url),
+      [SITE_D1, SITE_D2]);
+  } finally { cap.release(); restore(); }
+});
+
+test('site-image attach entry: /v1/messages body carries anthropic image blocks', async () => {
+  await seedProvider(ANTHROPIC_PROVIDER);
+  await localArea.set({ history: [siteImageAttachEntry()] });
+  const { calls, restore } = installFetch(() => anthropicLeg({ text: 'ok' }));
+  const cap = captureChunks(62);
+  try {
+    await handleChat({ tabId: 62, userText: '图片里有什么？' }, HINTS, '');
+    const body = calls[0].body;
+    const attach = body.messages.find((m) => Array.isArray(m.content)
+      && m.content.some((p) => p?.type === 'text' && p.text.startsWith(PAGE_CONTEXT_PREFIX)));
+    assert.ok(attach, 'attach entry must ride the anthropic messages');
+    assert.equal(countImageParts(attach.content, 'image'), 2, 'pixels must convert to base64 image blocks');
+    assert.ok(attach.content.every((p) => p?.type !== 'image'
+      || (p.source?.type === 'base64' && p.source.data?.length > 0)));
+  } finally { cap.release(); restore(); }
+});
+
+test('site-image attach entry: hermes /v1/runs history flattens pixels to [image] markers (never base64 in strings)', async () => {
+  await seedProvider(HERMES_PROVIDER);
+  await localArea.set({ history: [siteImageAttachEntry()] });
+  const { calls, restore } = installFetch((call) => (
+    call.method === 'POST' ? hermesRunCreated('run_site') : hermesEventsLeg({ text: 'ok' })
+  ));
+  const cap = captureChunks(63);
+  try {
+    await handleChat({ tabId: 63, userText: '图片里有什么？' }, HINTS, '');
+    const body = calls.find((c) => c.method === 'POST').body;
+    const attach = (body.conversation_history || []).find((m) => (m.content || '').startsWith(PAGE_CONTEXT_PREFIX));
+    assert.ok(attach, 'attach entry must ride conversation_history');
+    assert.match(attach.content, /\[image\]/, 'images flatten to [image] markers (runs str() contract)');
+    assert.match(attach.content, /苏州两日行程/);
+    assert.ok(!JSON.stringify(body).includes('base64,'), 'no pixel bytes may leak into the runs string history');
+  } finally { cap.release(); restore(); }
+});

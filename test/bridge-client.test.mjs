@@ -214,22 +214,22 @@ test('respondBridgeApproval: POST /approvals/:id with the choice', async () => {
 
 // ─── image forwarding (wire v1: /turns {text, sessionId?, images?}) ──────────
 
-test('bridgeStream: images ride in the POST body; junk filtered; >8 sliced; omitted when empty', async () => {
+test('bridgeStream: images ride in the POST body; junk filtered; wire-bound sliced; omitted when empty', async () => {
   const streamOk = () => sseResponse(['data: {"type":"done","full":"ok"}\n\n']);
   const IMG = (n) => `data:image/png;base64,${n}`;
   const capture = () => captureFetch(() => streamOk());
 
-  // happy path: https + data URLs pass, junk dropped, cap 8 applied
+  // happy path: https + data URLs pass, junk dropped, wire bound (18, AGENT_TURN_MAX_IMAGES) applied
   let calls = capture();
   await bridgeStream({
     baseUrl: 'http://127.0.0.1:3948', text: 'q',
     images: [
       IMG('A'), 'https://example.com/x.jpg', 'not-a-url', '', 42,
-      IMG('1'), IMG('2'), IMG('3'), IMG('4'), IMG('5'), IMG('6'), IMG('7'), IMG('8'), IMG('9'),
+      ...Array.from({ length: 20 }, (_, i) => IMG(i)),
     ],
   });
   let body = JSON.parse(calls[0].opts.body);
-  assert.equal(body.images.length, 8); // 2 valid + first 6 of the overflow batch
+  assert.equal(body.images.length, 18); // 2 valid + first 16 of the overflow batch
   assert.deepEqual(body.images.slice(0, 2), [IMG('A'), 'https://example.com/x.jpg']);
   assert.ok(!body.images.includes('not-a-url'));
 
@@ -272,4 +272,41 @@ test('renameBridgeSession: transport failure → status 0 (caller retries next t
   await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: '', title: 'x' });
   await renameBridgeSession({ baseUrl: 'http://127.0.0.1:3948', sessionId: 't', title: '' });
   assert.equal(calls.length, 0, 'no fetch without sessionId AND title');
+});
+
+// ── 老桥降级重试（agent-bridge <0.8.0 对 >8 张图整轮 400）────────────────────
+
+test('bridgeStream: >8 images against an OLD bridge (≤8 bound) → one fallback retry with first 8 + a text note', async () => {
+  const calls = captureFetch((url, opts, cs) => {
+    if (cs.length === 1) {
+      return new Response(JSON.stringify({ ok: false, error: 'images must be an array of ≤8 URL strings' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    return sseResponse([
+      'data: {"type":"start","sessionId":"th","turnId":"t1"}\n\n',
+      'data: {"type":"done","full":"收到8张"}\n\n',
+    ]);
+  });
+  const imgs = Array.from({ length: 12 }, (_, i) => `data:image/jpeg;base64,IMG${String(i).padStart(2, '0')}`);
+  const r = await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: '看图', images: imgs });
+  assert.equal(calls.length, 2, '恰好一次重试');
+  const first = JSON.parse(calls[0].opts.body);
+  assert.equal(first.images.length, 12, '首轮按新上限全量发送');
+  const second = JSON.parse(calls[1].opts.body);
+  assert.equal(second.images.length, 8, '重试只送前 8 张');
+  assert.deepEqual(second.images, imgs.slice(0, 8));
+  assert.match(second.text, /agent-bridge 版本较旧/, ' shortfall 以模型可见注记随行');
+  assert.match(second.text, /其余 4 张未随行/);
+  assert.equal(r.full, '收到8张');
+});
+
+test('bridgeStream: 400 without the images-bound message does NOT retry (genuine error surfaces)', async () => {
+  const calls = captureFetch(() => new Response(JSON.stringify({ ok: false, error: 'text required' }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }));
+  const imgs = Array.from({ length: 12 }, (_, i) => `data:image/jpeg;base64,IMG${i}`);
+  await assert.rejects(
+    bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: '看图', images: imgs }),
+    /bridge \/turns → 400/
+  );
+  assert.equal(calls.length, 1, '非图片上限的 400 不重试');
 });
