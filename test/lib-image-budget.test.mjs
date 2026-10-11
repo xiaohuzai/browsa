@@ -18,6 +18,7 @@ import {
   imageRejectReason,
   pickTurnImages,
   isAgentImageUrl,
+  capFetchedImages,
 } from '../lib/image-budget.js';
 
 // Small data-URL-shaped strings — never real images, and never tens of MB:
@@ -85,4 +86,32 @@ test('the composer enforces the gate at attach time (paste / drop / picker all f
     assert.ok(en[key]?.message, `_locales/en must define ${key}`);
     assert.ok(zh[key]?.message, `_locales/zh_CN must define ${key}`);
   }
+});
+
+// ── capFetchedImages（站点字节图：预算上限，非张数）──────────────────────────
+
+test('capFetchedImages — keeps everything under budget, reports dropped=0', () => {
+  const { images, dropped } = capFetchedImages(['data:image/jpeg;base64,AA', 'data:image/jpeg;base64,BB']);
+  assert.deepEqual(images, ['data:image/jpeg;base64,AA', 'data:image/jpeg;base64,BB']);
+  assert.equal(dropped, 0);
+});
+
+test('capFetchedImages — budget overflow skips the oversized, later smaller fills leftover (first-fit)', () => {
+  const big = 'data:image/jpeg;base64,' + 'A'.repeat(77);   // 100 chars
+  const mid = 'data:image/jpeg;base64,' + 'B'.repeat(77);    // 100 chars
+  const small = 'data:image/jpeg;base64,' + 'C'.repeat(10);  // 33 chars
+  // budget 160: big(100) fits; mid would make 200 > 160 → skipped; small fills (133)
+  const { images, dropped } = capFetchedImages([big, mid, small], { budgetChars: 160 });
+  assert.deepEqual(images, [big, small]);
+  assert.equal(dropped, 1);
+});
+
+test('capFetchedImages — count cap 18 (XHS platform maximum), junk dropped', () => {
+  const list = Array.from({ length: 20 }, (_, i) => `data:image/jpeg;base64,${i}`);
+  const { images, dropped } = capFetchedImages(list);
+  assert.equal(images.length, 18);
+  assert.equal(dropped, 2);
+  const { images: cleaned, dropped: junk } = capFetchedImages([null, undefined, 'ok', 42]);
+  assert.deepEqual(cleaned, ['ok']);
+  assert.equal(junk, 3);
 });

@@ -200,7 +200,7 @@ agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 5. 完成后只报告最终的桥地址（http://127.0.0.1:端口），我会把它填进 browsa 设置页的 Agent Bridge 卡并点 Ping。
 
 任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。</pre>
-      <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤8 张）。四点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址；pi 的内置工具自动执行、通常不弹审批卡，也不上报 token 用量；workbuddy 的对话存在 WorkBuddy 应用内存里，重启应用后下一轮自动开新会话（browsa 侧历史不受影响）。</p>
+      <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤18 张，需 agent-bridge ≥0.8.0，旧版桥自动降级为前 8 张并在消息里注明）。四点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址；pi 的内置工具自动执行、通常不弹审批卡，也不上报 token 用量；workbuddy 的对话存在 WorkBuddy 应用内存里，重启应用后下一轮自动开新会话（browsa 侧历史不受影响）。</p>
 
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>

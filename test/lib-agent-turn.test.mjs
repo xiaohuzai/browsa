@@ -35,11 +35,11 @@ test('pickTurnImages — keeps https and data:image URLs, drops junk with a coun
   assert.equal(dropped, 5);
 });
 
-test('pickTurnImages — hard cap 8', () => {
-  const many = Array.from({ length: 12 }, (_, i) => IMG(i));
+test(`pickTurnImages — hard cap AGENT_TURN_MAX_IMAGES (${AGENT_TURN_MAX_IMAGES})`, () => {
+  const many = Array.from({ length: 20 }, (_, i) => IMG(i));
   const { images, dropped } = pickTurnImages(many);
   assert.equal(images.length, AGENT_TURN_MAX_IMAGES);
-  assert.equal(dropped, 12 - AGENT_TURN_MAX_IMAGES);
+  assert.equal(dropped, 20 - AGENT_TURN_MAX_IMAGES);
   assert.deepEqual(images, many.slice(0, AGENT_TURN_MAX_IMAGES));
 });
 

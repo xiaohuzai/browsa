@@ -19,6 +19,8 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
 import { makeSidepanelChromeMock, wireSendMessage } from './helpers/chrome-mock.mjs';
+import { AGENT_TURN_IMAGE_BUDGET_CHARS, AGENT_TURN_MAX_IMAGES } from '../lib/image-budget.js';
+import { IMAGE_BUDGET_MB } from '../lib/sidepanel/image-drop.js';
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -76,9 +78,10 @@ test('an image that fits is attached and shows a thumbnail', async () => {
 });
 
 test('an over-budget image is refused at attach time, with a visible one-line notice', async () => {
-  // 3 MB of bytes → ~4 MB as a data URL, past the 3 MB-of-chars per-message
-  // budget (≈2.25 MB of image bytes).
-  pasteFiles([makeFile(3 * 1024 * 1024, 'screenshot-4k.png')]);
+  // 0.85 × char-budget of bytes → ~1.13 × budget as a data URL (base64 is
+  // 4/3 of the bytes) — past the per-message budget, whatever it is set to
+  // (sized from the constant so the test follows it automatically).
+  pasteFiles([makeFile(Math.ceil(AGENT_TURN_IMAGE_BUDGET_CHARS * 0.85), 'screenshot-4k.png')]);
   await settle();
 
   assert.equal(previews().length, 1, 'the over-budget image must NOT be attached (the first one stays)');
@@ -87,22 +90,24 @@ test('an over-budget image is refused at attach time, with a visible one-line no
   assert.equal(notice.classList.contains('has-detail'), false,
     'a local refusal stays a one-line ⚠ notice — not the provider-failure card ("Something went wrong" + Raw error + Copy)');
   assert.match(notice.textContent, /screenshot-4k\.png/, 'the notice must name the file');
-  assert.match(notice.textContent, /2\.2 MB/, 'and state the real per-message limit (floored, never overstated)');
+  assert.match(notice.textContent, new RegExp(`${IMAGE_BUDGET_MB.replace('.', '\.')} MB`), 'and state the real per-message limit (floored, never overstated)');
   assert.equal(document.getElementById('status-dot')?.dataset.state, 'error', 'the status dot still flags a refused attachment');
 });
 
 test('the per-message image count cap is enforced the same way', async () => {
-  // 1 preview is already attached; fill up to the cap, then one more.
-  for (let i = 0; i < 7; i++) pasteFiles([makeFile(1024, `pad-${i}.png`)]);
+  // Fill up to the cap (earlier tests in this file may have left previews
+  // attached — the DOM is shared), then one more.
+  const need = AGENT_TURN_MAX_IMAGES - previews().length;
+  for (let i = 0; i < need; i++) pasteFiles([makeFile(1024, `pad-${i}.png`)]);
   await settle();
-  assert.equal(previews().length, 8, 'eight small images fit');
+  assert.equal(previews().length, AGENT_TURN_MAX_IMAGES, `${AGENT_TURN_MAX_IMAGES} small images fit`);
 
   const before = notices().length;
-  pasteFiles([makeFile(1024, 'ninth.png')]);
+  pasteFiles([makeFile(1024, 'one-over.png')]);
   await settle();
-  assert.equal(previews().length, 8, 'the ninth image must NOT be attached');
+  assert.equal(previews().length, AGENT_TURN_MAX_IMAGES, 'the over-cap image must NOT be attached');
   const all = notices();
   assert.equal(all.length, before + 1, 'the refusal must be visible');
-  assert.match(all[all.length - 1].textContent, /ninth\.png/);
+  assert.match(all[all.length - 1].textContent, /one-over\.png/);
   assert.equal(all[all.length - 1].classList.contains('has-detail'), false, 'count refusals are one-liners too');
 });

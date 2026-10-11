@@ -563,6 +563,11 @@ async function handle(msg, sender) {
     }
 
     case 'GET_XHS_NOTE': {
+      // No production sender (the panel's XHS probe reads GET_PAGE_CONTEXT
+      // since the 2026-10-01 relay fix) — this case stays as the test
+      // seam that observes what pushXhsNote cached, including the
+      // security pin "tabId comes from sender.tab.id, never msg.tabId"
+      // (background-handler.test.mjs).
       const t = msg.tabId;
       return { note: xhsXhrCache.get(t) || null };
     }
@@ -771,7 +776,11 @@ async function handle(msg, sender) {
               const md = String(res?.result || '').trim();
               if (md && md.length >= cachedText.length * 0.5) {
                 ctx.text = md;
-                ctx.selectedFormat = 'markdown';
+                // `format` is the channel buildPageContextText renders into the
+                // header ("Mode: selected | markdown" — model-facing provenance
+                // that the text is structured Markdown). The old `selectedFormat`
+                // stamp had zero consumers (2026-10-11 audit).
+                ctx.format = 'markdown';
               }
             } catch (_) { /* fail-open: plain text stands */ }
           }
@@ -956,6 +965,14 @@ async function handle(msg, sender) {
         // stamped on every entry; summarize kick; image-byte bounding).
         // lib/handlers/attach-store.js — candidate #2 of the architecture review.
         const pageFigures = Array.isArray(ctx.pageFigures) ? ctx.pageFigures : [];
+        // 站点字节图（小红书/推特/Reddit：MAIN world 取到的 base64 随
+        // ctx.imageBase64List 带回）。这些合成文本只带张数（「🖼 N 图」/
+        // 「**配图**: N 张」），没有 [图N] 文内锚点 → interleaveImageParts
+        // 落成 [text, ...images] 形状（PDF 无位置信息的同款兜底）。图片由此
+        // 随 attach 条目入库并发往多模态 provider——v0.21.0 把请求重建搬到
+        // history 条目后，buildMessages 的 pageContext 分支成了死路，这些
+        // 字节一直被丢在落库之外（2026-10-11 用户报告小红书只有文字后修复）。
+        const siteImageBytes = Array.isArray(ctx.imageBase64List) ? ctx.imageBase64List.filter(Boolean) : [];
         // Very long attachments (e.g. a 4-5 hour video's transcript) get
         // resent in FULL on every subsequent turn — the one-time chunk/
         // summarize/merge pass here is cheaper than paying that cost on every
@@ -964,18 +981,17 @@ async function handle(msg, sender) {
         // bubble, so there's no UI to block on.
         const { attachId: pageAttachId } = await storeAttachment({
           pageContext: ctx,
-          contentFrom: (contextText) => pageFigures.length
-            // 有配图时存成按 [图N] 锚点真交错的多模态 content（与 ATTACH_ASR_CONFIRM 的
-            // 视频截图同构）；无配图保持纯字符串 content 形状不变。
-            ? interleaveImageParts(contextText, pageFigures)
-            : null,
+          contentFrom: (contextText) => {
+            const figures = pageFigures.length ? pageFigures : siteImageBytes;
+            return figures.length ? interleaveImageParts(contextText, figures) : null;
+          },
           // Stamp the video source on video page-contexts (youtube/bilibili)
           // so video-note replies can turn their [mm:ss] markers into clickable
           // seek links. Other pages have no seekable <video> target.
           videoSrc: modeCaps(ctx.mode).video
             ? { platform: ctx.mode, url: ctx.meta?.url || '', tabId }
             : null,
-          log: (contextText) => `page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}`,
+          log: (contextText) => `page attached — ${contextText.length} chars, mode=${mode}${pageFigures.length ? `, ${pageFigures.length} page images` : ''}${siteImageBytes.length ? `, ${siteImageBytes.length} site images` : ''}`,
         });
         return { ok: true, ctx, attachId: pageAttachId };
       } catch (e) {
