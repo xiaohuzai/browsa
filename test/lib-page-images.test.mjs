@@ -108,26 +108,29 @@ test('inlinePageImages: 无信息量 alt（微信「图片」）不进锚点', a
   }
 });
 
-test('inlinePageImages: 超过 8 张上限的落选图收敛为 [图片]，失败图仍保留 URL', async () => {
+test('inlinePageImages: budgetChars 注入的落选图收敛为 [图片]，失败图仍保留 URL', async () => {
   const restore = installDecodeStub();
   try {
     const fetchMap = {};
     const lines = ['开头'];
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 3; i++) {
       fetchMap[`https://cdn.example.com/${i}.png`] = { w: 640 };
       lines.push(`![图${i}](https://cdn.example.com/${i}.png)`);
     }
     lines.push('![死链](https://cdn.example.com/dead.png)');
     lines.push('结尾');
+    // budgetChars 只容前两张（stub 每张 dataURL 恰 27 字符；注入小预算验证体量
+    // 上限路径——张数路径在上方 18 张测试里）。
     const res = await inlinePageImages(lines.join('\n'), {
       baseUrl: BASE,
       fetchImpl: imgFetch(fetchMap),
+      budgetChars: 60,
     });
-    assert.equal(res.figures.length, 8, '上限 8 张');
-    assert.match(res.text, /\[图8\] 图8/, '前 8 张按文档序编号');
-    assert.doesNotMatch(res.text, /\[图9\]/, '第 9 张不占编号');
-    assert.match(res.text, /\[图片\]/, '落选的成功图原位收敛为 [图片]');
-    assert.doesNotMatch(res.text, /9\.png/, '落选图的 URL 不残留');
+    assert.equal(res.figures.length, 2, '预算内两张');
+    assert.match(res.text, /\[图2\] 图2/, '前两张按文档序编号');
+    assert.doesNotMatch(res.text, /\[图3\]/, '第 3 张不占编号');
+    assert.match(res.text, /\[图片\]/, '预算落选的成功图原位收敛为 [图片]');
+    assert.doesNotMatch(res.text, /3\.png/, '落选图的 URL 不残留');
     assert.match(res.text, /!\[死链\]\(https:\/\/cdn\.example\.com\/dead\.png\)/, '失败图仍保留 URL（模型可引用）');
   } finally {
     restore();
@@ -159,15 +162,28 @@ test('inlinePageImages: 同一 URL 多次出现只锚定首次；上限 8 张封
     });
     assert.equal(r1.figures.length, 1);
     assert.equal(r1.text.split('[图1]').length - 1, 1, '第二次出现保留 Markdown');
-    // 上限：10 张全部可下载 → 只锚 8 张
-    const many = Array.from({ length: 10 }, (_, i) => `![图${i}](https://cdn.example.com/${i}.png)`).join('\n');
+    // 上限：20 张全部可下载 → 只锚 MAX_IMAGES 张（与站点字节图共用常数，18）
+    const many = Array.from({ length: 20 }, (_, i) => `![图${i}](https://cdn.example.com/${i}.png)`).join('\n');
     const map = {};
-    for (let i = 0; i < 10; i++) map[`https://cdn.example.com/${i}.png`] = { w: 800 };
+    for (let i = 0; i < 20; i++) map[`https://cdn.example.com/${i}.png`] = { w: 800 };
     const r2 = await inlinePageImages(many, { baseUrl: BASE, fetchImpl: imgFetch(map) });
-    assert.equal(r2.figures.length, 8);
-    assert.doesNotMatch(r2.text, /(?<!!)\[图9\]/, '编号只到 8');
-    assert.match(r2.text, /(?:^|\n)\[图片\](?:\n|$)/, '第 9 张起收敛为 [图片]（URL 不残留）');
-    assert.doesNotMatch(r2.text, /8\.png/, '落选图的 URL 不残留');
+    assert.equal(r2.figures.length, 18);
+    assert.doesNotMatch(r2.text, /(?<!!)\[图19\]/, '编号只到 18');
+    assert.match(r2.text, /(?:^|\n)\[图片\](?:\n|$)/, '第 19 张起收敛为 [图片]（URL 不残留）');
+    assert.doesNotMatch(r2.text, /18\.png/, '落选图的 URL 不残留');
+
+    // 体量预算：budgetChars 注入（与站点字节图共用上限常数的默认值）——
+    // 第二张放不下时落选收敛为 [图片]，与张数上限同一行为。
+    const two = ['![甲](https://cdn.example.com/a.png)', '![乙](https://cdn.example.com/b.png)'].join('\n');
+    const r3 = await inlinePageImages(two, {
+      baseUrl: BASE,
+      fetchImpl: imgFetch({ 'https://cdn.example.com/a.png': { w: 800 }, 'https://cdn.example.com/b.png': { w: 800 } }),
+      budgetChars: 40, // 每张 dataURL 恰 27 字符——只容第一张
+    });
+    assert.equal(r3.figures.length, 1, '预算只容下第一张');
+    assert.match(r3.text, /\[图片\]/, '第二张收敛为 [图片]');
+    assert.doesNotMatch(r3.text, /b\.png/, '预算落选图 URL 不残留');
+    assert.doesNotMatch(r3.text, /\[图2\]/, '不产生第二编号');
   } finally {
     restore();
   }

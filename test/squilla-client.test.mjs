@@ -734,6 +734,35 @@ test('buildSquillaTurn: prepends the language directive, trims, and joins', asyn
   assert.deepEqual(buildSquillaTurn({ userText: 'hi' }, '', []).attachments, []);
 });
 
+test('buildSquillaTurn: >10 data: images fill the gateway cap and the shortfall gets a model-facing note', async () => {
+  const { buildSquillaTurn } = await import('../lib/handlers/chat-handler.js');
+  const { PAGE_CONTEXT_PREFIX } = await import('../lib/constants.js');
+  const imgs = Array.from({ length: 12 }, (_, i) => ({
+    type: 'image_url', image_url: { url: `data:image/jpeg;base64,IMG${String(i).padStart(2, '0')}` },
+  }));
+  const { message, attachments } = buildSquillaTurn({ userText: '看图' }, '', [
+    { role: 'user', content: [{ type: 'text', text: PAGE_CONTEXT_PREFIX + '# 笔记\n\n图文内容。' }, ...imgs] },
+  ]);
+  assert.equal(attachments.length, 10, 'gateway MAX_ATTACHMENTS cap');
+  assert.match(attachments[0].name, /page-figure-1\.jpg/);
+  assert.match(attachments[9].name, /page-figure-10\.jpg/);
+  assert.match(message, /另有 2 张图片超出网关附件上限/, 'shortfall must be named, never silent');
+  assert.match(message, /已随附 10 张/);
+});
+
+test('buildSquillaTurn: http-only figure URLs stay text lines — no attachments, no shortfall note', async () => {
+  const { buildSquillaTurn } = await import('../lib/handlers/chat-handler.js');
+  const { PAGE_CONTEXT_PREFIX } = await import('../lib/constants.js');
+  const { message, attachments } = buildSquillaTurn({ userText: '看图' }, '', [
+    { role: 'user', content: [
+      { type: 'text', text: PAGE_CONTEXT_PREFIX + '# 页面\n\n[图1] https://cdn.example.com/a.png' },
+      { type: 'image_url', image_url: { url: 'https://cdn.example.com/a.png' } },
+    ] },
+  ]);
+  assert.deepEqual(attachments, [], 'no bytes to attach');
+  assert.doesNotMatch(message, /超出网关附件上限/, 'URL-only figures are the documented degradation, not a silent drop');
+});
+
 test('buildSquillaTurn: forwards page context exactly when the attach is the latest turn', async () => {
   const { buildSquillaTurn } = await import('../lib/handlers/chat-handler.js');
   const { PAGE_CONTEXT_PREFIX } = await import('../lib/constants.js');
