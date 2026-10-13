@@ -1239,6 +1239,10 @@
     "message": "답변이 백그라운드에서 계속 진행되며 원래 세션에 저장됩니다",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamDied": {
+    "message": "⚠️ 답변 스트림이 중단되었습니다: $1",
+    "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"
+  },
   "streamCancelledNoOrigin": {
     "message": "진행 중이던 답변이 취소되었습니다 — 원래 세션을 저장할 수 없었습니다",
     "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"

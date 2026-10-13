@@ -1239,6 +1239,10 @@
     "message": "返信はバックグラウンドで続行され、元のセッションに保存されます",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamDied": {
+    "message": "⚠️ 返信のストリームが中断しました：$1",
+    "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"
+  },
   "streamCancelledNoOrigin": {
     "message": "進行中の返信をキャンセルしました — 元のセッションを保存できませんでした",
     "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"

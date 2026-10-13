@@ -1239,6 +1239,10 @@
     "message": "La respuesta continúa en segundo plano y se guardará en su sesión original",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamDied": {
+    "message": "⚠️ Transmisión de respuesta interrumpida: $1",
+    "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"
+  },
   "streamCancelledNoOrigin": {
     "message": "Respuesta en curso cancelada — no se pudo guardar su sesión",
     "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"
