@@ -1884,8 +1884,11 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       afterDone?.(el);
 
     } else if (m.type === 'ERROR') {
-      // Only ABORTED reaches here — real errors are re-thrown by background
-      // and handled via the !res.ok block below (no pushChunk for real errors).
+      // ABORTED: clean cancel. Other ERROR chunks (2026-10-13) come from the
+      // SW-death path only — a real error on a turn whose panel was already
+      // closed: the background tombstones it (the response channel is dead)
+      // and a resume replays it here. Show why the stream died — the bubble
+      // keeps the partial text, the wait indicator stops.
       turnChrome.stopWait();
       stopKeepAlive();
       target.getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
@@ -1897,6 +1900,8 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
         // 盖 hidx 保持镜像同步（用户主动 Esc 走 cancelStream 本地盖章，收不
         // 到这条 ERROR）。与 cancelStream 的收尸记账同一不变量。
         if (m.salvaged) hidxAssign(target.getEl());
+      } else {
+        appendError(tSub('streamDied', '⚠️ 回复流中断：$1', m.error || '未知错误'));
       }
       // The background never disconnects the port after pushing ERROR —
       // without this cleanup activeController leaks, and every later send
@@ -2096,6 +2101,11 @@ async function onSend() {
       clearInterval(_swPingInterval);
       activeController = null;
       try { port.disconnect(); } catch (_) {}
+      // The turn is terminal — release the background's streamState too, or
+      // it lingers as a zombie: a panel reopened inside the GC window would
+      // PEEK inFlight, resume, and spin forever on a stream that already
+      // errored (same loss family as the closed-panel case).
+      sendMessage({ type: 'STREAM_RELEASE', tabId: turnTabId }).catch(() => {});
       // Preserve any partial streaming content; append the error inline.
       const errMsg = res.error || 'Unknown error';
       if (state.acc) {
@@ -2166,6 +2176,15 @@ async function resumeInFlightStream(tabId) {
     // here for the common case where the stream finished while the
     // user was away — storage already has the reply, renderHistory
     // (called by onActivated / init) has shown it. Nothing to do.
+    // `recovered` (SW-death salvage, 2026-10-13): the peek just swept a
+    // durable record of a turn whose SW died mid-stream — the interrupted
+    // partial landed in history AFTER this panel's init renderHistory read
+    // storage, so re-render once to show it. A second full render is cheap
+    // next to losing the partial again.
+    if (peek.recovered) {
+      await renderHistory();
+      requestAnimationFrame(() => scrollToBottom());
+    }
     return;
   }
   // Seed the usage chip's timer from the real stream origin so tokens/sec

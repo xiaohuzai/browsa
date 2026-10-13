@@ -1239,6 +1239,10 @@
     "message": "Reply continues in the background and will be saved to its original session",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "streamDied": {
+    "message": "⚠️ Reply stream interrupted: $1",
+    "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"
+  },
   "streamCancelledNoOrigin": {
     "message": "In-progress reply cancelled — its session could not be saved",
     "description": "Toast: switching sessions mid-turn when the origin session failed to save; the reply is cancelled instead of leaking into the new conversation"

@@ -18,7 +18,7 @@ import {
   recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone,
   STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm
 } from './lib/state.js';
-import { handleChat, fetchLlmsTxt } from './lib/handlers/chat-handler.js';
+import { handleChat, fetchLlmsTxt, ensureDurableSalvage } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
 import { handleSession } from './lib/handlers/session-handler.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
@@ -493,6 +493,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (chatControllers.size === 0) chrome.alarms.clear(STREAM_KEEPALIVE_ALARM);
   }
 });
+
+// SW-death salvage sweep (2026-10-13): if the previous SW died mid-stream
+// despite the keepalive alarm, its durable in-flight turn record (lib/state.js)
+// survived in storage.session. Sweep it on EVERY module eval — that runs on
+// each SW wake, and there is no "I crashed" event to hook. STREAM_PEEK awaits
+// this same memoized promise, so a panel reopening right after a death sees
+// the recovered partial deterministically even when this sweep hasn't
+// finished yet. Fire-and-forget here; failures are logged inside.
+ensureDurableSalvage().catch(() => {});
 
 // videoUrlMatches now lives in lib/video-url.js (shared with the side
 // panel's live-tab resolution for seekVideo / the transcript drawer).
@@ -1023,7 +1032,14 @@ async function handle(msg, sender) {
       // conversation's reply into this one.
       const t = msg.tabId;
       const st = streamState.get(t);
-      if (!st) return { inFlight: false };
+      if (!st) {
+        // Not in memory — but if the previous SW died mid-turn, the durable
+        // record does: awaiting the memoized sweep here salvages it into
+        // history (once per SW lifetime) and lets the panel re-render it.
+        // Read-once per tab (Set.delete): one re-render per salvaged turn.
+        const recovered = (await ensureDurableSalvage()).delete(t);
+        return recovered ? { inFlight: false, recovered: true } : { inFlight: false };
+      }
       if (msg.sessionId != null && st.originSessionId === msg.sessionId) st.bg = false;
       return {
         inFlight: true,
