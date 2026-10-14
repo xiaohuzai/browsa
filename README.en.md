@@ -28,7 +28,7 @@ browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF 
   <img src="docs/assets/readme/demo-v16-en.gif" alt="browsa opens beside a Transformer article, renders the attention equation and diagrams, jumps to podcast key points, then copies notes, downloads images and continues the same session in an Agent demo." width="720" />
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=YOZ5cs0W1og"><strong>▶ Full video · 68 seconds</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Stay on the page. Ask beside it.</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-en.mp4">Download MP4</a> — Real UI demonstration: Open browsa, choose or switch your own AI and Agents, attach an article, ask about a sentence, and see formulas, flowcharts and charts. Verify content on the video timeline, manage multiple sessions, and use the session ID to continue in your Agent. Responses, saved results and the CLI continuation illustration use demo data; playback is edited. File saving depends on the connected Agent.</p>
+  <a href="https://www.youtube.com/watch?v=YOZ5cs0W1og"><strong>▶ Full video · 68 seconds</strong></a> · <a href="https://xiaohuzai.github.io/browsa/en/#demo"><strong>▶ Stay on the page. Ask beside it.</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-en.mp4">Download MP4</a> — The full workflow in 68 seconds: attach an article → formulas / flowcharts / charts → timeline verification → session management → session-ID handoff to your Agent. Math and diagrams come from real model replies; demo data, playback edited.</p>
 
 ## Highlights
 
@@ -119,7 +119,11 @@ Open ⚙ Settings, fill in the address, hit **Ping** — connectivity is verifie
 - **Agent providers** — full agent backends with server-side tool execution (bash, file ops, web search…). The AI can actually *do* things.
 - **LLM providers** — plain chat endpoints for conversation. Model ID required.
 
-Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface. The session ID is shown — and copyable — at the top of the session drawer. Saved browsa conversations retain their own Agent thread IDs, separately for each provider and bridge address; restoring a conversation restores those IDs too. Older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message.
+Conversations with agents live on the agent side:
+
+- sessions are named automatically ("browsa:" + your first message) — pick them up by name in the agent's own interface; the session ID is shown, and copyable, at the top of the session drawer
+- saved browsa conversations retain their Agent thread IDs per provider and bridge address; restoring a conversation restores those IDs too
+- older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message
 
 <details>
 <summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
@@ -132,7 +136,13 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name automatically) and that bridge's own API key (keys can differ per bridge). The sidebar dropdown lists them as "Agent Bridge · codex", each with its own independent session thread and its own ping status (⟳ on the row pings just that agent). Approval cards for dangerous actions appear right in the panel; screenshots, pasted images, and PDF figures ride along with your message (≤18 per turn — needs agent-bridge ≥0.8.0; older bridges degrade to the first 8 with a note in the message). Multi-turn context lives in the agent itself. If the agent narrates before tool calls (codex announcing a skill), that narration folds into the step history instead of the reply. workbuddy rides the WorkBuddy AI desktop app — keep it signed in and running (the bridge auto-discovers its local worker gateway); its conversations live in the app's memory, so restarting the app starts a fresh agent session on the next turn, with your browsa history unaffected.
+Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name) and that bridge's own API key (keys can differ per bridge).
+
+- the sidebar dropdown lists them as "Agent Bridge · codex"; each agent has its own session thread and ping status (⟳ on the row pings just that agent)
+- approval cards for dangerous actions appear right in the panel
+- screenshots, pasted images, and PDF figures ride along with your message — ≤18 per turn, needs agent-bridge ≥0.8.0 (older bridges degrade to the first 8 with a note in the message)
+- multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply
+- workbuddy: keep the WorkBuddy AI desktop app signed in and running (the bridge auto-discovers its local worker gateway); conversations live in the app's memory — restarting the app starts a fresh agent session next turn, browsa history unaffected
 
 
 </details>
@@ -239,7 +249,12 @@ opensquilla gateway start
 
 Origin-guard fine print (both ways): the listing is an exact string match (`*` does nothing). The snippet value covers the **Chrome Web Store build**; a **sideloaded build has a different ID** — loading the repo folder directly always shows `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn` (pinned by the repo manifest's key), while a build unpacked from the release zip gets an ID derived from its folder path on your machine. Either way, read the live value at `chrome://extensions` → browsa → **ID** and append that origin to the list (multiple entries are fine). Since v0.5.5 the guard accepts exactly-listed non-http(s) origins on loopback (the `ws://` scheme maps to `http`; `wss` is rejected — use `ws://` for a local gateway).
 
-Notes: each browsa conversation maps to one gateway session (gateway-assigned key, reset when you clear browsa's history). Chat history lives on the gateway side — browsa forwards your text plus any page you attached right before asking (the 📎 context rides along on the next message, then lives in the gateway's own transcript); a huge page (over 60k chars) is uploaded as a `page-context.md` document the agent reads with its own tools. Page figures ride along as image attachments (a text-only router model degrades to text automatically). Pasted screenshots stay in browsa's own history and are not forwarded yet. The reply-language preference is prepended to the message since this protocol has no system-prompt field.
+Notes: each browsa conversation maps to one gateway session (gateway-assigned key, reset when you clear browsa's history).
+
+- chat history lives on the gateway side — browsa forwards your text; the 📎-attached page rides along on the next message, then lives in the gateway's own transcript
+- a huge page (over 60k chars) is uploaded as a `page-context.md` document the agent reads with its own tools
+- page figures ride along as image attachments (a text-only router model degrades to text automatically); pasted screenshots stay in browsa's own history and are not forwarded yet
+- this protocol has no system-prompt field — the reply-language preference is prepended to the message
 
 </details>
 
@@ -402,6 +417,14 @@ Chrome / Edge 116+ (primary target); Brave 1.56+ should work (same Chromium surf
 - PDFs are parsed locally (WASM + pdf.js); extracted text and figure images can be sent to your configured provider. Local parsing does not mean all extracted content stays on the device.
 - LLM replies are sanitized with DOMPurify before rendering (blocks `data:image/svg+xml` sources; Mermaid's SVG output is stripped of `<script>` / event-handler attributes).
 - Content scripts only observe network requests; they never modify or block them.
+
+## Community
+
+Scan a code, add the maintainer as a friend (note "browsa"), and you'll be let into the WeChat / Feishu group — usage tips, feedback, and update news live there; or post on [GitHub Discussions](https://github.com/xiaohuzai/browsa/discussions).
+
+| WeChat (note "browsa") | Feishu (note "browsa") |
+|:---:|:---:|
+| <img src="docs/assets/community/wechat.png" width="200" alt="WeChat personal QR code — add with note browsa" /> | <img src="docs/assets/community/feishu.png" width="200" alt="Feishu personal QR code — add with note browsa" /> |
 
 ## License
 
