@@ -52,7 +52,7 @@ Una sola tarjeta de browsa se conecta a varios agentes a la vez; el desplegable 
 - **Vídeos**: subtítulos o transcripción automática (ASR) → notas con **marcas de tiempo `[mm:ss]` clicables**; haz clic en una para volver justo al momento. Los vídeos sin subtítulos también se pueden leer visualmente
 - **PDF / artículos científicos**: se analizan por completo en el navegador — tablas, diseño de varias columnas y encabezados reconstruidos; las regiones de las figuras se recortan y se envían a los modelos de visión
 - **Documentos de Office**: los enlaces directos a `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… se convierten a Markdown íntegramente en tu dispositivo (docling compilado a WASM) — las tablas, los encabezados y las listas se conservan
-- **Artículos y páginas desordenadas**: texto de artículo limpio; las páginas tipo feed leen directamente los datos de la propia página (YouTube, Bilibili, 小红书…)
+- **Artículos y páginas complejas**: texto de artículo limpio; las páginas tipo feed leen directamente los datos de la propia página (YouTube, Bilibili, 小红书…)
 
 La lista completa está en «Qué lee browsa» más abajo.
 
@@ -60,7 +60,7 @@ La lista completa está en «Qué lee browsa» más abajo.
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
@@ -286,7 +286,7 @@ Haz clic en 📎 para adjuntar la pestaña actual — modo **Automático** (text
 | Vídeos | transcripción con marcas de tiempo `[mm:ss]` clicables; los vídeos sin subtítulos se transcriben automáticamente (ASR, opcional — clave de Volcengine Ark en Ajustes) o se analizan visualmente junto con la voz |
 | Páginas de archivos de GitHub | código fuente en crudo desde `raw.githubusercontent.com` — el markdown y el código conservan su estructura |
 | Documentos de Feishu / Lark | la estructura de bloques del editor de la página se analiza directamente — los encabezados, las listas y las **filas y columnas de las tablas** se conservan |
-| Cualquier página desordenada | las propias peticiones de red de la página se observan y se leen directamente — subtítulos, comentarios, fuente del artículo (YouTube, Bilibili, 小红书 y más) |
+| Páginas complejas | las propias peticiones de red de la página se observan y se leen directamente — subtítulos, comentarios, fuente del artículo (YouTube, Bilibili, 小红书 y más) |
 
 Resalta texto en una página y aparece la **barra flotante de selección**: **Explicar** y **Traducir** responden en línea — una tarjeta en streaming justo al lado de la selección, sin necesidad del panel — mientras que **Preguntar** y **Resumir** (y el menú del clic derecho) entran al panel. No hace falta pulsar 📎.
 

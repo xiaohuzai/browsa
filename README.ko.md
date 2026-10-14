@@ -60,7 +60,7 @@ Agent Bridge를 통해 기존 로컬 에이전트를 연결하면, 에이전트�
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]

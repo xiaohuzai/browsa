@@ -52,7 +52,7 @@ Agent Bridge 経由で、お使いのローカルエージェントに、設定�
 - **動画**: 字幕または自動文字起こし（ASR）→ **クリックできる `[mm:ss]` タイムスタンプ付き**のノート。クリックすればその瞬間へジャンプ。字幕のない動画は映像からも読み取れます
 - **PDF / 論文**: すべてブラウザ内で解析 — 表・段組みレイアウト・見出しを再構築し、図の領域は切り出してビジョンモデルへ送信
 - **Office ドキュメント**: `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… への直接リンクを完全にオンデバイスで Markdown に変換（WASM にコンパイルした docling）— 表・見出し・リストの構造が保たれます
-- **記事や雑多なページ**: 記事本文をきれいに抽出。フィード型のページはページ自身のデータを直接読み取ります（YouTube、Bilibili、小红书…）
+- **記事や複雑なページ**: 記事本文をきれいに抽出。フィード型のページはページ自身のデータを直接読み取ります（YouTube、Bilibili、小红书…）
 
 完全な一覧は下の「browsa が読み取るもの」をご覧ください。
 
@@ -60,7 +60,7 @@ Agent Bridge 経由で、お使いのローカルエージェントに、設定�
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
@@ -286,7 +286,7 @@ LLM プロバイダーはいくつでも追加でき、それぞれが独自の�
 | 動画 | クリックできる `[mm:ss]` タイムスタンプ付きの文字起こし。字幕のない動画は自動文字起こし（ASR、オプション — 設定で Volcengine Ark キー）または音声と併せた映像解析 |
 | GitHub のファイルページ | `raw.githubusercontent.com` からの生ソース — markdown とコードの構造が保たれます |
 | Feishu / Lark ドキュメント | ページのエディタブロック構造を直接解析 — 見出し・リストに加え **表の行と列** まで保たれます |
-| その他雑多なページ | ページ自身のネットワークリクエストを観測して直接読み取り — 字幕、コメント、記事ソース（YouTube、Bilibili、小红书 など） |
+| 複雑なページ | ページ自身のネットワークリクエストを観測して直接読み取り — 字幕、コメント、記事ソース（YouTube、Bilibili、小红书 など） |
 
 ページ上でテキストを選択すると**フローティングツールバー**が現れます: **解説**と**翻訳**はその場でインライン回答 — 選択範囲のすぐ横にストリーミングカードが開き、パネルは不要 — 一方、**質問**と**要約**（および右クリックメニュー）はパネルに入ります。📎 をクリックする必要はありません。
 
