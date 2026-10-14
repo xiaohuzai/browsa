@@ -25,7 +25,7 @@ O browsa é uma extensão de painel lateral para Chrome / Edge. Traga um artigo,
   <img src="docs/assets/readme/demo-v16-pt-br.gif" alt="O browsa aparece ao lado de um artigo de Transformers, mostra a equação e diagramas de atenção, vai aos pontos do podcast, copia notas, baixa imagens e demonstra como continuar a mesma sessão em um agente." width="720" />
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=AeXEyqvzcDA"><strong>▶ Vídeo completo · 68 segundos</strong></a> · <a href="https://xiaohuzai.github.io/browsa/pt-br/#demo"><strong>▶ Fique na página. Pergunte ao lado dela.</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-pt-br.mp4">Baixar MP4</a> — Demonstração da interface real: abra o browsa, escolha ou alterne sua própria IA e agentes, anexe um artigo, aprofunde uma frase e veja fórmulas, fluxogramas e gráficos. Confira o conteúdo na linha do tempo do vídeo, gerencie várias sessões e continue no agente com o ID da sessão. Respostas, resultados salvos e a ilustração de continuidade na CLI usam dados de demonstração; a reprodução foi editada. Salvar arquivos depende do agente conectado.</p>
+  <a href="https://www.youtube.com/watch?v=AeXEyqvzcDA"><strong>▶ Vídeo completo · 68 segundos</strong></a> · <a href="https://xiaohuzai.github.io/browsa/pt-br/#demo"><strong>▶ Fique na página. Pergunte ao lado dela.</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-pt-br.mp4">Baixar MP4</a> — O fluxo de trabalho completo em 68 segundos: anexar um artigo → fórmulas / fluxogramas / gráficos → conferência na linha do tempo → gerenciamento de sessões → continuidade no agente pelo ID da sessão. Fórmulas e gráficos vêm de respostas reais do modelo; dados de demonstração, reprodução editada.</p>
 
 ## Destaques
 
@@ -116,7 +116,11 @@ Abra as ⚙ Configurações, preencha o endereço, clique em **Ping** — a cone
 - **Provedores de agente** — backends de agente completos, com execução de ferramentas no servidor (bash, operações de arquivos, busca na web…). A IA pode realmente *fazer* coisas.
 - **Provedores de LLM** — endpoints de chat simples para conversar. O ID do modelo é obrigatório.
 
-As conversas com agentes ficam do lado do agente: o browsa nomeia a sessão automaticamente ("browsa:" + a sua primeira mensagem) para que você possa retomá-la na própria interface do agente. O ID da sessão é exibido — e pode ser copiado — no topo da gaveta de sessões. As conversas salvas do browsa preservam e restauram os IDs de sessão de cada Agent e endereço de conexão. Conversas antigas sem ID registrado criam uma nova sessão de Agent na primeira mensagem e levam o histórico de texto existente.
+As conversas com agentes ficam do lado do agente:
+
+- as sessões recebem nome automaticamente ("browsa:" + a sua primeira mensagem) — retome-as pelo nome na própria interface do agente; o ID da sessão fica visível, e pode ser copiado, no topo da gaveta de sessões
+- as conversas salvas do browsa preservam os IDs de sessão de cada agente e de cada endereço de ponte; restaurar a conversa restaura esses IDs junto
+- arquivos antigos sem ID registrado criam uma sessão de agente nova e independente na primeira mensagem, levando consigo o histórico de texto existente
 
 <details>
 <summary><b>🔧 Agent Bridge</b> — ponte para agentes locais (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
@@ -129,8 +133,13 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # one bridge per entry; ports live in agents.json
 ```
 
-Abra as ⚙ Configurações, selecione o cartão **Agent Bridge**, clique em **＋ Adicionar agente** e preencha os endereços das pontes, um por linha — um agente por endereço, com um apelido opcional (deixe vazio e o Ping descobre o nome do agente automaticamente) e a chave de API da própria ponte (as chaves podem diferir de ponte para ponte). O menu suspenso da barra lateral os lista como "Agent Bridge · codex", cada um com a sua própria thread de sessão independente e o seu próprio status de ping (o ⟳ na linha faz o ping apenas daquele agente). Os cartões de aprovação para ações perigosas aparecem direto no painel; capturas de tela, imagens coladas e figuras de PDF vão junto com a sua mensagem (≤8 por turno). O contexto de múltiplos turnos fica no próprio agente. O workbuddy roda no aplicativo desktop WorkBuddy AI — basta mantê-lo com login feito e em execução (a ponte descobre automaticamente o gateway de worker local dele); as conversas dele ficam na memória do app, então reiniciar o app inicia uma nova sessão de agente no próximo turno, e o seu histórico do lado do browsa não é afetado.
+Abra as ⚙ Configurações, selecione o cartão **Agent Bridge**, clique em **＋ Adicionar agente** e preencha os endereços das pontes, um por linha — um agente por endereço, com um apelido opcional (deixe vazio e o Ping descobre o nome do agente automaticamente) e a chave de API da própria ponte (as chaves podem diferir de ponte para ponte).
 
+- o menu suspenso da barra lateral os lista como "Agent Bridge · codex"; cada agente tem a própria thread de sessão independente e o próprio status de ping (o ⟳ na linha faz o ping apenas daquele agente)
+- os cartões de aprovação para ações perigosas aparecem direto no painel
+- capturas de tela, imagens coladas e figuras de PDF vão junto com a sua mensagem — ≤18 por turno, requer agent-bridge ≥0.8.0 (pontes mais antigas degradam para as primeiras 8, com uma nota na mensagem)
+- o contexto de múltiplos turnos fica no próprio agente; a narração antes de uma chamada de ferramenta (o codex anunciando uma skill) é dobrada no histórico de passos, sem se misturar à resposta
+- workbuddy: basta manter o aplicativo desktop WorkBuddy AI com login feito e em execução (a ponte descobre automaticamente o gateway de worker local dele); as conversas ficam na memória do app — reiniciar o app inicia uma nova sessão de agente no próximo turno, e o histórico do lado do browsa não é afetado
 
 </details>
 
@@ -236,7 +245,12 @@ Dê um **Ping** para verificar — ele faz o handshake WebSocket de verdade, ent
 
 Letra miúda da guarda de origem (nos dois caminhos): a listagem é uma comparação exata de string (`*` não faz nada). O valor do snippet cobre a **versão da Chrome Web Store**; uma **versão instalada manualmente tem outro ID** — carregar a pasta do repositório diretamente sempre mostra `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn` (fixado pela chave do manifest do repositório), enquanto uma versão extraída do zip de release recebe um ID derivado do caminho da pasta na sua máquina. De qualquer forma, leia o valor real em `chrome://extensions` → browsa → **ID** e acrescente essa origem à lista (múltiplas entradas são permitidas). Desde a v0.5.5, a guarda aceita origens não-http(s) exatamente listadas em loopback (o esquema `ws://` mapeia para `http`; `wss` é rejeitado — use `ws://` para um gateway local).
 
-Notas: cada conversa do browsa corresponde a uma sessão do gateway (chave atribuída pelo gateway, redefinida quando você limpa o histórico do browsa). O histórico do chat fica do lado do gateway — o browsa encaminha o seu texto mais qualquer página que você tenha anexado logo antes de perguntar (o contexto do 📎 vai junto na próxima mensagem e depois vive na transcrição do próprio gateway); uma página enorme (mais de 60 mil caracteres) é enviada como um documento `page-context.md` que o agente lê com as próprias ferramentas dele. As figuras da página vão junto como anexos de imagem (um modelo roteador somente de texto degrada para texto automaticamente). As capturas de tela coladas ficam no histórico do próprio browsa e ainda não são encaminhadas. A preferência de idioma da resposta é prefixada à mensagem, pois este protocolo não tem campo de prompt de sistema.
+Notas: cada conversa do browsa corresponde a uma sessão do gateway (chave atribuída pelo gateway, redefinida quando você limpa o histórico do browsa).
+
+- o histórico do chat fica do lado do gateway — o browsa encaminha apenas o seu texto; a página anexada com 📎 vai junto na próxima mensagem e depois vive na transcrição do próprio gateway
+- uma página enorme (mais de 60 mil caracteres) é enviada como um documento `page-context.md` que o agente lê em partes com as próprias ferramentas dele
+- as figuras da página vão junto como anexos de imagem (um modelo roteador somente de texto degrada para texto automaticamente); as capturas de tela coladas ficam no histórico do próprio browsa e ainda não são encaminhadas
+- este protocolo não tem campo de prompt de sistema — a preferência de idioma da resposta é prefixada à mensagem como uma instrução comum
 
 </details>
 
@@ -398,6 +412,14 @@ Chrome / Edge 116+ (alvo principal); Brave 1.56+ deve funcionar (mesma base Chro
 - Os PDFs são processados localmente (WASM + pdf.js); o texto extraído e as imagens das figuras podem ser enviados ao provedor que você configurou. O processamento local não significa que todo o conteúdo extraído fica no dispositivo.
 - As respostas de LLM são sanitizadas com DOMPurify antes da renderização (bloqueia fontes `data:image/svg+xml`; o SVG de saída do Mermaid é limpo de `<script>` / atributos de manipuladores de eventos).
 - Os content scripts apenas observam as requisições de rede; eles nunca as modificam nem as bloqueiam.
+
+## Comunidade
+
+Escaneie o código, adicione o mantenedor como contato (com a nota "browsa") e você será incluído no grupo de WeChat / Feishu — dicas de uso, feedback e novidades de atualização ficam no grupo; também são bem-vindas publicações no [GitHub Discussions](https://github.com/xiaohuzai/browsa/discussions).
+
+| WeChat (nota "browsa") | Feishu (nota "browsa") |
+|:---:|:---:|
+| <img src="docs/assets/community/wechat.png" width="200" alt="QR code pessoal do WeChat — adicione com a nota browsa" /> | <img src="docs/assets/community/feishu.png" width="200" alt="QR code pessoal do Feishu — adicione com a nota browsa" /> |
 
 ## Licença
 

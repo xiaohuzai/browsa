@@ -28,7 +28,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
   <img src="docs/assets/readme/demo-v16-zh.gif" alt="browsa 在 Transformer 文章旁打开，呈现注意力公式和图示，点击播客要点跳转，再复制笔记、下载图片，并演示在智能体侧继续同一会话。" width="720" />
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=b5DiTpR7VMk"><strong>▶ 完整视频 · 68 秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 读到哪里，问到哪里。</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-zh.mp4">下载 MP4</a> — 真实界面演示：打开 browsa 浏览器插件，选择或切换自己的 AI 与智能体，附加文章、追问一句话，再把回答呈现为公式、流程图和图表。用视频时间线核对内容，管理多份会话，并通过会话 ID 在智能体侧继续。回复、保存结果与命令行接续画面使用演示数据，播放经过剪辑；保存能力取决于接入的智能体。</p>
+  <a href="https://www.youtube.com/watch?v=b5DiTpR7VMk"><strong>▶ 完整视频 · 68 秒</strong></a> · <a href="https://xiaohuzai.github.io/browsa/#demo"><strong>▶ 读到哪里，问到哪里。</strong></a> · <a href="docs/assets/promo/browsa-promo-v7-zh.mp4">下载 MP4</a> — 68 秒看完完整工作流：附加文章 → 公式 / 流程图 / 图表 → 时间线核对 → 会话管理 → 会话 ID 在智能体侧接续。公式与图表来自真实模型回复；演示数据、播放经过剪辑。</p>
 
 ## 亮点
 
@@ -119,7 +119,11 @@ npm run package      # → browsa-v<version>.zip
 - **Agent Provider（智能体）**——完整的智能体后端，在服务端执行工具（bash、文件操作、联网搜索……）。AI 真的能*做事*。
 - **LLM Provider（纯语言模型）**——仅用于对话的聊天端点。需填写模型 ID。
 
-与智能体的对话本体保存在智能体一侧：browsa 会自动给会话命名（「browsa：」+ 你的第一条消息），在智能体自己的界面里按名字就能找到它接着聊；会话 ID 在会话抽屉顶部随时可查、可复制。保存的 browsa 对话会保留各智能体、各连接地址对应的会话 ID，恢复时一起切回；未记录 ID 的旧存档会在首次发消息时创建独立的智能体会话，并带上已有文字记录。
+与智能体的对话本体保存在智能体一侧：
+
+- 会话自动命名（「browsa：」+ 你的第一条消息）——在智能体自己的界面里按名字接着聊；会话 ID 在会话抽屉顶部随时可查、可复制
+- 保存的 browsa 对话保留各智能体、各连接地址的会话 ID，恢复时一起切回
+- 未记录 ID 的旧存档：首次发消息时创建独立智能体会话，并带上已有文字记录
 
 <details>
 <summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）</summary>
@@ -132,7 +136,13 @@ cp "$(npm root -g)/@xiaohuzai/agent-bridge/agents.example.json" agents.json
 agent-bridge serve                                # 每个 entry 一座桥，端口写在 agents.json 里
 ```
 
-打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。侧边栏下拉按「Agent Bridge · codex」逐个选择，每个 agent 有自己独立的会话线程与连通状态（行上的 ⟳ 可单独 Ping 该 agent）。危险操作的审批卡片直接出现在面板里；截图、粘贴图片与 PDF 图表也会随消息发送（单条 ≤18 张，需 agent-bridge ≥0.8.0；旧版桥自动降级为前 8 张并在消息里注明）。多轮上下文由 agent 自己维护。agent 在工具调用前的过程自述（codex 宣告使用某技能）会折进步骤历史，不会混进回复正文。workbuddy 走 WorkBuddy AI 桌面应用——保持登录并运行即可（桥会自动发现它本地的 worker 网关）；其对话存在应用内存里，重启应用后下一轮自动开新会话，browsa 侧历史不受影响。
+打开 ⚙ 设置，选择 **Agent Bridge** 卡，点 **＋ 添加 Agent** 逐行填桥地址——一行一个 agent，可顺手填别名（留空则 Ping 后自动识别 agent 名字）和该桥自己的 API Key（每桥可不同）。
+
+- 侧边栏下拉按「Agent Bridge · codex」逐个选择；每个 agent 独立会话线程与连通状态（行上的 ⟳ 可单独 Ping）
+- 危险操作的审批卡片直接出现在面板里
+- 截图、粘贴图片与 PDF 图表随消息发送——单条 ≤18 张，需 agent-bridge ≥0.8.0（旧版桥自动降级为前 8 张并在消息里注明）
+- 多轮上下文由 agent 自己维护；工具调用前的过程自述（codex 宣告使用某技能）折进步骤历史，不混进回复正文
+- workbuddy：保持 WorkBuddy 桌面应用登录并运行即可（桥自动发现其本地 worker 网关）；对话存在应用内存，重启应用后下一轮自动开新会话，browsa 侧历史不受影响
 
 
 </details>
@@ -239,7 +249,12 @@ opensquilla gateway start
 
 来源守卫细则（两种方式通用）：白名单是**逐字精确匹配**（`*` 无效）。上面片段的值对应**商店安装版**；**解包加载的版本 ID 不同**——直接以「加载已解压的扩展程序」加载仓库目录时恒为 `chrome-extension://apoodheofdhglelbnmggeokbhampbmgn`（由仓库 manifest 的 key 字段锁定），从发行 zip 解包加载则按本机解压根目录路径派生（每台机器不同）。无论哪种，以 `chrome://extensions` → browsa → **ID** 实际显示的值为准，把它追加进白名单即可（可并列多条）。v0.5.5 起，守卫接受白名单里精确列出的非 http(s) 来源（仅限 loopback；`ws://` 按 `http` 等价处理，`wss` 会被拒——本地网关请用 `ws://`）。
 
-说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次，之后就住在网关自己的对话记录里）；超大页面（超过 6 万字符）会作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读。页面插图会以图片附件随行（路由器若选到纯文字模型会自动降级为纯文字）。粘贴的截图保留在 browsa 自己的历史里，暂不转发。此协议没有系统提示词字段，语言偏好以普通指令拼在消息开头。
+说明：每个 browsa 对话对应一个网关会话（键由网关分配，清空 browsa 历史即重置）。
+
+- 聊天记录存放在网关侧——browsa 只转发你的文字；📎 附加的页面随下一条消息送出一次，之后住在网关自己的对话记录里
+- 超大页面（超过 6 万字符）作为 `page-context.md` 文档上传，由智能体用自己的工具分段阅读
+- 页面插图以图片附件随行（路由器选到纯文字模型时自动降级为纯文字）；粘贴的截图暂不转发，保留在 browsa 历史里
+- 此协议没有系统提示词字段——语言偏好以普通指令拼在消息开头
 
 </details>
 
