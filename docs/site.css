@@ -838,39 +838,16 @@ html[data-md-color-scheme="slate"] .pb-idle{color:#d4a72c;background:rgba(212,16
 .hero-copy > :nth-child(6){animation-delay:.45s}
 .scenarios{opacity:0;animation:riseIn .6s ease .3s forwards}
 
-/* 滚动渐入：html.js 只在 site.js 确认支持 IntersectionObserver 时挂上，
-   无 JS / 不支持的浏览器保持全部可见（内容永远不丢，只是「晚出现」）。 */
-html.js .landing .section-head,
-html.js .landing .how,
-html.js .landing .feature,
-html.js .landing .site-strip,
-html.js .landing .keys-list,
-html.js .landing .prov-board,
-html.js .landing .install-option,
-html.js .landing .install-next,
-html.js .landing .demo-video,
-html.js .landing .community-qr figure{
-  opacity:0;transform:translateY(16px);
-  transition:opacity .55s ease,transform .55s ease;
-}
-html.js .landing .in-view{opacity:1;transform:none}
-html.js .landing :is(.feature,.how):nth-child(4n+2){transition-delay:.07s}
-html.js .landing :is(.feature,.how):nth-child(4n+3){transition-delay:.14s}
-html.js .landing :is(.feature,.how):nth-child(4n){transition-delay:.21s}
-
 /* reduced-motion：轮播与流式编排在 site.js 已停，这里保证零延迟直出终态
-   （全局 .001s 规则只缩短时长、不消 animation-delay，必须显式覆盖）。 */
+   （全局 .001s 规则只缩短时长、不消 animation-delay，必须显式覆盖）。
+   首屏以下不做任何入场动画——「Material 风格不滚动显现」是既有裁决，
+   2026-10-14 试过一版滚动渐入，因 .community-qr figure 优先级事故 + 跳锚点
+   内容追入的观感问题当日回退，勿再试。 */
 @media (prefers-reduced-motion:reduce){
   .hero-copy > *,.scenarios,.scenarios .window .p-sys,
   .scenarios .window .p-user,.scenarios .window .p-assist,
   .scenarios .window .p-tool,.scenarios .window .p-body > *,
   .scenarios .window .p-cursor{animation:none;opacity:1;transform:none}
-  html.js .landing .section-head,html.js .landing .how,html.js .landing .feature,
-  html.js .landing .site-strip,html.js .landing .keys-list,html.js .landing .prov-board,
-  html.js .landing .install-option,html.js .landing .install-next,
-  html.js .landing .demo-video,html.js .landing .community-qr figure{
-    opacity:1;transform:none;transition:none;
-  }
 }
 
 /* ── 社区交流群（README/官网同款双码）──────────────────────────────── */
