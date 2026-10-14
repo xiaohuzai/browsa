@@ -277,14 +277,14 @@
       <div class="section-head">
         <p class="eyebrow">demo</p>
         <h2>Stay on the page. Ask beside it.</h2>
-        <p>browsa is a Chrome / Edge browser extension for your own AI or Agent. One Transformer study connects an article, attention formula, Mermaid Q/K/V flow, Graphviz architecture and clickable key points from a separate long-form interview about AI at work. Brief protein and chemistry examples show additional renderers. Copy the answer, download images, manage sessions and resume the same session in Codex. The equations and colored Graphviz come from an actual Codex response rendered by the loaded browsa extension; other editions translate the prose and retain the same math and graph. The browser frame, article and interview are compositional demos. Agent continuation is labeled DEMO and playback is edited. Music and action sounds only.</p>
+        <p>The full workflow in 68 seconds: attach a document → math &amp; diagram rendering → clickable timestamps → session management and Agent handoff.</p>
       </div>
       <figure class="demo-video">
         <video controls preload="none" poster="../assets/promo/poster-v7-en.jpg" width="960">
           <source src="../assets/promo/browsa-promo-v7-en.mp4" type="video/mp4" />
           Your browser does not support embedded video — <a href="../assets/promo/browsa-promo-v7-en.mp4">download it here</a>.
         </video>
-        <figcaption>English captions; understandable with the sound off. Demo data; playback edited. <a href="https://www.youtube.com/watch?v=YOZ5cs0W1og">YouTube</a>.</figcaption>
+        <figcaption>English captions; understandable with the sound off. Math and diagrams come from real model replies; demo data, playback edited. <a href="https://www.youtube.com/watch?v=YOZ5cs0W1og">YouTube</a>.</figcaption>
       </figure>
     </div>
   </section>
@@ -311,7 +311,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>Stream replies <span class="tag">any backend</span></h3>
-          <p>Replies stream in word by word, with Markdown, math and charts. Connect your own OpenAI-compatible API, the Hermes / opencode / OpenSquilla agents — your subscription-logged-in Codex / Claude Code, the Google-login Gemini CLI via agent-bridge, pi with its own configured models, dsh on your DeepSeek API key, or the signed-in WorkBuddy desktop app kept running. The UI follows your browser language — English, 中文, 日本語, 한국어, Español, Português, Русский — switchable in Settings.</p>
+          <p>Replies stream in word by word, with Markdown, math and charts. Any OpenAI-compatible API — or the Hermes / opencode / OpenSquilla / agent-bridge agents. Seven UI languages included.</p>
         </div>
       </div>
       <p class="site-note">Installed? <a href="guide/quickstart.html">Quick start</a> walks you through the first question; the <a href="guide/">full guide</a> covers reading, video, rendering, sessions, backends and settings.</p>
@@ -334,8 +334,8 @@
           <ul>
             <li>Auto cascade: Readability body → DOM tree → full text</li>
             <li>📷 Screenshot mode, for multimodal models</li>
-            <li>PDF parsed locally: WASM rebuilds tables / headings / layout, figures auto-cropped</li>
-            <li>GitHub file pages pull raw source directly, skipping page cleanup</li>
+            <li>PDF parsed locally: tables / headings / layout rebuilt</li>
+            <li>GitHub file pages pull raw source directly</li>
           </ul>
         </div>
         <div class="feature">
@@ -344,8 +344,8 @@
           <p>Select any text on any page and ask directly:</p>
           <ul>
             <li>Floating toolbar: Ask · Explain · Translate · Summarize</li>
-            <li>Explain / Translate answer inline — streaming, in place, no panel</li>
-            <li>Ask / Summarize: the selection rides into the panel — no 📎 needed first</li>
+            <li>Explain / Translate stream inline, without interrupting your reading</li>
+            <li>Ask / Summarize ride into the panel — no 📎 needed</li>
           </ul>
         </div>
         <div class="feature">
@@ -356,17 +356,18 @@
             <li>Markdown GFM + 40+ language syntax highlighting</li>
             <li>LaTeX math (KaTeX, Web Worker accelerated)</li>
             <li>Mermaid diagrams, ECharts, Markmap mind maps</li>
-            <li>A Mermaid block that won't parse? Ask your configured AI to fix and re-render it</li>
+            <li>Broken Mermaid? One-click AI fix and re-render</li>
           </ul>
         </div>
         <div class="feature">
           <span class="f-tag">video</span>
           <h3>Video notes</h3>
-          <p>A complete workflow for video — structured subtitles from YouTube and Bilibili:</p>
+          <p>Structured subtitles from YouTube and Bilibili:</p>
           <ul>
-            <li>Replies carry clickable <code>[mm:ss]</code> timestamps that seek the video</li>
-            <li>Subtitle-less Bilibili videos can still be summarized — automatic ASR transcription</li>
-            <li>Xiaoyuzhou podcast episodes transcribe the same way — attach and the audio comes back as timestamped subtitles</li>
+            <li>Clickable <code>[mm:ss]</code> timestamps that seek the video</li>
+            <li>Subtitle drawer: live highlight · click to seek · note a line</li>
+            <li>No subtitles? ASR transcription / A/V deep-read</li>
+            <li>Xiaoyuzhou podcasts: one-click transcription with timestamps</li>
             <li>Long transcripts auto-compressed into points, timestamps preserved</li>
           </ul>
         </div>
@@ -376,13 +377,13 @@
           <p>No vendor lock-in — connect your own models:</p>
           <ul>
             <li>Hermes Agent: tool execution, approval for risky actions, progress display</li>
-            <li>OpenCode Agent: direct line to the opencode CLI agent — same full tool &amp; approval flow</li>
-            <li>OpenSquilla Agent: local desktop agent over its gateway WebSocket — server-side session memory, thinking output, server-side cancellation</li>
-            <li>Agent Bridge: bridges local agents — subscription-logged-in Codex / Claude Code (the model side runs on your subscription), the Google-login Gemini CLI, pi with whatever model you configure it with, dsh on your DeepSeek API key, or the signed-in WorkBuddy desktop app; one card connects several agents at once, each with its own session and ping status</li>
-            <li>Conversations with agents live on the agent side: browsa names the session automatically ("browsa:" + your first message) so you can pick it up in the agent's own interface; the session ID is shown and copyable in the session drawer</li>
+            <li>OpenCode Agent: direct CLI line — full tool &amp; approval flow</li>
+            <li>OpenSquilla Agent: gateway WebSocket — server-side session memory</li>
+            <li>Agent Bridge: bridges Codex / Claude Code / Gemini CLI / pi / dsh / WorkBuddy — one card, several agents</li>
+            <li>Agent sessions live agent-side — auto-named, easy to resume</li>
             <li>Any OpenAI-compatible API: OpenAI, Ollama, LiteLLM…</li>
-            <li>Add multiple models per card — switch via “Alias · model” in the sidebar</li>
-            <li>Per-model thinking level: the choices follow the model family and the request fields adapt to each API dialect</li>
+            <li>Multiple models per card — switch right in the sidebar</li>
+            <li>Per-model thinking level, request fields auto-adapt</li>
             <li>Ping to verify connectivity and capabilities</li>
           </ul>
         </div>
@@ -392,9 +393,9 @@
           <p>No browsa account. Your choice of model service:</p>
           <ul>
             <li>API keys are stored locally and used to authenticate with your configured provider</li>
-            <li>URLs in page context are masked locally before sending — tokens, passwords and signatures stripped</li>
-            <li>PDFs are parsed on-device; extracted text and images can be attached to model requests</li>
-            <li>Office documents (docx/pptx/xlsx/…) are converted to Markdown on-device; extracted content can be attached to model requests</li>
+            <li>Locally masked before sending: URL tokens / passwords / signatures</li>
+            <li>PDFs parsed on-device — content never leaves the machine</li>
+            <li>Office documents convert to Markdown on-device</li>
             <li>Content goes only to the backend you configure</li>
           </ul>
         </div>
@@ -406,7 +407,7 @@
             <li>Quick actions: Summarize / Key Points / Explain / Outline</li>
             <li>Slash commands + ↑/↓ input history; drafts survive closing the panel</li>
             <li>Keep typing while a reply streams — messages queue and send in order</li>
-            <li>Paste code in the composer — your own bubble renders it as a highlighted block (copy button, language auto-detected); everything else stays byte-for-byte</li>
+            <li>Pasted code becomes a highlighted block; everything else stays byte-for-byte</li>
           </ul>
         </div>
         <div class="feature">
@@ -414,10 +415,11 @@
           <h3>Sessions</h3>
           <p>Long conversations stay organized:</p>
           <ul>
-            <li>Save / restore named sessions with their Agent thread IDs, export Markdown</li>
-            <li>Switching sessions mid-reply never kills the reply — it finishes in the background and lands in the session it started in</li>
+            <li>Save / restore / export Markdown, with Agent thread IDs</li>
+            <li>Pin sessions — searchable by title and full text</li>
+            <li>Switch sessions mid-reply — it finishes in the background</li>
             <li>Full-text in-conversation search (<code>Ctrl+F</code>)</li>
-            <li>"Detail-thread" any text in a reply without touching the main history; paste images straight in; the input's ↑/↓ recalls follow-up questions only; quoted formulas render as math</li>
+            <li>"Detail-thread" any text without polluting the main chat; paste images too</li>
           </ul>
         </div>
       </div>
@@ -447,8 +449,7 @@
         <span class="site-chip">GeekTime<span class="en">articles</span></span>
       </div>
       <p class="site-note">
-        <b>Observes, never hijacks:</b> extraction works by watching the browser's own requests — no re-authentication,
-        on-demand site API requests may also run when attaching. Attached content can be sent to your configured model or Agent. Every other webpage works too, just not as deeply.
+        <b>Observes, never hijacks:</b> it just watches the requests the browser itself makes. Every other webpage works too, just not as deeply.
       </p>
     </div>
   </section>
