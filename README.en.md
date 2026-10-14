@@ -55,7 +55,7 @@ One browsa card connects to several agents at once; the sidebar dropdown switche
 - **Videos & podcasts**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too; Xiaoyuzhou podcast episodes transcribe with one attach
 - **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
 - **Office documents**: direct links to `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… are converted to Markdown fully on-device (docling compiled to WASM) — tables, headings and lists survive
-- **Articles & messy pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
+- **Articles & complex pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
 
 Full list under "What browsa reads" below.
 
@@ -63,7 +63,7 @@ Full list under "What browsa reads" below.
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
@@ -289,7 +289,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
 | GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
-| Anything messy | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"); long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
+| Complex pages | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"); long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
 | Selected text | structure preserved — tables, lists and links convert to Markdown on attach, not bare plain text |
 
 Highlight text on a page and the **floating toolbar** appears: **Explain** and **Translate** answer inline — a streaming card right next to the selection, no panel needed — while **Ask** and **Summarize** (and the right-click menu) ride into the panel. No need to click 📎.

@@ -52,7 +52,7 @@ Um único cartão do browsa conecta a vários agentes ao mesmo tempo; o menu sus
 - **Vídeos**: legendas ou transcrição automática (ASR) → notas com **timestamps `[mm:ss]` clicáveis**; clique em um para voltar direto ao momento. Vídeos sem legenda também podem ser lidos visualmente
 - **PDFs / artigos científicos**: processados inteiramente no navegador — tabelas, layout de múltiplas colunas e títulos reconstruídos; regiões de figuras recortadas e enviadas a modelos de visão
 - **Documentos Office**: links diretos para `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… são convertidos para Markdown totalmente no dispositivo (docling compilado para WASM) — tabelas, títulos e listas se mantêm
-- **Artigos & páginas bagunçadas**: texto do artigo limpo; páginas de feed leem os próprios dados da página diretamente (YouTube, Bilibili, 小红书…)
+- **Artigos & páginas complexas**: texto do artigo limpo; páginas de feed leem os próprios dados da página diretamente (YouTube, Bilibili, 小红书…)
 
 A lista completa está em "O que o browsa lê", abaixo.
 
@@ -60,7 +60,7 @@ A lista completa está em "O que o browsa lê", abaixo.
 
 ```mermaid
 flowchart LR
-    P["Current tab<br/>articles · videos · PDFs · messy pages"]
+    P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
         A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
@@ -285,7 +285,7 @@ Clique em 📎 para anexar a aba atual — modo **Auto** (texto do artigo limpo,
 | Vídeos | transcrição com timestamps `[mm:ss]` clicáveis; vídeos sem legenda são transcritos automaticamente (ASR, opcional — chave do Volcengine Ark nas Configurações) ou analisados visualmente junto com a fala |
 | Páginas de arquivo do GitHub | código-fonte bruto de `raw.githubusercontent.com` — markdown e código mantêm a estrutura |
 | Documentos Feishu / Lark | a estrutura de blocos do editor da página interpretada diretamente — títulos, listas e **linhas & colunas de tabelas** se mantêm |
-| Qualquer coisa bagunçada | as próprias requisições de rede da página, observadas e lidas diretamente — legendas, comentários, código-fonte do artigo (YouTube, Bilibili, 小红书, e mais) |
+| Páginas complexas | as próprias requisições de rede da página, observadas e lidas diretamente — legendas, comentários, código-fonte do artigo (YouTube, Bilibili, 小红书, e mais) |
 
 Selecione texto em uma página e a **barra flutuante** aparece: **Explicar** e **Traduzir** respondem inline — um cartão em streaming bem ao lado da seleção, sem precisar do painel — enquanto **Perguntar** e **Resumir** (e o menu de contexto) vão para o painel. Não precisa clicar em 📎.
 
