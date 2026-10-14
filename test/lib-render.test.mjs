@@ -252,6 +252,42 @@ test('initMermaidTheme re-initializes on OS theme hot-switch (per-render parity 
   assert.deepEqual(calls, ['dark', 'default'], 're-init only on theme change');
 });
 
+test('initMermaidTheme passes panel typography into initialize and re-inits when it changes (2026-10-14 字体一致性)', async () => {
+  // 图形文字必须跟正文一致：字体族/字号（--msg-font-size 档位）进 initialize，
+  // 且字号档位变化后新图跟手（键含字体，不只主题）。
+  const { initMermaidTheme } = await import('../lib/sidepanel/render.js');
+  const cfgs = [];
+  const fake = { initialize: (cfg) => cfgs.push(cfg) };
+  const orig = window.matchMedia;
+  try {
+    window.matchMedia = () => ({ matches: true });
+    initMermaidTheme(fake);
+    initMermaidTheme(fake); // 同键 → no-op
+    assert.equal(cfgs.length, 1, 'same key must not re-initialize');
+    assert.equal(cfgs[0].theme, 'dark');
+    assert.match(cfgs[0].fontFamily, /sans-serif/, 'jsdom falls back to the sidepanel.css body stack');
+    assert.equal(cfgs[0].themeVariables.fontSize, '13.5px', 'jsdom falls back to the :root --msg-font-size default');
+    // 档位变化 → 重新 initialize（键含字号）。jsdom 的 getComputedStyle 不
+    // 反映自定义属性——桩一层模拟 applyFontSize 写入后的 live 值。
+    const origGCS = globalThis.getComputedStyle;
+    globalThis.getComputedStyle = () => ({ getPropertyValue: (p) => (p === '--msg-font-size' ? '16px' : '') });
+    try {
+      initMermaidTheme(fake);
+      assert.equal(cfgs.length, 2, 'a --msg-font-size change must re-initialize so new diagrams follow');
+      assert.equal(cfgs[1].themeVariables.fontSize, '16px');
+      // 「正文字体」设置跟手：--msg-font-family 变量进 initialize.fontFamily
+      globalThis.getComputedStyle = () => ({ getPropertyValue: (p) => (p === '--msg-font-family' ? 'Georgia, serif' : '') });
+      initMermaidTheme(fake);
+      assert.equal(cfgs.length, 3, 'a --msg-font-family change must re-initialize so new diagrams follow');
+      assert.equal(cfgs[2].fontFamily, 'Georgia, serif');
+    } finally {
+      globalThis.getComputedStyle = origGCS;
+    }
+  } finally {
+    window.matchMedia = orig;
+  }
+});
+
 test('renderSafe: symbol-punctuation bold adjacent to CJK still parses (**2.5×**涨到)', async () => {
   const html = await renderSafe('硬科技占比从**2.5×**涨到**6×**');
   assert.doesNotMatch(html, /\*\*/, 'no literal ** may remain');

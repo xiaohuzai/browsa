@@ -471,6 +471,22 @@
     "message": "消息字号",
     "description": "Options: font size label"
   },
+  "fontFamilyLabel": {
+    "message": "正文字体",
+    "description": "Options: message font family label"
+  },
+  "fontFamilySystem": {
+    "message": "系统默认",
+    "description": "Options: font family — follow the system default"
+  },
+  "fontFamilySerif": {
+    "message": "宋体（衬线）",
+    "description": "Options: font family — serif (CJK Ming/Song)"
+  },
+  "fontFamilyMono": {
+    "message": "等宽",
+    "description": "Options: font family — monospace"
+  },
   "sendShortcutLabel": {
     "message": "发送快捷键",
     "description": "Options: send shortcut label"

@@ -308,6 +308,7 @@ body {
   color: var(--fg-2);
   white-space: pre-wrap;
   font-size: var(--msg-font-size);
+  font-family: var(--msg-font-family);
   text-align: left;
   max-width: 88%;
   box-shadow: 0 2px 8px color-mix(in srgb, #000 12%, transparent);
@@ -850,6 +851,7 @@ body {
 /* ─── Markdown inside assistant ─────────────────────────────────────────────── */
 .msg.assistant {
   font-size: var(--msg-font-size);
+  font-family: var(--msg-font-family);
   line-height: 1.72;
 }
 .msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 {
@@ -1230,6 +1232,14 @@ math[display="block"] {
   height: 380px;
 }
 .markmap-svg { width: 100%; height: 100%; display: block; }
+/* markmap 文字跟正文一致（2026-10-14）：vendor 注入的默认是
+   --markmap-font: 300 16px/20px sans-serif——族/字号/字重全不跟面板。
+   覆盖 vendor 自己的变量（其 .markmap 规则经 font:var(--markmap-font)
+   消费）；本选择器 specificity 更高，与 vendor <style> 的注入顺序无关。
+   族/字号都引用正文变量，「正文字体」设置（含图形跟手）自动覆盖到这里。 */
+.markmap-diagram .markmap {
+  --markmap-font: 400 var(--msg-font-size, 13.5px)/1.72 var(--msg-font-family);
+}
 
 /* ─── Code copy button ──────────────────────────────────────────────────────── */
 .code-copy-btn {
@@ -2482,7 +2492,14 @@ code.language-patch .hljs-addition { color: #7ee787; }
 
 
 /* ── Font size CSS variable (default 13.5px, adjustable via settings) ─────── */
-:root { --msg-font-size: 13.5px; }
+/* 正文排版变量：字号（设置档位）+ 字体族（设置「正文字体」，'system' 时
+   JS 移除内联值、落回这里 = body 同款栈）。render.js 的兜底字面量与本
+   默认值由 render-contract-lockstep.test.mjs 互相钉死，改任一侧必跑。 */
+:root {
+  --msg-font-size: 13.5px;
+  --msg-font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
 
 
 /* ── In-conversation search bar ─────────────────────────────────────────── */

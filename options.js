@@ -129,6 +129,8 @@ function applyChatPrefs(cfg) {  const fs = $('fontSize');
   const val = cfg.fontSize ?? 13.5;
   if (fs) fs.value = val;
   if (fsv) fsv.textContent = val + 'px';
+  const ff = $('fontFamily');
+  if (ff) ff.value = cfg.fontFamily || 'system';
   const ss = $('sendShortcut');
   if (ss) ss.value = cfg.sendShortcut || 'enter';
   const tac = $('thoughtAutoCollapse');
@@ -140,9 +142,11 @@ async function saveChatPrefs() {
   let fs = parseFloat($('fontSize')?.value || '13.5');
   if (!Number.isFinite(fs)) fs = 13.5; // empty/invalid range value → keep the default, don't store NaN
   const ss = $('sendShortcut')?.value || 'enter';
+  const ff = $('fontFamily')?.value || 'system';
   const tac = !!$('thoughtAutoCollapse')?.checked;
-  await persist({ fontSize: fs, sendShortcut: ss, thoughtAutoCollapse: tac });
+  await persist({ fontSize: fs, fontFamily: ff, sendShortcut: ss, thoughtAutoCollapse: tac });
   cachedCfg.fontSize = fs;
+  cachedCfg.fontFamily = ff;
   cachedCfg.sendShortcut = ss;
   cachedCfg.thoughtAutoCollapse = tac;
   const statusEl = $('chat-prefs-status');

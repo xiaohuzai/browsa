@@ -471,6 +471,22 @@
     "message": "Размер шрифта сообщений",
     "description": "Options: font size label"
   },
+  "fontFamilyLabel": {
+    "message": "Шрифт текста",
+    "description": "Options: message font family label"
+  },
+  "fontFamilySystem": {
+    "message": "Системный по умолчанию",
+    "description": "Options: font family — follow the system default"
+  },
+  "fontFamilySerif": {
+    "message": "С засечками",
+    "description": "Options: font family — serif (CJK Ming/Song)"
+  },
+  "fontFamilyMono": {
+    "message": "Моноширинный",
+    "description": "Options: font family — monospace"
+  },
   "sendShortcutLabel": {
     "message": "Сочетание клавиш для отправки",
     "description": "Options: send shortcut label"

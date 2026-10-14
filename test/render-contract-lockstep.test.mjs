@@ -15,6 +15,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const css = readFileSync(join(ROOT, 'sidepanel.css'), 'utf8');
 const renderJs = readFileSync(join(ROOT, 'lib', 'sidepanel', 'render.js'), 'utf8');
 const promptJs = readFileSync(join(ROOT, 'lib', 'prompt-assembly.js'), 'utf8');
+const sidepanelJs = readFileSync(join(ROOT, 'sidepanel.js'), 'utf8');
+const optionsJs = readFileSync(join(ROOT, 'options.js'), 'utf8');
+const storageJs = readFileSync(join(ROOT, 'lib', 'storage.js'), 'utf8');
+const fontChoicesJs = readFileSync(join(ROOT, 'lib', 'font-choices.js'), 'utf8');
 
 // ─── 1. bubble widening (field report: bare ```pdb fence → 185px Mol* sliver)
 // Live-render blocks are percentage-sized with no intrinsic width; a reply
@@ -119,4 +123,90 @@ test('lockstep: think body is height-capped, internally scrollable, and its pre 
   assert.ok(pre, '.think-body pre containment rule is gone');
   assert.match(pre[0], /white-space:\s*pre-wrap/, 'pre must wrap — indented pseudo-code overflowed the block border');
   assert.match(pre[0], /max-width:\s*100%/, 'pre must be width-contained');
+});
+
+// ─── 4. 图形文字跟正文一致（2026-10-14 用户报告：mermaid 文字字体字号与正文不同）
+// 四个 SVG 渲染器的文字此前各带一套字体（mermaid trebuchet+18px、echarts
+// sans-serif 12px、markmap vendor 300 16px/20px、graphviz Times 衬线）。render.js
+// 的兜底字面量必须与 sidepanel.css 的正文排版互相钉死——任何一侧单独改字体，
+// 另一侧静默漂移。
+test('lockstep: render.js font fallbacks mirror sidepanel.css body/bubble typography', () => {
+  const bodyBlock = css.match(/^body \{([^}]*)\}/m);
+  assert.ok(bodyBlock, 'the plain body block is gone from sidepanel.css');
+  const cssStack = (bodyBlock[1].match(/font-family:\s*([^;]+);/) || [])[1];
+  assert.ok(cssStack, 'body font-family is gone');
+  const jsStack = renderJs.match(/_FONT_STACK_FALLBACK = '([^']+)'/);
+  assert.ok(jsStack, 'render.js lost _FONT_STACK_FALLBACK — diagram text no longer follows the body font');
+  assert.equal(
+    jsStack[1].replace(/\s+/g, ' ').trim(),
+    cssStack.replace(/\s+/g, ' ').trim(),
+    'render.js font fallback and sidepanel.css body font-family drifted apart — keep them identical',
+  );
+  const rootDefault = (css.match(/--msg-font-size:\s*([\d.]+)px/) || [])[1];
+  assert.ok(rootDefault, 'the :root --msg-font-size default is gone');
+  const jsSize = renderJs.match(/_FONT_SIZE_FALLBACK = ([\d.]+)/);
+  assert.ok(jsSize, 'render.js lost _FONT_SIZE_FALLBACK');
+  assert.equal(jsSize[1], rootDefault, 'fallback bubble font size must equal the :root --msg-font-size default');
+});
+
+test('lockstep: markmap text follows the bubble font via the vendor --markmap-font variable', () => {
+  // markmap-view 注入 .markmap{font:var(--markmap-font)}，vendor 默认是
+  // 300 16px/20px sans-serif。覆盖规则丢了 → 思维导图文字回到 vendor 默认。
+  const rule = css.match(/\.markmap-diagram \.markmap\s*\{[^}]*\}/);
+  assert.ok(rule, 'the .markmap-diagram .markmap font override is gone');
+  assert.match(rule[0], /--markmap-font:[^;]*var\(--msg-font-size/, 'override must track the bubble font-size variable');
+  assert.match(rule[0], /--markmap-font:[^;]*var\(--msg-font-family/, 'override must track the bubble font-family variable (「正文字体」设置跟手)');
+});
+
+test('lockstep: echarts gets a panel-typography default textStyle under the model option', () => {
+  // 模型 option 之下的全局默认（两次 setOption 合并，模型自带 textStyle 仍胜）。
+  assert.match(
+    renderJs,
+    /setOption\(\{\s*textStyle:\s*\{\s*fontFamily:\s*panelFontFamily\(\),\s*fontSize:\s*bubbleFontSize\(\)\s*\}\s*\}\)/,
+    'the echarts default-textStyle setOption is gone — chart text fell back to echarts sans-serif 12px',
+  );
+});
+
+// ─── 5. 「正文字体」设置接线（2026-10-14，补齐只有字号没有字体族的半边）──────
+// 设置页选择 → storage.fontFamily → sidepanel applyFontFamily 写
+// --msg-font-family → .msg 气泡消费 + render.js 图形跟手。任何一环脱落：
+// 要么设置不生效，要么图形跟不上新字体（2026-10-14 图形一致性失效）。
+test('lockstep: the message-font-family setting is wired end to end', () => {
+  // CSS 侧：:root 默认 = body 同款栈（与 render.js 兜底字面量互钉）；两个气泡
+  // 选择器都消费变量。
+  const rootBlock = css.match(/:root\s*\{[^}]*\}/);
+  assert.ok(rootBlock, 'the typography :root block is gone');
+  const cssVar = (rootBlock[0].match(/--msg-font-family:\s*([^;]+);/) || [])[1];
+  assert.ok(cssVar, ':root lost --msg-font-family');
+  const jsStack = renderJs.match(/_FONT_STACK_FALLBACK = '([^']+)'/);
+  assert.ok(jsStack, 'render.js lost _FONT_STACK_FALLBACK');
+  assert.equal(
+    cssVar.replace(/\s+/g, ' ').trim(),
+    jsStack[1].replace(/\s+/g, ' ').trim(),
+    ':root --msg-font-family default and render.js fallback drifted — keep them identical',
+  );
+  // .msg.assistant 有两条规则（布局块 + 排版块）——任一条消费变量即算覆盖。
+  for (const sel of ['.msg.user', '.msg.assistant']) {
+    const re = new RegExp(sel.replace(/\./g, '\\.') + '\\s*\\{[^}]*\\}', 'g');
+    const blocks = css.match(re) || [];
+    assert.ok(blocks.length, `${sel} block is gone`);
+    assert.ok(
+      blocks.some((b) => /font-family:\s*var\(--msg-font-family\)/.test(b)),
+      `${sel} must consume --msg-font-family (the message font setting would not reach bubbles)`,
+    );
+  }
+  // render.js 侧：图形字体先读变量（设置跟手），读不到再落 body/兜底。
+  assert.match(renderJs, /getPropertyValue\('--msg-font-family'\)/,
+    'panelFontFamily must read --msg-font-family first or the font setting will not reach diagrams');
+  // 接线三环：options 存取、sidepanel 应用、storage 合同。
+  assert.match(optionsJs, /fontFamily: ff/, 'options saveChatPrefs must persist fontFamily');
+  assert.match(sidepanelJs, /function applyFontFamily/, 'sidepanel lost the applier');
+  assert.match(sidepanelJs, /changes\.fontFamily\) applyFontFamily/,
+    'sidepanel must live-track fontFamily storage changes');
+  assert.match(storageJs, /'fontSize', 'fontFamily', 'sendShortcut'/,
+    'fontFamily must ride GET_ALL_KEYS or the panel never sees the setting at init');
+  // 候选表：三档齐全，'system' 刻意 stack:null（移除内联 var 让 :root 兜底）。
+  for (const key of ['system', 'serif', 'mono']) {
+    assert.ok(fontChoicesJs.includes(`key: '${key}'`), `font-choices lost the '${key}' option`);
+  }
 });

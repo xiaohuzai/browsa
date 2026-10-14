@@ -15,7 +15,7 @@ import {
   activeRunIds, pendingApprovals, pendingClarifications,
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState,
-  recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone,
+  recordTerminalTombstone, takeTerminalTombstone, peekTerminalTombstone, clearTerminalTombstone,
   STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt, ensureDurableSalvage } from './lib/handlers/chat-handler.js';
@@ -1038,7 +1038,16 @@ async function handle(msg, sender) {
         // history (once per SW lifetime) and lets the panel re-render it.
         // Read-once per tab (Set.delete): one re-render per salvaged turn.
         const recovered = (await ensureDurableSalvage()).delete(t);
-        return recovered ? { inFlight: false, recovered: true } : { inFlight: false };
+        // Turn finished INSIDE the panel-reopen window (2026-10-14 field
+        // report: streaming close→reopen showed nothing): DONE persisted
+        // AFTER init's renderHistory read storage, PEEK answers after
+        // clearStreamState — the reply is in history but rendered nowhere.
+        // A non-consuming tombstone peek flags it; the panel re-renders
+        // once. (Not take(): a resume-HELLO replay may still need it.)
+        const justFinished = !recovered && peekTerminalTombstone(t);
+        return recovered ? { inFlight: false, recovered: true }
+          : justFinished ? { inFlight: false, justFinished: true }
+          : { inFlight: false };
       }
       if (msg.sessionId != null && st.originSessionId === msg.sessionId) st.bg = false;
       return {

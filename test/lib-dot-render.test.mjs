@@ -138,3 +138,33 @@ test('rethemeDotSvg: the 3-hex and named-color luminance paths do not crash', ()
   svg.querySelector('#node3 path').setAttribute('fill', 'darkslateblue');
   assert.doesNotThrow(() => rethemeDotSvg(svg, false));
 });
+
+// ─── rethemeDotSvg font normalization (2026-10-14 用户报告：图形文字跟正文一致) ─
+// graphviz 把自家默认字体（Times 衬线）写死在每个 <text> 的 font-family 上；
+// 只改写这个默认值到面板字体栈，模型自选 fontname 保留。字号不动——布局按它量的。
+test('rethemeDotSvg rewrites the graphviz default Times font to the panel stack, keeps model fontnames', () => {
+  const svg = vizFixture();
+  const texts = svg.querySelectorAll('text');
+  texts[0].setAttribute('font-family', 'Times,serif');      // graphviz 默认
+  texts[1].setAttribute('font-family', 'Times New Roman,serif'); // 默认的别名形状
+  texts[2].setAttribute('font-family', 'Arial');            // 模型自选 → 保留
+  texts[3].setAttribute('font-family', '"Segoe UI"');       // 带引号自选 → 保留
+  rethemeDotSvg(svg, false, 'PanelStack');
+  const ffs = [...svg.querySelectorAll('text')].map((t) => t.getAttribute('font-family'));
+  assert.deepEqual(ffs, ['PanelStack', 'PanelStack', 'Arial', '"Segoe UI"']);
+});
+
+test('rethemeDotSvg font rewrite falls back to the sidepanel.css body stack when no family passed', () => {
+  const svg = vizFixture();
+  svg.querySelector('#node1 text').setAttribute('font-family', 'Times,serif');
+  rethemeDotSvg(svg, false); // jsdom computed family 为空 → 兜底字面量
+  assert.match(svg.querySelector('#node1 text').getAttribute('font-family'), /sans-serif/);
+});
+
+test('rethemeDotSvg leaves text without a font-family attribute untouched', () => {
+  const svg = vizFixture(); // fixture 的 text 本就无 font-family
+  assert.doesNotThrow(() => rethemeDotSvg(svg, true));
+  for (const t of svg.querySelectorAll('text')) {
+    assert.equal(t.getAttribute('font-family'), null, 'no attribute in → no attribute out');
+  }
+});

@@ -471,6 +471,22 @@
     "message": "Message font size",
     "description": "Options: font size label"
   },
+  "fontFamilyLabel": {
+    "message": "Message font",
+    "description": "Options: message font family label"
+  },
+  "fontFamilySystem": {
+    "message": "System default",
+    "description": "Options: font family — follow the system default"
+  },
+  "fontFamilySerif": {
+    "message": "Serif",
+    "description": "Options: font family — serif (CJK Ming/Song)"
+  },
+  "fontFamilyMono": {
+    "message": "Monospace",
+    "description": "Options: font family — monospace"
+  },
   "sendShortcutLabel": {
     "message": "Send shortcut",
     "description": "Options: send shortcut label"

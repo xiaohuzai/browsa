@@ -471,6 +471,22 @@
     "message": "메시지 글자 크기",
     "description": "Options: font size label"
   },
+  "fontFamilyLabel": {
+    "message": "본문 글꼴",
+    "description": "Options: message font family label"
+  },
+  "fontFamilySystem": {
+    "message": "시스템 기본값",
+    "description": "Options: font family — follow the system default"
+  },
+  "fontFamilySerif": {
+    "message": "명조체(세리프)",
+    "description": "Options: font family — serif (CJK Ming/Song)"
+  },
+  "fontFamilyMono": {
+    "message": "고정 폭",
+    "description": "Options: font family — monospace"
+  },
   "sendShortcutLabel": {
     "message": "전송 단축키",
     "description": "Options: send shortcut label"
