@@ -120,7 +120,7 @@ const tick = (n = 3) => new Promise((r) => setTimeout(r, n));
 const flushDurable = () => new Promise((r) => setTimeout(r, 1100)); // > DURABLE_FLUSH_MS
 
 const bg = await import('../background.js');
-const { handle, streamState, streamPorts, chatControllers, clearTerminalTombstone, takeTerminalTombstone } = bg;
+const { handle, streamState, streamPorts, chatControllers, clearTerminalTombstone, takeTerminalTombstone, recordTerminalTombstone } = bg;
 const { initStreamState, appendToStreamState, clearStreamState } = bg;
 const chatMod = await import('../lib/handlers/chat-handler.js');
 const { salvageDurableTurns, resetDurableSalvageForTests } = chatMod;
@@ -437,4 +437,32 @@ test('squilla turn, panel closed mid-stream: PEEK shows the acc, completion pers
   await tick();
   gw.restore();
   streamState.clear();
+});
+
+// ---- 5. finish-inside-reopen-window (2026-10-14 field report) ----------------
+// A turn that COMPLETES while the panel document is being recreated: init's
+// renderHistory reads history BEFORE the DONE persists, STREAM_PEEK answers
+// after clearStreamState — the reply is in history but rendered nowhere
+// (field report: streaming close→reopen showed nothing; thinking-reopen
+// worked because the turn was still running and resumed live). PEEK must
+// flag a live terminal tombstone (non-consuming!) so the panel re-renders once.
+test('STREAM_PEEK reports justFinished when the turn completed inside the reopen window', async () => {
+  localArea._reset();
+  streamState.clear();
+  clearTerminalTombstone(27);
+  // The chat-handler DONE tail: terminal tombstone recorded + streamState cleared.
+  recordTerminalTombstone(27, { type: 'DONE', full: '完整回复' });
+  const peek = await handle({ type: 'STREAM_PEEK', tabId: 27 });
+  assert.equal(peek.inFlight, false, 'stream is gone — no resume, no spinner');
+  assert.equal(peek.justFinished, true, 'panel is told to re-render (reply persisted behind init render)');
+
+  // No tombstone → a plain not-in-flight peek stays flag-free (no extra render).
+  clearTerminalTombstone(27);
+  const peek2 = await handle({ type: 'STREAM_PEEK', tabId: 27 });
+  assert.deepEqual(peek2, { inFlight: false });
+
+  // PEEK must NOT consume the tombstone — the resume-HELLO replay keeps its one-shot.
+  recordTerminalTombstone(27, { type: 'DONE', full: 'x' });
+  await handle({ type: 'STREAM_PEEK', tabId: 27 });
+  assert.ok(takeTerminalTombstone(27), 'peekTerminalTombstone is read-only; take still delivers');
 });
