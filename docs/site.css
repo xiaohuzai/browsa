@@ -801,6 +801,78 @@ html[data-md-color-scheme="slate"] .pb-idle{color:#d4a72c;background:rgba(212,16
   margin-top:12px;text-align:center;font-size:12px;color:var(--md-fg-light);line-height:1.7;
 }
 
+/* ─── 首屏动效（2026-10-14，让首屏自己会讲产品）──────────────────────────
+   场景窗 inactive 为 display:none → 每次显示瞬间 CSS 动画自动重放，无需 JS 复位；
+   自动轮播由 site.js 每 11s 勾选下一个 radio，用户手动切换即永久接管。
+   prefers-reduced-motion：下方专属块把全部延迟动画置为直接可见。 */
+@keyframes riseIn{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:none}
+}
+@keyframes cursorBlink{0%,45%{opacity:1}50%,100%{opacity:0}}
+@keyframes toolDim{to{opacity:.55}}
+
+/* 面板侧模拟流式作答：附件条 → 提问 → 读取中（渐暗让位）→ 答案逐条浮现。
+   延迟与轮播周期（site.js 11s）配套：末条 ≈5.6s 出现，留 ~5s 阅读停驻。 */
+.scenarios .window .p-sys{opacity:0;animation:riseIn .4s ease .1s forwards}
+.scenarios .window .p-user{opacity:0;animation:riseIn .4s ease .8s forwards}
+.scenarios .window .p-assist{opacity:0;animation:riseIn .4s ease 1.6s forwards}
+.scenarios .window .p-tool{animation:toolDim .4s ease 3.6s forwards}
+.scenarios .window .p-body > *{opacity:0;animation:riseIn .45s ease forwards}
+.scenarios .window .p-body > :nth-child(1){animation-delay:2.6s}
+.scenarios .window .p-body > :nth-child(2){animation-delay:3.1s}
+.scenarios .window .p-body > :nth-child(3){animation-delay:3.6s}
+.scenarios .window .p-body > :nth-child(4){animation-delay:4.1s}
+.scenarios .window .p-body > :nth-child(5){animation-delay:4.6s}
+.scenarios .window .p-body > :nth-child(6){animation-delay:5.1s}
+.scenarios .window .p-body > :nth-child(7){animation-delay:5.6s}
+.scenarios .window .p-cursor{animation:cursorBlink 1.15s linear infinite}
+
+/* 首屏文案依次入场（与 reduced-motion 无关的短链路，直接跟着全局 .001s 兜底） */
+.hero-copy > *{opacity:0;animation:riseIn .55s ease forwards}
+.hero-copy > :nth-child(1){animation-delay:.05s}
+.hero-copy > :nth-child(2){animation-delay:.13s}
+.hero-copy > :nth-child(3){animation-delay:.21s}
+.hero-copy > :nth-child(4){animation-delay:.29s}
+.hero-copy > :nth-child(5){animation-delay:.37s}
+.hero-copy > :nth-child(6){animation-delay:.45s}
+.scenarios{opacity:0;animation:riseIn .6s ease .3s forwards}
+
+/* 滚动渐入：html.js 只在 site.js 确认支持 IntersectionObserver 时挂上，
+   无 JS / 不支持的浏览器保持全部可见（内容永远不丢，只是「晚出现」）。 */
+html.js .landing .section-head,
+html.js .landing .how,
+html.js .landing .feature,
+html.js .landing .site-strip,
+html.js .landing .keys-list,
+html.js .landing .prov-board,
+html.js .landing .install-option,
+html.js .landing .install-next,
+html.js .landing .demo-video,
+html.js .landing .community-qr figure{
+  opacity:0;transform:translateY(16px);
+  transition:opacity .55s ease,transform .55s ease;
+}
+html.js .landing .in-view{opacity:1;transform:none}
+html.js .landing :is(.feature,.how):nth-child(4n+2){transition-delay:.07s}
+html.js .landing :is(.feature,.how):nth-child(4n+3){transition-delay:.14s}
+html.js .landing :is(.feature,.how):nth-child(4n){transition-delay:.21s}
+
+/* reduced-motion：轮播与流式编排在 site.js 已停，这里保证零延迟直出终态
+   （全局 .001s 规则只缩短时长、不消 animation-delay，必须显式覆盖）。 */
+@media (prefers-reduced-motion:reduce){
+  .hero-copy > *,.scenarios,.scenarios .window .p-sys,
+  .scenarios .window .p-user,.scenarios .window .p-assist,
+  .scenarios .window .p-tool,.scenarios .window .p-body > *,
+  .scenarios .window .p-cursor{animation:none;opacity:1;transform:none}
+  html.js .landing .section-head,html.js .landing .how,html.js .landing .feature,
+  html.js .landing .site-strip,html.js .landing .keys-list,html.js .landing .prov-board,
+  html.js .landing .install-option,html.js .landing .install-next,
+  html.js .landing .demo-video,html.js .landing .community-qr figure{
+    opacity:1;transform:none;transition:none;
+  }
+}
+
 /* ── 社区交流群（README/官网同款双码）──────────────────────────────── */
 .community-qr{display:flex;justify-content:center;gap:56px;margin-top:8px}
 .community-qr figure{margin:0;text-align:center}

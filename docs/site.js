@@ -2,6 +2,7 @@
    - 主题切换：default/slate 双 scheme，localStorage 持久化（首帧由各页
      <head> 里的内联脚本先行设置，这里只负责切换与持久化）
    - 顶栏滚动阴影（Material md-header--shadow）
+   - 落地页：场景窗自动轮播（用户接管即停）+ 滚动渐入（html.js 门控）
    - 指南页：左栏搜索（懒抓取侧栏里链接到的页面做全文匹配）+
      右栏页内目录（从 h2/h3 自动生成，滚动高亮）
    全部原生 JS，无依赖。 */
@@ -38,6 +39,49 @@
       doc.style.colorScheme = next === 'slate' ? 'dark' : 'light';
       try { localStorage.setItem('browsa-scheme', next); } catch (e) {}
     });
+  }
+
+  /* ─── 落地页：场景窗自动轮播 ───
+     每 11s 勾选下一个场景（display:none→block 让 CSS 流式动画自动重放）；
+     用户手动/键盘切换触发 change，即永久接管、停止轮播。
+     程序化 .checked 不派发 change，轮播自身不会被误停。 */
+  var scnInputs = document.querySelectorAll('.scn-tabs input[name="scn"]');
+  if (scnInputs.length > 1 &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var scnOrder = Array.prototype.slice.call(scnInputs);
+    var scnIdx = 0;
+    scnOrder.forEach(function (r, i) { if (r.checked) scnIdx = i; });
+    var scnStopped = false;
+    scnOrder.forEach(function (r) {
+      r.addEventListener('change', function () { scnStopped = true; });
+    });
+    setInterval(function () {
+      if (scnStopped || document.hidden) return;
+      scnIdx = (scnIdx + 1) % scnOrder.length;
+      scnOrder[scnIdx].checked = true;
+    }, 11000);
+  }
+
+  /* ─── 落地页：滚动渐入 ───
+     html.js 只在 IntersectionObserver 可用时挂上——CSS 的隐藏态全部
+     门控在这个类下，无 JS / 不支持的浏览器内容保持完整可见。 */
+  if ('IntersectionObserver' in window && document.querySelector('.landing')) {
+    doc.classList.add('js');
+    var revealables = document.querySelectorAll(
+      '.landing .section-head, .landing .how, .landing .feature, ' +
+      '.landing .site-strip, .landing .keys-list, .landing .prov-board, ' +
+      '.landing .install-option, .landing .install-next, ' +
+      '.landing .demo-video, .landing .community-qr figure'
+    );
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add('in-view');
+          io.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    revealables.forEach(function (el) { io.observe(el); });
   }
 
   /* ─── 指南页：右栏页内目录 ─── */
