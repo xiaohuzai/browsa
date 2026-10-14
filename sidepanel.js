@@ -3,6 +3,7 @@
 // via a long-lived Port (chrome.runtime.connect) for low-latency chunk delivery.
 
 import { buildSelectionActionPrompt } from './lib/selection-language.js';
+import { msgFontStackOf } from './lib/font-choices.js';
 import { PAGE_CONTEXT_PREFIX } from './lib/constants.js';
 import * as storage from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
@@ -236,6 +237,7 @@ async function init() {
   // 勾选）的用户保持展开。
   setThoughtAutoCollapse(cfg.thoughtAutoCollapse !== false);
   if (cfg.fontSize) applyFontSize(cfg.fontSize);
+  if (cfg.fontFamily) applyFontFamily(cfg.fontFamily);
 
   // Load history
   const renderStats = await renderHistory();
@@ -572,6 +574,7 @@ async function init() {
         populateProviderSelect(cfg2Res.data || cfg2Res);
       }
       if (changes.fontSize?.newValue != null) applyFontSize(changes.fontSize.newValue);
+      if (changes.fontFamily) applyFontFamily(changes.fontFamily.newValue);
       if (changes.sendShortcut?.newValue != null) sendShortcut = changes.sendShortcut.newValue;
       if (changes.thoughtAutoCollapse) setThoughtAutoCollapse(changes.thoughtAutoCollapse.newValue !== false);
       return;
@@ -2181,7 +2184,11 @@ async function resumeInFlightStream(tabId) {
     // partial landed in history AFTER this panel's init renderHistory read
     // storage, so re-render once to show it. A second full render is cheap
     // next to losing the partial again.
-    if (peek.recovered) {
+    // `justFinished` (2026-10-14 field report: streaming close→reopen showed
+    // nothing): the turn COMPLETED inside the reopen window — DONE persisted
+    // after init's renderHistory read storage, PEEK answered after
+    // clearStreamState — same invisible-reply shape, same one re-render fix.
+    if (peek.recovered || peek.justFinished) {
       await renderHistory();
       requestAnimationFrame(() => scrollToBottom());
     }
@@ -3532,10 +3539,19 @@ async function renderHistory() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ─── Feature: Font size ────────────────────────────────────────────────────────
+// ─── Feature: Font size / font family ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--msg-font-size', px + 'px');
+}
+
+// 「正文字体」设置（设置页 fontFamily: system/serif/mono）：写 --msg-font-family
+// 供 .msg.user/.msg.assistant 消费；图形渲染经 render.js panelFontFamily() 读同
+// 一变量跟手。'system' 移除内联值，落回 :root 的 CSS 默认（= body 同款栈）。
+function applyFontFamily(key) {
+  const stack = msgFontStackOf(key);
+  if (stack) document.documentElement.style.setProperty('--msg-font-family', stack);
+  else document.documentElement.style.removeProperty('--msg-font-family');
 }
 
 

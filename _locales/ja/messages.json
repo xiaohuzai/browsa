@@ -471,6 +471,22 @@
     "message": "メッセージのフォントサイズ",
     "description": "Options: font size label"
   },
+  "fontFamilyLabel": {
+    "message": "本文フォント",
+    "description": "Options: message font family label"
+  },
+  "fontFamilySystem": {
+    "message": "システム既定",
+    "description": "Options: font family — follow the system default"
+  },
+  "fontFamilySerif": {
+    "message": "明朝体（セリフ）",
+    "description": "Options: font family — serif (CJK Ming/Song)"
+  },
+  "fontFamilyMono": {
+    "message": "等幅",
+    "description": "Options: font family — monospace"
+  },
   "sendShortcutLabel": {
     "message": "送信ショートカット",
     "description": "Options: send shortcut label"
