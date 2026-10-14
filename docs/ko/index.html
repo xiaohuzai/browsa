@@ -282,14 +282,14 @@
       <div class="section-head">
         <p class="eyebrow">데모</p>
         <h2>페이지에 머무르고, 곁에서 물어보세요.</h2>
-        <p>browsa는 나의 AI나 에이전트를 연결하는 Chrome / Edge 확장 프로그램입니다. Transformer 학습을 기사, 어텐션 수식, Mermaid Q/K/V 흐름, Graphviz 구조, 별도의 AI 업무 장편 인터뷰에서 클릭 가능한 핵심 내용으로 연결합니다. 수식과 컬러 Graphviz는 실제 Codex 답변을 browsa 확장에서 렌더링한 결과입니다. 다른 언어는 설명을 번역하고 같은 수식과 도형을 유지합니다. 브라우저 프레임, 기사와 인터뷰는 데모 구성입니다. Agent 이어하기는 데모로 표시되며 재생은 편집되었습니다. 음악과 동작 효과음만 사용합니다.</p>
+        <p>68초 만에 보는 전체 워크플로: 문서 첨부 → 수식·다이어그램 렌더링 → 클릭 가능한 타임스탬프 → 세션 관리와 Agent 이어하기.</p>
       </div>
       <figure class="demo-video">
         <video controls preload="none" poster="../assets/promo/poster-v7-ko.jpg" width="960">
           <source src="../assets/promo/browsa-promo-v7-ko.mp4" type="video/mp4" />
           브라우저에서 내장 동영상을 지원하지 않습니다 — <a href="../assets/promo/browsa-promo-v7-ko.mp4">여기서 다운로드</a>하세요.
         </video>
-        <figcaption>한국어 자막으로 소리 없이도 이해할 수 있습니다. 데모 데이터를 사용하며 재생은 편집되었습니다. <a href="https://www.youtube.com/watch?v=km0joAMt0Ow">YouTube</a>.</figcaption>
+        <figcaption>한국어 자막으로 소리 없이도 이해할 수 있습니다. 수식과 다이어그램은 실제 모델 답변에서 가져왔습니다. 데모 데이터를 사용하며 재생은 편집되었습니다. <a href="https://www.youtube.com/watch?v=km0joAMt0Ow">YouTube</a>.</figcaption>
       </figure>
     </div>
   </section>
@@ -316,7 +316,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>답변 스트리밍 <span class="tag">어떤 백엔드든</span></h3>
-          <p>답변은 단어 단위로 스트리밍되며 Markdown, 수식, 차트를 갖춰 나타납니다. 직접 쓰는 OpenAI 호환 API와 Hermes / opencode / OpenSquilla 에이전트 — 구독으로 로그인한 Codex / Claude Code, agent-bridge로 연결하는 Google 로그인 Gemini CLI, 자체 모델을 구성해 둔 pi, DeepSeek API 키로 로그인하는 dsh, 또는 로그인해 실행 상태로 유지하는 WorkBuddy 데스크톱 앱을 연결하세요. UI는 브라우저 언어를 따라갑니다 — English, 中文, 日本語, 한국어, Español, Português, Русский — 설정에서 언제든 바꿀 수 있습니다.</p>
+          <p>답변은 단어 단위로 스트리밍되며 Markdown, 수식, 차트를 갖춰 나타납니다. 어떤 OpenAI 호환 API든, 또는 Hermes / opencode / OpenSquilla / agent-bridge 에이전트든 연결할 수 있습니다. UI는 7개 언어를 기본 제공합니다.</p>
         </div>
       </div>
       <p class="site-note">설치했나요? <a href="../en/guide/quickstart.html">빠른 시작</a>이 첫 질문까지 안내하고, <a href="../en/guide/">전체 가이드</a>는 읽기, 동영상, 렌더링, 세션, 백엔드, 설정을 다룹니다.</p>
@@ -339,8 +339,8 @@
           <ul>
             <li>자동 계단식: Readability 본문 → DOM 트리 → 전체 텍스트</li>
             <li>📷 스크린샷 모드, 멀티모달 모델용</li>
-            <li>PDF 로컬 파싱: WASM이 표 / 제목 / 레이아웃을 재구성하고 그림은 자동으로 잘라 냅니다</li>
-            <li>GitHub 파일 페이지는 페이지 정리를 건너뛰고 raw 소스를 직접 가져옵니다</li>
+            <li>PDF 로컬 파싱: 표 / 제목 / 레이아웃 재구성</li>
+            <li>GitHub 파일 페이지는 raw 소스를 직접 가져옵니다</li>
           </ul>
         </div>
         <div class="feature">
@@ -349,8 +349,8 @@
           <p>아무 페이지에서 텍스트를 선택해 바로 질문하세요:</p>
           <ul>
             <li>플로팅 툴바: 질문 · 설명 · 번역 · 요약</li>
-            <li>설명 / 번역은 그 자리에서 인라인으로 답합니다 — 스트리밍, 그 자리에서, 패널 없이</li>
-            <li>질문 / 요약: 선택 영역이 패널로 전달됩니다 — 먼저 📎를 누를 필요가 없습니다</li>
+            <li>설명 / 번역은 읽기를 방해하지 않고 그 자리에서 인라인 스트리밍</li>
+            <li>질문 / 요약은 패널로 넘어갑니다 — 📎 없이</li>
           </ul>
         </div>
         <div class="feature">
@@ -361,7 +361,7 @@
             <li>Markdown GFM + 40개 이상 언어의 구문 강조</li>
             <li>LaTeX 수식 (KaTeX, Web Worker 가속)</li>
             <li>Mermaid 다이어그램, ECharts, Markmap 마인드맵</li>
-            <li>파싱에 실패한 Mermaid 블록? 구성해 둔 AI에게 고쳐 다시 그리도록 요청하세요</li>
+            <li>깨진 Mermaid는 AI가 한 번에 고쳐 다시 렌더링</li>
           </ul>
         </div>
         <div class="feature">
@@ -369,9 +369,11 @@
           <h3>동영상 노트</h3>
           <p>동영상을 위한 완전한 워크플로 — YouTube와 Bilibili의 구조화된 자막:</p>
           <ul>
-            <li>답변에는 동영상을 해당 시점으로 이동시키는 클릭 가능한 <code>[mm:ss]</code> 타임스탬프가 붙습니다</li>
-            <li>자막 없는 Bilibili 동영상도 요약할 수 있습니다 — 자동 ASR 전사</li>
-            <li>긴 전사문은 타임스탬프를 유지한 채 자동으로 요점으로 압축됩니다</li>
+            <li>클릭 가능한 <code>[mm:ss]</code> 타임스탬프 — 클릭하면 동영상의 해당 시점으로 이동</li>
+            <li>자막 드로어: 재생 위치 하이라이트 · 클릭해 이동 · 해당 줄 메모</li>
+            <li>자막이 없는 동영상: ASR 전사 / 시청각 정독</li>
+            <li>Xiaoyuzhou 팟캐스트: 타임스탬프 포함 원클릭 전사</li>
+            <li>긴 전사문은 타임스탬프를 유지한 채 자동으로 요점 압축</li>
           </ul>
         </div>
         <div class="feature">
@@ -380,14 +382,14 @@
           <p>벤더 종속 없음 — 내 모델을 연결하세요:</p>
           <ul>
             <li>Hermes 에이전트: 도구 실행, 위험 작업 승인, 진행 상태 표시</li>
-            <li>OpenCode 에이전트: opencode CLI 에이전트와 직통 연결 — 동일한 전체 도구 &amp; 승인 흐름</li>
-            <li>OpenSquilla 에이전트: 게이트웨이 WebSocket으로 연결하는 로컬 데스크톱 에이전트 — 서버 측 세션 메모리, 사고 과정 출력, 서버 측 취소</li>
-            <li>Agent Bridge: 로컬 에이전트를 연결합니다 — 구독으로 로그인한 Codex / Claude Code (모델 쪽은 내 구독으로 동작), Google 로그인 Gemini CLI, 원하는 모델을 구성해 둔 pi, DeepSeek API 키로 로그인하는 dsh, 또는 로그인해 실행 상태로 유지하는 WorkBuddy 데스크톱 앱; 한 카드로 여러 에이전트를 동시에 연결하며 각자 독립적인 세션과 핑 상태를 갖습니다</li>
-            <li>에이전트와의 대화는 에이전트 쪽에 남습니다: browsa가 세션 이름을 자동으로 붙이므로('browsa:' + 첫 메시지) 에이전트 자체 인터페이스에서 이어서 작업할 수 있습니다; 세션 ID는 세션 드로어에서 표시되고 복사할 수 있습니다</li>
+            <li>OpenCode 에이전트: CLI 직통 연결 — 전체 도구 &amp; 승인 흐름</li>
+            <li>OpenSquilla 에이전트: 게이트웨이 WebSocket — 서버 측 세션 메모리</li>
+            <li>Agent Bridge: Codex / Claude Code / Gemini CLI / pi / dsh / WorkBuddy 브리지 — 한 카드로 여러 에이전트</li>
+            <li>에이전트 세션은 에이전트 쪽에 — 자동으로 이름이 붙고 이어서 대화</li>
             <li>모든 OpenAI 호환 API: OpenAI, Ollama, LiteLLM…</li>
-            <li>카드에 모델을 여러 개 추가 — 사이드바에서 '별칭 · 모델'로 전환</li>
-            <li>모델별 사고 수준: 선택지는 모델 계열을 따르고 요청 필드는 각 API 방언에 맞게 조정됩니다</li>
-            <li>Ping으로 연결 상태와 지원 기능을 확인합니다</li>
+            <li>카드에 모델 여러 개 — 사이드바에서 바로 전환</li>
+            <li>모델별 사고 수준, 요청 필드 자동 조정</li>
+            <li>Ping으로 연결 상태와 지원 기능 확인</li>
           </ul>
         </div>
         <div class="feature">
@@ -395,11 +397,11 @@
           <h3>프라이버시 우선</h3>
           <p>browsa 계정은 없습니다. 모델 서비스는 내 선택:</p>
           <ul>
-            <li>API 키는 로컬에 저장되고 구성한 프로바이더 인증에만 사용됩니다</li>
-            <li>페이지 컨텍스트의 URL은 전송 전 로컬에서 마스킹됩니다 — 토큰, 비밀번호, 서명은 제거됩니다</li>
-            <li>PDF는 기기 안에서 파싱되며, 추출된 텍스트와 이미지는 모델 요청에 첨부할 수 있습니다</li>
-            <li>Office 문서(docx/pptx/xlsx/…)는 기기 안에서 Markdown으로 변환되며, 추출된 내용은 모델 요청에 첨부할 수 있습니다</li>
-            <li>내용은 내가 구성한 백엔드로만 전송됩니다</li>
+            <li>API 키는 로컬 저장 — 구성한 프로바이더 인증에만 사용</li>
+            <li>전송 전 로컬 마스킹: URL 토큰 / 비밀번호 / 서명</li>
+            <li>PDF는 기기 안에서 파싱 — 내용은 기기를 벗어나지 않습니다</li>
+            <li>Office 문서도 기기 안에서 Markdown으로 변환</li>
+            <li>내용은 내가 구성한 백엔드로만 전송</li>
           </ul>
         </div>
         <div class="feature">
@@ -408,9 +410,9 @@
           <p>더 두드리지 않고 더 말하기:</p>
           <ul>
             <li>빠른 작업: 요약 / 핵심 / 설명 / 목차</li>
-            <li>슬래시 명령 + ↑/↓ 입력 기록; 작성 중인 문구는 패널을 닫아도 남습니다</li>
-            <li>답변이 스트리밍되는 동안에도 계속 입력 — 메시지는 대기열에 쌓여 순서대로 전송됩니다</li>
-            <li>컴포저에 코드를 붙여넣으면 내 버블이 강조된 코드 블록으로 렌더링합니다(복사 버튼, 언어 자동 감지); 나머지 텍스트는 바이트 그대로 유지됩니다</li>
+            <li>슬래시 명령 + ↑/↓ 입력 기록 — 초안은 패널을 닫아도 유지</li>
+            <li>답변 스트리밍 중에도 입력 — 메시지는 대기열에 쌓여 순서대로 전송</li>
+            <li>붙여넣은 코드는 강조된 코드 블록으로 — 나머지 텍스트는 바이트 그대로</li>
           </ul>
         </div>
         <div class="feature">
@@ -418,10 +420,11 @@
           <h3>세션</h3>
           <p>긴 대화도 정돈된 상태로:</p>
           <ul>
-            <li>이름 있는 세션 저장 / 복원, Markdown 내보내기</li>
-            <li>답변 도중에 세션을 바꿔도 답변은 끊기지 않습니다 — 백그라운드에서 끝까지 진행되어 시작된 세션에 기록됩니다</li>
+            <li>세션 저장 / 복원 — Agent 스레드 ID 포함</li>
+            <li>Markdown 내보내기</li>
+            <li>답변 도중 세션 전환 — 백그라운드에서 끝까지 진행</li>
             <li>대화 내 전체 텍스트 검색(<code>Ctrl+F</code>)</li>
-            <li>답변의 어떤 텍스트든 '상세 스레드'로 파고들어도 메인 기록은 그대로입니다; 이미지를 바로 붙여넣을 수 있고, 입력창의 ↑/↓는 이어서 던진 질문만 불러오며, 인용된 수식은 수식으로 렌더링됩니다</li>
+            <li>선택한 텍스트로 상세 스레드 — 메인 대화 오염 없이 이어서 질문, 이미지 붙여넣기 지원</li>
           </ul>
         </div>
       </div>
@@ -451,7 +454,7 @@
         <span class="site-chip">GeekTime<span class="en">아티클</span></span>
       </div>
       <p class="site-note">
-        <b>지켜볼 뿐, 가로채지 않습니다:</b> 추출은 브라우저 자체의 요청을 지켜보는 방식으로 동작합니다 — 첨부할 때 필요에 따라 사이트 API도 요청합니다. 첨부된 내용은 설정한 모델이나 Agent로 전송할 수 있습니다. 그 밖의 모든 웹페이지도 동작하며, 다만 이만큼 깊지는 않습니다.
+        <b>가로채지도 않고, 고치지도 않습니다:</b> 브라우저 자체가 내보내는 요청을 지켜보고 읽을 뿐입니다. 다른 모든 웹페이지에서도 똑같이 사용할 수 있습니다 — 다만 이만큼 깊게는 읽지 않습니다.
       </p>
     </div>
   </section>

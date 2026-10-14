@@ -282,14 +282,14 @@
       <div class="section-head">
         <p class="eyebrow">demo</p>
         <h2>Quédate en la página. Pregunta a su lado.</h2>
-        <p>browsa es una extensión para Chrome / Edge que conecta tu IA o agente. Un estudio de Transformers enlaza artículo, fórmula de atención, flujo Q/K/V con Mermaid, arquitectura con Graphviz y puntos pulsables de una entrevista independiente y extensa sobre IA en el trabajo. Las fórmulas y Graphviz en color proceden de una respuesta real de Codex renderizada en browsa. Las demás ediciones traducen el texto y conservan las fórmulas y el diagrama. El marco del navegador, artículo y entrevista son demos compuestas. La continuación en Agent está marcada como DEMO y la reproducción está editada. Solo música y sonidos de acciones.</p>
+        <p>El flujo de trabajo completo en 68 segundos: adjuntar un documento → renderizado de fórmulas y diagramas → marcas de tiempo clicables → gestión de sesiones y continuación del agente.</p>
       </div>
       <figure class="demo-video">
         <video controls preload="none" poster="../assets/promo/poster-v7-es.jpg" width="960">
           <source src="../assets/promo/browsa-promo-v7-es.mp4" type="video/mp4" />
           Tu navegador no admite vídeo incrustado — <a href="../assets/promo/browsa-promo-v7-es.mp4">descárgalo aquí</a>.
         </video>
-        <figcaption>Subtítulos en español; se entiende sin sonido. Datos de demostración; reproducción editada. <a href="https://www.youtube.com/watch?v=Q3ySghDuKog">YouTube</a>.</figcaption>
+        <figcaption>Subtítulos en español; se entiende sin sonido. Las fórmulas y los diagramas proceden de respuestas reales del modelo; datos de demostración, reproducción editada. <a href="https://www.youtube.com/watch?v=Q3ySghDuKog">YouTube</a>.</figcaption>
       </figure>
     </div>
   </section>
@@ -316,7 +316,7 @@
         <div class="how">
           <span class="no">03</span>
           <h3>Respuestas en streaming <span class="tag">cualquier backend</span></h3>
-          <p>Las respuestas llegan en streaming palabra a palabra, con Markdown, matemáticas y gráficos. Conecta tu propia API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla — tu Codex / Claude Code con la sesión de tu suscripción, el Gemini CLI con login de Google vía agent-bridge, pi con sus propios modelos configurados, dsh con tu clave API de DeepSeek, o la app de escritorio WorkBuddy con la sesión iniciada y en ejecución. La interfaz sigue el idioma de tu navegador — English, 中文, 日本語, 한국어, Español, Português, Русский — y se puede cambiar en Ajustes.</p>
+          <p>Las respuestas llegan en streaming, con Markdown, fórmulas y gráficos. Conecta cualquier API compatible con OpenAI — o los agentes Hermes / opencode / OpenSquilla / agent-bridge. La interfaz está disponible en siete idiomas.</p>
         </div>
       </div>
       <p class="site-note">¿Ya lo tienes instalado? La <a href="../en/guide/quickstart.html">guía rápida</a> te acompaña hasta tu primera pregunta; la <a href="../en/guide/">guía completa</a> cubre lectura, vídeo, renderizado, sesiones, backends y ajustes.</p>
@@ -339,8 +339,8 @@
           <ul>
             <li>Cascada automática: cuerpo Readability → árbol DOM → texto completo</li>
             <li>📷 Modo captura de pantalla, para modelos multimodales</li>
-            <li>PDF analizado localmente: el WASM reconstruye tablas / encabezados / diseño, figuras recortadas automáticamente</li>
-            <li>Las páginas de archivos de GitHub obtienen el código fuente directamente, saltándose la limpieza de la página</li>
+            <li>PDF analizado localmente: tablas / encabezados / diseño reconstruidos</li>
+            <li>Las páginas de archivos de GitHub obtienen el código fuente directamente</li>
           </ul>
         </div>
         <div class="feature">
@@ -349,8 +349,8 @@
           <p>Selecciona cualquier texto en cualquier página y pregunta directamente:</p>
           <ul>
             <li>Barra flotante: Preguntar · Explicar · Traducir · Resumir</li>
-            <li>Explicar / Traducir responden en línea — en streaming, en el propio sitio, sin panel</li>
-            <li>Preguntar / Resumir: la selección viaja al panel — sin necesidad de 📎 antes</li>
+            <li>Explicar / Traducir en streaming, sin interrumpir tu lectura</li>
+            <li>Preguntar / Resumir van al panel — sin necesidad de 📎</li>
           </ul>
         </div>
         <div class="feature">
@@ -361,7 +361,7 @@
             <li>Markdown GFM + resaltado de sintaxis para más de 40 lenguajes</li>
             <li>Matemáticas LaTeX (KaTeX, acelerado con Web Worker)</li>
             <li>Diagramas Mermaid, ECharts, mapas mentales Markmap</li>
-            <li>¿Un bloque Mermaid que no se puede analizar? Pide a tu IA configurada que lo corrija y lo vuelva a renderizar</li>
+            <li>¿Mermaid roto? Corrección con IA y re-renderizado en un clic</li>
           </ul>
         </div>
         <div class="feature">
@@ -369,9 +369,11 @@
           <h3>Notas de vídeo</h3>
           <p>Un flujo de trabajo completo para el vídeo — subtítulos estructurados de YouTube y Bilibili:</p>
           <ul>
-            <li>Las respuestas llevan marcas de tiempo <code>[mm:ss]</code> clicables que saltan al momento del vídeo</li>
-            <li>Los vídeos de Bilibili sin subtítulos también se pueden resumir — transcripción ASR automática</li>
-            <li>Las transcripciones largas se comprimen automáticamente en puntos, conservando las marcas de tiempo</li>
+            <li>Marcas de tiempo <code>[mm:ss]</code> clicables que saltan al vídeo</li>
+            <li>Cajón de subtítulos: resaltado en vivo · clic para saltar · anotar una línea</li>
+            <li>¿Sin subtítulos? Transcripción ASR / lectura profunda de audio y vídeo</li>
+            <li>Pódcast de Xiaoyuzhou: transcripción con un clic, con marcas de tiempo</li>
+            <li>Transcripciones largas comprimidas en puntos, conservando las marcas de tiempo</li>
           </ul>
         </div>
         <div class="feature">
@@ -380,13 +382,13 @@
           <p>Sin dependencia de ningún proveedor — conecta tus propios modelos:</p>
           <ul>
             <li>Agente Hermes: ejecución de herramientas, aprobación de acciones de riesgo, progreso visible</li>
-            <li>Agente OpenCode: línea directa con el agente CLI de opencode — el mismo flujo completo de herramientas y aprobaciones</li>
-            <li>Agente OpenSquilla: agente de escritorio local vía su gateway WebSocket — memoria de sesión en el servidor, salida del razonamiento, cancelación en el servidor</li>
-            <li>Agent Bridge: conecta agentes locales — Codex / Claude Code con la sesión de tu suscripción (el lado del modelo funciona con tu suscripción), el Gemini CLI con login de Google, pi con el modelo que le configures, dsh con tu clave API de DeepSeek, o la app de escritorio WorkBuddy con la sesión iniciada y en ejecución; una sola tarjeta conecta varios agentes a la vez, cada uno con su propia sesión y estado de Ping</li>
-            <li>Las conversaciones con agentes viven en el lado del agente: browsa nombra la sesión automáticamente («browsa:» + tu primer mensaje) para que puedas retomarla en la propia interfaz del agente; el ID de sesión se muestra y se puede copiar en el historial de sesiones</li>
+            <li>Agente OpenCode: línea directa con el CLI — flujo completo de herramientas y aprobaciones</li>
+            <li>Agente OpenSquilla: gateway WebSocket — memoria de sesión en el servidor</li>
+            <li>Agent Bridge: puente con Codex / Claude Code / Gemini CLI / pi / dsh / WorkBuddy — una tarjeta, varios agentes</li>
+            <li>Las sesiones de agente viven en el lado del agente — con nombre automático, fáciles de retomar</li>
             <li>Cualquier API compatible con OpenAI: OpenAI, Ollama, LiteLLM…</li>
-            <li>Añade varios modelos por tarjeta — cambia mediante «Alias · modelo» en la barra lateral</li>
-            <li>Nivel de razonamiento por modelo: las opciones siguen a la familia del modelo y los campos de la petición se adaptan a cada dialecto de API</li>
+            <li>Varios modelos por tarjeta — cambia en la barra lateral</li>
+            <li>Nivel de razonamiento por modelo — los campos de la petición se adaptan solos</li>
             <li>Ping para verificar la conectividad y las capacidades</li>
           </ul>
         </div>
@@ -396,9 +398,9 @@
           <p>Sin cuenta de browsa. El servicio de modelos lo eliges tú:</p>
           <ul>
             <li>Las claves de API se guardan localmente y solo se usan para autenticarte con tu proveedor configurado</li>
-            <li>Las URL del contexto de la página se enmascaran localmente antes de enviarlas — tokens, contraseñas y firmas eliminados</li>
-            <li>Los PDF se analizan en el dispositivo; el texto y las imágenes extraídas se pueden adjuntar a las peticiones del modelo</li>
-            <li>Los documentos de Office (docx/pptx/xlsx/…) se convierten a Markdown en el dispositivo; el contenido extraído se puede adjuntar a las peticiones del modelo</li>
+            <li>Enmascarado en local antes de enviar: tokens / contraseñas / firmas de las URL</li>
+            <li>Los PDF se analizan en el dispositivo — el contenido nunca sale de tu equipo</li>
+            <li>Documentos Office convertidos a Markdown en el dispositivo</li>
             <li>El contenido va únicamente al backend que tú configuras</li>
           </ul>
         </div>
@@ -410,7 +412,7 @@
             <li>Acciones rápidas: Resumir / Puntos clave / Explicar / Esquema</li>
             <li>Comandos de barra diagonal + historial de entrada ↑/↓; los borradores sobreviven al cerrar el panel</li>
             <li>Sigue escribiendo mientras llega la respuesta — los mensajes se ponen en cola y se envían en orden</li>
-            <li>Pega código en el compositor — tu propia burbuja lo renderiza como un bloque resaltado (botón de copiar, lenguaje detectado automáticamente); todo lo demás se conserva byte a byte</li>
+            <li>El código pegado se convierte en bloque resaltado; todo lo demás se conserva byte a byte</li>
           </ul>
         </div>
         <div class="feature">
@@ -418,10 +420,11 @@
           <h3>Sesiones</h3>
           <p>Las conversaciones largas se mantienen ordenadas:</p>
           <ul>
-            <li>Guarda / restaura sesiones con nombre, exporta como Markdown</li>
-            <li>Cambiar de sesión a mitad de respuesta nunca la interrumpe — termina en segundo plano y queda en la sesión donde empezó</li>
+            <li>Guarda / restaura / exporta en Markdown, con los IDs de hilo del agente</li>
+            <li>Cambia de sesión a mitad de respuesta — termina en segundo plano</li>
             <li>Búsqueda de texto completo en la conversación (<code>Ctrl+F</code>)</li>
-            <li>«Preguntar más» sobre cualquier texto de una respuesta sin tocar el historial principal; pega imágenes directamente; el ↑/↓ del cuadro de entrada recupera solo las preguntas de seguimiento; las fórmulas citadas se muestran como matemáticas</li>
+            <li>«Preguntar más» sobre cualquier texto, sin contaminar el chat principal</li>
+            <li>Se pueden pegar imágenes en las preguntas de seguimiento</li>
           </ul>
         </div>
       </div>
@@ -451,7 +454,7 @@
         <span class="site-chip">GeekTime<span class="en">artículos</span></span>
       </div>
       <p class="site-note">
-        <b>Observa, nunca secuestra:</b> la extracción funciona observando las propias peticiones del navegador — al adjuntar también puede consultar las API del sitio según sea necesario. El contenido adjunto puede enviarse al modelo o agente que configures. Cualquier otra página web también funciona, solo que con menos profundidad.
+        <b>Observa, nunca secuestra:</b> solo mira las peticiones que el propio navegador envía. Cualquier otra página web también funciona, solo que con menos profundidad.
       </p>
     </div>
   </section>
