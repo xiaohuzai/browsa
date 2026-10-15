@@ -17,7 +17,7 @@
 
 **ページから離れず、その隣で尋ねる。**
 
-browsa は Chrome / Edge のサイドパネル拡張機能です。テキストをコピーしたりページを離れたりすることなく、記事・動画・PDF を**自分の AI** との会話に取り込みます。Agent Bridge 経由で **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy** をつなぎ、**opencode / Hermes / OpenSquilla** を利用するか、OpenAI・Anthropic・Ollama などのモデル API を設定できます。
+browsa は Chrome / Edge のサイドパネル拡張機能です。テキストをコピーしたりページを離れたりすることなく、記事・動画・PDF を**自分の AI** との会話に取り込みます。Agent Bridge 経由で **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** をつなぎ、**opencode / Hermes / OpenSquilla** を利用するか、OpenAI・Anthropic・Ollama などのモデル API を設定できます。
 
 **無料・MIT ライセンスの拡張機能です。** モデルやエージェントはご自身で用意します。API キーはローカルに保存され、設定したサービスへの認証に使用されます。
 
@@ -40,7 +40,6 @@ Agent Bridge 経由で、お使いのローカルエージェントに、設定�
 | **pi** (earendil-works) | agent-bridge ローカルデーモン | pi に設定したモデル |
 | **Gemini CLI** (Google) | agent-bridge ローカルデーモン | 既存の CLI 認証 |
 | **dsh** (DeepSeek Harness) | agent-bridge ローカルデーモン | DeepSeek API キー |
-| **workbuddy** (WorkBuddy AI デスクトップアプリ) | agent-bridge ローカルデーモン | WorkBuddy アプリのログイン（アプリを起動したまま） |
 | opencode | 公式ヘッドレスサーバーに直接接続 | 設定したモデル |
 | Hermes | セルフホスト、`/v1/runs` プロトコル | セルフホスト |
 | OpenSquilla | セルフホストゲートウェイ、WebSocket（`/ws`） | ゲートウェイが振り分けるモデル |
@@ -63,7 +62,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -123,9 +122,9 @@ npm run package      # → browsa-v<version>.zip
 - ID が記録されていない古い保存済み会話は、最初の送信時に独立したエージェントセッションを作成し、既存のテキスト履歴を引き継ぎます
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — ローカルエージェント（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）をブリッジ</summary>
+<summary><b>🔧 Agent Bridge</b> — ローカルエージェント（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）をブリッジ</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) は、ローカルエージェント（codex、claude、pi、gemini、dsh、workbuddy）を 1 つのローカル HTTP プロトコルに適合させるスタンドアロンのローカルデーモンです。エージェントに設定済みの認証を使います:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) は、ローカルエージェント（codex、claude、pi、gemini、dsh）を 1 つのローカル HTTP プロトコルに適合させるスタンドアロンのローカルデーモンです。エージェントに設定済みの認証を使います:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -139,7 +138,6 @@ agent-bridge serve                                # one bridge per entry; ports 
 - 危険な操作の承認カードはパネル内に直接表示されます
 - スクリーンショット・貼り付けた画像・PDF の図はメッセージに同乗 — 1 ターンにつき ≤18 枚、agent-bridge ≥0.8.0 が必要（旧バージョンのブリッジでは自動的に最初の 8 枚へ制限され、メッセージ内でその旨が示されます）
 - マルチターンの文脈はエージェント自身が保持します。ツール呼び出し前の過程の説明（codex がスキルの使用を告げるなど）はステップ履歴に折りたたまれ、返信本文には混ざりません
-- workbuddy: WorkBuddy AI デスクトップアプリにログインして起動したままにします（ブリッジがローカルのワーカーゲートウェイを自動検出します）。会話はアプリのメモリ内にあり、アプリ再起動後の次のターンから新しいセッションが始まります。browsa 側の履歴には影響しません
 
 
 </details>

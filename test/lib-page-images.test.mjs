@@ -9,6 +9,7 @@ import {
   collectMarkdownImages,
   blobToJpegDataURL,
   inlinePageImages,
+  refererGateForImageUrls,
 } from '../lib/page-images.js';
 
 const BASE = 'https://example.com/post/a';
@@ -218,4 +219,21 @@ test('blobToJpegDataURL: 拒绝损坏/不支持格式（SVG），成功时输出
   } finally {
     restore();
   }
+});
+
+// --------------- Referer 门禁图床表（2026-10-15 zhimg 回归修复）--------------
+
+test('refererGateForImageUrls: zhimg 各子域命中知乎门，非门域与垃圾输入返回 null', () => {
+  const gate = refererGateForImageUrls([
+    'https://example.com/no-hit.jpg',
+    'https://picx.zhimg.com/v2-abc_r.jpg?source=1',
+  ]);
+  assert.deepEqual(gate, { hostRe: gate.hostRe, urlFilter: 'zhimg', referer: 'https://www.zhihu.com/' });
+  assert.ok(gate.hostRe.test('pic1.zhimg.com'), 'pic1..pic4 子域都要命中');
+  assert.ok(gate.hostRe.test('zhimg.com'), '裸域也要命中');
+  assert.equal(refererGateForImageUrls(['https://picx.zhimg.com.evil.example/a.jpg']), null, '后缀伪装不是子域');
+  assert.equal(refererGateForImageUrls(['https://evilzhimg.com/a.jpg']), null, '无点边界的前缀拼接不命中');
+  assert.equal(refererGateForImageUrls(['https://sns-webpic-qc.xhscdn.com/a.jpg']), null);
+  assert.equal(refererGateForImageUrls([]), null);
+  assert.equal(refererGateForImageUrls(null), null);
 });

@@ -1,20 +1,33 @@
-// test/attach-site-images.test.mjs — 站点字节图（ctx.imageBase64List）落库接线测试。
+// test/attach-site-images.test.mjs — 站点图片落库接线测试（字节图 + 知乎配图两条管线）。
 //
 // 2026-10-11 用户报告「小红书图文笔记只有文字」暴露的断线：v0.20.0 把 MAIN world
 // 取到的字节随 CHAT 消息的 pageContext 进请求；v0.21.0 请求组装搬进 history 重建后
 // 这根线死了——每次附加提取到的字节在落库时被丢，而 buildMessages 里自称 XHS 图片
 // 通道的 pageContext 分支是死代码。#223 重做提取侧时也没接回发送侧。
 //
-// 本文件是这条链的**落库半段**地板：四条站点路径（XHS XHR 快路径 / XHS
-// INITIAL_STATE 慢路径 / X active fallback / Reddit active fallback）全部走真实
-// background.js 的 handle()，钉「字节必须随 attach 条目入库为 [text, ...image_url]
-// 多模态 content」（interleaveImageParts 无锚点兜底形状）。**请求半段**（带图条目
-// 必须到达每家 provider 的请求体）钉在 test/chat-rebuild-channels.test.mjs 的
-// "attach-entry images reach the wire" 节——两文件以同一条目形状对接，任一侧漂移
-// 都会红。全失败回退纯字符串形状也在此钉住。
+// 本文件是这条链的**落库半段**地板：五条站点路径（XHS XHR 快路径 / XHS
+// INITIAL_STATE 慢路径 / X active fallback / Reddit active fallback / 知乎专栏）
+// 全部走真实 background.js 的 handle()，钉「图片必须随 attach 条目入库」（字节图
+// 是 [text, ...image_url] 无锚形状，知乎配图是 [text, image_url, text] 锚点交错
+// 形状）。**请求半段**（带图条目必须到达每家 provider 的请求体）钉在
+// test/chat-rebuild-channels.test.mjs 的 "attach-entry images reach the wire" 节
+// ——两文件以同一条目形状对接，任一侧漂移都会红。全失败回退纯字符串形状也在此
+// 钉住。
+//
+// ⚠ 2026-10-15 教训（知乎配图回归）：本文件早期的桩是**手工造好的提取结果**——
+// 提取侧把图片剥掉时这些测试照样绿（XHS/X/Reddit 的桩喂原始提取形状、真合成器在
+// background 里跑，所以那三家桩层足够；知乎断在更上游的 content script 转换器）。
+// 「知乎链路」一节由此而生：真实 content script 函数（jsdom 驱动，只 stub 网络）
+// 产出喂真实 ATTACH_PAGE——站点能力的链条必须有这种只 stub 网络的链路级测试，
+// 桩喂手工结果的落库测试钉不住提取侧能力丢失。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { JSDOM } from 'jsdom';
+
+const require = createRequire(import.meta.url);
 
 const D1 = 'data:image/jpeg;base64,AAAA';
 const D2 = 'data:image/jpeg;base64,BBBB';
@@ -54,8 +67,12 @@ const sessionArea = makeStorageArea();
 // 每测试预置的 executeScript 返回值队列（files 注入调用不消费队列）。
 let scriptQueue = [];
 
+// DNR session 规则 spy（zhihu Referer 门测试用；每测试手动清零）。
+const dnrCalls = [];
+
 const chromeMock = {
   runtime: {
+    id: 'testextensionid',
     onMessage: { addListener: () => {} },
     onConnect: { addListener: () => {} },
     onInstalled: { addListener: () => {} },
@@ -100,6 +117,9 @@ const chromeMock = {
   contextMenus: {
     create: () => {},
     onClicked: { addListener: () => {} },
+  },
+  declarativeNetRequest: {
+    updateSessionRules: async (opts) => { dnrCalls.push(opts); },
   },
 };
 
@@ -255,4 +275,321 @@ test('XHS 15-image note: every fetched byte rides the entry (budget, not count, 
   const imgParts = entry.content.filter((p) => p?.type === 'image_url');
   assert.equal(imgParts.length, 15);
   assert.deepEqual(imgParts.map((p) => p.image_url.url), bytes, '顺序保持笔记图序');
+});
+
+// ── 知乎专栏（tryZhihuActiveFallback → [图N] 配图管线 + zhimg Referer 门）─────
+//
+// 2026-10-15 用户报告「知乎推文图片 attach 不上去」：#223 的知乎全文 fallback
+// 用 htmlToText 把 API HTML 剥成纯文本，图片 URL 一步丢失，而合成模式 'zhihu'
+// 不在 ATTACH_MODE_CAPS 里、没有任何配图通道。修复后知乎正文带保序
+// ![alt](url) markdown（zhihu-content-script 的 htmlToArticleText），走与
+// reader/auto 同一条 inlinePageImages 管线；zhimg.com 对「不像浏览器且无站内
+// Referer」的请求 403（真扩展 SW 靠浏览器特征可过，启发式收紧即静默降级），
+// 下载前经 DNR session 规则显式注入站内 Referer。
+//
+// mode 一律传 'dom'（与 X/XHS/Reddit 用例同法）：reader/auto 会先跑
+// ensureReadabilityInjected，其注入探针会消费脚本队列。站点 fast path 拥有
+// 提取权（dom 请求也得到 ctx.mode='zhihu'），caps 行 zhihu 照样生效。
+
+// 装上取图三件套 stub（Node 无 createImageBitmap/OffscreenCanvas；fetch 按 URL
+// 放行）。convertToBlob 返回固定字节 0x42,0x44 → dataURL 恒为 ...QkQ=，断言确定。
+// 2026-10-15 起知乎/掘金/极客时间/雪球四家配图测试共用（原图床 + 通用占位域）。
+function installFigureEnv({ failDownloads = false } = {}) {
+  const prev = {
+    fetch: globalThis.fetch,
+    createImageBitmap: globalThis.createImageBitmap,
+    OffscreenCanvas: globalThis.OffscreenCanvas,
+  };
+  globalThis.createImageBitmap = async () => ({ width: 640, height: 400, close() {} });
+  globalThis.OffscreenCanvas = class {
+    constructor(w, h) { this.width = w; this.height = h; }
+    getContext() { return { fillRect() {}, drawImage() {} }; }
+    async convertToBlob() { return new Blob([new Uint8Array([0x42, 0x44])], { type: 'image/jpeg' }); }
+  };
+  globalThis.fetch = async (url) => (!failDownloads && /zhimg\.com|byteimg\.com|geekbang\.org|imedao\.com|example\.com/.test(String(url))
+    ? { ok: true, blob: async () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }) }
+    : { ok: false });
+  return () => {
+    globalThis.fetch = prev.fetch;
+    globalThis.createImageBitmap = prev.createImageBitmap;
+    globalThis.OffscreenCanvas = prev.OffscreenCanvas;
+  };
+}
+
+const ZHIHU_FIGURE_TEXT = '正文开头。\n\n![配图](https://picx.zhimg.com/v2-abc_r.jpg?source=1)\n\n正文结尾。';
+
+test('zhihu attach: figures become [图N] anchors + image parts; zhimg Referer gate registered then removed', async () => {
+  const tabId = addTab(20, 'https://zhuanlan.zhihu.com/p/123456', '知乎专栏文章');
+  scriptQueue = [{
+    type: 'article', id: '123456', title: '知乎专栏文章', text: ZHIHU_FIGURE_TEXT,
+    author: '作者', voteupCount: 5, commentCount: 1, rawAt: Date.now(),
+  }];
+  const restore = installFigureEnv();
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true, `知乎附加不得报错: ${res.error || ''}`);
+    assert.equal(res.ctx.mode, 'zhihu', '站点 fast path 拥有提取权——dom 请求也得到合成的 zhihu 模式');
+
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content), '配图成功 → content 是多模态数组');
+    assert.equal(entry.content.length, 3, '锚点在文中 → [text, image_url, text] 交错形状');
+    assert.deepEqual(
+      entry.content[1],
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QkQ=' } },
+      '图片字节随条目入库'
+    );
+    const fullText = entry.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n');
+    assert.match(fullText, /\[图1\] 配图/, '原位 [图N] 锚点带 alt');
+    assert.ok(!fullText.includes('zhimg.com'), '锚点替换后图片 URL 不残留');
+    assert.match(fullText, /随附的 1 张页面配图/, '文末张数说明行');
+
+    assert.equal(dnrCalls.length, 2, `DNR 恰好 register+remove 两次，实际: ${JSON.stringify(dnrCalls)}`);
+    assert.equal(dnrCalls[0].addRules[0].condition.urlFilter, 'zhimg');
+    assert.equal(dnrCalls[0].addRules[0].action.requestHeaders[0].header, 'referer');
+    assert.equal(dnrCalls[0].addRules[0].action.requestHeaders[0].value, 'https://www.zhihu.com/');
+    assert.deepEqual(dnrCalls[0].addRules[0].condition.initiatorDomains, ['testextensionid'],
+      '规则只作用于扩展自己发起的请求');
+    assert.deepEqual(dnrCalls[1].removeRuleIds, [9000001], 'finally 移除规则');
+  } finally {
+    restore();
+  }
+});
+
+test('zhihu attach, non-gated figure host: figure still rides, DNR untouched', async () => {
+  const tabId = addTab(21, 'https://zhuanlan.zhihu.com/p/123456', '知乎专栏文章');
+  scriptQueue = [{
+    type: 'article', id: '123456', title: '知乎专栏文章',
+    text: 'a\n\n![](https://cdn.example.com/pic.jpg)\n\nb', rawAt: Date.now(),
+  }];
+  const restore = installFigureEnv();
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content));
+    assert.deepEqual(entry.content[1], { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QkQ=' } });
+    assert.equal(dnrCalls.length, 0, '非门禁图床不碰 DNR');
+  } finally {
+    restore();
+  }
+});
+
+test('zhihu attach, figure downloads all fail: fail-open keeps ![alt](url) text, DNR still cleaned up', async () => {
+  const tabId = addTab(22, 'https://zhuanlan.zhihu.com/p/123456', '知乎专栏文章');
+  scriptQueue = [{
+    type: 'article', id: '123456', title: '知乎专栏文章', text: ZHIHU_FIGURE_TEXT, rawAt: Date.now(),
+  }];
+  const restore = installFigureEnv({ failDownloads: true });
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    const entry = await lastEntry();
+    assert.equal(typeof entry.content, 'string', '全失败 → 保持纯字符串 content（管线 fail-open）');
+    assert.ok(entry.content.includes('![配图](https://picx.zhimg.com/v2-abc_r.jpg?source=1)'),
+      'URL 保留在正文里，模型仍看得到');
+    assert.equal(dnrCalls.length, 2, '下载失败也不泄漏 DNR 规则：register+remove 都发生');
+    assert.deepEqual(dnrCalls[1].removeRuleIds, [9000001]);
+  } finally {
+    restore();
+  }
+});
+
+// ── 知乎链路地板（真实提取函数 → 真实合成 → 真实落库，只 stub 网络）──────────
+//
+// 上面的知乎用例喂的是手工提取结果，钉不住「提取侧把图剥掉」这个本回归的真实
+// 形状。本节从 content script 的真函数开始：jsdom 驱动 activeZhihuFetch /
+// extractZhihuArticle（fetch 返回真实形状的知乎 API JSON），其产出再喂真实
+// ATTACH_PAGE——API HTML 到入库图片字节一线贯穿。
+
+const zhihuCs = require(fileURLToPath(new URL('../lib/content-scripts/zhihu-content-script.js', import.meta.url)));
+
+// 真实形状的知乎专栏 API content HTML：noscript 孪生 + 80px src + data-actualsrc。
+const ZHIHU_API_HTML = '<p>正文开头。</p>'
+  + '<figure data-size="normal">'
+  + '<noscript><img src="https://picx.zhimg.com/v2-real_r.jpg?source=1"></noscript>'
+  + '<img width="720" src="https://picx.zhimg.com/v2-real_720w.jpg?source=1" '
+  + 'data-actualsrc="https://picx.zhimg.com/v2-real_r.jpg?source=1" data-original="https://picx.zhimg.com/v2-real_r.jpg?source=1">'
+  + '<figcaption>图注</figcaption></figure>'
+  + '<p>正文结尾。</p>';
+
+// zhuanlan /api/articles/{id} 的计数字段是 camelCase（v4 answers API 才是 snake_case）。
+async function withZhihuPageDom(url, apiJson, fn) {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { url });
+  const prev = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch };
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.fetch = async (fetchUrl) => (/zhuanlan\.zhihu\.com\/api\/articles\//.test(String(fetchUrl))
+    ? { ok: true, json: async () => apiJson }
+    : { ok: false });
+  // return await（不是 return）：finally 必须等 fn 落定再恢复全局——否则
+  // activeZhihuFetch 还在 await fetch 时 document/fetch 已被还原。
+  try { return await fn(); } finally {
+    globalThis.window = prev.window;
+    globalThis.document = prev.document;
+    globalThis.fetch = prev.fetch;
+  }
+}
+
+test('zhihu chain: activeZhihuFetch (real converter) → synthesizer → storage carries the figure', async () => {
+  // 第 1 段：真实提取函数。jsdom location 指向用户报告的那篇专栏形状的 URL。
+  const extracted = await withZhihuPageDom(
+    'https://zhuanlan.zhihu.com/p/1883676507878168327',
+    { id: 1883676507878168327, title: '知乎专栏文章', content: ZHIHU_API_HTML, author: { name: '作者' }, voteupCount: 5, commentsCount: 1 },
+    () => zhihuCs.activeZhihuFetch(),
+  );
+  assert.ok(extracted, 'activeZhihuFetch 必须出结果');
+  assert.equal(extracted.type, 'article');
+  assert.equal((extracted.text.match(/!\[/g) || []).length, 1, 'noscript 孪生不重复');
+  assert.match(extracted.text, /!\[\]\(https:\/\/picx\.zhimg\.com\/v2-real_r\.jpg\?source=1\)/,
+    '真实转换器把 API HTML 的图保留成 markdown（data-actualsrc 优先）');
+  assert.ok(extracted.text.includes('正文开头。') && extracted.text.includes('正文结尾。'), '正文文字不丢');
+
+  // 第 2 段：提取结果（生产里由 executeScript 带回）喂真实 ATTACH_PAGE——合成、
+  // caps、Referer 门、取图、落库全链真实。
+  const tabId = addTab(30, 'https://zhuanlan.zhihu.com/p/1883676507878168327', '知乎专栏文章');
+  scriptQueue = [extracted];
+  const restoreEnv = installFigureEnv();
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true, `链条终点不得报错: ${res.error || ''}`);
+    assert.equal(res.ctx.mode, 'zhihu');
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content), '图片字节必须随条目入库——提取侧重新剥图时本测试红');
+    assert.equal(entry.content.length, 3);
+    assert.deepEqual(entry.content[1], { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QkQ=' } });
+    assert.match(entry.content[0].text, /\[图1\]/);
+    assert.equal(dnrCalls.length, 2, 'zhimg Referer 门照常挂/撤');
+  } finally {
+    restoreEnv();
+  }
+});
+
+test('zhihu chain: the passive interceptor path binds the image-preserving converter (lockstep)', async () => {
+  // 生产行为先于源码 pin：真实数据 + 真实转换器配对（文章 + 回答两条路）。
+  await withZhihuPageDom('https://zhuanlan.zhihu.com/p/1', {}, async () => {
+    const article = zhihuCs.extractZhihuArticle(
+      { id: 1, title: 'T', content: ZHIHU_API_HTML, author: { name: 'A' } }, zhihuCs.htmlToArticleText);
+    assert.match(article.text, /!\[\]\(https:\/\/picx\.zhimg\.com\/v2-real_r\.jpg\?source=1\)/,
+      '被动拦截的文章路径同样保图');
+    const answers = zhihuCs.extractZhihuAnswers(
+      { data: [{ id: 9, content: '<p>答</p><img src="https://pic1.zhimg.com/v2-ans_r.jpg">', author: { name: 'U' }, voteup_count: 1, question: { id: 500, title: 'Q' } }] },
+      zhihuCs.htmlToArticleText);
+    assert.match(answers.answers[0].text, /!\[\]\(https:\/\/pic1\.zhimg\.com\/v2-ans_r\.jpg\)/,
+      '回答正文里的图同样保图');
+  });
+  // 源码 lockstep pin：extractZhihuArticle/Answers 的 toText 是注入参数，上面的
+  // 行为测试钉不住生产绑定本身——拦截器装配处必须绑图片保留转换器（退回纯文本
+  // 剥离正是本回归的形状；源码 pin 用仓库惯例的正则锁行）。
+  const fs = require('node:fs');
+  const csSrc = fs.readFileSync(
+    fileURLToPath(new URL('../lib/content-scripts/zhihu-content-script.js', import.meta.url)), 'utf8');
+  assert.match(csSrc, /const toText = htmlToArticleText;/,
+    'installZhihuInterceptor 的 toText 闭包必须绑 htmlToArticleText');
+});
+
+// ── 掘金 / 极客时间 / 雪球（2026-10-15 姊妹批：同一条 [图N] 管线接通）─────────
+//
+// 三家都是被动拦截路径：真实推送消息（sender.tab.id 落缓存）→ SITE_CACHES →
+// synthesizeSiteCache（域门）→ ATTACH_PAGE 落库。掘金极客时间雪球图床实测均无
+// Referer 门 → dnrCalls 恒 0。
+
+test('juejin attach: markContent markdown figures ride the entry, byteimg needs no DNR gate', async () => {
+  const tabId = addTab(31, 'https://juejin.cn/post/7496397558359162934', '掘金文章');
+  await handle({
+    type: 'JUEJIN_ARTICLE',
+    article: {
+      title: '掘金文章', author: '作者', articleId: '7496397558359162934',
+      markContent: '正文。\n\n![image.png](https://p6-xtjj-sign.byteimg.com/tos-cn-i-xxx/a~tplv.awebp?rk3s=x&x-expires=1&x-signature=y)\n\n完。',
+      rawAt: Date.now(),
+    },
+  }, { tab: { id: tabId } });
+  const restoreEnv = installFigureEnv();
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true, res.error || '');
+    assert.equal(res.ctx.mode, 'juejin');
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content), '掘金配图必须随条目入库');
+    assert.deepEqual(entry.content[1], { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QkQ=' } });
+    assert.match(entry.content[0].text, /\[图1\]/);
+    assert.ok(!entry.content[0].text.includes('byteimg.com'), '锚点替换后签名 URL 不残留');
+    assert.equal(dnrCalls.length, 0, 'byteimg 签名即鉴权，不碰 DNR');
+  } finally { restoreEnv(); }
+});
+
+test('geektime chain: real maybeExtractGeektime (real converter) → push → cache → storage carries the figure', async () => {
+  // 第 1 段：真实提取函数（jsdom 只供 DOM；geektime 图是协议相对 URL）。
+  const geekCs = require(fileURLToPath(new URL('../lib/content-scripts/geektime-content-script.js', import.meta.url)));
+  const dom = new JSDOM('<!doctype html><html><body></body></html>');
+  const prevDoc = globalThis.document;
+  globalThis.document = dom.window.document;
+  let extracted;
+  try {
+    extracted = geekCs.maybeExtractGeektime('https://time.geekbang.org/serv/v1/article', {
+      code: 0,
+      data: { article_info: { article_id: 100, article_title: '极客时间文章', article_summary: '摘要',
+        article_content: '<p>正文。</p><img src="//static001.geekbang.org/resource/image/51/5d/abc.jpg"><p>完。</p>',
+        author_name: '作者' } },
+    }, geekCs.htmlToArticleText);
+  } finally { globalThis.document = prevDoc; }
+  assert.ok(extracted, 'maybeExtractGeektime 必须出结果');
+  assert.match(extracted.text, /!\[\]\(\/\/static001\.geekbang\.org\/resource\/image\/51\/5d\/abc\.jpg\)/,
+    '真实转换器保留课程配图（协议相对 URL 原样）');
+
+  // 第 2 段：提取结果走真实推送 → 缓存 → ATTACH_PAGE（协议相对按页面 base 绝对化）。
+  const tabId = addTab(32, 'https://time.geekbang.org/column/article/100', '极客时间文章');
+  await handle({ type: 'GEEKTIME_ARTICLE', article: extracted }, { tab: { id: tabId } });
+  const seenUrls = [];
+  const restoreEnv = installFigureEnv();
+  const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { seenUrls.push(String(url)); return prevFetch(url); };
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true, res.error || '');
+    assert.equal(res.ctx.mode, 'geektime');
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content), '极客时间配图必须随条目入库');
+    assert.deepEqual(entry.content[1], { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QkQ=' } });
+    assert.ok(seenUrls.some((u) => u === 'https://static001.geekbang.org/resource/image/51/5d/abc.jpg'),
+      '协议相对 URL 按 baseUrl 绝对化后下载');
+    assert.equal(dnrCalls.length, 0, 'geekbang 图床无门，不碰 DNR');
+  } finally { globalThis.fetch = prevFetch; restoreEnv(); }
+});
+
+test('xueqiu chain: real extractXueqiuPost → push → cache → storage carries the pics', async () => {
+  // 第 1 段：真实提取函数（纯正则，无需 DOM）。
+  const xqCs = require(fileURLToPath(new URL('../lib/content-scripts/xueqiu-content-script.js', import.meta.url)));
+  const post = xqCs.extractXueqiuPost({
+    status: {
+      id: 223456, title: '', user: { screen_name: '雪球用户' }, like_count: 9, reply_count: 1,
+      text: '<p>看好逻辑不变。</p><img src=\"//xqimg.imedao.com/inline0.png\">',
+      image_info_list: [{ filename: '17pic1.png' }, { filename: '17pic2.jpg' }],
+    },
+  });
+  assert.ok(post, 'extractXueqiuPost 必须出结果');
+  assert.match(post.text, /!\[\]\(\/\/xqimg\.imedao\.com\/inline0\.png\)/);
+  assert.match(post.text, /!\[\]\(https:\/\/xqimg\.imedao\.com\/17pic1\.png\)/);
+  assert.match(post.text, /!\[\]\(https:\/\/xqimg\.imedao\.com\/17pic2\.jpg\)/);
+
+  // 第 2 段：真实推送 → 缓存 → ATTACH_PAGE（3 张图全部入库）。
+  const tabId = addTab(33, 'https://xueqiu.com/1234567890/2234567890', '雪球帖子');
+  await handle({ type: 'XUEQIU_DATA', data: post }, { tab: { id: tabId } });
+  const restoreEnv = installFigureEnv();
+  dnrCalls.length = 0;
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true, res.error || '');
+    assert.equal(res.ctx.mode, 'xueqiu');
+    const entry = await lastEntry();
+    assert.ok(Array.isArray(entry.content));
+    const imgParts = entry.content.filter((p) => p?.type === 'image_url');
+    assert.equal(imgParts.length, 3, '内联 1 张 + image_info_list 2 张全入库');
+    assert.equal(dnrCalls.length, 0, 'xqimg 无门（未实测到真图，fail-open 兜底），不碰 DNR');
+  } finally { restoreEnv(); }
 });

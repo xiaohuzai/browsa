@@ -17,7 +17,7 @@
 
 **Оставайтесь на странице. Спрашивайте рядом.**
 
-browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
+browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
 
 **Бесплатное расширение под лицензией MIT.** Модель или агент — ваши собственные. API-ключи хранятся локально и используются для аутентификации в настраиваемых вами сервисах.
 
@@ -40,7 +40,6 @@ browsa — расширение с боковой панелью для Chrome /
 | **pi** (earendil-works) | локальный демон agent-bridge | Любая модель, настроенная в pi |
 | **Gemini CLI** (Google) | локальный демон agent-bridge | Существующая аутентификация CLI |
 | **dsh** (DeepSeek Harness) | локальный демон agent-bridge | API-ключ DeepSeek |
-| **workbuddy** (настольное приложение WorkBuddy AI) | локальный демон agent-bridge | Вход в приложение WorkBuddy (приложение должно быть запущено) |
 | opencode | официальный headless-сервер, напрямую | любая модель, настроенная в opencode |
 | Hermes | собственный сервер, протокол `/v1/runs` | собственный сервер |
 | OpenSquilla | собственный шлюз, WebSocket (`/ws`) | модели, на которые маршрутизирует шлюз |
@@ -63,7 +62,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -123,9 +122,9 @@ npm run package      # → browsa-v<version>.zip
 - старые диалоги без записанного ID при первом сообщении создают новую сессию агента и передают в неё имеющуюся текстовую историю
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — мост к локальным агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — мост к локальным агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит локальных агентов (codex, claude, pi, gemini, dsh, workbuddy) к одному локальному HTTP-протоколу. Использует настроенную в агенте аутентификацию:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит локальных агентов (codex, claude, pi, gemini, dsh) к одному локальному HTTP-протоколу. Использует настроенную в агенте аутентификацию:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -139,7 +138,6 @@ agent-bridge serve                                # one bridge per entry; ports 
 - карточки подтверждения опасных действий появляются прямо в панели
 - скриншоты, вставленные изображения и иллюстрации из PDF отправляются вместе с вашим сообщением — до 18 за ход, нужен agent-bridge ≥0.8.0 (старые мосты автоматически деградируют до первых 8 с пометкой в сообщении)
 - контекст многоходового разговора хранится в самом агенте; попутное повествование перед вызовом инструмента (codex объявляет об использовании навыка) сворачивается в историю шагов, а не попадает в текст ответа
-- workbuddy: сохраните вход в настольном приложении WorkBuddy AI и держите его запущенным (мост сам обнаруживает его локальный worker-шлюз); беседы живут в памяти приложения — после перезапуска приложения следующий ход начнёт новую сессию агента, история на стороне browsa не затрагивается
 
 
 </details>

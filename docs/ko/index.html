@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — 브라우저 사이드 패널 AI</title>
-<meta name="description" content="browsa는 Chrome / Edge 사이드 패널 확장입니다. 현재 페이지 — 아티클, 자막, PDF — 를 대화로 가져와 바로 옆에서 답변을 스트리밍합니다. OpenAI 호환 API, Hermes / opencode / OpenSquilla 에이전트, agent-bridge로 연결하는 내 Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy까지 지원합니다.">
+<meta name="description" content="browsa는 Chrome / Edge 사이드 패널 확장입니다. 현재 페이지 — 아티클, 자막, PDF — 를 대화로 가져와 바로 옆에서 답변을 스트리밍합니다. OpenAI 호환 API, Hermes / opencode / OpenSquilla 에이전트, agent-bridge로 연결하는 내 Codex / Claude Code / pi / Gemini CLI / dsh까지 지원합니다.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — 브라우저 사이드 패널 AI">
@@ -384,7 +384,7 @@
             <li>Hermes 에이전트: 도구 실행, 위험 작업 승인, 진행 상태 표시</li>
             <li>OpenCode 에이전트: CLI 직통 연결 — 전체 도구 &amp; 승인 흐름</li>
             <li>OpenSquilla 에이전트: 게이트웨이 WebSocket — 서버 측 세션 메모리</li>
-            <li>Agent Bridge: Codex / Claude Code / Gemini CLI / pi / dsh / WorkBuddy 브리지 — 한 카드로 여러 에이전트</li>
+            <li>Agent Bridge: Codex / Claude Code / Gemini CLI / pi / dsh 브리지 — 한 카드로 여러 에이전트</li>
             <li>에이전트 세션은 에이전트 쪽에 — 자동으로 이름이 붙고 이어서 대화</li>
             <li>모든 OpenAI 호환 API: OpenAI, Ollama, LiteLLM…</li>
             <li>카드에 모델 여러 개 — 사이드바에서 바로 전환</li>
@@ -443,12 +443,12 @@
         <span class="site-chip">YouTube<span class="en">자막/챕터</span></span>
         <span class="site-chip">Bilibili<span class="en">자막/챕터/ASR/통계</span></span>
         <span class="site-chip">Xiaohongshu<span class="en">노트/사진/댓글</span></span>
-        <span class="site-chip">Juejin<span class="en">아티클 원문</span></span>
-        <span class="site-chip">Zhihu<span class="en">아티클/답변</span></span>
+        <span class="site-chip">Juejin<span class="en">아티클 원문/이미지</span></span>
+        <span class="site-chip">Zhihu<span class="en">아티클/답변/이미지</span></span>
         <span class="site-chip">X / Twitter<span class="en">트윗/사진/답글</span></span>
         <span class="site-chip">GitHub<span class="en">메타데이터/README</span></span>
         <span class="site-chip">Reddit<span class="en">게시물/댓글/사진</span></span>
-        <span class="site-chip">Xueqiu<span class="en">시세/글</span></span>
+        <span class="site-chip">Xueqiu<span class="en">시세/글/이미지</span></span>
         <span class="site-chip">Xiaoyuzhou<span class="en">팟캐스트</span></span>
         <span class="site-chip">Dedao<span class="en">아티클</span></span>
         <span class="site-chip">GeekTime<span class="en">아티클</span></span>
@@ -508,7 +508,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / workbuddy · 로컬 에이전트 연결</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · 로컬 에이전트 연결</span></span>
             <span class="prov-badge pb-idle">브리지</span>
           </div>
         </div>

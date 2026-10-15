@@ -43,7 +43,8 @@ export {
 };
 import { extractActiveTab } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
-import { inlinePageImages } from './lib/page-images.js';
+import { inlinePageImages, collectMarkdownImages, refererGateForImageUrls } from './lib/page-images.js';
+import { registerPageImageReferer, removePageImageReferer } from './lib/sidepanel/media-headers.js';
 import { interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
@@ -958,7 +959,19 @@ async function handle(msg, sender) {
         // dom/full 是树状文本（无 Markdown 图片语法）、selected 是局部摘录，不参与。
         if (modeCaps(ctx.mode).inlineImages && ctx.text) {
           try {
-            const inlined = await inlinePageImages(ctx.text, { baseUrl: ctx.meta?.url || '' });
+            // Referer 门禁图床（zhimg.com 实测：不像浏览器且无站内 Referer
+            // 才 403；显式注入知乎 Referer 把合同钉死，不赌 CDN 的浏览器
+            // 特征启发式）：命中门表就先挂 DNR 注入规则、finally 移除——
+            // 与整条管线同一 fail-open 精神。
+            const gate = refererGateForImageUrls(
+              collectMarkdownImages(ctx.text, ctx.meta?.url || '').map((c) => c.url));
+            if (gate) await registerPageImageReferer(gate);
+            let inlined;
+            try {
+              inlined = await inlinePageImages(ctx.text, { baseUrl: ctx.meta?.url || '' });
+            } finally {
+              if (gate) await removePageImageReferer();
+            }
             if (inlined.figures.length) {
               ctx.text = inlined.text
                 + `\n\n（文中 [图N] 标记按顺序对应随附的 ${inlined.figures.length} 张页面配图；在回答中引用配图时请使用相同的 [图N] 标记。）`;

@@ -30,11 +30,18 @@ if (!chromium) {
 }
 // Pick the newest installed chromium build — the hardcoded pin (chromium-1234)
 // broke silently when playwright updated its cache (2026-10-09: 1243).
-const exe = fs.readdirSync('/root/.cache/ms-playwright')
-  .filter((d) => /^chromium-\d+$/.test(d))
-  .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
-  .map((d) => `/root/.cache/ms-playwright/${d}/chrome-linux64/chrome`)
-  .find((p) => fs.existsSync(p));
+// env BROWSA_CHROMIUM overrides; then the playwright cache scan (the pin broke
+// silently once — 2026-10-09 chromium-1243); finally the hermes tools dir.
+const pwCache = '/root/.cache/ms-playwright';
+const exe = process.env.BROWSA_CHROMIUM
+  || (fs.existsSync(pwCache)
+    ? fs.readdirSync(pwCache)
+      .filter((d) => /^chromium-\d+$/.test(d))
+      .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+      .map((d) => `${pwCache}/${d}/chrome-linux64/chrome`)
+      .find((p) => fs.existsSync(p))
+    : undefined)
+  || '/root/.hermes/tools/chromium-1208/chrome-linux64/chrome';
 const FONT = 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf';
 const PORT = 8947;
 

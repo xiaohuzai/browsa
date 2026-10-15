@@ -42,10 +42,12 @@ test('generic modes keep their historical capability sets (regression pins for t
     assert.ok(modeCaps(m).siteInstructions, `${m} must keep siteInstructions`);
   }
   // Image inlining used to be ['reader','auto','jina'] (dom/full are tree
-  // text, selected is an excerpt).
+  // text, selected is an excerpt). zhihu joined 2026-10-15 (synthesized text
+  // carries in-order ![alt](url) markdown — the [图N] figure pipeline); the
+  // same-day sibling batch wired juejin/geektime/xueqiu onto the same pipeline.
   assert.deepEqual(
     Object.keys(ATTACH_MODE_CAPS).filter((m) => modeCaps(m).inlineImages).sort(),
-    ['auto', 'jina', 'reader'],
+    ['auto', 'geektime', 'jina', 'juejin', 'reader', 'xueqiu', 'zhihu'],
   );
   // Video note + videoSrc used to be mode === 'youtube' || 'bilibili'.
   assert.deepEqual(
