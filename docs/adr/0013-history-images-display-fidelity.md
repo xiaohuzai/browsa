@@ -21,3 +21,19 @@
 - 顺带修复同族展示缺陷：历史气泡此前只读**第一个**文本部件，图文交错条目的后段文本被丢弃——现按序全量拼接。
 - 存储体积不再随答后压缩自动缩小，由 8MB 预算的缩略图降级兜底（面板打开的反序列化成本仍由该预算约束）。
 - 新增条目字段 `imagesSeen`（存储侧标记，builder 负责剥除）；`savedSessions` 逐字快照会带上它——恢复语义恰好需要它（带标记 = 恢复后首轮也只给模型看图注，与旧机制一致）。
+
+## Amendment (2026-10-14, 用户死命令)：请求侧压缩整体废除——KV 缓存率优先
+
+**状态：Decision 第 2 条（请求侧图片标签压缩）被本修正案取代；第 1、3、4 条（存储保真 / 驻留预算缩略图 / agent 零改动）继续有效。**
+
+用户在真机观察到 LLM 会话第二轮起首 token 延迟急剧恶化（「思考中…114s」），追问后拍板：**供应商前缀缓存（KV cache）的命中率是硬约束，历史必须逐字节原样上请求。**
+
+机制依据（非猜测）：前缀缓存是严格前缀匹配——请求中任何一个 token 在位置 N 改变，从 N 到结尾的全部缓存状态作废，**排在改写点之后的纯正文一并 miss**。原「图片→文字标签」压缩发生在历史中部的条目上，等于每轮对话第一次触发压缩时把整个后缀打爆；被压缩省下的像素 token，远抵不过后缀重算的 prefill 与缓存未命中计价（DeepSeek 缓存命中价 ~1/10，Anthropic 0.1x，OpenAI 0.5x）。
+
+随之废除的还有同族的 **context aging**（`ageStaleAttachments`：冷附件在发送时被换成占位符，`lib/handlers/chat-handler.js` 唯一调用点）——同一次后缀打爆，理由相同。
+
+现状：
+- 历史逐字原样直发（四个 builder 共用 `prepareHistoryForModel`，现只剥 `IMAGE_SEEN_FLAG` 旧标记——老存档与会话快照带标记，绝不入请求体；新盖章仅作遗留簿记）。
+- 保留的例外（均为一次性、确定性，不在每轮反复改写）：`stubOversizedAttachments`（上下文溢出自救，触发即后缀失效一次，但不自救即硬失败）；`boundUnseenImageBytes`（8MB 驻留预算的缩略图降级，触发后字节重新稳定）；`maybeSummarizeAttachment`（>100K 字符附件先落原文、异步回写摘要——通常在首问发出前完成，竞态时该条目一次性破后缀）；storage.js 的 300K 总字符前端裁剪（硬边界，与溢出自救同类）。四条 LLM 通道（chat / responses / anthropic / hermes-runs）全部经 `prepareHistoryForModel` 剥标记，缓存不变量测试覆盖全部通道。
+- 逐字直发的直接收益：图片像素在后续轮继续可见（原 ADR「后续轮只见图注」的取舍反转），且前缀从每轮首问起持续命中缓存。
+- 回归地板：`test/lib-message-builder-aging.test.mjs`（逐字直发 + **第 N 轮请求逐条消息字节等于第 N+1 轮请求前缀**的缓存不变量）；`test/history-compactor.test.mjs` 与 `test/chat-rebuild-channels.test.mjs` 已改为钉新世界。

@@ -504,8 +504,11 @@ const V1_NOTES = 'V1-NOTES-WITHOUT-TIMESTAMPS ' + 'n'.repeat(60);
 function assertRewriteShape(t, calls0Text, { instructionLast = true } = {}) {
   const raw = t.find(([role, text]) => text.includes(RAW_MARKER));
   assert.ok(raw, 'the rewrite request must carry the RAW video transcript (buildTimestampRewriteHistory reads the raw history)');
-  assert.ok(!calls0Text.includes(RAW_MARKER), 'the transcript must be aged OUT of the normal send (contrast: raw vs aged)');
-  assert.ok(calls0Text.includes('trimmed to keep replies fast'), 'the first request carries the aged stub instead');
+  // 2026-10-14 KV-cache ruling: no send-time aging — the normal send carries
+  // the transcript verbatim too (the old "raw vs aged" contrast is gone; what
+  // matters now is that the rewrite sees the SAME raw bytes the send saw).
+  assert.ok(calls0Text.includes(RAW_MARKER), 'the normal send rides the transcript verbatim as well');
+  assert.ok(!calls0Text.includes('trimmed to keep replies fast'), 'no aging stub in the normal send');
   const v1 = t.find(([role, text]) => role === 'assistant' && text.includes('V1-NOTES'));
   assert.ok(v1, 'the model must see its own v1 notes in the rewrite conversation');
   const userTurn = t.find(([role, text]) => role === 'user' && text === '总结一下这个视频');

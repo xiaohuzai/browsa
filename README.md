@@ -284,7 +284,7 @@ opensquilla gateway start
 | 你在读 | browsa 发送 |
 |---|---|
 | 文章与文档 | 干净的正文；站点 `llms.txt` 指令一并烘入上下文 |
-| PDF 与论文 | 完整版式——表格、标题、多栏——本机解析；插图区域裁出作为图片发给视觉模型（回答后在历史中压缩为带标签的占位符） |
+| PDF 与论文 | 完整版式——表格、标题、多栏——本机解析；插图区域裁出作为图片发给视觉模型 |
 | Office 文档（`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…） | 经 docling-wasm 本机转换为 Markdown——标题、列表、表格保持结构 |
 | 视频 / 播客单集 | 带可点击 `[mm:ss]` 时间戳的字幕/转写；无字幕视频自动转写（ASR，可选——设置中填 ASR Key：火山方舟或阿里云百炼）或画面与语音一起精读；小宇宙单集同样一键转写 |
 | GitHub 仓库与文件页 | 文件页直接抓 `raw.githubusercontent.com` 原始源码——markdown 与代码保持结构；仓库页附加结构化元数据（描述、topics、license、星数）加 README 原文，侧栏信息不再被当作导航丢掉 |
