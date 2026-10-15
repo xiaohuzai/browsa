@@ -281,7 +281,7 @@ Haz clic en 📎 para adjuntar la pestaña actual — modo **Automático** (text
 | Estás leyendo | Qué envía browsa |
 |---|---|
 | Artículos y documentación | texto de artículo limpio; las instrucciones `llms.txt` del sitio se integran en el contexto |
-| PDF y artículos científicos | diseño completo — tablas, encabezados, columnas — analizado en el navegador; las regiones de las figuras se recortan y se envían como imágenes a los modelos de visión (se compactan a placeholders etiquetados en el historial tras responder) |
+| PDF y artículos científicos | diseño completo — tablas, encabezados, columnas — analizado en el navegador; las regiones de las figuras se recortan y se envían como imágenes a los modelos de visión |
 | Documentos de Office (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | convertidos a Markdown en tu dispositivo vía docling-wasm — los encabezados, las listas y las tablas conservan su estructura |
 | Vídeos | transcripción con marcas de tiempo `[mm:ss]` clicables; los vídeos sin subtítulos se transcriben automáticamente (ASR, opcional — clave de Volcengine Ark en Ajustes) o se analizan visualmente junto con la voz |
 | Páginas de archivos de GitHub | código fuente en crudo desde `raw.githubusercontent.com` — el markdown y el código conservan su estructura |

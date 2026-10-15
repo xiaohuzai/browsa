@@ -280,7 +280,7 @@ Clique em 📎 para anexar a aba atual — modo **Auto** (texto do artigo limpo,
 | Você está lendo | O que o browsa envia |
 |---|---|
 | Artigos & documentação | texto do artigo limpo; as instruções `llms.txt` do site incorporadas ao contexto |
-| PDFs & artigos científicos | layout completo — tabelas, títulos, colunas — processado no navegador; regiões de figuras recortadas e enviadas como imagens a modelos de visão (compactadas para marcadores rotulados no histórico depois que a resposta sai) |
+| PDFs & artigos científicos | layout completo — tabelas, títulos, colunas — processado no navegador; regiões de figuras recortadas e enviadas como imagens a modelos de visão |
 | Documentos Office (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | convertidos para Markdown no dispositivo via docling-wasm — títulos, listas e tabelas mantêm a estrutura |
 | Vídeos | transcrição com timestamps `[mm:ss]` clicáveis; vídeos sem legenda são transcritos automaticamente (ASR, opcional — chave do Volcengine Ark nas Configurações) ou analisados visualmente junto com a fala |
 | Páginas de arquivo do GitHub | código-fonte bruto de `raw.githubusercontent.com` — markdown e código mantêm a estrutura |

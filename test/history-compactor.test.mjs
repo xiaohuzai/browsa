@@ -322,7 +322,7 @@ function imageEntry(extra, url = 'data:image/png;base64,PIX') {
   };
 }
 
-test('prepareHistoryForModel: seen images become labels (figure captions win) and the flag never leaks', () => {
+test('prepareHistoryForModel: seen images ride as pixels (2026-10-14 KV-cache ruling); only the flag is stripped', () => {
   const entry = {
     role: 'user',
     [IMAGE_SEEN_FLAG]: true,
@@ -332,10 +332,8 @@ test('prepareHistoryForModel: seen images become labels (figure captions win) an
     ],
   };
   const out = prepareHistoryForModel([entry]);
-  assert.deepEqual(out[0].content, [
-    { type: 'text', text: 'body\n\n## Figures\n1. Figure 3: training pipeline' },
-    { type: 'text', text: '[Figure 3: training pipeline]' },
-  ]);
+  assert.equal(out[0].content[1].type, 'image_url', 'seen pixels still ride the request — no label compaction');
+  assert.deepEqual(out[0].content[0], { type: 'text', text: 'body\n\n## Figures\n1. Figure 3: training pipeline' });
   assert.ok(!JSON.stringify(out).includes(IMAGE_SEEN_FLAG), 'flag stripped from the model view');
 });
 
@@ -353,20 +351,21 @@ test('prepareHistoryForModel: the flag is stripped even from text-only entries',
   assert.notEqual(out[0], entry);
 });
 
-test('prepareHistoryForModel: mixed history — only seen image entries are rewritten', () => {
+test('prepareHistoryForModel: mixed history — flagged entries keep pixels, only the flag is stripped', () => {
   const seen = imageEntry({ [IMAGE_SEEN_FLAG]: true }, 'data:image/png;base64,OLD');
   const fresh = imageEntry({}, 'data:image/png;base64,NEW');
   const text = { role: 'assistant', content: 'reply' };
   const out = prepareHistoryForModel([seen, fresh, text]);
-  assert.equal(out[0].content[1].type, 'text');
+  assert.equal(out[0].content[1].type, 'image_url', 'flagged pixels ride verbatim — no label rewrite');
+  assert.ok(!(IMAGE_SEEN_FLAG in out[0]), 'flag stripped from the copy');
   assert.equal(out[1], fresh);
   assert.equal(out[2], text);
-  assert.notEqual(out[0], seen);
+  assert.notEqual(out[0], seen, 'flag strip copies the entry');
 });
 
 // --------------- builder integration (what the provider actually receives) --
 
-test('buildMessages: answered images become labels; unanswered ride as pixels; flag never leaks', () => {
+test('buildMessages: answered images ride as pixels too (verbatim — prefix stability = cache hits); flag never leaks', () => {
   const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
     { type: 'text', text: 'seen turn' },
     { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
@@ -377,13 +376,12 @@ test('buildMessages: answered images become labels; unanswered ride as pixels; f
   ] };
   const msgs = buildMessages({ history: [seen, fresh], userText: 'q', systemPrompt: 'sys' });
   const wire = JSON.stringify(msgs);
-  assert.ok(!wire.includes('OLD'), 'answered pixels are not resent');
+  assert.ok(wire.includes('OLD'), 'answered pixels are resent verbatim');
   assert.ok(wire.includes('NEW'), 'fresh pixels ride the request');
   assert.ok(!wire.includes(IMAGE_SEEN_FLAG), 'no flag in the request body');
-  assert.ok(wire.includes('[image 1]'), 'answered image becomes a label');
 });
 
-test('buildAnthropicMessages: answered → no image blocks; unanswered → base64 image blocks', () => {
+test('buildAnthropicMessages: answered and unanswered both become base64 image blocks (verbatim)', () => {
   const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
     { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
   ] };
@@ -392,12 +390,12 @@ test('buildAnthropicMessages: answered → no image blocks; unanswered → base6
   ] };
   const out = buildAnthropicMessages({ userText: 'q' }, [seen, fresh]);
   const wire = JSON.stringify(out);
-  assert.ok(!wire.includes('OLD'));
+  assert.ok(wire.includes('OLD'), 'answered pixels ride verbatim');
   assert.ok(wire.includes('NEW'));
-  assert.ok(wire.includes('"type":"image"'), 'fresh image becomes an Anthropic image block');
+  assert.ok(wire.includes('"type":"image"'), 'images become Anthropic image blocks');
 });
 
-test('buildRunsConversationHistory (responses style): answered → labels; unanswered → input_image', () => {
+test('buildRunsConversationHistory (responses style): answered and unanswered both ride as input_image (verbatim)', () => {
   const seen = { role: 'user', [IMAGE_SEEN_FLAG]: true, content: [
     { type: 'image_url', image_url: { url: 'data:image/png;base64,OLD' } },
   ] };
@@ -405,6 +403,6 @@ test('buildRunsConversationHistory (responses style): answered → labels; unans
     { type: 'image_url', image_url: { url: 'data:image/png;base64,NEW' } },
   ] };
   const out = buildRunsConversationHistory([seen, fresh], { partStyle: 'responses' });
-  assert.deepEqual(out[0].content, [{ type: 'input_text', text: '[image 1]' }]);
+  assert.deepEqual(out[0].content, [{ type: 'input_image', image_url: 'data:image/png;base64,OLD' }]);
   assert.deepEqual(out[1].content, [{ type: 'input_image', image_url: 'data:image/png;base64,NEW' }]);
 });

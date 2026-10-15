@@ -284,7 +284,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | You're reading | What browsa sends |
 |---|---|
 | Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
-| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models (compacted to labeled placeholders in history after answering) |
+| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models |
 | Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
 | Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
 | GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |
