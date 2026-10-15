@@ -50,7 +50,7 @@ globalThis.chrome = {
   downloads: { download: async () => {} },
   runtime: {
     connect: () => { lastPort = makeFakePort(); return lastPort; },
-    sendMessage: (msg, cb) => { sentMessages.push(msg); cb({ ok: true }); },
+    sendMessage: (msg, cb) => { sentMessages.push(msg); cb({ ok: true, data: { ok: true } }); },
     lastError: undefined,
   },
 };
@@ -363,22 +363,100 @@ test('SUBCHAT_APPROVAL renders an approval card in the card; clicking a choice r
   card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
 
-  lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'execute_code', command: 'rm -rf /tmp/x', risk_level: 'high', choices: ['once', 'deny'] } });
+  lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'execute_code', command: 'rm -rf /tmp/x', risk_level: 'high', choices: ['once', 'deny'] }, reqKey: `${card.dataset.subId ?? 'sub-t'}::1` });
   await new Promise((r) => setTimeout(r, 10));
-  const ap = card.querySelector('.approval-card');
-  assert.ok(ap, 'an approval card must render inside the detail-thread card');
-  assert.match(ap.textContent, /execute_code/);
+  try {
+    const ap = card.querySelector('.approval-card');
+    assert.ok(ap, 'an approval card must render inside the detail-thread card');
+    assert.match(ap.textContent, /execute_code/);
 
-  ap.querySelector('[data-choice="once"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    ap.querySelector('[data-choice="once"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 10));
+    const sent = sentMessages.find(m => m.type === 'SUBCHAT_APPROVAL_RESPOND');
+    assert.ok(sent, 'clicking a choice must send SUBCHAT_APPROVAL_RESPOND');
+    assert.equal(sent.choice, 'once');
+    assert.equal(sent.subId, ap.dataset.subId);
+    assert.equal(sent.reqKey, ap.dataset.reqKey, 'the relay must carry the card\'s own reqKey (stacking router)');
+    assert.ok(!card.querySelector('.approval-card'), 'card must be removed after answering');
+  } finally {
+    // Turn never completes (the agent is waiting on the approval); close the
+    // card to tear down the port + its SW_PING interval so the process can
+    // exit EVEN WHEN an assertion above throws (a leaked interval hangs the run).
+    card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  }
+});
+
+test('concurrent approvals STACK: two SUBCHAT_APPROVAL chunks render two cards in request order, each answering its own reqKey', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Reply.');
+  openDetailThread(bubble, 'excerpt', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'go parallel';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'exec_one', command: 'cmd-one', choices: ['once', 'deny'] }, reqKey: '7::1' });
   await new Promise((r) => setTimeout(r, 10));
-  const sent = sentMessages.find(m => m.type === 'SUBCHAT_APPROVAL_RESPOND');
-  assert.ok(sent, 'clicking a choice must send SUBCHAT_APPROVAL_RESPOND');
-  assert.equal(sent.choice, 'once');
-  assert.equal(sent.subId, ap.dataset.subId);
-  assert.ok(!card.querySelector('.approval-card'), 'card must be removed after answering');
-  // Turn never completes (the agent is waiting on the approval); close the
-  // card to tear down the port + its SW_PING interval so the process can exit.
-  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'exec_two', command: 'cmd-two', choices: ['once', 'deny'] }, reqKey: '7::2' });
+  await new Promise((r) => setTimeout(r, 10));
+
+  try {
+    const cards = card.querySelectorAll('.approval-card');
+    assert.equal(cards.length, 2, 'a second approval event must NOT displace the first card');
+    assert.match(cards[0].textContent, /exec_one/, 'cards keep chronological (request) order…');
+    assert.match(cards[1].textContent, /exec_two/, '…newest appended last, not slotted between bubble and previous card');
+    assert.equal(cards[0].dataset.reqKey, '7::1');
+    assert.equal(cards[1].dataset.reqKey, '7::2');
+
+    // Answer the SECOND card first — the whole point of per-card routing.
+    cards[1].querySelector('[data-choice="deny"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 10));
+    const sentTwo = sentMessages.find(m => m.type === 'SUBCHAT_APPROVAL_RESPOND');
+    assert.ok(sentTwo, 'answering card two must relay');
+    assert.equal(sentTwo.reqKey, '7::2', 'the reply must be routed to card two\'s OWN request');
+    assert.equal(sentTwo.choice, 'deny');
+    assert.equal(card.querySelectorAll('.approval-card').length, 1, 'only the answered card is removed');
+
+    cards[0].querySelector('[data-choice="once"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 10));
+    const sentOne = sentMessages.filter(m => m.type === 'SUBCHAT_APPROVAL_RESPOND').pop();
+    assert.equal(sentOne.reqKey, '7::1', 'then card one relays its own request');
+    assert.equal(card.querySelectorAll('.approval-card').length, 0);
+  } finally {
+    // Same teardown rationale as the single-card test above — MUST run even
+    // when an assertion throws, or the leaked SW_PING interval hangs the run.
+    card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  }
+});
+
+test('a failed approval relay KEEPS the card (and shows the reason) so the user can retry', async () => {
+  sentMessages.length = 0;
+  const originalSendMessage = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = (msg, cb) => { sentMessages.push(msg); cb({ ok: true, data: { ok: false, error: 'network down' } }); };
+  try {
+    const bubble = makeAssistantBubble('Reply.');
+    openDetailThread(bubble, 'excerpt', bubble);
+    const card = bubble.nextElementSibling;
+    const input = card.querySelector('.detail-thread-input');
+    input.value = 'retry me';
+    card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    try {
+      lastPort.emit({ type: 'SUBCHAT_APPROVAL', data: { tool: 'exec', choices: ['once', 'deny'] }, reqKey: '9::1' });
+      await new Promise((r) => setTimeout(r, 10));
+      card.querySelector('[data-choice="once"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 10));
+      assert.ok(card.querySelector('.approval-card'), 'a failed relay must not destroy the card — the pending request is still live');
+      assert.ok(sentMessages.some(m => m.type === 'SUBCHAT_APPROVAL_RESPOND'), 'the relay was attempted');
+    } finally {
+      // Same teardown rationale as the tests above.
+      card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    }
+  } finally {
+    chrome.runtime.sendMessage = originalSendMessage;
+  }
 });
 
 test('SUBCHAT_CLARIFY renders a question card; submitting relays SUBCHAT_CLARIFY_RESPOND with subId', async () => {
@@ -391,21 +469,25 @@ test('SUBCHAT_CLARIFY renders a question card; submitting relays SUBCHAT_CLARIFY
   card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 20));
 
-  lastPort.emit({ type: 'SUBCHAT_CLARIFY', data: { question: 'Which file do you mean?' } });
+  lastPort.emit({ type: 'SUBCHAT_CLARIFY', data: { question: 'Which file do you mean?' }, reqKey: '8::1' });
   await new Promise((r) => setTimeout(r, 10));
-  const cl = card.querySelector('.clarify-card');
-  assert.ok(cl, 'a clarify card must render inside the detail-thread card');
-  assert.match(cl.textContent, /Which file do you mean\?/);
+  try {
+    const cl = card.querySelector('.clarify-card');
+    assert.ok(cl, 'a clarify card must render inside the detail-thread card');
+    assert.match(cl.textContent, /Which file do you mean\?/);
 
-  cl.querySelector('.clarify-input').value = 'the config file';
-  cl.querySelector('.clarify-submit').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 10));
-  const sent = sentMessages.find(m => m.type === 'SUBCHAT_CLARIFY_RESPOND');
-  assert.ok(sent, 'submitting must send SUBCHAT_CLARIFY_RESPOND');
-  assert.equal(sent.response, 'the config file');
-  assert.ok(!card.querySelector('.clarify-card'), 'card must be removed after answering');
-  // Same teardown rationale as the approval test above.
-  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    cl.querySelector('.clarify-input').value = 'the config file';
+    cl.querySelector('.clarify-submit').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 10));
+    const sent = sentMessages.find(m => m.type === 'SUBCHAT_CLARIFY_RESPOND');
+    assert.ok(sent, 'submitting must send SUBCHAT_CLARIFY_RESPOND');
+    assert.equal(sent.response, 'the config file');
+    assert.equal(sent.reqKey, '8::1', 'the relay must carry the card\'s own reqKey');
+    assert.ok(!card.querySelector('.clarify-card'), 'card must be removed after answering');
+  } finally {
+    // Same teardown rationale as the approval test above.
+    card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  }
 });
 
 test('DONE folds tool events into a tool-history details block and renders the token usage chip (main-panel parity)', async () => {

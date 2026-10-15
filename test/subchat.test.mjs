@@ -297,8 +297,15 @@ test('SUBCHAT_DONE carries the same reply-source stamp as CHAT, via the shared r
 test('SUBCHAT pushes tool progress + approval/clarify chunks and relays replies subId-keyed, all three agent kinds covered', async () => {
   const subchatSrc = await readSubchatHandlerSrc();
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_TOOL_PROGRESS', subId, text \}\)/);
-  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_APPROVAL', subId, data \}\)/);
-  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CLARIFY', subId, data \}\)/);
+  // 2026-10-15 并发审批堆叠：chunk 带 reqKey，应答按 reqKey 精确路由。
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_APPROVAL', subId, data, reqKey \}\)/);
+  assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CLARIFY', subId, data, reqKey \}\)/);
+  assert.equal((subchatSrc.match(/const reqKey = agentPendingKey\(subId\);/g) || []).length, 5,
+    'all five creation sites (opencode appr+clar, bridge appr, hermes appr+clar) key by agentPendingKey');
+  assert.match(subchatSrc, /subchatPendingApprovals\.get\(msg\.reqKey\)/,
+    'approval relay must route by reqKey, not the old subId single slot');
+  assert.match(subchatSrc, /subchatPendingClarifications\.get\(msg\.reqKey\)/,
+    'clarification relay must route by reqKey');
   // Runs + opencode + bridge branches all wire onApproval: two `onApproval:`
   // option keys (opencode/bridge) plus the runs branch's local const passed
   // as shorthand (`onApproval,` at the runsApiStream call).
@@ -306,9 +313,14 @@ test('SUBCHAT pushes tool progress + approval/clarify chunks and relays replies 
   assert.match(subchatSrc, /const onApproval = \(data\) => \{/, 'the runs branch must define its own approval handler');
   assert.match(subchatSrc, /\n          onApproval,\n/, 'the runs branch must pass its approval handler to runsApiStream');
   assert.equal((subchatSrc.match(/onToolProgress:/g) || []).length, 3, 'all three agent branches must surface tool progress');
-  // subId-keyed pending maps, cleaned on abort AND turn end.
+  // subId-scoped pending maps (reqKey-keyed since the stacking fix), swept on
+  // abort AND turn end.
   assert.match(subchatSrc, /const subchatPendingApprovals = new Map\(\)/);
   assert.match(subchatSrc, /const subchatPendingClarifications = new Map\(\)/);
+  assert.match(subchatSrc, /sweepAgentPending\(subchatPendingApprovals, subId\)/,
+    'turn-end finally must sweep the scope');
+  assert.match(subchatSrc, /sweepAgentPending\(subchatPendingApprovals, msg\.subId\)/,
+    'abort must sweep the scope');
   assert.match(subchatSrc, /export async function handleSubchatApprovalRespond\(/);
   assert.match(subchatSrc, /export async function handleSubchatClarifyRespond\(/);
   const bgSrc = await readBackgroundSrc();
