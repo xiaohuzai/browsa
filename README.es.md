@@ -17,7 +17,7 @@
 
 **Quédate en la página. Pregunta a su lado.**
 
-browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness) / workbuddy** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
+browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
 
 **Extensión gratuita, con licencia MIT.** Trae tu propio modelo o agente. Las claves de API se guardan localmente y se usan para autenticarte con los servicios que configures.
 
@@ -40,7 +40,6 @@ Conecta tus agentes locales existentes a través de Agent Bridge, usando su inic
 | **pi** (earendil-works) | demonio local agent-bridge | El modelo que le configures a pi |
 | **Gemini CLI** (Google) | demonio local agent-bridge | Autenticación CLI existente |
 | **dsh** (DeepSeek Harness) | demonio local agent-bridge | Clave API de DeepSeek |
-| **workbuddy** (aplicación de escritorio WorkBuddy AI) | demonio local agent-bridge | Inicio de sesión de la app WorkBuddy (mantén la app en ejecución) |
 | opencode | servidor headless oficial, conexión directa | el modelo que le configures |
 | Hermes | autoalojado, protocolo `/v1/runs` | autoalojado |
 | OpenSquilla | gateway autoalojado, WebSocket (`/ws`) | los modelos que el gateway enrute |
@@ -63,7 +62,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -123,9 +122,9 @@ Las conversaciones con agentes viven del lado del agente:
 - las conversaciones antiguas sin ID registrado inician una sesión de agente nueva con su historial de texto al enviar el primer mensaje
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — puente para agentes locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — puente para agentes locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes locales (codex, claude, pi, gemini, dsh, workbuddy) a un único protocolo HTTP local. Usa la autenticación ya configurada del agente:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes locales (codex, claude, pi, gemini, dsh) a un único protocolo HTTP local. Usa la autenticación ya configurada del agente:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -139,7 +138,6 @@ Abre ⚙ Ajustes, selecciona la tarjeta **Agent Bridge**, haz clic en **＋ Aña
 - las tarjetas de aprobación para acciones peligrosas aparecen directamente en el panel
 - las capturas de pantalla, las imágenes pegadas y las figuras de PDF viajan junto con tu mensaje — ≤18 por turno, requiere agent-bridge ≥0.8.0 (los bridges antiguos degradan a las primeras 8 con una nota en el mensaje)
 - el contexto multi-turno vive en el propio agente; la narración previa a las llamadas a herramientas (codex anunciando un skill) se pliega en el historial de pasos, no en la respuesta
-- workbuddy: mantén la aplicación de escritorio WorkBuddy AI con la sesión iniciada y en ejecución (el bridge descubre automáticamente su gateway de worker local); las conversaciones viven en la memoria de la app — reiniciar la app inicia una sesión de agente nueva en el siguiente turno, y tu historial del lado de browsa no se ve afectado
 
 
 </details>

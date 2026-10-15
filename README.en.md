@@ -20,7 +20,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -43,7 +43,6 @@ Connect your existing local agents through Agent Bridge, using their configured 
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
 | **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek API key |
-| **workbuddy** (WorkBuddy AI desktop app) | agent-bridge local daemon | WorkBuddy app sign-in (keep the app running) |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 | OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
@@ -66,7 +65,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -126,9 +125,9 @@ Conversations with agents live on the agent side:
 - older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>workbuddy</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh, workbuddy) to one local HTTP protocol. It uses the agent's configured authentication:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh) to one local HTTP protocol. It uses the agent's configured authentication:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -142,7 +141,6 @@ Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and
 - approval cards for dangerous actions appear right in the panel
 - screenshots, pasted images, and PDF figures ride along with your message — ≤18 per turn, needs agent-bridge ≥0.8.0 (older bridges degrade to the first 8 with a note in the message)
 - multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply
-- workbuddy: keep the WorkBuddy AI desktop app signed in and running (the bridge auto-discovers its local worker gateway); conversations live in the app's memory — restarting the app starts a fresh agent session next turn, browsa history unaffected
 
 
 </details>
@@ -289,7 +287,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
 | GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |
 | Feishu / Lark docs | the page's editor block structure parsed directly — headings, lists, and **table rows & columns** survive |
-| Complex pages | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"); long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
+| Complex pages | the page's own network requests observed and read directly — subtitles, comments, article source (YouTube, Bilibili, 小红书, and more). XHS notes attach **with their photos** (best scene variant per image); Zhihu answers & columns read the API's **full text** (long answers no longer cut off by the collapsed "read more"), with the article's inline images attached; Juejin articles come through as **Markdown source with their images**; Geektime course figures and Xueqiu post images attach too; long posts on X come through with **full text and photos** (quoted posts keep their content too); Reddit reads the post's own JSON API first, **galleries attach with their images**; multi-part Bilibili videos take the subtitles and creator chapters of the part you're on |
 | Selected text | structure preserved — tables, lists and links convert to Markdown on attach, not bare plain text |
 
 Highlight text on a page and the **floating toolbar** appears: **Explain** and **Translate** answer inline — a streaming card right next to the selection, no panel needed — while **Ask** and **Summarize** (and the right-click menu) ride into the panel. No need to click 📎.

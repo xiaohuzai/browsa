@@ -20,7 +20,7 @@
 
 **读到哪里，问到哪里。**
 
-browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
@@ -43,7 +43,6 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek API key |
-| **workbuddy**（WorkBuddy AI 桌面应用） | agent-bridge 本地桥 | WorkBuddy 应用登录（保持运行） |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 | OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
@@ -66,7 +65,7 @@ flowchart LR
     P["当前标签页<br/>文章 · 视频 · PDF · 复杂页面"]
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
     subgraph Y["你的后端 —— 云端、本机或自托管"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh · workbuddy<br/>agent-bridge 桥 · 沿用本地登录"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>agent-bridge 桥 · 沿用本地登录"]
         A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -126,9 +125,9 @@ npm run package      # → browsa-v<version>.zip
 - 未记录 ID 的旧存档：首次发消息时创建独立智能体会话，并带上已有文字记录
 
 <details>
-<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>workbuddy</b>…）</summary>
+<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh、workbuddy 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
@@ -142,7 +141,6 @@ agent-bridge serve                                # 每个 entry 一座桥，端
 - 危险操作的审批卡片直接出现在面板里
 - 截图、粘贴图片与 PDF 图表随消息发送——单条 ≤18 张，需 agent-bridge ≥0.8.0（旧版桥自动降级为前 8 张并在消息里注明）
 - 多轮上下文由 agent 自己维护；工具调用前的过程自述（codex 宣告使用某技能）折进步骤历史，不混进回复正文
-- workbuddy：保持 WorkBuddy 桌面应用登录并运行即可（桥自动发现其本地 worker 网关）；对话存在应用内存，重启应用后下一轮自动开新会话，browsa 侧历史不受影响
 
 
 </details>
@@ -289,7 +287,7 @@ opensquilla gateway start
 | 视频 / 播客单集 | 带可点击 `[mm:ss]` 时间戳的字幕/转写；无字幕视频自动转写（ASR，可选——设置中填 ASR Key：火山方舟或阿里云百炼）或画面与语音一起精读；小宇宙单集同样一键转写 |
 | GitHub 仓库与文件页 | 文件页直接抓 `raw.githubusercontent.com` 原始源码——markdown 与代码保持结构；仓库页附加结构化元数据（描述、topics、license、星数）加 README 原文，侧栏信息不再被当作导航丢掉 |
 | 飞书 / Lark 文档 | 直接解析页面编辑器的块结构——标题、列表与**表格行列**完整保留 |
-| 复杂页面 | 观察并直接读页面自身的网络请求——字幕、评论、文章源码（YouTube、Bilibili、小红书等）。小红书笔记连**配图**一起附加（按场景挑最优变体）；知乎回答与专栏读 API **全文**（长答案不被「展开阅读全文」折叠截断）；X 长推文取**全文与配图**（引用的原推内容一并保留）；Reddit 优先读帖子自己的 JSON API，**图集帖子连图一起附加**；B站分P视频按所在分P取字幕，UP主章节一并附带 |
+| 复杂页面 | 观察并直接读页面自身的网络请求——字幕、评论、文章源码（YouTube、Bilibili、小红书等）。小红书笔记连**配图**一起附加（按场景挑最优变体）；知乎回答与专栏读 API **全文**（长答案不被「展开阅读全文」折叠截断），文章配图一并附加；掘金文章读 **Markdown 源码**，配图一并附加；极客时间课程与雪球帖子的**配图**一并附加；X 长推文取**全文与配图**（引用的原推内容一并保留）；Reddit 优先读帖子自己的 JSON API，**图集帖子连图一起附加**；B站分P视频按所在分P取字幕，UP主章节一并附带 |
 | 选中的文字 | 保留结构——表格、列表、链接在附加时转成 Markdown，不只是纯文本 |
 
 划选网页文字会出现**浮动工具栏**：**解释**和**翻译**就地作答——流式卡片展开在选区旁，不用打开侧栏；**提问**和**总结**（以及右键菜单）把选区送进侧栏。不用点 📎。

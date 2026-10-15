@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — 浏览器侧边栏 AI</title>
-<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API，接 Hermes / opencode / OpenSquilla 智能体，或经 agent-bridge 桥接你的 Codex / Claude Code / pi / Gemini CLI / dsh / workbuddy。读到哪里，问到哪里。">
+<meta name="description" content="browsa 是一个 Chrome / Edge 侧边栏扩展：把当前页面带进对话，流式回答，支持 OpenAI / Anthropic / Ollama 等主流 API，接 Hermes / opencode / OpenSquilla 智能体，或经 agent-bridge 桥接你的 Codex / Claude Code / pi / Gemini CLI / dsh。读到哪里，问到哪里。">
 <link rel="icon" type="image/png" href="icon48.png">
 <link rel="stylesheet" href="site.css">
 <meta property="og:title" content="browsa — 浏览器侧边栏 AI">
@@ -377,7 +377,7 @@
             <li>Hermes Agent：工具执行、危险操作审批、进度展示</li>
             <li>OpenCode Agent：CLI 直连，完整工具与审批流</li>
             <li>OpenSquilla Agent：网关 WebSocket 直连，服务端会话记忆</li>
-            <li>Agent Bridge：桥接 Codex / Claude Code / Gemini CLI / pi / dsh / WorkBuddy，一张卡连多个</li>
+            <li>Agent Bridge：桥接 Codex / Claude Code / Gemini CLI / pi / dsh，一张卡连多个</li>
             <li>会话保存在智能体侧，自动命名、随时续聊</li>
             <li>多协议接入：OpenAI（Chat / Responses）、Anthropic Messages、Ollama、LiteLLM…</li>
             <li>一张卡多个模型，侧边栏随手切换</li>
@@ -437,15 +437,15 @@
         <span class="site-chip">Bilibili<span class="en">字幕/章节/ASR/统计</span></span>
         <span class="site-chip">小红书<span class="en">笔记/配图/评论</span></span>
         <span class="site-chip">飞书<span class="en">文档/表格</span></span>
-        <span class="site-chip">掘金<span class="en">文章源码</span></span>
-        <span class="site-chip">知乎<span class="en">文章/回答</span></span>
+        <span class="site-chip">掘金<span class="en">文章源码/配图</span></span>
+        <span class="site-chip">知乎<span class="en">文章/回答/配图</span></span>
         <span class="site-chip">X / Twitter<span class="en">推文/配图/回复</span></span>
         <span class="site-chip">GitHub<span class="en">仓库元数据/README</span></span>
         <span class="site-chip">Reddit<span class="en">帖子/评论/配图</span></span>
-        <span class="site-chip">雪球<span class="en">行情/帖子</span></span>
+        <span class="site-chip">雪球<span class="en">行情/帖子/配图</span></span>
         <span class="site-chip">小宇宙<span class="en">播客/ASR</span></span>
         <span class="site-chip">得到<span class="en">文章</span></span>
-        <span class="site-chip">极客时间<span class="en">文章</span></span>
+        <span class="site-chip">极客时间<span class="en">文章/配图</span></span>
       </div>
       <p class="site-note">
         <b>不劫持、不改动：</b>只读取浏览器自身发出的请求，像在旁边「看」。任意其他网页同样可用，只是没这么「深」。
@@ -501,7 +501,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / workbuddy · 连接本地智能体</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · 连接本地智能体</span></span>
             <span class="prov-badge pb-idle">bridge</span>
           </div>
         </div>

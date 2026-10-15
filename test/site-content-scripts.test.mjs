@@ -556,6 +556,10 @@ function loadContentScript(name) {
     const prevWindow = globalThis.window;
     const prevFetch = globalThis.fetch;
     const prevDocument = globalThis.document;
+    // perf stub MUST be restored here too — jsdom's Window constructor calls
+    // performance.now(), so a leaked stub breaks every later JSDOM test in
+    // this file (real recurrence: the zhihu htmlToArticleText tests).
+    const prevPerf = globalThis.performance;
     try {
       globalThis.window = {
         location: { search: '?v=NEW_VIDEO_ID' }, // URL already updated
@@ -578,6 +582,7 @@ function loadContentScript(name) {
       if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
       if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
       if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
     }
   });
 
@@ -1427,7 +1432,7 @@ function loadContentScript(name) {
 // zhihu-content-script.js
 // ============================================================================
 {
-  const { isZhihuArticleUrl, isZhihuAnswersUrl, extractZhihuArticle, extractZhihuAnswers, installZhihuInterceptor, zhihuTargetFromUrl } =
+  const { isZhihuArticleUrl, isZhihuAnswersUrl, extractZhihuArticle, extractZhihuAnswers, installZhihuInterceptor, zhihuTargetFromUrl, htmlToArticleText } =
     loadContentScript('zhihu-content-script.js');
   const identityToText = (html) => (html || '').replace(/<[^>]+>/g, ''); // stand-in for the real DOM-based htmlToText
 
@@ -1488,6 +1493,52 @@ function loadContentScript(name) {
   test('zhihu: installZhihuInterceptor is a no-op outside a browser context', () => {
     assert.equal(installZhihuInterceptor(), false);
   });
+
+  // htmlToArticleText (2026-10-15 回归修复): the converter feeding BOTH the
+  // passive interceptor and activeZhihuFetch must keep article figures as
+  // markdown image syntax at their in-document position — plain textContent
+  // stripping here is what made zhihu attaches text-only.
+  {
+    const { JSDOM } = require('jsdom');
+    const withDom = (fn) => {
+      const dom = new JSDOM('<!doctype html><html><body></body></html>');
+      const prev = globalThis.document;
+      globalThis.document = dom.window.document;
+      try { return fn(); } finally { globalThis.document = prev; }
+    };
+
+    test('zhihu: htmlToArticleText keeps figures in place, prefers data-actualsrc, dedupes the <noscript> twin', () => withDom(() => {
+      const html = '<p>正文开头。</p>'
+        + '<figure data-size="normal">'
+        + '<noscript><img src="https://picx.zhimg.com/v2-orig_r.jpg?source=1"></noscript>'
+        + '<img width="720" src="https://picx.zhimg.com/v2-orig_720w.jpg?source=1" '
+        + 'data-actualsrc="https://picx.zhimg.com/v2-orig_r.jpg?source=1" data-original="https://picx.zhimg.com/v2-orig_r.jpg?source=1">'
+        + '<figcaption>图注文字</figcaption></figure>'
+        + '<p>正文结尾。</p>';
+      const text = htmlToArticleText(html);
+      const imgs = text.match(/!\[[^\]]*\]\([^)]*\)/g) || [];
+      assert.equal(imgs.length, 1, 'noscript twin must not duplicate the figure');
+      assert.equal(imgs[0], '![](https://picx.zhimg.com/v2-orig_r.jpg?source=1)', 'data-actualsrc (the rendered original) wins over the 720w src variant');
+      assert.ok(text.indexOf('正文开头。') < text.indexOf('!['), 'figure stays at its in-document position');
+      assert.ok(text.indexOf('图注文字') > text.indexOf('!['), 'figcaption rides after the figure');
+      assert.ok(text.includes('正文结尾。'));
+    }));
+
+    test('zhihu: htmlToArticleText skips data:/blob: lazy placeholders, falls back to bare src', () => withDom(() => {
+      const lazy = htmlToArticleText('<p>a</p><img src="data:image/svg+xml;base64,PHN2Zy8+" data-actualsrc="https://pic1.zhimg.com/v2-x.jpg">');
+      assert.match(lazy, /!\[\]\(https:\/\/pic1\.zhimg\.com\/v2-x\.jpg\)/, 'placeholder src never qualifies');
+      const bare = htmlToArticleText('<img src="https://pic4.zhimg.com/v2-y.jpg">');
+      assert.match(bare, /!\[\]\(https:\/\/pic4\.zhimg\.com\/v2-y\.jpg\)/, 'plain src is the last fallback');
+      assert.equal(htmlToArticleText('<img src="blob:https://zhihu.com/x">').trim(), '', 'blob: only → no image syntax');
+    }));
+
+    test('zhihu: htmlToArticleText keeps paragraphs apart and sanitizes markdown-breaking alt text', () => withDom(() => {
+      const text = htmlToArticleText('<p>第一段</p><p>第二段</p>');
+      assert.match(text, /^第一段\n\n第二段$/);
+      const alt = htmlToArticleText('<img alt="a[b](c)" src="https://picx.zhimg.com/v2-z.jpg">');
+      assert.match(alt, /!\[a b c\]\(https:\/\/picx\.zhimg\.com\/v2-z\.jpg\)/, 'brackets/parens in alt are stripped so the [图N] regex can pair the markdown');
+    }));
+  }
 }
 
 // ============================================================================
@@ -1548,7 +1599,7 @@ function loadContentScript(name) {
 // geektime-content-script.js
 // ============================================================================
 {
-  const { isGeektimeArticleUrl, isValidGeektimeResponse, extractGeektimeArticle, maybeExtractGeektime, installGeektimeInterceptor } =
+  const { isGeektimeArticleUrl, isValidGeektimeResponse, extractGeektimeArticle, maybeExtractGeektime, installGeektimeInterceptor, htmlToArticleText } =
     loadContentScript('geektime-content-script.js');
   const identityToText = (html) => (html || '').replace(/<[^>]+>/g, '');
 
@@ -1580,6 +1631,39 @@ function loadContentScript(name) {
     assert.equal(maybeExtractGeektime('https://example.com/serv/v1/article', validData, identityToText), null, 'wrong URL must gate out even valid data');
     assert.equal(maybeExtractGeektime('https://time.geekbang.org/serv/v1/article', { code: 1 }, identityToText), null, 'invalid response must gate out');
   });
+
+  // htmlToArticleText (2026-10-15 姊妹批，zhihu 同款): article_content 的课程
+  // 配图（//static001.geekbang.org 协议相对 URL）必须保序保留成 markdown，
+  // 纯 textContent 剥离正是知乎回归的形状。
+  {
+    const { JSDOM } = require('jsdom');
+    const withDom = (fn) => {
+      const dom = new JSDOM('<!doctype html><html><body></body></html>');
+      const prev = globalThis.document;
+      globalThis.document = dom.window.document;
+      try { return fn(); } finally { globalThis.document = prev; }
+    };
+    test('geektime: htmlToArticleText keeps course figures (protocol-relative src kept verbatim)', () => withDom(() => {
+      const text = htmlToArticleText('<p>正文。</p>'
+        + '<img src="//static001.geekbang.org/resource/image/51/5d/abc.jpg" alt="">'
+        + '<p>续文。</p>');
+      assert.match(text, /!\[\]\(\/\/static001\.geekbang\.org\/resource\/image\/51\/5d\/abc\.jpg\)/,
+        '协议相对 URL 原样保留——page-images 按 baseUrl 绝对化');
+      assert.ok(text.indexOf('正文。') < text.indexOf('![') && text.indexOf('![') < text.indexOf('续文。'),
+        '图在文档原位');
+      assert.equal(htmlToArticleText('<p>纯文本</p>'), '纯文本');
+    }));
+    test('geektime: production binding pins the image-preserving converter (source lockstep)', () => {
+      const fs = require('node:fs');
+      const csSrc = fs.readFileSync(
+        fileURLToPath(new URL('../lib/content-scripts/geektime-content-script.js', import.meta.url)), 'utf8');
+      assert.equal(csSrc.includes('htmlToText'), false,
+        '纯文本剥离版不得残留——toText 绑定必须是 htmlToArticleText');
+      assert.match(csSrc, /maybeExtractGeektime\(url, data, htmlToArticleText\)/);
+      assert.match(csSrc, /maybeExtractGeektime\(this\.__browsaUrl, data, htmlToArticleText\)/,
+        'fetch 与 XHR 两条拦截路径都要绑保图转换器');
+    });
+  }
 
   test('geektime: installGeektimeInterceptor is a no-op outside a browser context', () => {
     assert.equal(installGeektimeInterceptor(), false);
@@ -1636,7 +1720,7 @@ function loadContentScript(name) {
 // xueqiu-content-script.js
 // ============================================================================
 {
-  const { isXueqiuStockUrl, isXueqiuPostUrl, extractXueqiuStock, extractXueqiuPost, installXueqiuInterceptor } =
+  const { isXueqiuStockUrl, isXueqiuPostUrl, extractXueqiuStock, extractXueqiuPost, xueqiuPostText, installXueqiuInterceptor } =
     loadContentScript('xueqiu-content-script.js');
 
   test('xueqiu: isXueqiuStockUrl / isXueqiuPostUrl match distinct hosts and paths', () => {
@@ -1672,6 +1756,25 @@ function loadContentScript(name) {
 
   test('xueqiu: installXueqiuInterceptor is a no-op outside a browser context', () => {
     assert.equal(installXueqiuInterceptor(), false);
+  });
+
+  // xueqiuPostText (2026-10-15 姊妹批): 帖子图的两个来源都要保住——内联 <img>
+  // 原位转 markdown、image_info_list[].filename（RSSHub 同字段）追加成行；
+  // 正则剥标签正是知乎回归的形状。
+  test('xueqiu: post text keeps inline <img> as markdown in place and appends image_info_list pics', () => {
+    const text = xueqiuPostText({
+      text: '<p>观点 A</p><img src=\"//xqimg.imedao.com/abc.png\"><p>观点 B</p>',
+      image_info_list: [{ filename: '17abcd1234.png' }, { filename: '' }],
+    });
+    assert.match(text, /观点 A\n\n!\[\]\(\/\/xqimg\.imedao\.com\/abc\.png\)\n\n观点 B/,
+      '内联图原位转 markdown，其余标签照常剥');
+    assert.match(text, /!\[\]\(https:\/\/xqimg\.imedao\.com\/17abcd1234\.png\)/,
+      'image_info_list 进正文（空 filename 跳过）');
+  });
+  test('xueqiu: post text without images is unchanged plain text (and data:/blob: placeholders drop)', () => {
+    assert.equal(xueqiuPostText({ text: '<p>hello&nbsp;world</p>' }), 'hello world');
+    assert.equal(xueqiuPostText({ text: 'a<img src="data:image/svg+xml;base64,x">b', image_info_list: [] }), 'ab');
+    assert.equal(xueqiuPostText({ description: '<b>desc</b>' }), 'desc');
   });
 }
 
