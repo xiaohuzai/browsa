@@ -1818,11 +1818,11 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
 
     } else if (m.type === 'APPROVAL') {
       turnChrome.stopWait();
-      turnChrome.showApprovalCard(target.getEl(), m.data);
+      turnChrome.showApprovalCard(target.getEl(), m.data, m.reqKey);
 
     } else if (m.type === 'CLARIFY') {
       turnChrome.stopWait();
-      turnChrome.showClarifyCard(target.getEl(), m.data);
+      turnChrome.showClarifyCard(target.getEl(), m.data, m.reqKey);
 
     } else if (m.type === 'RETRY') {
       // Caller-specific reset first (onSend wipes the bubble + rebuilds the
@@ -2299,6 +2299,16 @@ async function resumeInFlightStream(tabId) {
       },
     },
   });
+  // 补挂仍未决的审批/澄清卡（并发审批堆叠，2026-10-15）：面板重开时流可能
+  // 正停在等审批——没有卡用户就无法应答，只能干等到 idle-stop。已答条目已在
+  // RESPOND 成功时从后台删除，不会重复补挂；若回合在补挂后立刻 DONE，
+  // clearTurnChrome 照常清场。
+  for (const c of peek.pendingAgentCards?.approvals || []) {
+    turnChrome.showApprovalCard(target.getEl(), c.data, c.reqKey);
+  }
+  for (const c of peek.pendingAgentCards?.clarifies || []) {
+    turnChrome.showClarifyCard(target.getEl(), c.data, c.reqKey);
+  }
   port.onDisconnect.addListener(() => {
     clearInterval(_swPingInterval);
     setStreamingUI(false);

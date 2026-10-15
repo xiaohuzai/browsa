@@ -1063,6 +1063,10 @@ async function handle(msg, sender) {
           : { inFlight: false };
       }
       if (msg.sessionId != null && st.originSessionId === msg.sessionId) st.bg = false;
+      // 并发审批堆叠（2026-10-15）：把该 tab 名下仍未决的审批/澄清卡随 PEEK
+      // 带回——面板重开时流正停在等审批，没有卡用户就无法应答（只能干等到
+      // idle-stop）。已答的条目在 RESPOND 成功时已删，不会重复补挂。
+      const peekPrefix = `${t}::`;
       return {
         inFlight: true,
         acc: st.acc,
@@ -1071,7 +1075,15 @@ async function handle(msg, sender) {
         providerLabel: st.providerLabel,
         providerKey: st.providerKey,
         originSessionId: st.originSessionId || null,
-        bg: !!st.bg
+        bg: !!st.bg,
+        pendingAgentCards: {
+          approvals: [...pendingApprovals]
+            .filter(([k]) => k.startsWith(peekPrefix))
+            .map(([reqKey, e]) => ({ reqKey, data: e.data })),
+          clarifies: [...pendingClarifications]
+            .filter(([k]) => k.startsWith(peekPrefix))
+            .map(([reqKey, e]) => ({ reqKey, data: e.data })),
+        },
       };
     }
 
@@ -1142,14 +1154,22 @@ async function handle(msg, sender) {
       return handleSubchatClarifyRespond(msg);
 
     case 'APPROVAL_RESPOND': {      // User clicked Allow/Deny on an approval card. Relay the choice to
-      // the agent so it can resume. opencode pending entries carry the
-      // server session + request id and reply via the opencode endpoint;
-      // card choices (once/always/deny) map onto opencode's reply enum
-      // (deny → reject) — see showApprovalCard's btnLabels.
-      const pending = pendingApprovals.get(msg.tabId);
+      // the agent so it can resume. The card carries its reqKey — the pending
+      // entry's map key (agent-stream-session.js agentPendingKey). Routing by
+      // reqKey keeps concurrently stacked cards answering their OWN request
+      // (the old tabId single slot let the second event overwrite the first,
+      // losing it and mis-relaying an in-flight answer to the new request).
+      // opencode pending entries carry the server session + request id and
+      // reply via the opencode endpoints; card choices (once/always/deny) map
+      // onto opencode's reply enum (deny → reject) — see showApprovalCard's
+      // btnLabels.
+      const pending = pendingApprovals.get(msg.reqKey);
       if (!pending) return { ok: false, error: 'no pending approval' };
       try {
-        return await relayApproval(pending, msg.choice);
+        const res = await relayApproval(pending, msg.choice);
+        // 答成即删：条目不再参与 STREAM_PEEK 的未决卡补挂；失败保留供重试。
+        if (res?.ok) pendingApprovals.delete(msg.reqKey);
+        return res;
       } catch (e) {
         return { ok: false, error: e?.message };
       }
@@ -1160,10 +1180,13 @@ async function handle(msg, sender) {
       // opencode question flow expects {answers: [[label, …], …]} — browsa's
       // clarify card is free-text, so the response rides as the single
       // selected label (opencode's QuestionInfo has a `custom` answer path).
-      const pending = pendingClarifications.get(msg.tabId);
+      // reqKey routing mirrors APPROVAL_RESPOND (see above).
+      const pending = pendingClarifications.get(msg.reqKey);
       if (!pending) return { ok: false, error: 'no pending clarification' };
       try {
-        return await relayClarify(pending, msg.response);
+        const res = await relayClarify(pending, msg.response);
+        if (res?.ok) pendingClarifications.delete(msg.reqKey);
+        return res;
       } catch (e) {
         return { ok: false, error: e?.message };
       }
