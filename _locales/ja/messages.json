@@ -584,7 +584,7 @@
     "description": "Options: agent group title"
   },
   "agentGroupDesc": {
-    "message": "フルエージェントバックエンド — ツール実行、ファイルアクセス、マルチステップタスク",
+    "message": "フルエージェントバックエンド",
     "description": "Options: agent group description"
   },
   "llmGroupLabel": {
@@ -592,7 +592,7 @@
     "description": "Options: LLM group title"
   },
   "llmGroupDesc": {
-    "message": "言語モデルのエンドポイント — 何個でも追加でき、それぞれが独自の通信プロトコルを使います",
+    "message": "LLM のエンドポイント",
     "description": "Options: LLM group description"
   },
   "addProviderBtn": {

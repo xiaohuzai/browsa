@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult, synthesizeXiaoyuzhouResult, isXiaoyuzhouEpisodeUrl } from '../lib/site-synthesizers.js';
+import { synthesizeSiteCache, synthesizeTwitterResult, synthesizeRedditResult, synthesizeYouTubeResult, synthesizeXiaoyuzhouResult, isXiaoyuzhouEpisodeUrl, twitterFromSyndication } from '../lib/site-synthesizers.js';
 
 const fakeMeta = (url) => ({ url, title: 'Test', articleTitle: 'Test' });
 
@@ -274,4 +274,54 @@ test('synthesizeRedditResult: gallery images render as [图N] lines, bytes rende
 
   const plain = synthesizeRedditResult({ post: { title: 'T' } }, fakeMeta('https://www.reddit.com/r/x/comments/abc/'));
   assert.ok(!plain.text.includes('配图'));
+});
+
+// ── X syndication 载荷映射（twitterFromSyndication，2026-10-16 登录墙报告）──
+// cdn.syndication.twimg.com/tweet-result 的 JSON → synthesizeTwitterResult 的
+// 提取形状。真机载荷形状按 2110864391230947496 实测（免鉴权端点）。
+
+test('twitterFromSyndication: display_text_range trims the trailing t.co media link; photos upgrade to name=large', () => {
+  const text = '太傻逼了，实在看不下去了。\n\n这就是我为什么说北大清华50%的教授都是大傻逼的根本原因。 https://t.co/3acKIMMgsK';
+  const p = {
+    __typename: 'Tweet',
+    id_str: '2110864391230947496',
+    text,
+    display_text_range: [0, 44],
+    favorite_count: 165,
+    conversation_count: 23,
+    lang: 'zh',
+    created_at: '2026-10-15T22:44:23.000Z',
+    user: { name: 'lidang 立党', screen_name: 'lidangzzz' },
+    mediaDetails: [
+      { type: 'photo', media_url_https: 'https://pbs.twimg.com/media/HUtL-cUWQAAXT-W.jpg' },
+      { type: 'photo', media_url_https: 'https://pbs.twimg.com/media/SECOND.jpg' },
+    ],
+  };
+  const t = twitterFromSyndication(p);
+  assert.ok(t, 'a well-formed payload must map');
+  assert.equal(t.text, '太傻逼了，实在看不下去了。\n\n这就是我为什么说北大清华50%的教授都是大傻逼的根本原因。',
+    'display_text_range must cut the trailing t.co link the model cannot open');
+  assert.ok(!t.text.includes('t.co'), 'no shortened link may survive the trim');
+  assert.equal(t.author, 'lidang 立党');
+  assert.equal(t.screenName, 'lidangzzz');
+  assert.equal(t.likes, 165);
+  assert.equal(t.replies, 23, 'conversation_count rides as the reply count');
+  assert.deepEqual(t.photos,
+    ['https://pbs.twimg.com/media/HUtL-cUWQAAXT-W.jpg?name=large', 'https://pbs.twimg.com/media/SECOND.jpg?name=large'],
+    'photos upgrade to the name=large rendering');
+});
+
+test('twitterFromSyndication: video-only media gets the un-extracted note; garbage payloads return null', () => {
+  const base = { __typename: 'Tweet', id_str: '1', text: '看视频', display_text_range: [0, 3], user: {} };
+  const video = twitterFromSyndication({
+    ...base,
+    mediaDetails: [{ type: 'video', media_url_https: 'https://pbs.twimg.com/media/v.jpg' }],
+  });
+  assert.match(video.text, /此推文含视频\/GIF，画面未提取/);
+  assert.deepEqual(video.photos, [], 'video is not a photo — no URL lines');
+
+  assert.equal(twitterFromSyndication(null), null);
+  assert.equal(twitterFromSyndication({ __typename: 'Tweet' }), null, 'no id/text → null');
+  assert.equal(twitterFromSyndication({ __typename: 'Tweet', id_str: '1', text: '' }), null, 'empty text → null');
+  assert.equal(twitterFromSyndication({ __typename: 'Block', id_str: '1', text: 'x' }), null, 'wrong typename → null');
 });

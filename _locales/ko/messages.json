@@ -584,7 +584,7 @@
     "description": "Options: agent group title"
   },
   "agentGroupDesc": {
-    "message": "완전한 에이전트 백엔드 — 도구 실행, 파일 접근, 다단계 작업",
+    "message": "완전한 에이전트 백엔드",
     "description": "Options: agent group description"
   },
   "llmGroupLabel": {
@@ -592,7 +592,7 @@
     "description": "Options: LLM group title"
   },
   "llmGroupDesc": {
-    "message": "언어 모델 엔드포인트 — 원하는 만큼 추가하세요. 각 엔드포인트는 자체 와이어 프로토콜을 선택합니다",
+    "message": "LLM 엔드포인트",
     "description": "Options: LLM group description"
   },
   "addProviderBtn": {

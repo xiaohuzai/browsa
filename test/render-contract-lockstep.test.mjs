@@ -199,7 +199,10 @@ test('lockstep: the message-font-family setting is wired end to end', () => {
   assert.match(renderJs, /getPropertyValue\('--msg-font-family'\)/,
     'panelFontFamily must read --msg-font-family first or the font setting will not reach diagrams');
   // 接线三环：options 存取、sidepanel 应用、storage 合同。
-  assert.match(optionsJs, /fontFamily: ff/, 'options saveChatPrefs must persist fontFamily');
+  // 2026-10-16 设置页改即存：fontFamily 由 change 监听经 saveChatPref(patch)
+  // 持久化（不再有显式保存按钮的 saveChatPrefs 整包写）。
+  assert.match(optionsJs, /\$\('fontFamily'\)\?\.addEventListener\('change', \(e\) => saveChatPref\(\{ fontFamily: e\.target\.value \|\| 'system' \}\)\)/,
+    'options must persist fontFamily on change via saveChatPref (auto-save)');
   assert.match(sidepanelJs, /function applyFontFamily/, 'sidepanel lost the applier');
   assert.match(sidepanelJs, /changes\.fontFamily\) applyFontFamily/,
     'sidepanel must live-track fontFamily storage changes');

@@ -734,20 +734,20 @@ test('buildSquillaTurn: prepends the language directive, trims, and joins', asyn
   assert.deepEqual(buildSquillaTurn({ userText: 'hi' }, '', []).attachments, []);
 });
 
-test('buildSquillaTurn: >10 data: images fill the gateway cap and the shortfall gets a model-facing note', async () => {
+test('buildSquillaTurn: >16 data: images fill the gateway cap and the shortfall gets a model-facing note', async () => {
   const { buildSquillaTurn } = await import('../lib/handlers/chat-handler.js');
   const { PAGE_CONTEXT_PREFIX } = await import('../lib/constants.js');
-  const imgs = Array.from({ length: 12 }, (_, i) => ({
+  const imgs = Array.from({ length: 18 }, (_, i) => ({
     type: 'image_url', image_url: { url: `data:image/jpeg;base64,IMG${String(i).padStart(2, '0')}` },
   }));
   const { message, attachments } = buildSquillaTurn({ userText: '看图' }, '', [
     { role: 'user', content: [{ type: 'text', text: PAGE_CONTEXT_PREFIX + '# 笔记\n\n图文内容。' }, ...imgs] },
   ]);
-  assert.equal(attachments.length, 10, 'gateway MAX_ATTACHMENTS cap');
+  assert.equal(attachments.length, 16, 'gateway MAX_ATTACHMENTS cap (upstream 0.5.6)');
   assert.match(attachments[0].name, /page-figure-1\.jpg/);
-  assert.match(attachments[9].name, /page-figure-10\.jpg/);
+  assert.match(attachments[15].name, /page-figure-16\.jpg/);
   assert.match(message, /另有 2 张图片超出网关附件上限/, 'shortfall must be named, never silent');
-  assert.match(message, /已随附 10 张/);
+  assert.match(message, /已随附 16 张/);
 });
 
 test('buildSquillaTurn: http-only figure URLs stay text lines — no attachments, no shortfall note', async () => {

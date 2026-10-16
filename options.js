@@ -105,14 +105,26 @@ async function init() {
     syncAsrProviderUI();
   });
 
-  // Chat preferences
+  // Chat preferences — 即时生效（2026-10-16 冗余清理）：开关/单选/滑杆改即存，
+  // 与本页既有的自动保存范式一致（界面语言下拉、悬浮工具条/llms.txt/深度提取
+  // 开关都是 change 即存）；显式保存只留给文本/多字段表单（系统提示词、服务商
+  // 卡、ASR 卡）。滑杆 input 只刷刻度，change（松手）才落存储。
   applyChatPrefs(cachedCfg);
-  document.querySelector('button[data-act="save-chat-prefs"]')?.addEventListener('click', saveChatPrefs);
   const fontSizeEl = $('fontSize');
   const fontSizeVal = $('fontSizeVal');
   if (fontSizeEl && fontSizeVal) {
     fontSizeEl.addEventListener('input', () => { fontSizeVal.textContent = fontSizeEl.value + 'px'; });
+    fontSizeEl.addEventListener('change', () => saveChatPref({ fontSize: parseFloat(fontSizeEl.value) || 13.5 }));
   }
+  $('fontFamily')?.addEventListener('change', (e) => saveChatPref({ fontFamily: e.target.value || 'system' }));
+  $('sendShortcut')?.addEventListener('change', (e) => saveChatPref({ sendShortcut: e.target.value || 'enter' }));
+  $('thoughtAutoCollapse')?.addEventListener('change', (e) => saveChatPref({ thoughtAutoCollapse: !!e.target.checked }));
+}
+
+async function saveChatPref(patch) {
+  await persist(patch);
+  Object.assign(cachedCfg, patch);
+  flash('ok', _t('savedFlash', '✓ Saved'));
 }
 
 // 使用指南链接随 UI 语言走：中文站 /guide/，英文站 /en/guide/。HTML 里已带
@@ -136,25 +148,6 @@ function applyChatPrefs(cfg) {  const fs = $('fontSize');
   const tac = $('thoughtAutoCollapse');
   // 勾选框反映实际行为：从未设置（undefined）= 默认折叠 = 勾上；显式取消才展开。
   if (tac) tac.checked = cfg.thoughtAutoCollapse !== false;
-}
-
-async function saveChatPrefs() {
-  let fs = parseFloat($('fontSize')?.value || '13.5');
-  if (!Number.isFinite(fs)) fs = 13.5; // empty/invalid range value → keep the default, don't store NaN
-  const ss = $('sendShortcut')?.value || 'enter';
-  const ff = $('fontFamily')?.value || 'system';
-  const tac = !!$('thoughtAutoCollapse')?.checked;
-  await persist({ fontSize: fs, fontFamily: ff, sendShortcut: ss, thoughtAutoCollapse: tac });
-  cachedCfg.fontSize = fs;
-  cachedCfg.fontFamily = ff;
-  cachedCfg.sendShortcut = ss;
-  cachedCfg.thoughtAutoCollapse = tac;
-  const statusEl = $('chat-prefs-status');
-  if (statusEl) {
-    statusEl.className = 'card-status ok';
-    statusEl.textContent = _t('savedFlash', '✓ Saved');
-    setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'card-status'; }, 3000);
-  }
 }
 
 // ASR 卡片的下拉选项、占位符、? 提示、文档链接全部由 lib/asr-providers.js 的
@@ -1292,8 +1285,11 @@ function applyReplyLanguage() {
   const el = $('replyLanguage');
   if (!el) return;
   el.value = cachedCfg.replyLanguage || '';
-  document.querySelector('button[data-act="save-reply-language"]')?.addEventListener('click', async () => {
+  // 即时生效（2026-10-16 冗余清理）：与界面语言下拉同一范式——改即存，不再要
+  // 求单点保存（本卡片上方已有系统提示词自己的 Save/Reset，三键并存易误读）。
+  el.addEventListener('change', async () => {
     await storage.set({ replyLanguage: el.value });
+    cachedCfg.replyLanguage = el.value;
     flash('ok', el.value ? tSub('replyLanguageSet', `Reply language set to "$1".`, el.options[el.selectedIndex]?.text) : _t('replyLanguageAutoSet', 'Reply language: Auto.'));
   });
 }

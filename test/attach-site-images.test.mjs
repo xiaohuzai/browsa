@@ -593,3 +593,120 @@ test('xueqiu chain: real extractXueqiuPost → push → cache → storage carrie
     assert.equal(dnrCalls.length, 0, 'xqimg 无门（未实测到真图，fail-open 兜底），不碰 DNR');
   } finally { restoreEnv(); }
 });
+
+// ── X syndication 兜底（2026-10-16 登录墙报告）─────────────────────────────
+// 用户实测：X 推文页本地提取为空时，auto 曾静默落到 r.jina.ai——匿名服务端
+// 抓取只拿得到 X 的登录墙（Log in/Sign up 全是噪声），图片也丢。修复：
+// tryXActiveFallback 在页内路径拿不到时改走免鉴权的 syndication 端点（X 自家
+// embed 数据源，全文/作者/计数/mediaDetails 原图 URL）；explicit jina 模式在
+// 推文 URL 上同样先走本站路径。本节三条接线：级联兜底、jina 抢占、404
+// fail-open。token 公式用字面量钉死（react-tweet 同款 (id/1e15)*π 六进制去
+// 零——真实端点校验它，测试改坏公式即红）。照片 bytes 在 Node 无 canvas 环境
+// fail-open 为空 → photos 保持 [图N] URL 行（与页内路径 URL-only 同形状），
+// 字节随行本身由上方「X active-fallback」用例钉住。
+
+const SYND_URL = 'https://cdn.syndication.twimg.com/tweet-result?id=123456&token=52255123252515451&lang=zh';
+const SYND_PAYLOAD = (() => {
+  const text = '太傻逼了，实在看不下去了。\n\n这就是我为什么说北大清华50%的教授都是大傻逼的根本原因。 https://t.co/3acKIMMgsK';
+  return {
+    __typename: 'Tweet',
+    id_str: '123456',
+    text,
+    display_text_range: [0, 44],
+    favorite_count: 165,
+    conversation_count: 23,
+    lang: 'zh',
+    created_at: '2026-10-15T22:44:23.000Z',
+    user: { name: 'lidang 立党', screen_name: 'lidangzzz' },
+    mediaDetails: [{ type: 'photo', media_url_https: 'https://pbs.twimg.com/media/HUtL-cUWQAAXT-W.jpg' }],
+  };
+})();
+
+function stubXFetch({ syndStatus = 200, jinaText = null } = {}) {
+  const prev = { fetch: globalThis.fetch };
+  const fetched = [];
+  globalThis.fetch = async (url) => {
+    fetched.push(String(url));
+    if (String(url) === SYND_URL) {
+      if (syndStatus !== 200) return { ok: false, status: syndStatus };
+      return { ok: true, status: 200, json: async () => SYND_PAYLOAD };
+    }
+    if (/pbs\.twimg\.com\/media/.test(String(url))) {
+      return { ok: true, status: 200, blob: async () => new Blob([new Uint8Array(8)], { type: 'image/jpeg' }) };
+    }
+    if (/r\.jina\.ai/.test(String(url))) {
+      if (jinaText == null) throw new Error('r.jina.ai must not be reached in this test');
+      return { ok: true, status: 200, text: async () => jinaText };
+    }
+    throw new Error('unexpected fetch: ' + url);
+  };
+  return { fetched, restore: () => { globalThis.fetch = prev.fetch; } };
+}
+
+test('X syndication fallback: dead page state still yields the clean tweet (auto/dom cascade)', async () => {
+  const tabId = addTab(21, 'https://x.com/lidangzzz/status/123456', 'Tweet');
+  scriptQueue = [null]; // activeXFetch 拿不到（登出页 state 缺失 / DOM 未渲染）
+  const stub = stubXFetch();
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'dom' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'twitter', 'the syndication synthesizer owns this ctx');
+    const entry = await lastEntry();
+    const text = typeof entry.content === 'string' ? entry.content : entry.content[0].text;
+    assert.match(text, /太傻逼了，实在看不下去了/, 'the authoritative tweet text must ride');
+    assert.match(text, /lidang 立党 @lidangzzz/);
+    assert.match(text, /\[图1\] https:\/\/pbs\.twimg\.com\/media\/HUtL-cUWQAAXT-W\.jpg\?name=large/,
+      'photo rides as an [图N] URL line when bytes fail open (Node has no canvas)');
+    assert.ok(!text.includes('t.co/3acKIMMgsK'), 'the trailing t.co link must be trimmed');
+    assert.ok(stub.fetched.includes(SYND_URL), 'the syndication URL (incl. pinned token) must be requested');
+  } finally { stub.restore(); }
+});
+
+test('X syndication fallback: explicit jina mode on a tweet URL prefers the site path, never reaches r.jina.ai', async () => {
+  const tabId = addTab(22, 'https://x.com/lidangzzz/status/123456', 'Tweet');
+  scriptQueue = [null];
+  const stub = stubXFetch();
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'jina' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'twitter', 'site path wins over the jina proxy for tweet URLs');
+    const entry = await lastEntry();
+    const text = typeof entry.content === 'string' ? entry.content : entry.content[0].text;
+    assert.match(text, /太傻逼了，实在看不下去了/);
+    assert.ok(stub.fetched.every((u) => !/r\.jina\.ai/.test(u)),
+      'the login-wall proxy must never fire when the site path succeeded');
+  } finally { stub.restore(); }
+});
+
+test('X syndication fallback: endpoint 404 fails open into jina (preemption must not strand the user)', async () => {
+  const tabId = addTab(23, 'https://x.com/lidangzzz/status/123456', 'Tweet');
+  scriptQueue = [null];
+  const WALL = '# 登录墙占位文本\n\nLog in — Sign up';
+  const stub = stubXFetch({ syndStatus: 404, jinaText: WALL });
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'jina' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'jina', 'with the site path empty, jina still serves');
+    const entry = await lastEntry();
+    const text = typeof entry.content === 'string' ? entry.content : entry.content[0].text;
+    assert.match(text, /登录墙占位文本/);
+  } finally { stub.restore(); }
+});
+
+test('X syndication fallback: a SHORT tweet in auto mode must NOT fall through to jina (<200 chars is legitimate)', async () => {
+  // 用户抓到的残余 bug：短推文经 syndication 合成后 ~150 字符，auto 的
+  // 「<200 视为提取失败」回退曾把它误判、拿更长的 jina 登录墙顶掉权威数据。
+  // siteSynthesized 标记（makeSynthResult）让 auto 回退跳过站点产物。
+  const tabId = addTab(24, 'https://x.com/lidangzzz/status/123456', 'Tweet');
+  scriptQueue = [null];
+  const stub = stubXFetch(); // r.jina.ai 在此 stub 里被触及即 throw
+  try {
+    const res = await handle({ type: 'ATTACH_PAGE', tabId, mode: 'auto' }, { tab: { id: tabId } });
+    assert.equal(res.ok, true);
+    assert.equal(res.ctx.mode, 'twitter');
+    assert.ok((res.ctx.text || '').length < 200, 'this synthesized tweet is genuinely short');
+    assert.match(res.ctx.text, /太傻逼了，实在看不下去了/);
+    assert.ok(stub.fetched.every((u) => !/r\.jina\.ai/.test(u)),
+      'a site-synthesized short result must never trigger the auto jina fallback');
+  } finally { stub.restore(); }
+});

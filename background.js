@@ -41,7 +41,7 @@ export {
   initStreamState, appendToStreamState, clearStreamState,
   recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone
 };
-import { extractActiveTab } from './lib/page-extractor.js';
+import { extractActiveTab, tryXActiveFallback, autoJinaFallbackWarranted } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
 import { inlinePageImages, collectMarkdownImages, refererGateForImageUrls } from './lib/page-images.js';
 import { registerPageImageReferer, removePageImageReferer } from './lib/sidepanel/media-headers.js';
@@ -801,19 +801,26 @@ async function handle(msg, sender) {
           const tab = await chrome.tabs.get(tabId).catch(() => null);
           if (!tab?.url) return { ok: false, error: 'Cannot get tab URL' };
           if (!/^https?:\/\//.test(tab.url)) return { ok: false, error: 'Jina Reader only works on http/https pages' };
-          const jinaUrl = 'https://r.jina.ai/' + tab.url;
-          const resp = await fetch(jinaUrl, {
-            headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' }
-          }).catch(e => { throw new Error('Jina fetch failed: ' + e.message); });
-          if (!resp.ok) throw new Error(`Jina Reader returned ${resp.status} for this page`);
-          const markdown = await resp.text();
-          if (!markdown?.trim()) return { ok: false, error: 'Jina Reader returned empty content' };
-          ctx = {
-            meta: { url: tab.url, title: tab.title || '', favIconUrl: tab.favIconUrl || '' },
-            mode: 'jina',
-            text: markdown,
-            truncated: { rawTextLength: markdown.length, textLength: markdown.length, wasCapped: false }
-          };
+          // 推文 URL 先走 X 本站路径（activeXFetch + syndication 兜底，见
+          // tryXActiveFallback）：r.jina.ai 是匿名服务端抓取，X 的推文页只
+          // 拿得到登录墙、图片也丢（2026-10-16 用户报告），本站路径才是权威
+          // 数据；拿不到再退回 jina。
+          ctx = await tryXActiveFallback(tab, { url: tab.url, title: tab.title || '', favIconUrl: tab.favIconUrl || '' }).catch(() => null);
+          if (!ctx) {
+            const jinaUrl = 'https://r.jina.ai/' + tab.url;
+            const resp = await fetch(jinaUrl, {
+              headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' }
+            }).catch(e => { throw new Error('Jina fetch failed: ' + e.message); });
+            if (!resp.ok) throw new Error(`Jina Reader returned ${resp.status} for this page`);
+            const markdown = await resp.text();
+            if (!markdown?.trim()) return { ok: false, error: 'Jina Reader returned empty content' };
+            ctx = {
+              meta: { url: tab.url, title: tab.title || '', favIconUrl: tab.favIconUrl || '' },
+              mode: 'jina',
+              text: markdown,
+              truncated: { rawTextLength: markdown.length, textLength: markdown.length, wasCapped: false }
+            };
+          }
         } else {
           // auto and reader modes may need Readability; dom/full don't
           if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
@@ -827,12 +834,36 @@ async function handle(msg, sender) {
           });
           if (!ctx) return { ok: false, error: 'extraction returned null' };
 
-          // Auto mode silent Jina fallback: if all local strategies returned
-          // very little content (< 200 chars), try r.jina.ai as last resort.
+          // Auto mode silent Jina fallback: if local extraction FAILED, try
+          // r.jina.ai as last resort and adopt only if it returns more.
           // Jina runs on their servers without user cookies, so it's only
           // useful for public pages. We set autoMode='jina' so the UI label
           // shows "auto/jina" rather than the empty/failed local mode.
-          if (mode === 'auto' && (ctx.text?.length || 0) < 200) {
+          // 失败判据用 page-extractor 的 autoJinaFallbackWarranted（2026-10-16
+          // 正解化）：绝对下限 + 相对亏空（页面 body.innerText 量做参照），
+          // 替代旧的单看 <200 字符——短页面不再误判、大页面的半失败反而开始
+          // 被救援。站点合成产物（siteSynthesized）永不回退。
+          let jinaWarranted = false;
+          if (mode === 'auto' && !ctx.siteSynthesized) {
+            let bodyTextLen = null;
+            if ((ctx.text?.length || 0) >= 200) {
+              // 相对亏空层才需要页面参照：探 body.innerText 量（tab 没了/
+              // 注入失败 → null → 相对层失效，绝对层照旧）。
+              try {
+                const [probe] = await chrome.scripting.executeScript({
+                  target: { tabId },
+                  func: () => (document.body?.innerText || '').length,
+                });
+                bodyTextLen = typeof probe?.result === 'number' ? probe.result : null;
+              } catch (_) { /* fail-open */ }
+            }
+            jinaWarranted = autoJinaFallbackWarranted({
+              textLen: ctx.text?.length || 0,
+              siteSynthesized: ctx.siteSynthesized,
+              bodyTextLen,
+            });
+          }
+          if (jinaWarranted) {
             try {
               const tab = await chrome.tabs.get(tabId).catch(() => null);
               if (tab?.url && /^https?:\/\//.test(tab.url)) {
