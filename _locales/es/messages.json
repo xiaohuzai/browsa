@@ -584,7 +584,7 @@
     "description": "Options: agent group title"
   },
   "agentGroupDesc": {
-    "message": "Backend de agente completo — ejecución de herramientas, acceso a archivos y tareas de varios pasos",
+    "message": "Backend de agente completo",
     "description": "Options: agent group description"
   },
   "llmGroupLabel": {
@@ -592,7 +592,7 @@
     "description": "Options: LLM group title"
   },
   "llmGroupDesc": {
-    "message": "Endpoint de modelo de lenguaje — añade tantos como quieras; cada uno usa su propio protocolo de comunicación",
+    "message": "Endpoint de LLM",
     "description": "Options: LLM group description"
   },
   "addProviderBtn": {

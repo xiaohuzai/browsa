@@ -584,7 +584,7 @@
     "description": "Options: agent group title"
   },
   "agentGroupDesc": {
-    "message": "完整 Agent 后端——工具执行、文件访问、多步任务",
+    "message": "完整 Agent 后端",
     "description": "Options: agent group description"
   },
   "llmGroupLabel": {
@@ -592,7 +592,7 @@
     "description": "Options: LLM group title"
   },
   "llmGroupDesc": {
-    "message": "语言模型端点——想加几张加几张，各自选择协议",
+    "message": "LLM 端点",
     "description": "Options: LLM group description"
   },
   "addProviderBtn": {
