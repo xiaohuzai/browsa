@@ -503,6 +503,10 @@
     "message": "Автоматически сворачивать блоки размышлений",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "Проигрывать звук, когда агент запрашивает подтверждение",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "Мультимодальное понимание видео",
     "description": "Options: ASR card heading"
