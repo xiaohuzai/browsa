@@ -31,30 +31,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 // ---- in-memory chrome.storage areas (same pattern as chat-rebuild-channels)
-function makeStorageArea() {
-  let store = {};
-  const clone = (v) => (v === undefined ? v : structuredClone(v));
-  return {
-    async get(keys) {
-      if (keys == null) return clone(store);
-      if (typeof keys === 'string') return { [keys]: clone(store[keys]) };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = clone(store[k]);
-        return out;
-      }
-      return clone(store);
-    },
-    async set(obj) { store = { ...store, ...clone(obj) }; },
-    async remove(keys) {
-      for (const k of Array.isArray(keys) ? keys : [keys]) delete store[k];
-    },
-    _reset() { store = {}; },
-    _store() { return store; },
-  };
-}
 
 const localArea = makeStorageArea();
 const sessionArea = makeStorageArea();

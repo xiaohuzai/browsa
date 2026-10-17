@@ -1743,5 +1743,97 @@
   "pingTimeoutErr": {
     "message": "连接超时——服务没有响应",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "没有收到任何回复分块——请检查 Service Worker 的 DevTools 控制台。",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "选择此消息",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "拖动选择截图区域",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "取消",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "使用完整截图",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "裁剪并使用",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "（无文本）",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "图片（$1 张，按上下文顺序）",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "第 $1 页的图片",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "未配置系统提示词。",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "复制完整提示词",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "关闭",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "跳到最新",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "正在读取页面…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "页面",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "无法读取此页面：$1。若这是小红书，请尝试登录或在普通标签页打开该笔记。",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "小红书内容可能不完整（$1）。XHR 已返回但内容偏薄。若与页面不符，请强制刷新（Ctrl+Shift+R）。",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "复制",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "关闭",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "实际生效的系统提示词",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "思考中…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "截图",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "点击查看大图",
+    "description": "Panel: screenshot preview tooltip"
   }
 }

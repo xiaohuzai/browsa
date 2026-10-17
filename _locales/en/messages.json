@@ -1743,5 +1743,97 @@
   "pingTimeoutErr": {
     "message": "Connection timed out — the service is not responding",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "No response chunks received — check the Service Worker DevTools console.",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "Select message",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "Drag to select a region",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "Cancel",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "Use full screenshot",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "Crop and use",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "(no text)",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "Figures ($1, in context order)",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "Figure on page $1",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "No system prompt configured.",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "Copy full prompt",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "Close",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "Jump to bottom",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "Reading page…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "Page",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "Couldn't read this page: $1. If this is Xiaohongshu, try logging in or opening the note in a regular tab.",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "Xiaohongshu content may be incomplete ($1). The XHR returned but looks thin. If it doesn't match the page, try a hard refresh (Ctrl+Shift+R).",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "Copy",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "Dismiss",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "Effective System Prompt",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "Thinking…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "Screenshot",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "Click to open full size",
+    "description": "Panel: screenshot preview tooltip"
   }
 }

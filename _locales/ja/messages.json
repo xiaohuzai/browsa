@@ -1743,5 +1743,97 @@
   "pingTimeoutErr": {
     "message": "接続がタイムアウトしました——サービスが応答していません",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "応答チャンクを受信できませんでした — Service Worker の DevTools コンソールを確認してください。",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "このメッセージを選択",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "範囲をドラッグして選択",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "キャンセル",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "スクリーンショット全体を使う",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "切り取って使う",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "（テキストなし）",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "画像（$1 枚、文脈順）",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "$1 ページの図",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "システムプロンプトが未設定です。",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "プロンプト全体をコピー",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "閉じる",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "最新へ移動",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "ページを読み込み中…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "ページ",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "このページを読み取れませんでした：$1。Xiaohongshu の場合、ログインするか通常のタブで開いてください。",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "Xiaohongshu の内容が不完全な可能性があります（$1）。XHR は返りましたが内容が薄いようです。ページと一致しない場合は強制再読み込み（Ctrl+Shift+R）してください。",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "コピー",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "閉じる",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "実効システムプロンプト",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "思考中…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "スクリーンショット",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "クリックで拡大",
+    "description": "Panel: screenshot preview tooltip"
   }
 }

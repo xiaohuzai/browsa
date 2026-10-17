@@ -111,3 +111,71 @@ export function wireSendMessage(handler) {
     Promise.resolve(handler(msg)).then((res) => cb(res)).catch((e) => cb({ ok: false, error: e.message }));
   };
 }
+
+// ─── Why there is no single "makeEverythingChromeMock" here (2026-10-17) ─────
+// A sweep of the 118 test files that build their own chrome mock produced the
+// comparison table below. The remaining mocks are NOT copies: each collapses
+// when parameterized, because the DIFFERENCES are the protocol under test.
+//
+//   surfaces | shape                          | count | examples
+//   ---------|--------------------------------|-------|-----------------------------
+//   7        | jsdom + Port + downloads        |   3   | lib-sidepanel-asr-video/-youtube/attach-hint
+//   5        | jsdom + Port                    |   5   | lib-sidepanel-asr/attach-progress/bridge-endpoint-ping/multimodel/screenshot-undo
+//   5        | background-shaped (no jsdom)    |   2   | agentic-extract, lib-page-extract-frame-gone
+//   2-3      | storage-only or runtime-only    |  ~20  | history-compactor, composer-state, pdf/katex/office worker clients
+//   0        | bare `globalThis.chrome = {}`   |   4   | abort, background-handler, subchat, stream-resume
+//
+// The three 7-surface files DO share `makeSidepanelChromeMock` above and
+// already use it. Everything below that line differs in its port ACK protocol
+// (STREAM_HELLO vs SUBCHAT_HELLO vs none), its sendMessage routing table, or
+// its storage seeding — the exact things a test exists to pin. Forcing them
+// into one factory would add a parameter per axis and make a failure message
+// point at the factory instead of the test.
+//
+// RULE for new tests: use `makeSidepanelChromeMock` when you are driving
+// sidepanel.js; use `makeStorageArea` for any storage-shaped mock; build a
+// bespoke object only when the protocol itself is what you are testing, and
+// delete the parts you do not use (a mock that defines a surface the code
+// under test never touches hides dead paths).
+
+/**
+ * A stateful chrome.storage.local area backed by one in-memory object.
+ *
+ * 21 test files had hand-rolled this (only the `remove` array handling and a
+ * couple of `_dump`/`_set` conveniences differed), so a change to Chrome's
+ * storage semantics had to be mirrored 21 times. This one is a superset:
+ * `get(null | string | string[] | object)` with Chrome's shapes, `set` merging,
+ * `remove` accepting either a key or an array, plus `_dump()` / `_set()` /
+ * `_reset()` for assertions, seeding and per-test isolation.
+ *
+ * `{ clone: true }` deep-copies on every read/write — real chrome.storage
+ * serializes, so a test that mutates a returned object and expects storage to
+ * be unaffected needs it (chat-rebuild-channels relies on exactly that to
+ * prove the rebuild passes don't reuse request objects).
+ */
+export function makeStorageArea(initial = {}, { clone = false } = {}) {
+  let store = clone ? structuredClone(initial) : { ...initial };
+  const cp = clone ? (v) => (v === undefined ? v : structuredClone(v)) : (v) => v;
+  return {
+    async get(keys) {
+      if (keys == null) return cp({ ...store });
+      if (typeof keys === 'string') return { [keys]: cp(store[keys]) };
+      if (Array.isArray(keys)) {
+        const out = {};
+        for (const k of keys) out[k] = cp(store[k]);
+        return out;
+      }
+      // Object form: defaults for absent keys (Chrome's documented behavior).
+      const out = {};
+      for (const [k, fallback] of Object.entries(keys)) out[k] = k in store ? cp(store[k]) : fallback;
+      return out;
+    },
+    async set(obj) { store = { ...store, ...cp(obj) }; },
+    async remove(keyOrKeys) {
+      for (const k of Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys]) delete store[k];
+    },
+    _set(obj) { store = { ...store, ...cp(obj) }; },
+    _reset() { store = {}; },
+    _dump() { return store; },
+  };
+}

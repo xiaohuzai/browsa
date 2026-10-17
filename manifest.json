@@ -60,6 +60,7 @@
         "https://xiaohongshu.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/xhs-content-script.js"
       ],
       "run_at": "document_start",
@@ -81,6 +82,7 @@
         "https://juejin.cn/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/juejin-content-script.js"
       ],
       "run_at": "document_start",
@@ -93,6 +95,7 @@
         "https://youtube.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/youtube-content-script.js"
       ],
       "run_at": "document_start",
@@ -105,6 +108,7 @@
         "https://zhuanlan.zhihu.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/zhihu-content-script.js"
       ],
       "run_at": "document_start",
@@ -116,6 +120,7 @@
         "https://www.dedao.cn/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/dedao-content-script.js"
       ],
       "run_at": "document_start",
@@ -127,6 +132,7 @@
         "https://time.geekbang.org/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/geektime-content-script.js"
       ],
       "run_at": "document_start",
@@ -139,6 +145,7 @@
         "https://bilibili.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/bilibili-content-script.js"
       ],
       "run_at": "document_start",
@@ -151,6 +158,7 @@
         "https://www.xueqiu.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/xueqiu-content-script.js"
       ],
       "run_at": "document_start",
@@ -163,6 +171,7 @@
         "https://x.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/twitter-content-script.js"
       ],
       "run_at": "document_start",
@@ -175,6 +184,7 @@
         "https://xiaoyuzhoufm.com/*"
       ],
       "js": [
+        "lib/content-scripts/site-common.js",
         "lib/content-scripts/xiaoyuzhou-content-script.js"
       ],
       "run_at": "document_start",
@@ -210,8 +220,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "lib/vendor/Readability.iife.js",
-        "lib/vendor/Turndown.iife.js",
         "icons/icon16.png",
         "_locales/*/messages.json"
       ],
@@ -221,6 +229,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://*:* https://*:* ws://*:* wss://*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'none'; worker-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:* http://*:* https://*:* ws://localhost:* ws://127.0.0.1:* wss://*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'none'; worker-src 'self'"
   }
 }

@@ -4,10 +4,26 @@
 //   lib/vendor/{name}.iife.js   (for page-world eval via chrome.scripting)
 //   lib/vendor/{name}.bundle.js (ESM for direct import from sidepanel.js)
 //
-// Source: lib/_src/ (for Readability, fetched from GitHub) OR
-//         node_modules/ (for npm packages — turndown, marked, dompurify)
+// Source: node_modules/ for EVERY vendor (all build inputs are declared in
+// devDependencies — a clean `npm ci && npm run build` is reproducible).
 // We bundle to (a) minify, (b) convert UMD/ESM into a single shape we
 // control, (c) get tree-shaking for free.
+//
+// Missing source is a BUILD FAILURE by default: silently skipping a vendor
+// leaves the previous lib/vendor/<name> in place, producing a mixed-state
+// bundle whose CSP patches may not match its version (molstar/RDKit then
+// throw EvalError inside the real extension). Pass --allow-missing for the
+// deliberate partial-rebuild case.
+//
+// ⚠ A vendor rebuild is its own PR, not a side effect of another change: the
+// marked/DOMPurify/turndown bundles were refreshed to their current
+// devDependencies pins on 2026-10-17, which moves marked across the v13
+// renderer-extension boundary. render.js deliberately wraps tables through
+// `hooks.postprocess` (string-level) instead of `renderer.table` precisely
+// because of that boundary — re-verify it (test/lib-render.test.mjs) plus the
+// AGENTS.md real-extension gate (launchPersistentContext --load-extension,
+// assert the extension SW target + zero CSP violations) whenever these are
+// regenerated.
 
 import { promises as fs } from 'node:fs';
 import { existsSync } from 'node:fs';
@@ -19,8 +35,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const LIB = join(ROOT, 'lib');
 const VENDOR = join(LIB, 'vendor');
-const SRC = join(LIB, '_src');
-const DEPS = join(__dirname, '_deps'); // gitignored, contains node_modules for build
+const SRC = join(LIB, '_src'); // scratch dir for the CJS→IIFE intermediate
+const ALLOW_MISSING = process.argv.includes('--allow-missing');
 
 await fs.mkdir(VENDOR, { recursive: true });
 await fs.mkdir(SRC, { recursive: true });
@@ -32,37 +48,45 @@ await fs.mkdir(SRC, { recursive: true });
 const VENDORS = [
   {
     name: 'Readability',
-    srcEntry:  'Readability.js',           // in lib/_src/
-    srcDir:    SRC,
+    srcEntry:  '@mozilla/readability/Readability.js',
+    srcDir:    join(ROOT, 'node_modules'),
     cjsToIife: true,
     iifeName:  'Readability'
   },
   {
     name: 'Turndown',
-    srcEntry:  'turndown/lib/turndown.cjs.js',  // in build/_deps/node_modules/
-    srcDir:    join(DEPS, 'node_modules'),
+    srcEntry:  'turndown/lib/turndown.cjs.js',
+    srcDir:    join(ROOT, 'node_modules'),
     cjsToIife: true,
     iifeName:  'TurndownService',
     define:    { 'process.browser': 'true' }   // skip node-only paths
   },
   {
     name: 'TurndownPluginGfm',
-    srcEntry:  'turndown-plugin-gfm/lib/turndown-plugin-gfm.cjs.js',  // in build/_deps/node_modules/
-    srcDir:    join(DEPS, 'node_modules'),
+    srcEntry:  'turndown-plugin-gfm/lib/turndown-plugin-gfm.cjs.js',
+    srcDir:    join(ROOT, 'node_modules'),
     cjsToIife: true,
     iifeName:  'TurndownPluginGfm'
   },
   {
     name: 'marked',
-    srcEntry:  'marked/lib/marked.cjs',
-    srcDir:    join(DEPS, 'node_modules'),
+    // marked 16 ships ESM only (no CJS entry) and exports NAMED symbols, so
+    // a thin entry re-exports the namespace as `default` — render.js does
+    // `import marked from …`, and the old CJS-based bundle provided exactly
+    // that shape (see build/entries/marked-entry.mjs). ⚠ The renderer
+    // extension contract MUST be re-verified after any marked rebuild:
+    // render.js wraps tables via marked's `hooks.postprocess` (string-level,
+    // stable) instead of `renderer.table` because older bundles call
+    // extensions with the pre-v13 signature. test/lib-render.test.mjs pins it.
+    srcEntry:  'entries/marked-entry.mjs',
+    srcDir:    __dirname,
     esmBundle: true,
     outName:   'marked'
   },
   {
     name: 'DOMPurify',
     srcEntry:  'dompurify/dist/purify.cjs.js',
-    srcDir:    join(DEPS, 'node_modules'),
+    srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'purify'
   },
@@ -128,14 +152,14 @@ const VENDORS = [
   {
     name: 'markstream-core',
     srcEntry:  'markstream-core/dist/index.js',
-    srcDir:    join(DEPS, 'node_modules'),
+    srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'markstream-core'
   },
   {
     name: 'stream-markdown-parser',
     srcEntry:  'stream-markdown-parser/dist/index.js',
-    srcDir:    join(DEPS, 'node_modules'),
+    srcDir:    join(ROOT, 'node_modules'),
     esmBundle: true,
     outName:   'stream-markdown-parser'
   },
@@ -329,6 +353,7 @@ async function copyRaw({ srcDir, files }) {
   for (const file of files) {
     const srcPath = join(srcDir, file);
     if (!existsSync(srcPath)) {
+      if (!ALLOW_MISSING) throw new Error(`missing vendor source: ${srcPath} (run npm ci, or pass --allow-missing for a deliberate partial build)`);
       console.log(`  ⚠ skipping ${file} (source not found: ${srcPath})`);
       continue;
     }
@@ -350,6 +375,7 @@ console.log('browsa: building vendor bundles...');
 for (const v of VENDORS) {
   const srcPath = join(v.srcDir, v.srcEntry);
   if (!existsSync(srcPath)) {
+    if (!ALLOW_MISSING) throw new Error(`missing vendor source: ${srcPath} (run npm ci, or pass --allow-missing for a deliberate partial build)`);
     console.log(`  ⚠ skipping ${v.name} (source not found: ${srcPath})`);
     continue;
   }

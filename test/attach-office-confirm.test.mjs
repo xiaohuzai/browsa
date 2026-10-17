@@ -11,6 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isOfficeUrl, officeFilenameFromUrl } from '../lib/page-extractor.js';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 // ── pure helpers ────────────────────────────────────────────────────────────
 
@@ -51,26 +52,6 @@ test('officeFilenameFromUrl: basename + query stripping + fallback', () => {
 });
 
 // ── background wiring ───────────────────────────────────────────────────────
-
-function makeStorageArea(initial = {}) {
-  let store = { ...initial };
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) { store = { ...store, ...obj }; },
-    async remove(key) { delete store[key]; },
-    _set(obj) { store = { ...store, ...obj }; },
-    _dump() { return store; },
-  };
-}
 
 const localArea = makeStorageArea({
   activeProvider: 'compatible',

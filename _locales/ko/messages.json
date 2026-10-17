@@ -1743,5 +1743,97 @@
   "pingTimeoutErr": {
     "message": "연결 시간 초과——서비스가 응답하지 않습니다",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "응답 청크를 받지 못했습니다 — Service Worker DevTools 콘솔을 확인하세요.",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "이 메시지 선택",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "드래그하여 영역 선택",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "취소",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "전체 스크린샷 사용",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "자르고 사용",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "(텍스트 없음)",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "이미지($1개, 문맥 순서)",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "$1페이지 이미지",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "시스템 프롬프트가 설정되지 않았습니다.",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "전체 프롬프트 복사",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "닫기",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "맨 아래로",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "페이지 읽는 중…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "페이지",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "이 페이지를 읽을 수 없습니다: $1. Xiaohongshu라면 로그인하거나 일반 탭에서 열어 보세요.",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "Xiaohongshu 콘텐츠가 불완전할 수 있습니다($1). XHR은 반환되었지만 내용이 빈약합니다. 페이지와 다르면 강력 새로고침(Ctrl+Shift+R)을 해 보세요.",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "복사",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "닫기",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "실제 시스템 프롬프트",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "생각 중…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "스크린샷",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "클릭하여 크게 보기",
+    "description": "Panel: screenshot preview tooltip"
   }
 }

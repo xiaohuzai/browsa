@@ -9,31 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PAGE_CONTEXT_PREFIX } from '../lib/constants.js';
 import { BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
-
-function makeStorageArea() {
-  let store = {};
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) {
-      store = { ...store, ...obj };
-    },
-    async remove(keys) {
-      const list = Array.isArray(keys) ? keys : [keys];
-      for (const k of list) delete store[k];
-    },
-    _reset() { store = {}; },
-    _dump() { return store; }
-  };
-}
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 const localArea = makeStorageArea();
 const sessionArea = makeStorageArea();
@@ -735,7 +711,6 @@ test('批E: getSessionFull returns the snapshot with image pixels intact (pixel 
   assert.deepEqual(full.history, history, 'bytes in, bytes out — the split changes WHERE they live, never WHAT they are');
 });
 
-
 test('simultaneous first agent turns share one conversation identity', async () => {
   reset();
   const [a, b] = await Promise.all([storage.getAgentSessionContextId(), storage.getAgentSessionContextId()]);
@@ -795,7 +770,6 @@ test('an ID arriving between switch-away save and load is retained in the saved 
   await storage.loadSession(a.id);
   assert.equal(await storage.getBridgeSessionId('bridge', 'http://localhost:3948'), 'A-late');
 });
-
 
 test('the sidepanel reading an Agent ID cannot initialize or replace the worker conversation identity', async () => {
   reset();

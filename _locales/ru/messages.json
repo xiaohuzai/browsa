@@ -1743,5 +1743,97 @@
   "pingTimeoutErr": {
     "message": "Истекло время ожидания — служба не отвечает",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "Ответные фрагменты не получены — проверьте консоль DevTools Service Worker.",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "Выбрать сообщение",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "Перетащите, чтобы выбрать область",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "Отмена",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "Использовать весь снимок",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "Обрезать и использовать",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "(нет текста)",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "Изображения ($1, в порядке контекста)",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "Изображение на странице $1",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "Системный промпт не задан.",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "Скопировать весь промпт",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "Закрыть",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "К последнему сообщению",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "Читаю страницу…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "Страница",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "Не удалось прочитать страницу: $1. Если это Xiaohongshu, войдите в аккаунт или откройте заметку в обычной вкладке.",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "Содержимое Xiaohongshu может быть неполным ($1). XHR вернулся, но выглядит скудно. Если не совпадает со страницей, сделайте жёсткую перезагрузку (Ctrl+Shift+R).",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "Копировать",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "Закрыть",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "Действующий системный промпт",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "Размышляю…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "Скриншот",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "Нажмите, чтобы открыть полностью",
+    "description": "Panel: screenshot preview tooltip"
   }
 }
