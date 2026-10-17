@@ -503,6 +503,10 @@
     "message": "Auto-collapse thinking blocks",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "Play a sound when an agent approval is requested",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "Multimodal video understanding",
     "description": "Options: ASR card heading"

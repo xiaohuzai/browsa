@@ -503,6 +503,10 @@
     "message": "自动折叠思考块",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "Agent 请求审批时播放提示音",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "多模态视频理解",
     "description": "Options: ASR card heading"

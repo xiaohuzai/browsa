@@ -120,6 +120,7 @@ async function init() {
   $('fontFamily')?.addEventListener('change', (e) => saveChatPref({ fontFamily: e.target.value || 'system' }));
   $('sendShortcut')?.addEventListener('change', (e) => saveChatPref({ sendShortcut: e.target.value || 'enter' }));
   $('thoughtAutoCollapse')?.addEventListener('change', (e) => saveChatPref({ thoughtAutoCollapse: !!e.target.checked }));
+  $('approvalChime')?.addEventListener('change', (e) => saveChatPref({ approvalChime: !!e.target.checked }));
 }
 
 async function saveChatPref(patch) {
@@ -149,6 +150,9 @@ function applyChatPrefs(cfg) {  const fs = $('fontSize');
   const tac = $('thoughtAutoCollapse');
   // 勾选框反映实际行为：从未设置（undefined）= 默认折叠 = 勾上；显式取消才展开。
   if (tac) tac.checked = cfg.thoughtAutoCollapse !== false;
+  const chime = $('approvalChime');
+  // 同款默认语义：undefined = 默认开（审批需要用户注意）；显式取消才静音。
+  if (chime) chime.checked = cfg.approvalChime !== false;
 }
 
 // ASR 卡片的下拉选项、占位符、? 提示、文档链接全部由 lib/asr-providers.js 的

@@ -503,6 +503,10 @@
     "message": "Recolher automaticamente os blocos de raciocínio",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "Tocar um som quando um agente solicitar aprovação",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "Compreensão de vídeo multimodal",
     "description": "Options: ASR card heading"

@@ -123,7 +123,7 @@ main {
 }
 
 .card h2 {
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: .09em;
@@ -138,7 +138,7 @@ main {
 }
 .hint b { color: var(--fg-2); font-weight: 500; }
 .hint code {
-  font-family: ui-monospace, "SF Mono", monospace;
+  font-family: var(--mono);
   font-size: 11.5px;
   background: var(--border);
   padding: 1px 5px;
@@ -471,7 +471,7 @@ details.provider-group[open] > .provider-group-header::before {
   border-radius: 999px;
   padding: 1px 4px 1px 9px;
   font-size: 12px;
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-family: var(--mono);
   line-height: 1.5;
   color: var(--fg);
   background: var(--surface);
@@ -694,7 +694,7 @@ details.provider-group[open] > .provider-group-header::before {
 
 /* ── Textarea ────────────────────────────────────────────────────────────── */
 textarea {
-  font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+  font-family: var(--mono);
   font-size: 12px;
   line-height: 1.6;
   padding: 10px 12px;
@@ -899,7 +899,7 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .tip-bubble b { color: #f0f2f5; font-weight: 600; }
 .tip-bubble code {
-  font-family: ui-monospace, "SF Mono", monospace;
+  font-family: var(--mono);
   font-size: 11px;
   background: #343a43;
   padding: 1px 4px;

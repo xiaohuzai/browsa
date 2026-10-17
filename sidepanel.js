@@ -49,6 +49,8 @@ import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
+import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
+import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -135,6 +137,11 @@ let slashSuggestIdx = -1;  // keyboard-nav index in slash autocomplete
 // counter + the shift-after-delete protocol); mutate it only through those fns.
 let deleteLock = false; // serialises message-delete operations to prevent index races
 let isUserScrolledUp = false; // true when user has manually scrolled up during streaming
+// 150ms follower cooldown (scroll-follow.js): timestamped by REAL scroll input
+// (wheel/touch/key), not by the scroll event — programmatic scrolls fire that
+// event too. -Infinity = no input yet, so the first follow after open is never
+// blocked by the document's own clock.
+let lastUserScrollInputAt = -Infinity;
 let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
@@ -714,11 +721,27 @@ async function init() {
     }
   }
 
-  messagesEl.addEventListener('scroll', () => {
-    const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
-    isUserScrolledUp = dist > 80;
+  const updateScrollState = () => {
+    const geom = {
+      scrollHeight: messagesEl.scrollHeight,
+      scrollTop: messagesEl.scrollTop,
+      clientHeight: messagesEl.clientHeight,
+    };
+    isUserScrolledUp = calcIsUserScrolledUp(geom);
     scrollToBottomBtn.hidden = !isUserScrolledUp;
-  }, { passive: true });
+    // Scroll-edge feather (sidepanel.css .fade-t/.fade-b): recompute per scroll.
+    const { fadeT, fadeB } = edgeFadeClasses(geom);
+    messagesEl.classList.toggle('fade-t', fadeT);
+    messagesEl.classList.toggle('fade-b', fadeB);
+  };
+  messagesEl.addEventListener('scroll', updateScrollState, { passive: true });
+  updateScrollState();
+  // The follower cooldown timestamps REAL input, not the (also programmatic)
+  // scroll event — see lastUserScrollInputAt above.
+  const markScrollInput = () => { lastUserScrollInputAt = performance.now(); };
+  messagesEl.addEventListener('wheel', markScrollInput, { passive: true });
+  messagesEl.addEventListener('touchstart', markScrollInput, { passive: true });
+  messagesEl.addEventListener('keydown', markScrollInput);
 
   // Image lightbox — delegate click on all img inside messages. 用户贴图
   // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
@@ -3354,18 +3377,22 @@ function appendError(text, { compact = false } = {}) {
 }
 
 // force=true: always scroll (user action, new message).
-// force=false (default): respect user scroll position during streaming.
-// renderHistory paints N bubbles in a loop; each append* helper forces a
-// layout read via scrollToBottom(true). Suppress during the loop and scroll
-// ONCE at the end (long histories paid N synchronous reflows).
+// force=false (default): respect user scroll position during streaming — both
+// the scrolled-up gate AND the 150ms active-scroll cooldown (scroll-follow.js):
+// a wheel flick inside the bottom tolerance no longer yanks the viewport back
+// mid-gesture; once the hand settles, following resumes.
+//
+// `_suppressAutoScroll` (2026-10-17): renderHistory paints N bubbles in a loop
+// and each append* helper forces a layout read via scrollToBottom(true).
+// Suppress during the loop and scroll ONCE at the end (long histories paid N
+// synchronous reflows). Orthogonal to the gesture cooldown above.
 let _suppressAutoScroll = false;
 function scrollToBottom(force = false) {
   if (_suppressAutoScroll) return;
-  if (force || !isUserScrolledUp) {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
-    isUserScrolledUp = false;
-  }
+  if (!shouldFollowStream({ force, isUserScrolledUp, lastUserScrollInputAt, now: performance.now() })) return;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
+  isUserScrolledUp = false;
 }
 
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────
@@ -3645,7 +3672,11 @@ function showImageLightbox(src, alt) {
   closeBtn.addEventListener('click', dismiss);
   dlg.appendChild(img);
   dlg.appendChild(closeBtn);
-  dlg.addEventListener('click', (e) => { if (e.target === dlg) dismiss(); });
+  // Cursor-anchored pan/zoom (2026-10-17 motion pass, CDS physics). A drag
+  // that ends over the backdrop fires a trailing click on the dialog — the
+  // zoom handle remembers it so it can't dismiss the viewer mid-pan.
+  const zoom = attachLightboxZoom(img, dlg);
+  dlg.addEventListener('click', (e) => { if (e.target === dlg && !zoom.consumeDraggedClick()) dismiss(); });
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); dlg.close(); });
   dlg.addEventListener('close', () => dlg.remove());
   document.body.appendChild(dlg);

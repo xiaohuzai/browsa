@@ -138,7 +138,7 @@ agent-bridge serve                                # one bridge per entry; ports 
 Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and fill in bridge addresses one per row — one agent per address, with an optional alias (leave it empty and Ping discovers the agent's name) and that bridge's own API key (keys can differ per bridge).
 
 - the sidebar dropdown lists them as "Agent Bridge · codex"; each agent has its own session thread and ping status (⟳ on the row pings just that agent)
-- approval cards for dangerous actions appear right in the panel
+- approval cards for dangerous actions appear right in the panel (an optional sound plays when an approval arrives; toggle in Settings)
 - screenshots, pasted images, and PDF figures ride along with your message — ≤18 per turn, needs agent-bridge ≥0.8.0 (older bridges degrade to the first 8 with a note in the message)
 - multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply
 

@@ -503,6 +503,10 @@
     "message": "생각 블록 자동 접기",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "에이전트가 승인을 요청할 때 소리 재생",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "멀티모달 비디오 이해",
     "description": "Options: ASR card heading"
