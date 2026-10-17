@@ -325,7 +325,7 @@ Switching sessions mid-reply never kills the reply: it keeps running in the back
 
 | Feature | What you get |
 |---|---|
-| **Sessions** | save the conversation as a named session; browse and restore from the 🕐 drawer; pin favorites above the list |
+| **Sessions** | save the conversation as a named session; browse and restore from the 🕐 drawer; pin favorites above the list. If the conversation a background reply belongs to gets deleted mid-turn, the reply is preserved in a recreated "Recovered turn (…)" session instead of being written into whatever conversation is on screen |
 | **Search everywhere** | `Ctrl+F` across all messages in a conversation; the drawer filters sessions by title **and** message content (content-only hits flagged) |
 | **Export** | any session as a Markdown file |
 | **Safe deletion** | two-step armed delete for sessions; multi-select messages for batch deletion; clearing all messages requires confirmation |
