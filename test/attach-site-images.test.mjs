@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -36,25 +37,6 @@ const D2 = 'data:image/jpeg;base64,BBBB';
 // tabId 隔离，快路径种过的 tab 不能再走慢路径测试。
 const TABS = new Map();
 function addTab(id, url, title = 'T') { TABS.set(id, { url, title }); return id; }
-
-function makeStorageArea(initial = {}) {
-  let store = { ...initial };
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) { store = { ...store, ...obj }; },
-    async remove(key) { delete store[key]; },
-    _dump() { return store; },
-  };
-}
 
 const localArea = makeStorageArea({
   activeProvider: 'compatible',
@@ -709,4 +691,33 @@ test('X syndication fallback: a SHORT tweet in auto mode must NOT fall through t
     assert.ok(stub.fetched.every((u) => !/r\.jina\.ai/.test(u)),
       'a site-synthesized short result must never trigger the auto jina fallback');
   } finally { stub.restore(); }
+});
+
+// ─── Host-aware cache selection (2026-10-17) ────────────────────────────────
+// The site cache is keyed by tabId alone and every site's push lands in the
+// same tab. "First registry hit wins" made a STALE entry from the previous
+// site in this tab shadow the live one.
+test('getSiteCache: a host-mismatched stale entry never shadows the live one', async () => {
+  const { getSiteCache, recordSiteMessage, purgeTab } = await import('../lib/handlers/site-cache-store.js');
+  const tabId = 9_001;
+  recordSiteMessage({ type: 'YOUTUBE_DATA', video: { videoId: 'old' } }, tabId);
+  recordSiteMessage({ type: 'ZHIHU_CONTENT', content: { title: 'live' } }, tabId);
+
+  const forZhihu = getSiteCache(tabId, 'https://zhuanlan.zhihu.com/p/123');
+  assert.equal(forZhihu?.source, 'zhihu', 'the current host must win over registry order');
+  assert.equal(forZhihu?.data?.title, 'live');
+
+  const forJuejin = getSiteCache(tabId, 'https://juejin.cn/post/1');
+  assert.equal(forJuejin, null, 'no entry matches this host — nothing stale is returned');
+
+  purgeTab(tabId);
+});
+
+test('getSiteCache: without a URL it still returns an entry (legacy callers unchanged)', async () => {
+  const { getSiteCache, recordSiteMessage, purgeTab } = await import('../lib/handlers/site-cache-store.js');
+  const tabId = 9_002;
+  recordSiteMessage({ type: 'XUEQIU_DATA', data: { stock: 'x' } }, tabId);
+  const hit = getSiteCache(tabId);
+  assert.equal(hit?.source, 'xueqiu');
+  purgeTab(tabId);
 });

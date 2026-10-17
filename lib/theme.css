@@ -56,16 +56,12 @@
   --accent-hover: rgba(224,84,44,0.16);
   --accent-glow:  rgba(224,84,44,0.24);
   --mark:         var(--accent);
-  --mark-dim:     var(--accent-dim);
-  --mark-hover:   var(--accent-hover);
-  --mark-glow:    var(--accent-glow);
 
   /* Secondary accent — "highlighter gold". Reserved for margin-note content
      (video timestamps, citation markers, search highlights) — never used for
      primary actions/buttons, which stay --mark only. */
   --gold:         #d4a72c;
   --gold-dim:     rgba(212,167,44,0.12);
-  --gold-hover:   rgba(212,167,44,0.20);
 
   --error:        #f0685a;
   --warn:         #e0b23a;
@@ -166,7 +162,6 @@
   --hover-bg:     rgba(148,160,171,0.08);
   --input-bg:     var(--bg);
   --code-bg:      rgba(148,160,171,0.08);
-  --shadow:       var(--shadow-sm);
 }
 
 @media (prefers-color-scheme: light) {
@@ -197,7 +192,6 @@
        chip). This value hits 4.80:1, same hue, just less luminant. */
     --gold:         #926c0d;
     --gold-dim:     rgba(146,108,13,0.10);
-    --gold-hover:   rgba(146,108,13,0.16);
 
     --error:        #c0392b;
     --warn:         #926c0d; /* same contrast fix as --gold above — was #a3790f */

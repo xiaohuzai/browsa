@@ -9,15 +9,15 @@ import * as storage from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { createTurnChrome, addProviderChip } from './lib/sidepanel/turn-chrome.js';
 import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
-import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeComposing, scheduleIdle } from './lib/sidepanel/ui-utils.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeComposing, scheduleIdle, buildModeButton } from './lib/sidepanel/ui-utils.js';
 import {
-  renderSafe, renderStreamingSafe, preloadChartVendors, wantsChartVendors, finishBubble,
-  addCodeCopyButtons, decorateLinks, linkifyTimestamps, disposeChartObservers, disposeMolstarViewers, disposeRenderInstancesIn,
+  renderSafe, renderStreamingSafe, preloadChartVendors, chartVendorLangs, finishBubble,
+  addCodeCopyButtons, linkifyTimestamps, disposeChartObservers, disposeMolstarViewers, disposeRenderInstancesIn,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry,
   renderUserContent
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
-import { initMathCopy, addMathCopyButtons } from './lib/sidepanel/math-copy.js';
+import { initMathCopy } from './lib/sidepanel/math-copy.js';
 import { classifyErrorText } from './lib/sidepanel/error-classifier.js';
 import {
   initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups
@@ -46,7 +46,7 @@ import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orc
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
-import { applyI18n, initI18n, watchUiLang, currentUiLang, uiLocale, t, tSub } from './lib/i18n.js';
+import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
@@ -92,17 +92,30 @@ const inputEl = $('input');
 const sendBtn = $('send');
 const providerSel = $('provider');
 
-// One-shot gate for chart-vendor warming (2026-09-30 批C): once any fence has
-// triggered preloadChartVendors(), every getXxx() holds its own module-level
-// cache for the panel session — re-scanning the WHOLE accumulated text on
-// every backtick-bearing delta (and again on every DONE) is pure waste after
-// the first hit. The flag short-circuits both the scan and the (idempotent
-// but not free) preload call.
-let _chartVendorsWarmed = false;
-function warmChartVendorsOnce() {
-  if (_chartVendorsWarmed) return;
-  _chartVendorsWarmed = true;
-  preloadChartVendors();
+// Chart-vendor warming (2026-09-30 批C + 2026-10-17 scoping): warm ONLY the
+// vendors whose fence language actually appeared, and only once per language
+// for the panel session — every getXxx() holds its own module-level cache.
+// Previously any fence warmed all six bundles (mermaid+viz+echarts+markmap
+// ≈7MB) plus RDKit's 7MB wasm compile and Mol*'s 5MB script.
+const _chartVendorsWarmed = new Set();
+function warmChartVendors(langs) {
+  const missing = new Set();
+  for (const l of langs || []) if (!_chartVendorsWarmed.has(l)) missing.add(l);
+  if (!missing.size) return;
+  for (const l of missing) _chartVendorsWarmed.add(l);
+  preloadChartVendors(missing);
+}
+// Rolling scan cursor for the per-delta sniff: a fence opener can be split
+// across deltas ("``" then "`mermaid"), so each backtick-bearing delta scans
+// from 8 chars before the previous cursor instead of rescanning the whole
+// accumulated reply (was O(n²) on long inline-code-heavy answers).
+let _chartFenceScanPos = 0;
+function sniffStreamingChartFence(state, delta) {
+  if (!delta.includes('`')) return;
+  const from = Math.max(0, _chartFenceScanPos - 8);
+  const langs = chartVendorLangs(state.acc.slice(from));
+  _chartFenceScanPos = state.acc.length;
+  if (langs.size) warmChartVendors(langs);
 }
 const charCountEl = $('charcount');
 const tokCountEl = $('tokcount');
@@ -170,6 +183,159 @@ function applyEmptyHint() {
   // （.messages:not(:has(.msg))::after），无需任何显隐维护。
   const text = _t('emptyHint', 'Click 📎 to attach the current page').replaceAll("'", "\\'");
   document.documentElement.style.setProperty('--empty-hint', `'${text}'`);
+}
+
+// The toolbar "tools" <details> menu: Esc closes it (returning focus to the
+// summary), choosing a button closes it, and any outside pointer/focus closes
+// it. Extracted from init() (2026-10-17) — pure wiring, no init-local state.
+function wireToolbarToolsMenu() {
+  const tools = $('toolbar-tools');
+  const closeTools = (restoreFocus = false) => {
+    if (!tools?.open) return;
+    tools.open = false;
+    if (restoreFocus) tools.querySelector('summary')?.focus();
+  };
+  tools?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && tools.open) {
+      e.preventDefault(); e.stopPropagation(); closeTools(true);
+    }
+  });
+  tools?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) closeTools(tools.contains(document.activeElement));
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!tools?.contains(e.target)) closeTools();
+  });
+  document.addEventListener('focusin', (e) => {
+    if (!tools?.contains(e.target)) closeTools();
+  });
+}
+
+// Composer image intake wiring (paste / drag-drop / file picker) — extracted
+// from init() (2026-10-17), same wiring as before, no init-local state.
+function wireImageInputs() {
+  inputEl.addEventListener('paste', onPaste);
+  const composer = document.querySelector('.composer');
+  composer.addEventListener('dragover', (e) => { e.preventDefault(); composer.classList.add('dragover'); });
+  composer.addEventListener('dragleave', () => composer.classList.remove('dragover'));
+  composer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    composer.classList.remove('dragover');
+    handleDroppedFiles(e.dataTransfer.files);
+  });
+  imagePicker.addEventListener('change', () => {
+    if (imagePicker.files) handleDroppedFiles(imagePicker.files);
+    imagePicker.value = ''; // reset so re-pick works
+  });
+}
+
+// Long-lived nav port. The background pushes NAVIGATED events for ANY
+// tab (it's a firehose). We filter to our current tab so SPAs like
+// 小红书 update the side panel's page-meta UI in real time when the
+// user clicks from one note to another. Without this, chrome.tabs.onUpdated
+// never fires (SPA pushState is invisible to it), and the side panel
+// would keep showing the title of the first note the user opened.
+// Extract navPort message handler as a named function so we can
+// re-attach it every time the port reconnects (after SW restart, a new
+// port object is created — the old listener is lost and must be re-bound).
+function onNavPortMessage(msg) {
+  if (!msg) return;
+  if (msg.type === 'SELECTION_ACTION') {
+    handleSelectionAction(msg.action, msg.text);
+    return;
+  }
+
+  if (msg.type === 'DEEP_EXTRACT_PROGRESS') {
+    // Live progress from background's deep-extraction pass, which runs
+    // inside the still-pending ATTACH_PAGE round trip; surface it on the
+    // same fixed pill the attach flow uses (cleared when attach lands).
+    if (msg.tabId === currentTabId && msg.text) showAttachProgress(msg.text);
+    return;
+  }
+
+  if (msg.type === 'XHS_XHR_NOTE') {
+    // Real XHR data from the content script. The most authoritative
+    // source — the browser's own signed fetch, with cookies. We
+    // always accept it (overwriting any prior note for this tab).
+    if (msg.tabId !== currentTabId) return;
+    lastXhsNote = msg.note;
+    // Re-probe the diagnostics banner so the user sees the
+    // "extraction is healthy" state if desc is now populated.
+    if (/^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(pagemetaEl.href)) {
+      renderDiagnosticsFromXhr(lastXhsNote);
+    }
+    return;
+  }
+  if (msg.type !== 'NAVIGATED') return;
+  if (msg.tabId !== currentTabId) return; // firehose filter
+  if (msg.closed) {
+    pagemetaEl.textContent = _t('tabClosed', '(tab closed)');
+    pagemetaEl.href = '#';
+    pagemetaEl.title = '';
+    diagnosticsEl.hidden = true;
+    diagnosticsEl.innerHTML = '';
+    lastXhsNote = null;
+    return;
+  }
+  if (msg.url) {
+    pagemetaEl.href = msg.url;
+    pagemetaEl.title = msg.url;
+  }
+  if (msg.title) {
+    pagemetaEl.textContent = msg.title;
+  } else if (msg.url) {
+    // Title comes from webNavigation as empty; show the URL path so the
+    // user at least sees something change.
+    try {
+      const u = new URL(msg.url);
+      pagemetaEl.textContent = u.pathname + u.search;
+    } catch (_) {
+      pagemetaEl.textContent = msg.url;
+    }
+  }
+  // Re-probe the new URL. If it's a 小红书 explore page, the
+  // diagnostics banner needs to update. We don't await — the new
+  // banner will appear when the probe finishes (a few hundred ms).
+  if (msg.url && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(msg.url)) {
+    // New note — clear the prior XHR cache so we don't send
+    // stale data. The content script will deliver the new note's
+    // XHR within a few hundred ms.
+    lastXhsNote = null;
+    sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId })
+      .then((res) => renderDiagnostics(res?.data))
+      .catch(() => {});
+  } else {
+    // Not a 小红书 note — clear the banner and cache.
+    diagnosticsEl.hidden = true;
+    diagnosticsEl.innerHTML = '';
+    lastXhsNote = null;
+  }
+}
+
+function connectNavPort() {
+  navPort = chrome.runtime.connect({ name: 'browsa-nav' });
+  navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
+  // Re-attach message listener on every new port object.
+  navPort.onMessage.addListener(onNavPortMessage);
+  navPort.onDisconnect.addListener(() => {
+    navPort = null;
+    // Read session storage DIRECTLY — no SW roundtrip needed, no 1-second
+    // wait. If a selection action was stored while the SW was restarting,
+    // the sidepanel can read and deliver it immediately by itself.
+    chrome.storage.session.get(['pendingSelectionAction']).then((sess) => {
+      if (sess.pendingSelectionAction) {
+        chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
+        const { action, text } = sess.pendingSelectionAction;
+        handleSelectionAction(action, text);
+      }
+    }).catch(() => {});
+    // Also reconnect the nav port after a short delay so future events work.
+    setTimeout(() => {
+      if (!navPort) {
+        try { connectNavPort(); } catch (_) {}
+      }
+    }, 1000);
+  });
 }
 
 async function init() {
@@ -251,27 +417,7 @@ async function init() {
 
   // Wire UI
   providerSel.addEventListener('change', onProviderChange);
-  const tools = $('toolbar-tools');
-  const closeTools = (restoreFocus = false) => {
-    if (!tools?.open) return;
-    tools.open = false;
-    if (restoreFocus) tools.querySelector('summary')?.focus();
-  };
-  tools?.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && tools.open) {
-      e.preventDefault(); e.stopPropagation(); closeTools(true);
-    }
-  });
-  tools?.addEventListener('click', (e) => {
-    if (e.target.closest('button')) closeTools(tools.contains(document.activeElement));
-  });
-  document.addEventListener('pointerdown', (e) => {
-    if (!tools?.contains(e.target)) closeTools();
-  });
-  document.addEventListener('focusin', (e) => {
-    if (!tools?.contains(e.target)) closeTools();
-  });
-
+  wireToolbarToolsMenu();
 
   $('sessions-btn')?.addEventListener('click', () => { closeTranscriptDrawer(); openSessionsDrawer(); });
   document.getElementById('sessions-close')?.addEventListener('click', closeSessionsDrawer);
@@ -449,115 +595,6 @@ async function init() {
     }
   });
 
-  // Long-lived nav port. The background pushes NAVIGATED events for ANY
-  // tab (it's a firehose). We filter to our current tab so SPAs like
-  // 小红书 update the side panel's page-meta UI in real time when the
-  // user clicks from one note to another. Without this, chrome.tabs.onUpdated
-  // never fires (SPA pushState is invisible to it), and the side panel
-  // would keep showing the title of the first note the user opened.
-  // Extract navPort message handler as a named function so we can
-  // re-attach it every time the port reconnects (after SW restart, a new
-  // port object is created — the old listener is lost and must be re-bound).
-  function onNavPortMessage(msg) {
-    if (!msg) return;
-    if (msg.type === 'SELECTION_ACTION') {
-      handleSelectionAction(msg.action, msg.text);
-      return;
-    }
-
-    if (msg.type === 'DEEP_EXTRACT_PROGRESS') {
-      // Live progress from background's deep-extraction pass, which runs
-      // inside the still-pending ATTACH_PAGE round trip; surface it on the
-      // same fixed pill the attach flow uses (cleared when attach lands).
-      if (msg.tabId === currentTabId && msg.text) showAttachProgress(msg.text);
-      return;
-    }
-
-    if (msg.type === 'XHS_XHR_NOTE') {
-      // Real XHR data from the content script. The most authoritative
-      // source — the browser's own signed fetch, with cookies. We
-      // always accept it (overwriting any prior note for this tab).
-      if (msg.tabId !== currentTabId) return;
-      lastXhsNote = msg.note;
-      // Re-probe the diagnostics banner so the user sees the
-      // "extraction is healthy" state if desc is now populated.
-      if (/^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(pagemetaEl.href)) {
-        renderDiagnosticsFromXhr(lastXhsNote);
-      }
-      return;
-    }
-    if (msg.type !== 'NAVIGATED') return;
-    if (msg.tabId !== currentTabId) return; // firehose filter
-    if (msg.closed) {
-      pagemetaEl.textContent = _t('tabClosed', '(tab closed)');
-      pagemetaEl.href = '#';
-      pagemetaEl.title = '';
-      diagnosticsEl.hidden = true;
-      diagnosticsEl.innerHTML = '';
-      lastXhsNote = null;
-      return;
-    }
-    if (msg.url) {
-      pagemetaEl.href = msg.url;
-      pagemetaEl.title = msg.url;
-    }
-    if (msg.title) {
-      pagemetaEl.textContent = msg.title;
-    } else if (msg.url) {
-      // Title comes from webNavigation as empty; show the URL path so the
-      // user at least sees something change.
-      try {
-        const u = new URL(msg.url);
-        pagemetaEl.textContent = u.pathname + u.search;
-      } catch (_) {
-        pagemetaEl.textContent = msg.url;
-      }
-    }
-    // Re-probe the new URL. If it's a 小红书 explore page, the
-    // diagnostics banner needs to update. We don't await — the new
-    // banner will appear when the probe finishes (a few hundred ms).
-    if (msg.url && /^https?:\/\/(www\.)?xiaohongshu\.com\/explore\//.test(msg.url)) {
-      // New note — clear the prior XHR cache so we don't send
-      // stale data. The content script will deliver the new note's
-      // XHR within a few hundred ms.
-      lastXhsNote = null;
-      sendMessage({ type: 'GET_PAGE_CONTEXT', mode: 'reader', tabId: currentTabId })
-        .then((res) => renderDiagnostics(res?.data))
-        .catch(() => {});
-    } else {
-      // Not a 小红书 note — clear the banner and cache.
-      diagnosticsEl.hidden = true;
-      diagnosticsEl.innerHTML = '';
-      lastXhsNote = null;
-    }
-  }
-
-  function connectNavPort() {
-    navPort = chrome.runtime.connect({ name: 'browsa-nav' });
-    navPort.postMessage({ type: 'NAV_HELLO', tabId: currentTabId });
-    // Re-attach message listener on every new port object.
-    navPort.onMessage.addListener(onNavPortMessage);
-    navPort.onDisconnect.addListener(() => {
-      navPort = null;
-      // Read session storage DIRECTLY — no SW roundtrip needed, no 1-second
-      // wait. If a selection action was stored while the SW was restarting,
-      // the sidepanel can read and deliver it immediately by itself.
-      chrome.storage.session.get(['pendingSelectionAction']).then((sess) => {
-        if (sess.pendingSelectionAction) {
-          chrome.storage.session.remove('pendingSelectionAction').catch(() => {});
-          const { action, text } = sess.pendingSelectionAction;
-          handleSelectionAction(action, text);
-        }
-      }).catch(() => {});
-      // Also reconnect the nav port after a short delay so future events work.
-      setTimeout(() => {
-        if (!navPort) {
-          try { connectNavPort(); } catch (_) {}
-        }
-      }, 1000);
-    });
-  }
-
   connectNavPort();
 
   // Diagnostics: on init, do a one-shot XHS page-context probe so we
@@ -598,20 +635,7 @@ async function init() {
   });
 
   // Image paste / drop / picker
-  inputEl.addEventListener('paste', onPaste);
-  const composer = document.querySelector('.composer');
-  composer.addEventListener('dragover', (e) => { e.preventDefault(); composer.classList.add('dragover'); });
-  composer.addEventListener('dragleave', () => composer.classList.remove('dragover'));
-  composer.addEventListener('drop', (e) => {
-    e.preventDefault();
-    composer.classList.remove('dragover');
-    handleDroppedFiles(e.dataTransfer.files);
-  });
-  imagePicker.addEventListener('change', () => {
-    if (imagePicker.files) handleDroppedFiles(imagePicker.files);
-    imagePicker.value = ''; // reset so re-pick works
-  });
-
+  wireImageInputs();
   refreshImageStrip();
 
   // After history is rendered, peek the background for any in-flight
@@ -634,7 +658,7 @@ async function init() {
   // handler), and a first-ever PDF attach compiles on demand at click time
   // (the attach flow already runs behind a progress spinner).
   scheduleIdle(() => {
-    if (renderStats?.historyHasCharts) warmChartVendorsOnce();
+    if (renderStats?.historyHasCharts) warmChartVendors(renderStats.historyChartLangs);
     if (renderStats?.historyHasPdf) warmupPdfInspector();
   });
   // Snap to the bottom of the rendered history. renderHistory() does
@@ -670,7 +694,7 @@ async function init() {
   scrollToBottomBtn = document.createElement('button');
   scrollToBottomBtn.className = 'scroll-to-bottom-btn';
   scrollToBottomBtn.hidden = true;
-  scrollToBottomBtn.title = 'Jump to bottom';
+  scrollToBottomBtn.title = _t('jumpToBottom', '跳到最新');
   scrollToBottomBtn.textContent = '↓';
   scrollToBottomBtn.addEventListener('click', () => {
     isUserScrolledUp = false;
@@ -1037,9 +1061,10 @@ function hideSlashSuggest() {
 function renderDiagnostics(ctx) {
   if (!ctx || ctx.error) {
     diagnosticsEl.hidden = false;
-    diagnosticsEl.innerHTML =
-      `Couldn't read this page: <code>${escM(ctx?.error || 'unknown')}</code>. ` +
-      `If this is 小红书, try logging in or opening the note in a regular tab.`;
+    const errCode = `<code>${escM(ctx?.error || 'unknown')}</code>`;
+    diagnosticsEl.innerHTML = escM(_t('xhsReadFailed',
+      '无法读取此页面：$1。若这是小红书，请尝试登录或在普通标签页打开该笔记。'))
+      .replace('$1', errCode);
     return;
   }
   if (!ctx.xhsSource) {
@@ -1084,10 +1109,10 @@ function renderDiagnosticsFromXhr(note) {
   if (note.imageCount === 0 && descLen < 30) reasons.push('no images, near-empty desc (XHR)');
   if (reasons.length > 0) {
     diagnosticsEl.hidden = false;
-    diagnosticsEl.innerHTML =
-      `小红书 content may be incomplete (${reasons.map((r) => `<code>${escM(r)}</code>`).join(', ')}). ` +
-      `The XHR returned, but it looks thin. If this doesn't match the page, ` +
-      `try a hard refresh (Ctrl+Shift+R).`;
+    const codes = reasons.map((r) => `<code>${escM(r)}</code>`).join(', ');
+    diagnosticsEl.innerHTML = escM(_t('xhsXhrThin',
+      '小红书内容可能不完整（$1）。XHR 已返回但内容偏薄。若与页面不符，请强制刷新（Ctrl+Shift+R）。'))
+      .replace('$1', codes);
   } else {
     // Healthy XHR. The DOM may still be stale, but the data source
     // is good — clear the warning.
@@ -1160,17 +1185,18 @@ async function refreshAsrStreams(platform, want = 'audio') {
 //  downloadAndTranscodeAudioBest / showAsrModeCard). Wired up via
 // initAttachOrchestrator() in init(); onAttachPage is imported back in.
 
-/** Show a visible "attaching…" status pill above the composer, reusing the
- * same .tool-progress styling as the chat tool-progress indicator. Unlike
- * showToolProgress (anchored relative to a streaming message bubble), this
- * has a fixed anchor: right before .composer-box, inside <footer class="composer">. */
-function showAttachProgress(text) {
-  let el = document.getElementById('attach-progress');
+// Fixed-anchor status pill above the composer, reusing the chat
+// tool-progress styling. Two owners of the same markup/shape lived here
+// (attach progress + history-upgrade progress) — one builder now.
+// Anchor is right before .composer-box, inside <footer class="composer">
+// (unlike the chat tool-progress line, which is anchored to a bubble).
+function showFixedProgressPill(id, text) {
+  let el = document.getElementById(id);
   if (!el) {
     const composerBox = document.querySelector('.composer-box');
     if (!composerBox) return;
     el = document.createElement('div');
-    el.id = 'attach-progress';
+    el.id = id;
     el.className = 'tool-progress';
     el.dataset.tier = 'reading';
     composerBox.parentNode.insertBefore(el, composerBox);
@@ -1178,27 +1204,23 @@ function showAttachProgress(text) {
   el.innerHTML = `<span class="tp-icon">${ICONS.book}</span><span class="tp-text">${escM(text)}</span>`;
 }
 
-/** Remove the attach-progress pill, if present. */
-function clearAttachProgress() {
-  document.getElementById('attach-progress')?.remove();
+function clearFixedProgressPill(id) {
+  document.getElementById(id)?.remove();
 }
 
-/** Same fixed-anchor pill pattern as showAttachProgress, shown while
- * renderHistory()'s background KaTeX/mermaid/echarts upgrade pass is still
- * running, so a long history with several formulas reads as "still working"
- * rather than looking like the extension is broken/unresponsive. */
+function showAttachProgress(text) {
+  showFixedProgressPill('attach-progress', text);
+}
+
+function clearAttachProgress() {
+  clearFixedProgressPill('attach-progress');
+}
+
+/** Shown while renderHistory()'s background KaTeX/mermaid/echarts upgrade
+ * pass is still running, so a long history with several formulas reads as
+ * "still working" rather than looking broken/unresponsive. */
 function showHistoryUpgradeIndicator() {
-  let el = document.getElementById('history-upgrade-progress');
-  if (!el) {
-    const composerBox = document.querySelector('.composer-box');
-    if (!composerBox) return;
-    el = document.createElement('div');
-    el.id = 'history-upgrade-progress';
-    el.className = 'tool-progress';
-    el.dataset.tier = 'reading';
-    composerBox.parentNode.insertBefore(el, composerBox);
-  }
-  el.innerHTML = `<span class="tp-icon">${ICONS.book}</span><span class="tp-text">${_t('renderingHistory', '正在渲染历史消息…')}</span>`;
+  showFixedProgressPill('history-upgrade-progress', _t('renderingHistory', '正在渲染历史消息…'));
 }
 
 function hideHistoryUpgradeIndicator() {
@@ -1228,7 +1250,7 @@ async function newSession() {
     if (savedId) {
       sendMessage({ type: 'REASSIGN_STREAM_SESSION', tabId: streamTabIdOf(), sessionId: savedId }).catch(() => {});
       stopWatchingStream();
-      showToast(_t('streamMovedToBackground', '进行中的回复已转入后台，完成后写入原会话'));
+      showToast(_t('streamMovedToBackground', '进行中的回复已转入后台，完成后写入原会话'), 'info');
     } else {
       // 没有可路由的来源会话（保存失败 / 无消息）——转后台会让孤儿回复在 DONE
       // 落回 live history（清空后的新会话开头，line 318 那个旧 bug）。取消掉。
@@ -1584,21 +1606,7 @@ function showProviderSwitchCard(label) {
   card.appendChild(title);
   const row = document.createElement('div');
   row.className = 'asr-mode-row';
-  const mkBtn = (main, sub, onClick) => {
-    const b = document.createElement('button');
-    b.className = 'asr-mode-btn';
-    b.type = 'button';
-    const m1 = document.createElement('span');
-    m1.className = 'asr-mode-main';
-    m1.textContent = main;
-    const m2 = document.createElement('span');
-    m2.className = 'asr-mode-sub';
-    m2.textContent = sub;
-    b.appendChild(m1);
-    b.appendChild(m2);
-    b.addEventListener('click', () => { card.remove(); onClick(); });
-    return b;
-  };
+  const mkBtn = (main, sub, onClick) => buildModeButton(card, main, sub, { onPick: onClick });
   row.appendChild(mkBtn(
     _t('providerSwitchCarry', '带上当前对话继续'),
     _t('providerSwitchCarrySub', '对话记录作为第一条消息发给它'),
@@ -1700,11 +1708,21 @@ function startSwPingKeepAlive(port) {
 
 // Shown in port.onDisconnect when the port dies before any chunks arrived —
 // a real hint vs a silent empty bubble. Shared by onSend() and
-// resumeInFlightStream() (same message, same guard: acc === '' && text '▍').
+// resumeInFlightStream(). The blinking caret is a CSS ::after pseudo-element,
+// so an untouched bubble has EMPTY textContent (the old `textContent === '▍'`
+// check never matched — this hint was dead), and appendAssistant() always
+// appends a .msg-time stamp, so "no children" never holds either. The real
+// signal is: accumulator empty AND no content nodes besides the timestamp.
 function showNoChunkHint(el, state) {
-  if (state.acc === '' && el && el.textContent === '▍') {
-    el.textContent = '(no chunks received — check Service Worker DevTools)';
-  }
+  if (!el || state.acc !== '') return;
+  const hasContent = [...el.childNodes].some(
+    (n) => !(n.nodeType === 1 && n.classList?.contains('msg-time'))
+  );
+  if (hasContent) return;
+  const hint = _t('noChunkReceived', '(no chunks received — check Service Worker DevTools)');
+  // Insert before the timestamp rather than replacing textContent, so the
+  // turn's time stamp survives.
+  el.insertBefore(document.createTextNode(hint), el.firstChild);
 }
 
 // ─── StreamTarget ─────────────────────────────────────────────────────────────
@@ -1817,11 +1835,10 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       target.getRenderer()(m.delta, false); // pass delta, not accumulated text
       updateOutputTokenCount(m.delta);
       // Fence sniff: the instant a diagram fence appears in the stream, warm
-      // the multi-MB chart vendors so the render at DONE finds them cached.
-      // preloadChartVendors() is idempotent; the backtick gate keeps this at
-      // one cheap string scan per fence-bearing delta. A fence opener can
-      // split across deltas, so match against the accumulated text.
-      if (!_chartVendorsWarmed && m.delta.includes('`') && wantsChartVendors(state.acc)) warmChartVendorsOnce();
+      // the matching chart vendors so the render at DONE finds them cached.
+      // Rolling-window scan (see sniffStreamingChartFence) — only the
+      // languages that actually appeared are warmed.
+      sniffStreamingChartFence(state, m.delta);
 
     } else if (m.type === 'TOOL_PROGRESS') {
       turnChrome.stopWait();
@@ -1864,7 +1881,8 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       const finalText = m.full || state.acc;
       // Belt-and-suspenders sniff: a silent rewrite/continuation can produce
       // a final text whose fences differ from what the deltas streamed.
-      if (!_chartVendorsWarmed && wantsChartVendors(finalText)) warmChartVendorsOnce();
+      const finalLangs = chartVendorLangs(finalText);
+      if (finalLangs.size) warmChartVendors(finalLangs);
       hidxAssign(el); // assistant turn stored in background
       el.classList.add('done'); // stream over → content-visibility 恢复生效（CSS 豁免条件）
       // videoSrc 必须在最终渲染前落戳：renderStream isDone 里的 finishBubble→
@@ -1981,7 +1999,7 @@ async function onSend() {
     // 入队失败 = 队列满：提示并保留输入。此前返回值被忽略，第 6 条起被静默
     // 清空丢弃（无 toast、无 chip、不进 ↑ 召回）。
     if (!enqueueFollowup(rawText)) {
-      showToast(_t('followupQueueFull', '排队已满（最多 5 条），先等当前回复完成'));
+      showToast(_t('followupQueueFull', '排队已满（最多 5 条），先等当前回复完成'), 'warn');
       return;
     }
     resetHistoryNav(inputEl); // 同 onSend：先复位召回态再清空
@@ -2025,12 +2043,18 @@ async function onSend() {
   clearPersistedDraft();
   updateComposerInfo();
   setStreamingUI(true);
+  // Per-turn token counter: reset HERE (the single start point), not only on
+  // DONE — a cancelled or errored turn used to leave its count in place, so
+  // the next turn's live count started from the previous turn's total.
+  outputTokens = 0;
+  if (tokCountEl) tokCountEl.textContent = '~0';
 
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('');
   // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel;
   // startedAt is the first-chunk timestamp for the usage chip's t/s.
   const state = { acc: '', toolEvents: [], startedAt: 0 };
+  _chartFenceScanPos = 0; // fresh rolling fence scan for this turn
   let renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
   // StreamTarget: one FIXED bubble for this turn — the renderer is swapped
   // only through the RETRY hook below (which reassigns renderStream).
@@ -2220,6 +2244,13 @@ async function resumeInFlightStream(tabId) {
   // Seed the usage chip's timer from the real stream origin so tokens/sec
   // reflects total stream duration, not just the post-resume portion.
   const startedAt = peek.startedAt || Date.now();
+  // A resumed stream is a LIVE turn again: restore the streaming composer /
+  // status-dot / aria state. This path used to leave the panel in idle UI —
+  // the send button said "send" while clicking it actually cancelled, and
+  // #messages kept aria-live=polite so every streamed frame was announced.
+  setStreamingUI(true);
+  outputTokens = 0;
+  if (tokCountEl) tokCountEl.textContent = '~0';
   // From here, the background is still streaming. The DOM is whatever
   // the previous panel session left behind (or just renderHistory()
   // output if the panel was opened fresh). We need to:
@@ -2236,6 +2267,7 @@ async function resumeInFlightStream(tabId) {
   // Same SW keep-alive as the onSend path — resumed streams face identical risk.
   const _swPingInterval = startSwPingKeepAlive(port);
   const state = { acc: peek.acc || '', toolEvents: [], startedAt };
+  _chartFenceScanPos = 0; // resumed stream: seeded acc is re-scanned from 0
   function getOrCreateAssistantBubble() {
     // Reuse the tail assistant bubble only when it is the very last `.msg`.
     // Deliberately NOT `.msg.assistant:last-of-type` — that pseudo-class
@@ -2362,11 +2394,11 @@ function showScreenshotCropUI({ imageDataUrl, metaUrl, metaTitle }, onConfirm) {
 
   modal.innerHTML = `
     <div class="crop-header">
-      <span class="crop-hint">拖动选择区域</span>
+      <span class="crop-hint">${escM(_t('cropHint', '拖动选择截图区域'))}</span>
       <div class="crop-actions">
-        <button class="crop-cancel">取消</button>
-        <button class="crop-use-full">使用完整截图</button>
-        <button class="crop-confirm" disabled>裁剪并使用</button>
+        <button class="crop-cancel">${escM(_t('cropCancel', '取消'))}</button>
+        <button class="crop-use-full">${escM(_t('cropUseFull', '使用完整截图'))}</button>
+        <button class="crop-confirm" disabled>${escM(_t('cropConfirm', '裁剪并使用'))}</button>
       </div>
     </div>
     <div class="crop-body">
@@ -2628,7 +2660,7 @@ async function seekVideo(vs, seconds) {
     chrome.tabs.create({ url: appendTimeParam(vs.url, seconds) });
     return true;
   }
-  showToast(_t('videoSourceGone', '视频源已失效，无法跳转'));
+  showToast(_t('videoSourceGone', '视频源已失效，无法跳转'), 'warn');
   return false;
 }
 
@@ -2644,10 +2676,11 @@ async function retargetVideoSrcToLiveTab(vs) {
 
 // Transcript drawer source scan: the LAST user history entry stamped with
 // videoSrc (ATTACH_PAGE on a video page, or ATTACH_ASR_CONFIRM). Its content
-// carries the `## 字幕` block as [mm:ss] lines.
-async function getVideoTranscriptSource() {
+// carries the `## 字幕` block as [mm:ss] lines. `knownList` skips the storage
+// read when the caller already has the deserialized history.
+async function getVideoTranscriptSource(knownList) {
   try {
-    const history = await storage.getHistory();
+    const history = Array.isArray(knownList) ? knownList : await storage.getHistory();
     const list = Array.isArray(history) ? history : [];
     for (let i = list.length - 1; i >= 0; i--) {
       const m = list[i];
@@ -2679,7 +2712,7 @@ async function getVideoTranscriptSource() {
 // The user adds their reaction on top and sends; the [mm:ss] stays clickable.
 function noteFromTranscript(seconds, line) {
   if (seconds == null || !line) {
-    showToast(_t('noTranscriptPosition', '还没有可用的播放位置或字幕行'));
+    showToast(_t('noTranscriptPosition', '还没有可用的播放位置或字幕行'), 'info');
     return;
   }
   const note = `[${formatTs(seconds)}] 「${line.label ? line.label + ' ' : ''}${line.text}」`;
@@ -3071,9 +3104,12 @@ function appendScreenshot(dataUrl) {
   el.className = 'msg screenshot-preview';
   const img = document.createElement('img');
   img.src = dataUrl;
-  img.alt = 'Screenshot';
-  img.title = 'Click to open full size';
-  img.addEventListener('click', () => window.open(dataUrl));
+  img.alt = _t('screenshotAlt', '截图');
+  img.title = _t('screenshotOpenFull', '点击查看大图');
+  // No per-element click handler: #messages' delegated handler already opens
+  // the in-panel lightbox for <img>. The old `window.open(dataUrl)` was a DEAD
+  // path — Chrome blocks top-level navigation to data: URLs — and having both
+  // meant two competing openers.
   el.appendChild(img);
   messagesEl.appendChild(el);
   scrollToBottom(true);
@@ -3119,12 +3155,12 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
           ${figList.length ? '<div class="ctx-inspector-figures"></div>' : ''}
         </div>`;
       // Set textContent on the <pre> to avoid any XSS from raw page content.
-      overlay.querySelector('.ctx-inspector-body').textContent = ctxText || '(无文本)';
+      overlay.querySelector('.ctx-inspector-body').textContent = ctxText || _t('noText', '(no text)');
       const figContainer = overlay.querySelector('.ctx-inspector-figures');
       if (figContainer && figList.length) {
         const figTitle = document.createElement('div');
         figTitle.className = 'ctx-fig-title';
-        figTitle.textContent = `Figures (${figList.length}, in context order)`;
+        figTitle.textContent = tSub('figuresInContext', '图片（$1 张，按上下文顺序）', String(figList.length));
         figContainer.appendChild(figTitle);
         figList.forEach((f, i) => {
           const url = typeof f === 'string' ? f : f.url;
@@ -3134,9 +3170,10 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
           figure.className = 'ctx-fig';
           const img = document.createElement('img');
           img.src = url;
-          img.alt = cap || `Figure on page ${page || '?'}`;
+          const figLabel = cap || tSub('figureOnPage', '第 $1 页的图片', String(page || '?'));
+          img.alt = figLabel;
           const figcaption = document.createElement('figcaption');
-          figcaption.textContent = `${i + 1}. ${cap || `Figure on page ${page || '?'}`}`;
+          figcaption.textContent = `${i + 1}. ${figLabel}`;
           figure.appendChild(img);
           figure.appendChild(figcaption);
           figContainer.appendChild(figure);
@@ -3154,7 +3191,7 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
       overlay.querySelector('.ctx-inspector-close').addEventListener('click', closeOverlay);
       overlay.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
         _copyText(ctxText || '');
-        showToast(_t('copied', '已复制'));
+        showToast(_t('copied', '已复制'), 'success');
       });
       overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
       document.addEventListener('keydown', onKey);
@@ -3344,7 +3381,14 @@ function appendError(text, { compact = false } = {}) {
 // the scrolled-up gate AND the 150ms active-scroll cooldown (scroll-follow.js):
 // a wheel flick inside the bottom tolerance no longer yanks the viewport back
 // mid-gesture; once the hand settles, following resumes.
+//
+// `_suppressAutoScroll` (2026-10-17): renderHistory paints N bubbles in a loop
+// and each append* helper forces a layout read via scrollToBottom(true).
+// Suppress during the loop and scroll ONCE at the end (long histories paid N
+// synchronous reflows). Orthogonal to the gesture cooldown above.
+let _suppressAutoScroll = false;
 function scrollToBottom(force = false) {
+  if (_suppressAutoScroll) return;
   if (!shouldFollowStream({ force, isUserScrolledUp, lastUserScrollInputAt, now: performance.now() })) return;
   messagesEl.scrollTop = messagesEl.scrollHeight;
   if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
@@ -3370,7 +3414,7 @@ async function showEffectivePrompt() {
   // Build modal with safe DOM APIs (textContent) to avoid XSS from user-configured prompts
   const titleEl = document.createElement('div');
   titleEl.className = 'confirm-title';
-  titleEl.textContent = 'Effective System Prompt';
+  titleEl.textContent = _t('effectivePromptTitle', '实际生效的系统提示词');
   const urlEl = document.createElement('div');
   urlEl.className = 'prompt-inspector-url';
   // 当前页 URL 从顶栏的 pagemeta 链接取（tab 切换时会同步更新）；原代码引用
@@ -3392,17 +3436,17 @@ async function showEffectivePrompt() {
   } else {
     const emptyEl = document.createElement('p');
     emptyEl.style.cssText = 'color:var(--muted);font-size:13px';
-    emptyEl.textContent = 'No system prompt configured.';
+    emptyEl.textContent = _t('noSystemPrompt', '未配置系统提示词。');
     modal.appendChild(emptyEl);
   }
   const actionsEl = document.createElement('div');
   actionsEl.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px';
   const copyBtn = document.createElement('button');
   copyBtn.className = 'pi-copy';
-  copyBtn.innerHTML = `${ICONS.copy}<span>Copy full prompt</span>`;
+  copyBtn.innerHTML = `${ICONS.copy}<span>${escM(_t('copyFullPrompt', '复制完整提示词'))}</span>`;
   const closeBtn = document.createElement('button');
   closeBtn.className = 'pi-close confirm-ok';
-  closeBtn.textContent = 'Close';
+  closeBtn.textContent = _t('closeBtn', '关闭');
   actionsEl.appendChild(copyBtn);
   actionsEl.appendChild(closeBtn);
   modal.appendChild(actionsEl);
@@ -3442,13 +3486,15 @@ async function renderHistory() {
   // scheduleIdle call there). Costs two regexes over the entry text; a fresh
   // or plain-text session leaves both false and warms nothing.
   let historyHasCharts = false, historyHasPdf = false;
+  const historyChartLangs = new Set();
   const sniffText = (content) => {
     const text = typeof content === 'string'
       ? content
       : Array.isArray(content)
         ? content.filter((p) => p?.type === 'text').map((p) => p.text || '').join('\n')
         : '';
-    if (wantsChartVendors(text)) historyHasCharts = true;
+    for (const l of chartVendorLangs(text)) historyChartLangs.add(l);
+    if (historyChartLangs.size) historyHasCharts = true;
     if (hasPdfTrace(text)) historyHasPdf = true;
   };
 
@@ -3460,44 +3506,57 @@ async function renderHistory() {
   // before the panel showed anything — visibly 5+ seconds with a long history.
   const asyncUpgrades = []; // [{ el, rawContent, videoSrc }] to upgrade in parallel
 
-  for (let i = 0; i < list.length; i++) {
-    const m = list[i];
-    sniffText(m.content); // runs before any `continue` — attached (skipped) entries carry the PDF traces
-    if (m.role === 'user') {
-      if (Array.isArray(m.content)) {
-        // ALL text parts, in order — a first-text-part-only read silently
-        // dropped everything after an image (interleaved entries render as
-        // "strip + text"; the text must be everything that was typed).
-        const textPart = m.content
-          .filter(p => p?.type === 'text' || p?.type === 'input_text')
-          .map(p => p?.text || '')
-          .join('\n');
-        if (textPart.startsWith(PAGE_CONTEXT_PREFIX)) continue;
-        const imgUrls = m.content
-          .filter(p => p.type === 'image_url')
-          .map(p => p.image_url?.url || p.image_url)
-          .filter(Boolean);
-        const el = appendUser(textPart || '(image)', imgUrls.length ? imgUrls : null);
+  _suppressAutoScroll = true;
+  try {
+    for (let i = 0; i < list.length; i++) {
+      // Yield every 25 bubbles so the first screenful paints before the rest
+      // of a long history is parsed synchronously (the comment above promises
+      // "visible immediately"; without a yield the whole loop finishes first).
+      // A macrotask (not rAF) keeps this working identically under jsdom.
+      if (i > 0 && i % 25 === 0) await new Promise((r) => setTimeout(r, 0));
+      const m = list[i];
+      sniffText(m.content); // runs before any `continue` — attached (skipped) entries carry the PDF traces
+      if (m.role === 'user') {
+        if (Array.isArray(m.content)) {
+          // ALL text parts, in order — a first-text-part-only read silently
+          // dropped everything after an image (interleaved entries render as
+          // "strip + text"; the text must be everything that was typed).
+          const textPart = m.content
+            .filter(p => p?.type === 'text' || p?.type === 'input_text')
+            .map(p => p?.text || '')
+            .join('\n');
+          if (textPart.startsWith(PAGE_CONTEXT_PREFIX)) continue;
+          const imgUrls = m.content
+            .filter(p => p.type === 'image_url')
+            .map(p => p.image_url?.url || p.image_url)
+            .filter(Boolean);
+          const el = appendUser(textPart || '(image)', imgUrls.length ? imgUrls : null);
+          el.dataset.hidx = i;
+          continue;
+        }
+        if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
+        const el = appendUser(m.content);
         el.dataset.hidx = i;
-        continue;
+      } else if (m.role === 'assistant') {
+        const rawContent = m.content;
+        const el = appendAssistant('', true);
+        // Sync fast-render so the bubble is visible immediately
+        el.innerHTML = renderStreamingSafe(rawContent);
+        // Only resolve preceding figures when this reply actually references
+        // them — figuresBeforeEntry walks backwards to the nearest image-bearing
+        // user entry, which in a text-only history scans to index 0 per reply.
+        const figs = /\[图\d+\]/.test(rawContent) ? figuresBeforeEntry(list, i) : [];
+        decorateFigureRefs(el, figs);
+        el.dataset.raw = rawContent;
+        el.dataset.hidx = i;
+        if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
+        addMsgActions(el, () => rawContent);
+        addProviderChip(el, m.providerLabel);
+        asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs, providerLabel: m.providerLabel });
       }
-      if (m.content.startsWith(PAGE_CONTEXT_PREFIX)) continue;
-      const el = appendUser(m.content);
-      el.dataset.hidx = i;
-    } else if (m.role === 'assistant') {
-      const rawContent = m.content;
-      const el = appendAssistant('', true);
-      // Sync fast-render so the bubble is visible immediately
-      el.innerHTML = renderStreamingSafe(rawContent);
-      const figs = figuresBeforeEntry(list, i);
-      decorateFigureRefs(el, figs);
-      el.dataset.raw = rawContent;
-      el.dataset.hidx = i;
-      if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
-      addMsgActions(el, () => rawContent);
-      addProviderChip(el, m.providerLabel);
-      asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs, providerLabel: m.providerLabel });
     }
+  } finally {
+    _suppressAutoScroll = false;
   }
   // Switch-prompt decision input: which provider/endpoint produced the most
   // recent reply (null when the conversation has no replies yet).
@@ -3505,8 +3564,10 @@ async function renderHistory() {
 
   // Synchronous rendering done — panel is visible. Wire shallow decorations
   // (copy buttons, timestamps) on the fast-rendered content now so they work
-  // even before the full upgrade resolves.
-  addCodeCopyButtons();
+  // even before the full upgrade resolves. highlight:false — the upgrade
+  // replaces this HTML and re-highlights; doing it twice is pure main-thread
+  // cost on a long history.
+  addCodeCopyButtons(undefined, { highlight: false });
   scrollToBottom(true);
   // cv 延迟到首帧稳定后生效（两次 rAF）：初始渲染与滚动定位期间绝不启用——
   // cv 的占位高度会拖慢首开、并把 scrollToBottom 的落点算错（指南明写的反模式）。
@@ -3515,7 +3576,9 @@ async function renderHistory() {
   }));
   // Whether this conversation carries a video transcript decides the
   // transcript-drawer button's visibility — rescan after every history load.
-  refreshTranscriptSource();
+  // Pass the list we just deserialized: the scan is otherwise a SECOND full
+  // ≤8MB history read (it only needs role/videoSrc/content).
+  refreshTranscriptSource(list);
 
   // Upgrade all assistant bubbles to the full renderSafe() output (KaTeX
   // math, proper think-block handling, etc.) in the BACKGROUND — deliberately
@@ -3570,7 +3633,7 @@ async function renderHistory() {
       for (const job of asyncUpgrades) historyUpgradeIO.observe(job.el);
     }
   }
-  return { historyHasCharts, historyHasPdf };
+  return { historyHasCharts, historyHasPdf, historyChartLangs: [...historyChartLangs] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

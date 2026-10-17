@@ -321,7 +321,7 @@ Cambiar de sesión a mitad de una respuesta nunca la mata: sigue ejecutándose e
 
 | Función | Qué obtienes |
 |---|---|
-| **Sesiones** | guarda la conversación como una sesión con nombre; explora y restaura desde el cajón 🕐; fija las favoritas encima de la lista |
+| **Sesiones** | guarda la conversación como una sesión con nombre; explora y restaura desde el cajón 🕐; fija las favoritas encima de la lista Si la conversación a la que pertenece una respuesta en segundo plano se elimina a mitad del turno, la respuesta se conserva en una sesión recreada «Recovered turn (…)» en lugar de escribirse en la conversación en pantalla. |
 | **Búsqueda en todas partes** | `Ctrl+F` en todos los mensajes de una conversación; el cajón filtra sesiones por título **y** por contenido de los mensajes (las coincidencias solo de contenido van marcadas) |
 | **Exportación** | cualquier sesión como archivo Markdown |
 | **Borrado seguro** | borrado en dos pasos para sesiones; multiselección de mensajes para el borrado por lotes; borrar todos los mensajes requiere confirmación |

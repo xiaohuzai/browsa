@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractMermaidFence, repairMermaid } from '../lib/handlers/mermaid-repair.js';
 import { formatMermaidParseError } from '../lib/sidepanel/mermaid-utils.js';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 // ── 纯函数 ───────────────────────────────────────────────────────────────────
 
@@ -51,25 +52,6 @@ test('formatMermaidParseError: 非 parse error（加载失败等）返回 null',
 });
 
 // ── 走真实 background handle() ──────────────────────────────────────────────
-
-function makeStorageArea(initial = {}) {
-  let store = { ...initial };
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) { store = { ...store, ...obj }; },
-    async remove(key) { delete store[key]; },
-    _set(obj) { store = { ...store, ...obj }; },
-  };
-}
 
 const localArea = makeStorageArea({
   activeProvider: 'compatible',

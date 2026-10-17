@@ -140,3 +140,22 @@ test('extractInPageWorld sees a function Readability when the injection resoluti
   assert.ok((res.text || '').length >= 100, 'reader must produce real markdown text');
   assert.match(res.text, /Title/, 'reader output should contain the article heading');
 });
+
+// ─── Injection mechanism (2026-10-17) ────────────────────────────────────────
+// Indirect eval inside the injected function is subject to the PAGE's
+// script-src policy; sites without 'unsafe-eval' (GitHub et al.) made reader
+// mode silently degrade to the DOM-tree dump. The fix is chrome.scripting
+// files injection, which page CSP does not govern.
+test('the injector injects vendor FILES into the MAIN world and never eval()s page-world source', async () => {
+  const raw = await readFile(join(ROOT, 'lib/readability-injector.js'), 'utf8');
+  // Strip comment lines first: the module header EXPLAINS the old eval-based
+  // approach it replaced, so a raw substring match would flag the rationale.
+  const src = raw.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  assert.doesNotMatch(src, /\(0,\s*eval\)|new Function/,
+    'page-world library injection must not eval — strict-CSP pages block it and reader mode degrades silently');
+  assert.match(src, /files:\s*required/, 'required libraries must be injected as files');
+  assert.match(src, /lib\/vendor\/Readability\.iife\.js/);
+  assert.match(src, /lib\/vendor\/Turndown\.iife\.js/);
+  assert.match(src, /lib\/vendor\/TurndownPluginGfm\.iife\.js/);
+  assert.match(src, /world:\s*'MAIN'/);
+});

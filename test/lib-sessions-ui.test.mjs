@@ -138,8 +138,13 @@ function setupDom() {
     { id: 's2', name: 'Second session', createdAt: Date.now() - 3_600_000 },
     { id: 's1', name: 'First session', createdAt: Date.now() - 60_000 },
   ];
+  // NOT `hidden`: the rename flow depends on real focus/blur, and jsdom 30
+  // stopped focusing elements inside a hidden subtree (jsdom 29 allowed it).
+  // A browser never focuses those either, so rendering the drawer visible is
+  // the faithful fixture — the hidden->visible transition itself is covered by
+  // the dedicated openSessionsDrawer test below.
   document.body.innerHTML = `
-    <div id="sessions-drawer" hidden>
+    <div id="sessions-drawer">
       <input class="sessions-search" />
       <div id="agent-session-line" class="agent-session-line" hidden></div>
       <div id="sessions-list"></div>

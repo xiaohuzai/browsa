@@ -1747,5 +1747,97 @@
   "pingTimeoutErr": {
     "message": "Tempo de conexão esgotado: o serviço não responde",
     "description": "Options: friendly ping timeout error"
+  },
+  "noChunkReceived": {
+    "message": "Nenhum fragmento de resposta recebido — verifique o console do DevTools do Service Worker.",
+    "description": "Panel: shown when a stream port disconnects before any chunks arrived"
+  },
+  "selectMessage": {
+    "message": "Selecionar mensagem",
+    "description": "Panel: aria-label for the multiselect checkbox on a message"
+  },
+  "cropHint": {
+    "message": "Arraste para selecionar uma região",
+    "description": "Panel: screenshot crop hint"
+  },
+  "cropCancel": {
+    "message": "Cancelar",
+    "description": "Panel: screenshot crop cancel button"
+  },
+  "cropUseFull": {
+    "message": "Usar captura completa",
+    "description": "Panel: use the uncropped screenshot"
+  },
+  "cropConfirm": {
+    "message": "Recortar e usar",
+    "description": "Panel: confirm the crop"
+  },
+  "noText": {
+    "message": "(sem texto)",
+    "description": "Panel: context inspector empty body"
+  },
+  "figuresInContext": {
+    "message": "Imagens ($1, na ordem do contexto)",
+    "description": "Panel: context inspector figure list title"
+  },
+  "figureOnPage": {
+    "message": "Figura na página $1",
+    "description": "Panel: figure image alt/fallback caption"
+  },
+  "noSystemPrompt": {
+    "message": "Nenhum prompt de sistema configurado.",
+    "description": "Panel: /prompt inspector empty state"
+  },
+  "copyFullPrompt": {
+    "message": "Copiar prompt completo",
+    "description": "Panel: /prompt inspector copy button"
+  },
+  "closeBtn": {
+    "message": "Fechar",
+    "description": "Panel: generic close button"
+  },
+  "jumpToBottom": {
+    "message": "Ir para o fim",
+    "description": "Panel: scroll-to-bottom button tooltip"
+  },
+  "readingPage": {
+    "message": "Lendo a página…",
+    "description": "Panel: attach button busy title"
+  },
+  "pageFallback": {
+    "message": "Página",
+    "description": "Panel: fallback title when the page has none"
+  },
+  "xhsReadFailed": {
+    "message": "Não foi possível ler esta página: $1. Se for o Xiaohongshu, faça login ou abra a nota em uma aba normal.",
+    "description": "Panel: page read failure banner"
+  },
+  "xhsXhrThin": {
+    "message": "O conteúdo do Xiaohongshu pode estar incompleto ($1). O XHR respondeu mas parece escasso. Se não corresponder à página, force uma recarga (Ctrl+Shift+R).",
+    "description": "Panel: Xiaohongshu thin-XHR banner"
+  },
+  "toastCopy": {
+    "message": "Copiar",
+    "description": "Panel: error toast copy button"
+  },
+  "toastDismiss": {
+    "message": "Dispensar",
+    "description": "Panel: error toast dismiss button"
+  },
+  "effectivePromptTitle": {
+    "message": "Prompt de sistema efetivo",
+    "description": "Panel: /prompt inspector title"
+  },
+  "thinkingLabel": {
+    "message": "Pensando…",
+    "description": "Panel: live thinking block summary"
+  },
+  "screenshotAlt": {
+    "message": "Captura de tela",
+    "description": "Panel: screenshot preview alt text"
+  },
+  "screenshotOpenFull": {
+    "message": "Clique para ver em tamanho real",
+    "description": "Panel: screenshot preview tooltip"
   }
 }

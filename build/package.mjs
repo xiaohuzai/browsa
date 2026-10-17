@@ -19,8 +19,13 @@ const version = pkg.version;
 const out = join(ROOT, `browsa-v${version}.zip`);
 
 // Use Python's stdlib zipfile (always available on the system; no native dep).
-// Exclude .git, node_modules, transient build deps, vendored source cache,
-// and the zip itself.
+//
+// ALLOWLIST (2026-10-17): the shipped tree is enumerated from the manifest's
+// own references plus the fixed runtime roots (_locales, icons, fonts, lib,
+// and the top-level page/script files). The previous deny-list silently swept
+// three separate incidents into store packages (screenshots, CONTEXT.md, a
+// loose PDF) — an allowlist cannot repeat that. The post-build verifier below
+// still runs as a second, independent check.
 //
 // We anchor the relative path against ROOT (the browsa/ project dir), not
 // against its parent, so files inside the zip are stored as
@@ -31,62 +36,82 @@ const out = join(ROOT, `browsa-v${version}.zip`);
 // fails to load.
 const py = `
 import os, sys, json, zipfile
-root, out, exclude_dirs = sys.argv[1], sys.argv[2], {".git", "node_modules", "build", "test",
-    # Dev-only trees: preview harness + its screenshot library (gitignored),
-    # CWS store screenshots (gitignored), and the github.io website sources.
-    # None of these load in the browser as part of the extension. A real
-    # incident (2026-08-28, v0.32.0): ~6MB of accumulated dev screenshots in
-    # dev-preview/shots were silently swept in, bloating the zip from ~5.5MB
-    # to 11.8MB -- same failure mode as the loose-PDF exclusion below.
-    "dev-preview", "preview-shots", "store-assets", "docs"}
-exclude_files = {"package-lock.json", "package.json", "check-compat.sh", "config.example.json", "AGENTS.md", "skills-lock.json",
-    # Repo housekeeping / dev docs that must not ship in the CWS zip.
-    # (2026-10-01 audit: CONTEXT.md and the manual-test checklist were swept in
-    # -- the third recurrence of this failure mode. Keep this list in sync with
-    # whatever root-level docs exist, or switch to an allowlist.)
-    ".gitignore", "README.md", "README.en.md", "SITES.md", "CONTEXT.md", "MANUAL-TEST-2026-09-30.md"}
-# Dev/editor dot-directories (.pi channel transcripts, .claude local config,
-# .github workflows, .vscode, ...) must never ship in a distribution zip --
-# they can contain Feishu chat transcripts and local secrets. Handled below
-# by dropping any directory whose name starts with '.'.
-exclude_path_prefixes = (os.path.join("lib", "_src"),)
+root, out = sys.argv[1], sys.argv[2]
+
+ALWAYS = [
+    "manifest.json",
+    "LICENSE",  # MIT requires the license text to travel with the distribution
+    "background.js", "sidepanel.js", "sidepanel.html", "sidepanel.css",
+    "options.js", "options.html", "options.css",
+    "lib", "icons", "_locales", "fonts",
+]
+
+# Anything the manifest references by path is part of the extension by
+# definition (content scripts, workers, WAR entries, side panel, options UI).
+manifest = json.load(open(os.path.join(root, "manifest.json"), encoding="utf-8"))
+referenced = []
+def note(v):
+    if isinstance(v, str) and ("/" in v or v.endswith((".js", ".html", ".css", ".json", ".wasm", ".png"))):
+        referenced.append(v)
+def walk_json(node):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            walk_json(v)
+    elif isinstance(node, list):
+        for v in node: walk_json(v)
+    else:
+        note(node)
+walk_json(manifest)
+
+def collect(rel):
+    """Yield every file under root/rel (or rel itself when it is a file)."""
+    full = os.path.join(root, rel)
+    if os.path.isfile(full):
+        yield rel
+        return
+    if not os.path.isdir(full):
+        return
+    for dirpath, dirnames, filenames in os.walk(full):
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        for fn in filenames:
+            if fn.startswith("."):
+                continue
+            # Dev-only files can live inside a runtime root (lib/content-scripts/
+            # SITES.md is documentation). Skip them here; the verifier below
+            # also fails the build if one slips through.
+            if fn.endswith((".md", ".log")) or fn.endswith(".test.mjs"):
+                continue
+            relpath = os.path.relpath(os.path.join(dirpath, fn), root)
+            yield relpath.replace(os.sep, "/")
+
+want = set()
+for entry in ALWAYS:
+    want.update(collect(entry))
+for ref in referenced:
+    ref = ref.lstrip("./")
+    # Glob-ish manifest entries (e.g. _locales/*/messages.json) are covered by
+    # the ALWAYS roots; literal paths are added directly.
+    if "*" not in ref:
+        want.update(collect(ref))
+
 out_name = os.path.basename(out)
 with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in exclude_dirs and not d.startswith('.')]
-        rel_dir = os.path.relpath(dirpath, root)
-        if rel_dir == "." or rel_dir.startswith(".."):
-            rel = ""
-        else:
-            if any(rel_dir == p or rel_dir.startswith(p + os.sep) for p in exclude_path_prefixes):
-                continue
-            rel = rel_dir
-        for fn in filenames:
-            if fn in exclude_files: continue
-            # All README translations are repository documentation, including
-            # future locales; none are browser runtime assets.
-            if fn.startswith("README.") and fn.endswith(".md"): continue
-            if fn == out_name: continue
-            if fn.startswith("browsa-v") and fn.endswith(".zip"): continue
-            # Loose PDFs at any depth are never part of the extension itself
-            # (a real 17.9MB test fixture left at the repo root once bloated
-            # a package to 21MB by being silently swept up here) -- browsa
-            # ships no .pdf assets, so this is a safe blanket exclusion.
-            if fn.endswith(".pdf"): continue
-            full = os.path.join(dirpath, fn)
-            arcname = os.path.join(rel, fn) if rel else fn
-            if any(arcname.startswith(p) for p in exclude_path_prefixes):
-                continue
-            if arcname == "manifest.json":
-                # CWS upload rejects a manifest containing a "key" field (the
-                # store assigns its own key and ID). The repo manifest keeps
-                # it so unpacked installs from Releases get a stable extension
-                # ID (chrome.storage.local is keyed by ID); strip it only here.
-                data = json.loads(open(full, encoding="utf-8").read())
-                if data.pop("key", None) is not None:
-                    zf.writestr(arcname, json.dumps(data, indent=2, ensure_ascii=False) + "\\n")
-                    continue
-            zf.write(full, arcname)
+    for arcname in sorted(want):
+        if arcname == out_name:
+            continue
+        full = os.path.join(root, arcname)
+        if not os.path.isfile(full):
+            continue
+        if arcname == "manifest.json":
+            # CWS upload rejects a manifest containing a "key" field (the
+            # store assigns its own key and ID). The repo manifest keeps it so
+            # unpacked installs from Releases get a stable extension ID;
+            # strip it only here.
+            data = json.loads(open(full, encoding="utf-8").read())
+            data.pop("key", None)
+            zf.writestr(arcname, json.dumps(data, indent=2, ensure_ascii=False) + "\\n")
+            continue
+        zf.write(full, arcname)
 print(out)
 `;
 const r = spawnSync('python3', ['-c', py, ROOT, out], { encoding: 'utf8' });
@@ -98,3 +123,33 @@ console.log(r.stdout.trim());
 
 const stat = await fs.stat(out);
 console.log(`  (${stat.size.toLocaleString()} bytes)`);
+
+// Post-build assertion: the exclusion list above is a DENY-list and has leaked
+// dev material into a store package three times (screenshots, CONTEXT.md, a
+// loose PDF). Instead of trusting it, verify the artifact: no markdown / test
+// / docs / dev-preview entries, and manifest.json at the zip root.
+const verify = spawnSync('python3', ['-c', `
+import json, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+names = z.namelist()
+bad = [n for n in names if n.endswith(('.md', '.test.mjs', '.log')) or
+       n.startswith(('test/', 'docs/', 'dev-preview/', 'store-assets/', 'node_modules/', 'build/'))]
+if bad:
+    print('FAIL: dev-only files leaked into the package:', bad[:10])
+    sys.exit(1)
+if 'manifest.json' not in names:
+    print('FAIL: manifest.json is not at the zip root')
+    sys.exit(1)
+m = json.loads(z.read('manifest.json'))
+if 'key' in m:
+    print('FAIL: manifest still carries the CWS-forbidden "key" field')
+    sys.exit(1)
+print(f'  verified: {len(names)} entries, manifest at root, no dev files')
+`, out], { encoding: 'utf8' });
+if (verify.status !== 0) {
+  console.error(verify.stdout || verify.stderr);
+  await fs.unlink(out).catch(() => {});
+  console.error('package verification failed — artifact removed');
+  process.exit(1);
+}
+console.log(verify.stdout.trim());

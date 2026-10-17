@@ -40,10 +40,27 @@ jobs:
         with:
           enablement: true
 
-      - name: Upload docs
+      # The site is HTML/CSS/JS + assets. Internal strategy notes
+      # (docs/cws-listing.md, docs/promo-*.md, docs/uiux-*.md,
+      # docs/optimization-audit-*.md, docs/growth-experiments-*.md,
+      # docs/hermes-api-server.md) live in docs/ for agent/tooling reference
+      # but must NOT be published — uploading the whole directory exposed
+      # them to search engines.
+      - name: Stage site files (exclude internal markdown)
+        run: |
+          mkdir -p _site
+          # `*-nobgm.mp4` are silent masters kept only for re-editing, and
+          # browsa-promo-v3.mp4 is the superseded cut — none are referenced by
+          # any page, yet together they are ~120MB of a 295MB asset tree that
+          # GitHub Pages serves (and every deploy uploads).
+          rsync -a docs/ _site/ --exclude='*.md' \
+            --exclude='assets/promo/*-nobgm.mp4' \
+            --exclude='assets/promo/browsa-promo-v3.mp4'
+
+      - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: _site
 
       - name: Deploy
         id: deployment

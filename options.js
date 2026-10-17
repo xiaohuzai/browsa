@@ -73,7 +73,8 @@ async function init() {
   // localAgentTab 是 targeted-read 键（不在 GET_ALL_KEYS），getAll 读不到——
   // 补一次定向读回。此前持久化是单向的：切换时写了 storage.set，却从来没人
   // 读回，每次打开设置页都回落「唯一已配置/activeProvider/bridge」启发式。
-  try { cachedCfg.localAgentTab = (await storage.get('localAgentTab'))?.localAgentTab || cachedCfg.localAgentTab; } catch (_) {}
+  // storage.get('key') 已解包为裸值（lib/storage.js）——再取 .localAgentTab 会恒得 undefined。
+  try { cachedCfg.localAgentTab = (await storage.get('localAgentTab')) || cachedCfg.localAgentTab; } catch (_) {}
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
   applyAsr(cachedCfg);
@@ -159,13 +160,19 @@ function applyChatPrefs(cfg) {  const fs = $('fontSize');
 function syncAsrProviderUI() {
   const sel = document.getElementById('asrProvider');
   if (!sel) return;
+  // Rebuild the option labels on every call: they are localized, and this is
+  // also the language-switch refresh path — the old `if (!sel.options.length)`
+  // guard froze them in whatever language the page first opened with.
   if (!sel.options.length) {
     for (const p of Object.values(ASR_PROVIDERS)) {
       const o = document.createElement('option');
       o.value = p.id;
-      o.textContent = _t(`asrLabel_${p.id}`, p.label); // 字典按 provider id 覆盖，注册表原文兜底
       sel.appendChild(o);
     }
+  }
+  for (const o of sel.options) {
+    const p = ASR_PROVIDERS[o.value];
+    if (p) o.textContent = _t(`asrLabel_${p.id}`, p.label); // 字典按 provider id 覆盖，注册表原文兜底
   }
   const p = getAsrProvider(sel.value);
   const baseEl = document.getElementById('asrBaseUrl');
@@ -302,6 +309,141 @@ async function saveAsr() {
 // 激活 provider 或第一个。Agent 侧的 localAgentTab 是持久化偏好，两码事。）
 let llmEditorTab = null;
 
+// LLM group: one tab per provider plus a permanent ＋ tab (the only creation
+// entry point). Extracted from renderProviders (2026-10-17).
+function renderLlmGroup(details, entries) {
+    // 标签栏呈现（与 Agent 合并卡同一分段控件）：每个 LLM 服务商一个横条标签
+    // （别名即标签），末尾常驻 ＋ 标签 = 唯一的新建入口。同屏只显示当前标签
+    // 的那张卡。
+    const tabsWrap = document.createElement('div');
+    tabsWrap.className = 'provider-tabs';
+    for (const [name, cfg] of entries) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'provider-tab' + (name === llmEditorTab ? ' on' : '');
+      b.textContent = (cfg.alias || '').trim() || name.replace(/^llm-/, 'LLM ');
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (llmEditorTab === name) return;
+        llmEditorTab = name;
+        renderProviders({ keepDirty: true });
+      });
+      tabsWrap.append(b);
+    }
+    const addTab = document.createElement('button');
+    addTab.type = 'button';
+    addTab.className = 'provider-tab provider-tab-add';
+    addTab.textContent = '＋';
+    addTab.title = _t('addProviderBtn', '＋ Add Provider');
+    addTab.setAttribute('aria-label', addTab.title);
+    addTab.addEventListener('click', () => addProvider());
+    tabsWrap.append(addTab);
+
+    // The reserved empty "LLM 1" slot only exists while there are NO LLM
+    // providers at all (fresh install / every card deleted). It is
+    // render-only — NOT persisted — so the sidebar dropdown never lists an
+    // unconfigured "LLM 1 — not set". The moment any provider is committed,
+    // the slot is consumed and never comes back on its own.
+    if (entries.length === 0) {
+      // 空槽位也走与多卡相同的标签栏形态（用户拍板：两态必须同款，避免
+      // 「没配置时是标题头、配了之后变标签栏」的观感跳变）——「LLM 1」
+      // 活动标签 ＋ 常驻 ＋ 插进卡头 h3、隐藏标题名；reserved 卡无删除钮，
+      // 徽标照常留在标签右侧。
+      const reservedTab = document.createElement('button');
+      reservedTab.type = 'button';
+      reservedTab.className = 'provider-tab on';
+      reservedTab.textContent = 'LLM 1';
+      tabsWrap.insertBefore(reservedTab, addTab);
+      const cardEl = buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true });
+      details.appendChild(cardEl);
+      const h3 = cardEl.querySelector('.provider-h3');
+      const nameSpan = h3.querySelector('.name');
+      if (nameSpan) nameSpan.style.display = 'none';
+      h3.insertBefore(tabsWrap, nameSpan);
+    } else {
+      if (!entries.some(([n]) => n === llmEditorTab)) {
+        const active = cachedCfg.activeProvider;
+        llmEditorTab = entries.some(([n]) => n === active) ? active : entries[0][0];
+      }
+      for (const [name, cfg] of entries) {
+        const cardEl = buildProviderCard(name, cfg);
+        if (name !== llmEditorTab) cardEl.style.display = 'none';
+        details.appendChild(cardEl);
+        if (name === llmEditorTab) {
+          const h3 = cardEl.querySelector('.provider-h3');
+          const nameSpan = h3.querySelector('.name');
+          if (nameSpan) nameSpan.style.display = 'none';
+          h3.insertBefore(tabsWrap, nameSpan);
+        }
+      }
+    }
+}
+
+// Agent group: the merged local-agent card (type tabs over one card at a
+// time). Extracted from renderProviders (2026-10-17) — needs only the group
+// container, the provider map and its entries.
+function renderAgentGroup(details, providers, entries) {
+    // 本地 Agent 合并卡（用户反馈：设置页 agent 卡太多、不知道选哪个；
+    // 二轮反馈：Hermes 在选中 bridge/opencode 后仍常驻）——三张 agent 卡
+    // （Agent Bridge / OpenCode / Hermes）合成一个「类型切换」呈现：三张卡
+    // 都正常构建（各自的 buildProviderCard/saveCard/pingCard 零改动），同屏
+    // 只显示当前类型的那张。切换偏好持久化在 localAgentTab（纯 UI 偏好）。
+    const tab = localAgentTab();
+    const tabsWrap = document.createElement('div');
+    tabsWrap.className = 'provider-tabs';
+    // 已配置指示点：切走的 tab 背后若存有配置（如 codex 桥配了三个 agent、
+    // 又配了 opencode 直连），pill 上点一个点——多 agent 用户一眼看出
+    // 「哪个 tab 背后有东西」，不用来回切。
+    const agentConfigured = (id) => {
+      const p = providers[id];
+      if (!p) return false;
+      return !!(p.baseUrl || '').trim() || (id === 'bridge' && p.models?.length > 0);
+    };
+    const tabBtn = (id) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'provider-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
+      b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
+      b.textContent = id === 'bridge'
+        ? _t('localAgentTabBridge', 'Agent Bridge')
+        : id === 'opencode'
+        ? _t('localAgentTabOpencode', 'OpenCode')
+        : id === 'squilla'
+        ? _t('localAgentTabSquilla', 'OpenSquilla')
+        : _t('localAgentTabHermes', 'Hermes');
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (cachedCfg.localAgentTab === id) return;
+        cachedCfg.localAgentTab = id;
+        try { await storage.set({ localAgentTab: id }); } catch (_) {}
+        renderProviders({ keepDirty: true });
+      });
+      return b;
+    };
+    for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
+      if (!providers[id]) continue;
+      tabsWrap.append(tabBtn(id));
+    }
+    // 分段控件直接住进「可见卡」的标题行——tab 就是标题（该卡的 .name 隐藏，
+    // 消掉「Codex/Claude Code」出现两遍的重复），控件与卡读作一个整体。
+    details.appendChild(tabsWrap);
+    for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
+      if (!entries.some(([n]) => n === id)) continue;
+      const cardEl = buildProviderCard(id, providers[id]);
+      if (id !== tab) cardEl.style.display = 'none';
+      details.appendChild(cardEl);
+      if (id === tab) {
+        const h3 = cardEl.querySelector('.provider-h3');
+        const nameSpan = h3.querySelector('.name');
+        if (nameSpan) nameSpan.style.display = 'none';
+        h3.insertBefore(tabsWrap, nameSpan);
+      }
+    }
+    for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'squilla' && n !== 'hermes')) {
+      details.appendChild(buildProviderCard(name, cfg));
+    }
+}
+
 function renderProviders({ keepDirty = false } = {}) {
   // 整卡重渲前捕快照、重建后回填（2026-10-01 审计 P1）：本函数用 innerHTML=''
   // 从 cachedCfg（上次保存值）重建——切 LLM/Agent 标签、＋添加、切语言都会触发，
@@ -340,136 +482,8 @@ function renderProviders({ keepDirty = false } = {}) {
       <span class="provider-group-desc">${group.desc}</span>`;
     details.appendChild(summary);
 
-    if (group.type === 'agent') {
-      // 本地 Agent 合并卡（用户反馈：设置页 agent 卡太多、不知道选哪个；
-      // 二轮反馈：Hermes 在选中 bridge/opencode 后仍常驻）——三张 agent 卡
-      // （Agent Bridge / OpenCode / Hermes）合成一个「类型切换」呈现：三张卡
-      // 都正常构建（各自的 buildProviderCard/saveCard/pingCard 零改动），同屏
-      // 只显示当前类型的那张。切换偏好持久化在 localAgentTab（纯 UI 偏好）。
-      const tab = localAgentTab();
-      const tabsWrap = document.createElement('div');
-      tabsWrap.className = 'provider-tabs';
-      // 已配置指示点：切走的 tab 背后若存有配置（如 codex 桥配了三个 agent、
-      // 又配了 opencode 直连），pill 上点一个点——多 agent 用户一眼看出
-      // 「哪个 tab 背后有东西」，不用来回切。
-      const agentConfigured = (id) => {
-        const p = providers[id];
-        if (!p) return false;
-        return !!(p.baseUrl || '').trim() || (id === 'bridge' && p.models?.length > 0);
-      };
-      const tabBtn = (id) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'provider-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
-        b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
-        b.textContent = id === 'bridge'
-          ? _t('localAgentTabBridge', 'Agent Bridge')
-          : id === 'opencode'
-          ? _t('localAgentTabOpencode', 'OpenCode')
-          : id === 'squilla'
-          ? _t('localAgentTabSquilla', 'OpenSquilla')
-          : _t('localAgentTabHermes', 'Hermes');
-        b.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (cachedCfg.localAgentTab === id) return;
-          cachedCfg.localAgentTab = id;
-          try { await storage.set({ localAgentTab: id }); } catch (_) {}
-          renderProviders({ keepDirty: true });
-        });
-        return b;
-      };
-      for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
-        if (!providers[id]) continue;
-        tabsWrap.append(tabBtn(id));
-      }
-      // 分段控件直接住进「可见卡」的标题行——tab 就是标题（该卡的 .name 隐藏，
-      // 消掉「Codex/Claude Code」出现两遍的重复），控件与卡读作一个整体。
-      details.appendChild(tabsWrap);
-      for (const id of ['bridge', 'opencode', 'squilla', 'hermes']) {
-        if (!entries.some(([n]) => n === id)) continue;
-        const cardEl = buildProviderCard(id, providers[id]);
-        if (id !== tab) cardEl.style.display = 'none';
-        details.appendChild(cardEl);
-        if (id === tab) {
-          const h3 = cardEl.querySelector('.provider-h3');
-          const nameSpan = h3.querySelector('.name');
-          if (nameSpan) nameSpan.style.display = 'none';
-          h3.insertBefore(tabsWrap, nameSpan);
-        }
-      }
-      for (const [name, cfg] of entries.filter(([n]) => n !== 'bridge' && n !== 'opencode' && n !== 'squilla' && n !== 'hermes')) {
-        details.appendChild(buildProviderCard(name, cfg));
-      }
-    }
-
-    if (group.type === 'llm') {
-      // 标签栏呈现（与 Agent 合并卡同一分段控件）：每个 LLM 服务商一个横条标签
-      // （别名即标签），末尾常驻 ＋ 标签 = 唯一的新建入口。同屏只显示当前标签
-      // 的那张卡。
-      const tabsWrap = document.createElement('div');
-      tabsWrap.className = 'provider-tabs';
-      for (const [name, cfg] of entries) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'provider-tab' + (name === llmEditorTab ? ' on' : '');
-        b.textContent = (cfg.alias || '').trim() || name.replace(/^llm-/, 'LLM ');
-        b.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (llmEditorTab === name) return;
-          llmEditorTab = name;
-          renderProviders({ keepDirty: true });
-        });
-        tabsWrap.append(b);
-      }
-      const addTab = document.createElement('button');
-      addTab.type = 'button';
-      addTab.className = 'provider-tab provider-tab-add';
-      addTab.textContent = '＋';
-      addTab.title = _t('addProviderBtn', '＋ Add Provider');
-      addTab.setAttribute('aria-label', addTab.title);
-      addTab.addEventListener('click', () => addProvider());
-      tabsWrap.append(addTab);
-
-      // The reserved empty "LLM 1" slot only exists while there are NO LLM
-      // providers at all (fresh install / every card deleted). It is
-      // render-only — NOT persisted — so the sidebar dropdown never lists an
-      // unconfigured "LLM 1 — not set". The moment any provider is committed,
-      // the slot is consumed and never comes back on its own.
-      if (entries.length === 0) {
-        // 空槽位也走与多卡相同的标签栏形态（用户拍板：两态必须同款，避免
-        // 「没配置时是标题头、配了之后变标签栏」的观感跳变）——「LLM 1」
-        // 活动标签 ＋ 常驻 ＋ 插进卡头 h3、隐藏标题名；reserved 卡无删除钮，
-        // 徽标照常留在标签右侧。
-        const reservedTab = document.createElement('button');
-        reservedTab.type = 'button';
-        reservedTab.className = 'provider-tab on';
-        reservedTab.textContent = 'LLM 1';
-        tabsWrap.insertBefore(reservedTab, addTab);
-        const cardEl = buildProviderCard('llm-1', { ...BLANK_LLM }, { reserved: true });
-        details.appendChild(cardEl);
-        const h3 = cardEl.querySelector('.provider-h3');
-        const nameSpan = h3.querySelector('.name');
-        if (nameSpan) nameSpan.style.display = 'none';
-        h3.insertBefore(tabsWrap, nameSpan);
-      } else {
-        if (!entries.some(([n]) => n === llmEditorTab)) {
-          const active = cachedCfg.activeProvider;
-          llmEditorTab = entries.some(([n]) => n === active) ? active : entries[0][0];
-        }
-        for (const [name, cfg] of entries) {
-          const cardEl = buildProviderCard(name, cfg);
-          if (name !== llmEditorTab) cardEl.style.display = 'none';
-          details.appendChild(cardEl);
-          if (name === llmEditorTab) {
-            const h3 = cardEl.querySelector('.provider-h3');
-            const nameSpan = h3.querySelector('.name');
-            if (nameSpan) nameSpan.style.display = 'none';
-            h3.insertBefore(tabsWrap, nameSpan);
-          }
-        }
-      }
-    }
-
+    if (group.type === 'agent') renderAgentGroup(details, providers, entries);
+    if (group.type === 'llm') renderLlmGroup(details, entries);
     providersEl.appendChild(details);
   }
   _restoreCardInputs(cardInputSnap);
@@ -627,6 +641,197 @@ async function rowPingBridge(card, row) {
   else if (states.length && states.every((s) => s === 'unreachable')) setBadge(card, 'unreachable', name);
 }
 
+// Single owner of "forget ping state" (2026-10-17): three call sites (config
+// changed, remove provider, reset card) each carried the same read-modify-write
+// block, and one could drift out of sync. `name == null` clears everything.
+function forgetPingState(name) {
+  if (name == null) {
+    for (const k of Object.keys(_pingState)) delete _pingState[k];
+  } else {
+    delete _pingState[name];
+  }
+  storage.get('pingStates').then((pingStates) => {
+    const updated = { ...(pingStates || {}) };
+    if (name == null) for (const k of Object.keys(updated)) delete updated[k];
+    else delete updated[name];
+    persist({ pingStates: updated });
+  });
+}
+
+// Show/hide the card-level API key field. Extracted from buildProviderCard
+// (2026-10-17).
+function wireApiKeyToggle(card) {
+  const apiToggle = card.querySelector('.apikey-toggle');
+  const apiInput  = card.querySelector('[data-k="apiKey"]');
+  if (!apiToggle || !apiInput) return;
+  apiToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const show = apiInput.type === 'password';
+    apiInput.type = show ? 'text' : 'password';
+    apiToggle.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
+  });
+}
+
+// Model ID chips editor (input + Enter/＋ to add, ✕ to remove). Extracted
+// from buildProviderCard (2026-10-17): self-contained wiring, only needs the
+// card element.
+function wireModelChips(card) {
+  // Model ID chips 编辑器：输入 + 回车/＋ 添加（粘贴逗号分隔自动拆分、去重），
+  // chip 上 ✕ 移除；真实值同步进隐藏的 data-k="model" 逗号串，readCard/saveCard
+  // 的既有规范化（models 全量 + model 首个）零改动。
+  const chipsWrap = card.querySelector('[data-model-chips]');
+  if (chipsWrap) {
+    const hidden = card.querySelector('input[data-k="model"]');
+    const chipInput = chipsWrap.querySelector('.chip-input');
+    const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
+    const syncChips = () => {
+      hidden.value = chipIds().join(', ');
+      // 思考档位的选项跟着模型 id 自适应（填 glm-5 出 {关,开}、gpt-5.6 出力度
+      // 梯）——lib/reasoning-levels.js 的词表。改完 chips 现刷选项。
+      const sel = card.querySelector('[data-thinking-select]');
+      if (sel) {
+        const levels = ['auto'];
+        for (const id of chipIds()) for (const l of reasoningLevelOptions(id)) if (!levels.includes(l)) levels.push(l);
+        const cur = sel.value;
+        sel.innerHTML = levels.map((l) => `<option value="${escapeAttr(l)}">${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
+        sel.value = levels.includes(cur) ? cur : 'auto';
+      }
+    };
+    const addChips = () => {
+      const parts = chipInput.value.split(',').map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) return;
+      const existing = new Set(chipIds());
+      for (const id of parts) {
+        if (existing.has(id)) continue;
+        existing.add(id);
+        chipInput.insertAdjacentHTML('beforebegin',
+          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="${_t('chipRemoveTitle', 'Remove model')}" aria-label="${_t('chipRemoveAria', 'Remove')} ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
+      }
+      chipInput.value = '';
+      syncChips();
+    };
+    chipInput.addEventListener('keydown', (e) => {
+      // Enter 即提交口必须过 IME 判定（isImeComposing，与 ui-utils.js 同一约定）：
+      // 输入法确认候选字的 Enter 不能被当成提交——否则候选字上不了屏且半截文本被切成 chip。
+      if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addChips(); }
+    });
+    chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
+    chipsWrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove]');
+      if (btn) {
+        e.stopPropagation();
+        btn.closest('.chip').remove();
+        syncChips();
+        return;
+      }
+      // 盒子外观对齐普通输入框后，点空白/点 chip 也应聚焦输入框（表单惯例）
+      if (e.target !== chipInput) chipInput.focus();
+    });
+  }
+}
+
+// Bridge endpoints row editor. Extracted from buildProviderCard (2026-10-17).
+function wireBridgeEndpointEditor(card) {
+  // Bridge endpoints editor: ＋ appends an empty row and focuses its URL
+  // input; ✕ removes the row, and when the last row goes a fresh empty one
+  // takes its place so the card never renders rowless; the eye toggles that
+  // row's own key field. (Row inputs carry data-bridge-* on purpose —
+  // readCard only harvests [data-k], and the bridge branch of saveCard reads
+  // the rows itself.)
+  const bridgeWrap = card.querySelector('[data-bridge-endpoints]');
+  if (bridgeWrap) {
+    bridgeWrap.addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="bridge-add"]')) {
+        e.stopPropagation();
+        addBridgeRow(bridgeWrap).querySelector('[data-bridge-url]').focus();
+        return;
+      }
+      const eye = e.target.closest('[data-act="bridge-key-eye"]');
+      if (eye) {
+        e.stopPropagation();
+        const keyInput = eye.closest('.apikey-wrap')?.querySelector('[data-bridge-key]');
+        if (keyInput) {
+          const show = keyInput.type === 'password';
+          keyInput.type = show ? 'text' : 'password';
+          eye.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
+        }
+        return;
+      }
+      const rowPingBtn = e.target.closest('[data-act="bridge-row-ping"]');
+      if (rowPingBtn) {
+        e.stopPropagation();
+        rowPingBridge(card, rowPingBtn.closest('.bridge-row'));
+        return;
+      }
+      const rm = e.target.closest('[data-act="bridge-remove"]');
+      if (rm) {
+        e.stopPropagation();
+        rm.closest('.bridge-row').remove();
+        if (!bridgeWrap.querySelector('.bridge-row')) addBridgeRow(bridgeWrap);
+      }
+    });
+  }
+
+  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
+  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
+  const activate = async () => {
+    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
+    // can't be the active provider, so don't highlight/persist a click on it.
+    if (!cachedCfg.providers[name]) return;
+    document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    // Persist! This handler used to only toggle the CSS class, so the highlight
+    // silently reverted to the stored provider on reload / language switch.
+    cachedCfg.activeProvider = name;
+    cachedCfg.activeModel = '';
+    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
+  };
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('input, button, select, textarea')) return;
+    activate();
+  });
+  const cardH3 = card.querySelector('.provider-h3');
+  if (cardH3) {
+    cardH3.tabIndex = 0;
+    cardH3.addEventListener('keydown', (e) => {
+      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
+    });
+  }
+}
+
+// Card click / keyboard activation. Extracted from buildProviderCard
+// (2026-10-17): the reserved empty slot is render-only, so activation is
+// ignored there.
+function wireProviderActivation(card, name) {
+  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
+  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
+  const activate = async () => {
+    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
+    // can't be the active provider, so don't highlight/persist a click on it.
+    if (!cachedCfg.providers[name]) return;
+    document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    // Persist! This handler used to only toggle the CSS class, so the highlight
+    // silently reverted to the stored provider on reload / language switch.
+    cachedCfg.activeProvider = name;
+    cachedCfg.activeModel = '';
+    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
+  };
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('input, button, select, textarea')) return;
+    activate();
+  });
+  const cardH3 = card.querySelector('.provider-h3');
+  if (cardH3) {
+    cardH3.tabIndex = 0;
+    cardH3.addEventListener('keydown', (e) => {
+      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
+    });
+  }
+}
+
 function buildProviderCard(name, cfg, opts = {}) {
   const reserved = !!opts.reserved; // render-only empty slot (not yet persisted)
   const card = document.createElement('div');
@@ -762,137 +967,12 @@ function buildProviderCard(name, cfg, opts = {}) {
     </div>
   `;
 
-  // API key show/hide toggle
-  const apiToggle = card.querySelector('.apikey-toggle');
-  const apiInput  = card.querySelector('[data-k="apiKey"]');
-  if (apiToggle && apiInput) {
-    apiToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const show = apiInput.type === 'password';
-      apiInput.type = show ? 'text' : 'password';
-      apiToggle.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
-    });
-  }
+  wireApiKeyToggle(card);
 
-  // Model ID chips 编辑器：输入 + 回车/＋ 添加（粘贴逗号分隔自动拆分、去重），
-  // chip 上 ✕ 移除；真实值同步进隐藏的 data-k="model" 逗号串，readCard/saveCard
-  // 的既有规范化（models 全量 + model 首个）零改动。
-  const chipsWrap = card.querySelector('[data-model-chips]');
-  if (chipsWrap) {
-    const hidden = card.querySelector('input[data-k="model"]');
-    const chipInput = chipsWrap.querySelector('.chip-input');
-    const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
-    const syncChips = () => {
-      hidden.value = chipIds().join(', ');
-      // 思考档位的选项跟着模型 id 自适应（填 glm-5 出 {关,开}、gpt-5.6 出力度
-      // 梯）——lib/reasoning-levels.js 的词表。改完 chips 现刷选项。
-      const sel = card.querySelector('[data-thinking-select]');
-      if (sel) {
-        const levels = ['auto'];
-        for (const id of chipIds()) for (const l of reasoningLevelOptions(id)) if (!levels.includes(l)) levels.push(l);
-        const cur = sel.value;
-        sel.innerHTML = levels.map((l) => `<option value="${escapeAttr(l)}">${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
-        sel.value = levels.includes(cur) ? cur : 'auto';
-      }
-    };
-    const addChips = () => {
-      const parts = chipInput.value.split(',').map((s) => s.trim()).filter(Boolean);
-      if (!parts.length) return;
-      const existing = new Set(chipIds());
-      for (const id of parts) {
-        if (existing.has(id)) continue;
-        existing.add(id);
-        chipInput.insertAdjacentHTML('beforebegin',
-          `<span class="chip" data-id="${escapeAttr(id)}">${escapeHtml(id)}<button type="button" class="chip-x" data-remove="${escapeAttr(id)}" title="${_t('chipRemoveTitle', 'Remove model')}" aria-label="${_t('chipRemoveAria', 'Remove')} ${escapeAttr(id)}">${ICON_CLOSE}</button></span>`);
-      }
-      chipInput.value = '';
-      syncChips();
-    };
-    chipInput.addEventListener('keydown', (e) => {
-      // Enter 即提交口必须过 IME 判定（isImeComposing，与 ui-utils.js 同一约定）：
-      // 输入法确认候选字的 Enter 不能被当成提交——否则候选字上不了屏且半截文本被切成 chip。
-      if (e.key === 'Enter' && !isImeComposing(e)) { e.preventDefault(); addChips(); }
-    });
-    chipsWrap.querySelector('.chip-add').addEventListener('click', (e) => { e.stopPropagation(); chipInput.focus(); addChips(); });
-    chipsWrap.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-remove]');
-      if (btn) {
-        e.stopPropagation();
-        btn.closest('.chip').remove();
-        syncChips();
-        return;
-      }
-      // 盒子外观对齐普通输入框后，点空白/点 chip 也应聚焦输入框（表单惯例）
-      if (e.target !== chipInput) chipInput.focus();
-    });
-  }
+  wireModelChips(card);
+  wireBridgeEndpointEditor(card);
+  wireProviderActivation(card, name);
 
-  // Bridge endpoints editor: ＋ appends an empty row and focuses its URL
-  // input; ✕ removes the row, and when the last row goes a fresh empty one
-  // takes its place so the card never renders rowless; the eye toggles that
-  // row's own key field. (Row inputs carry data-bridge-* on purpose —
-  // readCard only harvests [data-k], and the bridge branch of saveCard reads
-  // the rows itself.)
-  const bridgeWrap = card.querySelector('[data-bridge-endpoints]');
-  if (bridgeWrap) {
-    bridgeWrap.addEventListener('click', (e) => {
-      if (e.target.closest('[data-act="bridge-add"]')) {
-        e.stopPropagation();
-        addBridgeRow(bridgeWrap).querySelector('[data-bridge-url]').focus();
-        return;
-      }
-      const eye = e.target.closest('[data-act="bridge-key-eye"]');
-      if (eye) {
-        e.stopPropagation();
-        const keyInput = eye.closest('.apikey-wrap')?.querySelector('[data-bridge-key]');
-        if (keyInput) {
-          const show = keyInput.type === 'password';
-          keyInput.type = show ? 'text' : 'password';
-          eye.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
-        }
-        return;
-      }
-      const rowPingBtn = e.target.closest('[data-act="bridge-row-ping"]');
-      if (rowPingBtn) {
-        e.stopPropagation();
-        rowPingBridge(card, rowPingBtn.closest('.bridge-row'));
-        return;
-      }
-      const rm = e.target.closest('[data-act="bridge-remove"]');
-      if (rm) {
-        e.stopPropagation();
-        rm.closest('.bridge-row').remove();
-        if (!bridgeWrap.querySelector('.bridge-row')) addBridgeRow(bridgeWrap);
-      }
-    });
-  }
-
-  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
-  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
-  const activate = async () => {
-    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
-    // can't be the active provider, so don't highlight/persist a click on it.
-    if (!cachedCfg.providers[name]) return;
-    document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
-    card.classList.add('active');
-    // Persist! This handler used to only toggle the CSS class, so the highlight
-    // silently reverted to the stored provider on reload / language switch.
-    cachedCfg.activeProvider = name;
-    cachedCfg.activeModel = '';
-    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
-  };
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('input, button, select, textarea')) return;
-    activate();
-  });
-  const cardH3 = card.querySelector('.provider-h3');
-  if (cardH3) {
-    cardH3.tabIndex = 0;
-    cardH3.addEventListener('keydown', (e) => {
-      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
-      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
-    });
-  }
   card.querySelector('button[data-act="save"]').addEventListener('click', () => saveCard(name, card));
   card.querySelector('button[data-act="ping"]').addEventListener('click', () => pingCard(name, card));
   card.querySelector('button[data-act="reset"]').addEventListener('click', () => resetCard(name, card));
@@ -999,18 +1079,15 @@ async function saveCard(name, card) {
   }
   const configChanged = prevFp !== connFp(cachedCfg.providers[name]);
   if (configChanged) {
-    delete _pingState[name]; // config changed — ping state no longer valid
-    // Bridge 每端点状态同样随连通配置失效（端点列表/键变了，旧状态对不上号）。
+    // config changed — ping state no longer valid（_pingState 与 storage 由
+    // 下方的 forgetPingState 一并清）。Bridge 每端点状态同样随连通配置失效
+    // （端点列表/键变了，旧状态对不上号）。
     // 必须在 storage.set 之前删——否则存储里残留旧 endpointPing，与内存分叉。
     delete cachedCfg.providers[name].endpointPing;
   }
   await persist({ providers: cachedCfg.providers });
   if (configChanged) {
-    storage.get('pingStates').then((pingStates) => {
-      const updated = { ...(pingStates || {}) };
-      delete updated[name];
-      persist({ pingStates: updated });
-    });
+    forgetPingState(name);
     // 卡面同步回未测态——否则卡片还挂着旧「● reachable」，主页下拉已是
     // 「未 Ping」，两处口径打架。就地改（不重渲，保住用户可能还在改的输入）。
     const badge = card.querySelector('.provider-badge');
@@ -1208,12 +1285,7 @@ async function resetCard(name, card) {
   await persist({ providers: cachedCfg.providers });
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
-  delete _pingState[name];
-  storage.get('pingStates').then((pingStates) => {
-    const updated = { ...(pingStates || {}) };
-    delete updated[name];
-    persist({ pingStates: updated });
-  });
+  forgetPingState(name);
   renderProviders();
 }
 
@@ -1253,13 +1325,8 @@ async function removeProvider(name) {
   if (!cfg || (cfg.type || 'llm') === 'agent') return;
   if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
-  delete _pingState[name];
   await persist({ providers: cachedCfg.providers });
-  storage.get('pingStates').then((pingStates) => {
-    const updated = { ...(pingStates || {}) };
-    delete updated[name];
-    persist({ pingStates: updated });
-  });
+  forgetPingState(name);
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
     cachedCfg.activeModel = '';
@@ -1298,41 +1365,46 @@ function applyReplyLanguage() {
   });
 }
 
-function applyToolbarToggle() {
-  const el = $('showSelectionToolbar');
+// The three on/off switches below shared a byte-identical 10-line body (read →
+// default-on → write → flash). One owner now — a new toggle is a one-liner.
+function applyBoolToggle(id, { key, onFlash, offFlash, readTargeted = false } = {}) {
+  const el = $(id);
   if (!el) return;
-  storage.get('showSelectionToolbar').then((showSelectionToolbar) => {
-    el.checked = showSelectionToolbar !== false; // default on
-  });
+  // getAll() already carries DEFAULTS-backed switches; only keys outside
+  // GET_ALL_KEYS (showSelectionToolbar) need a targeted read.
+  if (readTargeted) {
+    storage.get(key).then((v) => { el.checked = v !== false; }); // default on
+  } else {
+    el.checked = cachedCfg?.[key] !== false;
+  }
   el.addEventListener('change', () => {
-    storage.set({ showSelectionToolbar: el.checked });
-    flash('ok', el.checked ? _t('toolbarEnabledFlash', 'Floating toolbar enabled.') : _t('toolbarDisabledFlash', 'Floating toolbar disabled.'));
+    storage.set({ [key]: el.checked });
+    flash('ok', el.checked ? _t(onFlash.key, onFlash.fallback) : _t(offFlash.key, offFlash.fallback));
+  });
+}
+
+function applyToolbarToggle() {
+  applyBoolToggle('showSelectionToolbar', {
+    key: 'showSelectionToolbar',
+    readTargeted: true,
+    onFlash: { key: 'toolbarEnabledFlash', fallback: 'Floating toolbar enabled.' },
+    offFlash: { key: 'toolbarDisabledFlash', fallback: 'Floating toolbar disabled.' },
   });
 }
 
 function applyLlmsTxt() {
-  const el = $('llmsTxtEnabled');
-  if (!el) return;
-  storage.get('llmsTxtEnabled').then((llmsTxtEnabled) => {
-    el.checked = llmsTxtEnabled !== false; // default true
-  });
-  el.addEventListener('change', () => {
-    storage.set({ llmsTxtEnabled: el.checked });
-    flash('ok', el.checked ? _t('llmsTxtOnFlash', 'llms.txt will be included when attaching a page.') : _t('llmsTxtOffFlash', 'llms.txt disabled.'));
+  applyBoolToggle('llmsTxtEnabled', {
+    key: 'llmsTxtEnabled',
+    onFlash: { key: 'llmsTxtOnFlash', fallback: 'llms.txt will be included when attaching a page.' },
+    offFlash: { key: 'llmsTxtOffFlash', fallback: 'llms.txt disabled.' },
   });
 }
 
 function applyDeepExtract() {
-  const el = $('deepExtractEnabled');
-  if (!el) return;
-  storage.get('deepExtractEnabled').then((deepExtractEnabled) => {
-    el.checked = deepExtractEnabled !== false; // default true
-  });
-  el.addEventListener('change', () => {
-    storage.set({ deepExtractEnabled: el.checked });
-    flash('ok', el.checked
-      ? _t('deepExtractOnFlash', 'Automatic expand-and-page on incomplete pages enabled.')
-      : _t('deepExtractOffFlash', 'Automatic expand-and-page disabled.'));
+  applyBoolToggle('deepExtractEnabled', {
+    key: 'deepExtractEnabled',
+    onFlash: { key: 'deepExtractOnFlash', fallback: 'Automatic expand-and-page on incomplete pages enabled.' },
+    offFlash: { key: 'deepExtractOffFlash', fallback: 'Automatic expand-and-page disabled.' },
   });
 }
 

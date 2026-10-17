@@ -7,31 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-
-function makeStorageArea() {
-  let store = {};
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) {
-      store = { ...store, ...obj };
-    },
-    async remove(keys) {
-      const list = Array.isArray(keys) ? keys : [keys];
-      for (const k of list) delete store[k];
-    },
-    _reset() { store = {}; },
-    _dump() { return store; }
-  };
-}
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 const localArea = makeStorageArea();
 Object.defineProperty(globalThis, 'chrome', {

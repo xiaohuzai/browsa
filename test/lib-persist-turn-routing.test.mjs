@@ -63,11 +63,24 @@ test('persistTurnEntry: a backgrounded stream writes its ORIGIN session snapshot
   assert.deepEqual(stored.history.map((m) => m.content), ['the OTHER conversation'], 'the switched-to conversation is untouched');
 });
 
-test('persistTurnEntry: backgrounded with a deleted origin session falls back to the live append', async () => {
+test('persistTurnEntry: a deleted origin session is RESCUED, never leaked into live history', async () => {
+  // 2026-10-17 裁决修正: the old fallback appended the reply to LIVE history —
+  // writing it into whatever conversation the user had switched TO, which is
+  // exactly the cross-session leak bg routing exists to prevent. Dropping the
+  // turn instead would contradict "never silently drop a turn". The rescue
+  // recreates the origin session under its id, so BOTH hold: the text is
+  // preserved and the visible conversation is untouched.
   reset('t3', { originSessionId: 'gone' });
   streamState.get('t3').bg = true;
-  await persistTurnEntry('t3', { role: 'assistant', content: 'orphan' });
-  assert.deepEqual(stored.history.map((m) => m.content), ['orphan'], 'never silently drop a turn');
+  stored.history = [{ role: 'user', content: 'the OTHER conversation' }];
+  const res = await persistTurnEntry('t3', { role: 'assistant', content: 'orphan' });
+  assert.equal(res.toSession, true, 'the rescued entry belongs to its origin session, not live history');
+  assert.deepEqual(stored.history.map((m) => m.content), ['the OTHER conversation'],
+    'the conversation on screen must not receive another conversation\'s reply');
+  assert.deepEqual(stored['session_gone'].map((m) => m.content), ['orphan'],
+    'the turn is preserved in a recreated origin session');
+  const index = stored.savedSessions.find((s) => s.id === 'gone');
+  assert.ok(index?.name, 'the recovered session is listed in the drawer with a recognizable name');
 });
 
 test('pushChunk: backgrounded streams stay silent except approval/clarify', async () => {

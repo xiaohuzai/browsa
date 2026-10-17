@@ -111,9 +111,12 @@ node .agents/skills/promo-video/video-v7/render.mjs zh en ja ko es pt-BR ru
 
 当前输出：
 
-- `docs/assets/promo/browsa-promo-v7-<slug>.mp4` / `-nobgm.mp4`
+- `docs/assets/promo/browsa-promo-v7-<slug>.mp4`（随仓库分发）
+- `-nobgm.mp4`（**不随仓库分发**，见下）
 - `docs/assets/promo/poster-v7-<slug>.jpg`（4.3 秒取帧）
 - `docs/assets/readme/demo-v16-<slug>.gif`（32.4 秒、720px、10fps）
+
+**无音乐母版的存放（2026-10-17 起）**：`*-nobgm.mp4` 是重剪用的中间母版（七语合计约 120MB），已从工作树移除以免仓库被素材撑爆；它们留在 git 历史 `79d7ad3`，需要时 `git show 79d7ad3:docs/assets/promo/<file> > <file>` 取回，或用 `render-growth.mjs` / `build-audio.mjs` 重新生成。`patch-chapter.mjs` 需要 nobgm 作输入——跑它之前先按上式取回。
 
 内容改变需更新 GIF 版本名和脚本输出，再同步引用。新视频版本应同步脚本路径、copy、public、验证规格与交付索引，不能只改文件名。
 

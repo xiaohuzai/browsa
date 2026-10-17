@@ -9,7 +9,7 @@ import { stopHermesRun } from './lib/handlers/agent-stream-session.js';
 import * as storage from './lib/storage.js';
 import { initI18n, t } from './lib/i18n.js';
 import { ProviderConfigError } from './lib/llm-client.js';
-import { PAGE_CONTEXT_PREFIX, VIDEO_NOTE_HINT } from './lib/constants.js';
+import { VIDEO_NOTE_HINT } from './lib/constants.js';
 import {
   streamPorts, streamState, chatControllers, idleTimerResetters,
   activeRunIds, pendingApprovals, pendingClarifications,
@@ -44,7 +44,7 @@ export {
 import { extractActiveTab, tryXActiveFallback, autoJinaFallbackWarranted } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
 import { inlinePageImages, collectMarkdownImages, refererGateForImageUrls } from './lib/page-images.js';
-import { registerPageImageReferer, removePageImageReferer } from './lib/sidepanel/media-headers.js';
+import { registerPageImageReferer, removePageImageReferer, sweepOrphanedMediaRules } from './lib/sidepanel/media-headers.js';
 import { interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
 
@@ -146,7 +146,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     // something changed and can refresh any page that still feels stale.
     if (details.reason === 'update') {
       const { version } = chrome.runtime.getManifest();
-      chrome.storage.local.set({ pendingUpdateNotice: version });
+      // Fire-and-forget, but caught: some Chrome builds reject local writes
+      // while the storage backend is still settling right after an update,
+      // and an unhandled rejection here surfaces as a SW console error.
+      chrome.storage.local.set({ pendingUpdateNotice: version })
+        .catch((e) => console.warn('[browsa] update notice write failed:', e?.message || e));
       chrome.action.setBadgeText({ text: 'NEW' });
       chrome.action.setBadgeBackgroundColor({ color: '#238636' });
     }
@@ -260,10 +264,12 @@ async function runInVideoTab(tabId, url, func, args) {
 }
 
 // 抽取参数里的站点缓存二件套（ATTACH_PAGE 与 GET_PAGE_CONTEXT 各写一份）。
-async function siteCacheCtx(t) {
+async function siteCacheCtx(t, url = '') {
   await siteCacheRestorePromise(); // ensure session-storage restore finished (lazy, shared)
   if (typeof t !== 'number') return { xhsXhrNote: null, siteCache: null };
-  return { xhsXhrNote: xhsXhrCache.get(t) || null, siteCache: getSiteCache(t) };
+  // `url` lets cache selection be host-aware (see getSiteCache): without it a
+  // stale entry from the previous site in this tab shadowed the live one.
+  return { xhsXhrNote: xhsXhrCache.get(t) || null, siteCache: getSiteCache(t, url) };
 }
 
 // 选区 HTML 的存储上限（selectionCache 的 html 字段；整页误选的极端情形也不至于
@@ -504,6 +510,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // finished yet. Fire-and-forget here; failures are logged inside.
 ensureDurableSalvage().catch(() => {});
 
+// Same wake-time self-heal for DNR session rules: media-header rules are
+// registered with deterministic ids and removed in a `finally`, but a panel
+// document torn down mid-attach can skip that finally — and session rules
+// outlive the SW. Sweeping on every wake keeps a cookie-injecting rule from
+// surviving the rest of the browser session.
+sweepOrphanedMediaRules().catch(() => {});
+
 // videoUrlMatches now lives in lib/video-url.js (shared with the side
 // panel's live-tab resolution for seekVideo / the transcript drawer).
 
@@ -594,6 +607,10 @@ async function handle(msg, sender) {
         selectionCache.set(tabId, {
           text: msg.text,
           html: typeof msg.html === 'string' ? msg.html.slice(0, SELECTION_HTML_CAP) : '',
+          // Origin URL at capture time: a selection made on page A must never
+          // be attached under page B's URL/title after an SPA or full
+          // navigation in the same tab (the cache outlives the document).
+          url: typeof msg.url === 'string' ? msg.url : (sender?.tab?.url || ''),
         });
       }
       return { ok: true };
@@ -760,31 +777,48 @@ async function handle(msg, sender) {
           const cached = selectionCache.get(tabId);
           const cachedText = (typeof cached === 'string' ? cached : cached?.text) || msg.text || '';
           const cachedHtml = (typeof cached === 'object' && cached?.html) || '';
-          if (cachedText && cached) selectionCache.set(tabId, cached); // keep in sync
+          // Stale-cache guard: a selection captured on page A must not be
+          // attached under whatever page B is showing now (the entry is keyed
+          // only by tabId and survives navigation). Compare origins; when they
+          // differ, prefer the explicitly-passed text (right-click / toolbar,
+          // which carry the current selection) and drop the stale HTML.
+          const cachedUrl = (typeof cached === 'object' && cached?.url) || '';
+          const liveUrl = (sender?.tab?.url) || msg.tabUrl || '';
+          const sameOrigin = (() => {
+            if (!cachedUrl || !liveUrl) return true; // unknown → don't second-guess
+            try { return new URL(cachedUrl).origin === new URL(liveUrl).origin; } catch (_) { return true; }
+          })();
+          if (!sameOrigin && !msg.text) {
+            selectionCache.delete(tabId);
+            return { ok: false, error: 'Selection is from a different page. Select text again, then click 📎.' };
+          }
+          const usableCachedText = sameOrigin ? cachedText : (msg.text || '');
+          const usableCachedHtml = sameOrigin ? cachedHtml : '';
+          if (usableCachedText && cached) selectionCache.set(tabId, cached); // keep in sync
           const tab = await chrome.tabs.get(tabId).catch(() => null);
           const meta = tab ? { url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || '' } : { url: '', title: '', favIconUrl: '' };
-          if (!cachedText) return { ok: false, error: 'No text selected. Select some text on the page first, then click 📎.' };
+          if (!usableCachedText) return { ok: false, error: 'No text selected. Select some text on the page first, then click 📎.' };
           ctx = {
             meta, mode: 'selected',
-            text: cachedText,
-            truncated: { rawTextLength: cachedText.length, textLength: cachedText.length, wasCapped: false }
+            text: usableCachedText,
+            truncated: { rawTextLength: usableCachedText.length, textLength: usableCachedText.length, wasCapped: false }
           };
           // 选区附加保留结构（2026-10-07，移植自 EdgeEver 的 selection clip）：捕获时
           // 存的选区 HTML 在页面 MAIN world 里经 Turndown（ensureReadabilityInjected
           // 注入的页面全局）转 Markdown——表格/列表/链接结构进上下文，纯文本全部丢失
           // 的那类信息不再丢。转换在分离容器上进行，与当前页面内容无关（导航过也能转）；
           // 任何一步失败都保持纯文本（md 长度 sanity 门：明显短于纯文本视为转换失真）。
-          if (cachedHtml) {
+          if (usableCachedHtml) {
             try {
               await ensureReadabilityInjected(tabId).catch(() => {});
               const [res] = await chrome.scripting.executeScript({
                 target: { tabId },
                 world: 'MAIN',
                 func: selectionHtmlToMarkdownInPage,
-                args: [cachedHtml]
+                args: [usableCachedHtml]
               });
               const md = String(res?.result || '').trim();
-              if (md && md.length >= cachedText.length * 0.5) {
+              if (md && md.length >= usableCachedText.length * 0.5) {
                 ctx.text = md;
                 // `format` is the channel buildPageContextText renders into the
                 // header ("Mode: selected | markdown" — model-facing provenance
@@ -824,11 +858,15 @@ async function handle(msg, sender) {
         } else {
           // auto and reader modes may need Readability; dom/full don't
           if (mode === 'reader' || mode === 'auto') await ensureReadabilityInjected(tabId).catch(() => {});
+          // Host for cache selection comes from the live tab (ctx doesn't
+          // exist yet here) — without it a stale entry from the previous site
+          // in this tab shadowed the live one.
+          const tabForCache = await chrome.tabs.get(tabId).catch(() => null);
           ctx = await extractActiveTab({
             mode,
             tabId,
             maxTextChars: all.maxTextChars,
-            ...(await siteCacheCtx(tabId)),
+            ...(await siteCacheCtx(tabId, msg.url || tabForCache?.url || '')),
             query: msg.query || '',
             preClean: true
           });
@@ -1236,11 +1274,14 @@ async function handle(msg, sender) {
         await ensureReadabilityInjected(tabIdOf(msg, sender)).catch(() => {});
       }
       const t = tabIdOf(msg, sender);
+      // Host for cache selection: the caller's tab URL (sender.tab is present
+      // for content-script callers; panel callers pass the live tab id).
+      const tabForCache = typeof t === 'number' ? await chrome.tabs.get(t).catch(() => null) : null;
       const ctx = await extractActiveTab({
         mode,
         tabId: typeof t === 'number' ? t : null,
         maxTextChars: all.maxTextChars,
-        ...(await siteCacheCtx(t)),
+        ...(await siteCacheCtx(t, msg.tabUrl || tabForCache?.url || '')),
       });
       return ctx;
     }
@@ -1361,6 +1402,9 @@ function broadcastNav(tabId, url) {
 // any panel that is actually open.
 function onNavHistoryStateUpdated(details) {
   if (details.frameId !== 0) return; // only top frame
+  // SPA route change = new document/route; a selection from the previous
+  // route is no longer attachable (it would be sent under the new URL).
+  selectionCache.delete(details.tabId);
   broadcastNav(details.tabId, details.url);
 }
 
@@ -1368,11 +1412,15 @@ function onNavCommitted(details) {
   if (details.frameId !== 0) return;
   // Only fires for non-history-API commits. onHistoryStateUpdated handles
   // the SPA case. This is a safety net for any other navigation path.
+  selectionCache.delete(details.tabId);
   broadcastNav(details.tabId, details.url);
 }
 
 function onNavBeforeNavigate(details) {
   if (details.frameId !== 0) return;
+  // A selection captured on the outgoing page must not survive into the next
+  // one (same tabId key) — clear it at the earliest navigation signal.
+  selectionCache.delete(details.tabId);
   // Reset the dedup so a same-URL back/forward (which history treats as
   // a new navigation) still fires. We can't know the new URL yet, so we
   // just clear.

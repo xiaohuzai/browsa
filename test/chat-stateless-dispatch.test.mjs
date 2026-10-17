@@ -14,28 +14,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 // ---- in-memory chrome.storage areas (same pattern as test/storage.test.mjs)
-function makeStorageArea() {
-  let store = {};
-  return {
-    async get(keys) {
-      if (keys == null) return { ...store };
-      if (typeof keys === 'string') return { [keys]: store[keys] };
-      if (Array.isArray(keys)) {
-        const out = {};
-        for (const k of keys) out[k] = store[k];
-        return out;
-      }
-      return { ...store };
-    },
-    async set(obj) { store = { ...store, ...obj }; },
-    async remove(keys) {
-      for (const k of Array.isArray(keys) ? keys : [keys]) delete store[k];
-    },
-    _reset() { store = {}; },
-  };
-}
 
 const localArea = makeStorageArea();
 const sessionArea = makeStorageArea();

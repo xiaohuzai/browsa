@@ -320,7 +320,7 @@ Trocar de sessão no meio de uma resposta nunca mata a resposta: ela continua ro
 
 | Recurso | O que você ganha |
 |---|---|
-| **Sessões** | salve a conversa como uma sessão nomeada; navegue e restaure pela gaveta 🕐; fixe as favoritas acima da lista |
+| **Sessões** | salve a conversa como uma sessão nomeada; navegue e restaure pela gaveta 🕐; fixe as favoritas acima da lista Se a conversa a que uma resposta em segundo plano pertence for excluída no meio do turno, a resposta é preservada em uma sessão recriada "Recovered turn (…)" em vez de ser escrita na conversa na tela. |
 | **Busca em todo lugar** | `Ctrl+F` em todas as mensagens de uma conversa; a gaveta filtra as sessões por título **e** por conteúdo da mensagem (acertos só de conteúdo são sinalizados) |
 | **Exportação** | qualquer sessão como um arquivo Markdown |
 | **Exclusão segura** | exclusão em dois passos para sessões; selecione várias mensagens para exclusão em lote; limpar todas as mensagens exige confirmação |

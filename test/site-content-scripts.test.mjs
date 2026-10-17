@@ -1865,3 +1865,60 @@ function loadContentScript(name) {
     assert.deepEqual(post.images, [{ url: 'https://i.redd.it/p.jpg', alt: 'T' }]);
   });
 }
+
+// ─── site-common.js injection ordering (2026-10-17) ─────────────────────────
+// relayToHost's wire shape now lives ONLY in site-common.js. Each site script
+// resolves it lazily from the shared global, so the manifest MUST list the
+// common script first — otherwise every interceptor throws on its first push
+// (the failure mode that already killed this channel once in the v0.19.1
+// MAIN-world migration).
+test('manifest injects site-common.js before every MAIN-world site script', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
+  const siteScripts = manifest.content_scripts.filter((cs) =>
+    (cs.js || []).some((f) => /-content-script\.js$/.test(f)) && cs.world === 'MAIN');
+  assert.ok(siteScripts.length >= 10, 'all ten site interceptors must be declared MAIN-world');
+  for (const cs of siteScripts) {
+    const idx = cs.js.indexOf('lib/content-scripts/site-common.js');
+    const siteIdx = cs.js.findIndex((f) => /-content-script\.js$/.test(f));
+    assert.notEqual(idx, -1, `${cs.js.join(',')} must include site-common.js`);
+    assert.ok(idx < siteIdx, `site-common.js must load BEFORE ${cs.js[siteIdx]}`);
+    assert.equal(idx, 0, 'site-common.js is the first entry');
+  }
+});
+
+test('no site content script still carries its own postMessage relay shape', async () => {
+  const { readFile, readdir } = await import('node:fs/promises');
+  const dir = new URL('../lib/content-scripts/', import.meta.url);
+  for (const f of await readdir(dir)) {
+    if (!/-content-script\.js$/.test(f)) continue;
+    const src = await readFile(new URL(f, dir), 'utf8');
+    assert.doesNotMatch(src, /__browsaRelay: true/,
+      `${f} must delegate to site-common.js instead of re-implementing the wire shape`);
+  }
+});
+
+// ─── relay-missing diagnostic (2026-10-17) ──────────────────────────────────
+// Every site script's relayToHost forwards to window.__browsaRelayToHost
+// (installed by site-common.js). If that global is missing the forward throws
+// a TypeError into each caller's fail-open catch, so the site's whole data
+// channel dies with NO diagnostic. Each wrapper must warn once instead.
+test('every site script warns when site-common.js did not load', async () => {
+  const { readFile, readdir } = await import('node:fs/promises');
+  const dir = new URL('../lib/content-scripts/', import.meta.url);
+  let checked = 0;
+  for (const f of await readdir(dir)) {
+    if (!/-content-script\.js$/.test(f)) continue;
+    const src = await readFile(new URL(f, dir), 'utf8');
+    // reddit has no relay at all (it is read through the active-fetch path in
+    // page-extractor, not a page interceptor), so it has nothing to forward.
+    if (!src.includes('relayToHost')) continue;
+    const m = src.match(/function relayToHost\(msg\) \{[\s\S]*?\n\}/);
+    assert.ok(m, `${f}: relayToHost wrapper not found`);
+    assert.match(m[0], /typeof forward !== 'function'/, `${f}: must detect a missing site-common global`);
+    assert.match(m[0], /browsa: site-common\.js did not load/, `${f}: must emit the diagnostic`);
+    assert.match(m[0], /__browsaRelayMissing/, `${f}: the warning must fire once per page, not per event`);
+    checked++;
+  }
+  assert.ok(checked >= 9, `expected every relaying site interceptor, checked ${checked}`);
+});

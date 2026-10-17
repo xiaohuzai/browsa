@@ -68,6 +68,7 @@
         <li>Sessions can be renamed;</li>
         <li>Older snapshots without recorded Agent IDs start a fresh Agent thread on the first message, carrying their existing text history once.</li>
         <li><strong>Switching sessions mid-reply never kills the reply</strong> — it keeps running in the background and lands in the session it started in (marked with an in-flight dot in the drawer). Stopping a reply yourself keeps whatever already streamed, marked as interrupted.</li>
+        <li><strong>A deleted origin never loses the reply</strong> — if the session a background reply belongs to is deleted before it finishes, the reply is not written into whatever conversation is on screen. A "Recovered turn (…)" session is recreated in the drawer with the full content.</li>
       </ul>
       <figure class="shot slim">
         <img src="../../assets/guide/panel-sessions.png" alt="The sessions drawer: pinned on top, grouped by age, searchable by title and content" loading="lazy">
