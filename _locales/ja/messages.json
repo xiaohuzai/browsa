@@ -503,6 +503,10 @@
     "message": "思考ブロックを自動で折りたたむ",
     "description": "Options: auto-collapse thinking label"
   },
+  "approvalChimeLabel": {
+    "message": "エージェントが承認を求めたときにサウンドを再生する",
+    "description": "Options: approval chime toggle label"
+  },
   "asrHeading": {
     "message": "マルチモーダル動画理解",
     "description": "Options: ASR card heading"
