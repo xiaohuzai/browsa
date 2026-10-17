@@ -22,8 +22,10 @@ const fontChoicesJs = readFileSync(join(ROOT, 'lib', 'font-choices.js'), 'utf8')
 
 // ─── 1. bubble widening (field report: bare ```pdb fence → 185px Mol* sliver)
 // Live-render blocks are percentage-sized with no intrinsic width; a reply
-// that is ONLY a fence collapses the fit-content bubble. Every live-render
-// wrapper class MUST be covered by a .msg.assistant:has(...) widening rule.
+// that is ONLY a fence collapses the fit-content bubble. The renderer stamps
+// `.has-live-diagram` on the bubble when it swaps in a wrapper (2026-10-17 —
+// it used to be six `:has()` rules, which forced ancestor re-matching on every
+// streamed mutation).
 
 const WRAPPER_CLASSES = {
   mermaid: 'mermaid-diagram',
@@ -34,7 +36,7 @@ const WRAPPER_CLASSES = {
   dot: 'dot-diagram',
 };
 
-test('lockstep: every live-render wrapper class is widened by a :has bubble rule', () => {
+test('lockstep: every live-render renderer widens its bubble', () => {
   // The class map itself must stay honest: each wrapper className must still
   // be assigned somewhere in render.js (renames trip this).
   for (const [fence, cls] of Object.entries(WRAPPER_CLASSES)) {
@@ -42,16 +44,17 @@ test('lockstep: every live-render wrapper class is widened by a :has bubble rule
       renderJs.includes(`'${cls}'`) || renderJs.includes(`"${cls}"`),
       `wrapper class "${cls}" (fence ${fence}) no longer assigned in render.js — update WRAPPER_CLASSES here`,
     );
-    assert.ok(
-      css.includes(`.msg.assistant:has(.${cls})`),
-      `sidepanel.css lost the bubble-widening rule for .${cls} — a reply that is only a \`\`\`${fence} fence will collapse the viewer into a sliver (2026-09-30 field report)`,
-    );
   }
+  const stamps = (renderJs.match(/markBubbleWide\(wrapper\)/g) || []).length;
+  assert.equal(stamps, Object.keys(WRAPPER_CLASSES).length,
+    'every one of the six renderers must call markBubbleWide(wrapper) — a missing one collapses its viewer into a sliver (2026-09-30 field report)');
+  assert.doesNotMatch(css, /\.msg\.assistant:has\(/,
+    'bubble widening must not go back to :has() — streaming re-matches it on the ancestor every frame');
 });
 
 test('lockstep: the widening rule actually sets a definite width (not just max-width)', () => {
-  const block = css.match(/\.msg\.assistant:has\(\.pdb-block\)[^{]*\{[^}]*\}/);
-  assert.ok(block, 'the :has widening block is gone');
+  const block = css.match(/\.msg\.assistant\.has-live-diagram\s*\{[^}]*\}/);
+  assert.ok(block, 'the .has-live-diagram widening block is gone');
   assert.match(block[0], /width:\s*100%/, 'must set width:100% — max-width alone cannot widen a fit-content bubble');
 });
 

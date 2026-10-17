@@ -29,8 +29,14 @@ Object.defineProperty(globalThis, 'chrome', {
 });
 
 let round = 0;
+// The main scope's persistence debounce is 400ms in production; a test that
+// waits past it pays that wall clock per case. Shrink it so the sequencing
+// stays identical without the sleep.
+const TEST_DEBOUNCE_MS = 10;
 async function freshModule() {
-  return await import(`../lib/sidepanel/composer-state.js?round=${++round}`);
+  const mod = await import(`../lib/sidepanel/composer-state.js?round=${++round}`);
+  mod.__setMainDebounceForTests(TEST_DEBOUNCE_MS);
+  return mod;
 }
 
 function makeInput(value = '') {
@@ -126,7 +132,7 @@ test('draft survives persist→restore roundtrip and never overwrites typed text
   cs.attachDraftPersistence(input);
   input.value = 'unsent thought';
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise(r => setTimeout(r, 500)); // debounce 400ms
+  await new Promise(r => setTimeout(r, TEST_DEBOUNCE_MS * 4));
 
   // New panel session: fresh module instance reading the same storage.
   const cs2 = await freshModule();
@@ -245,7 +251,9 @@ test('createInputHistory scopes are independent: separate lists and separate sto
   assert.equal(sub.handleHistoryNav(keydown(subInput, 'ArrowUp')), true);
   assert.equal(subInput.value, 'sub q', 'the card scope recalls only its own sends');
 
-  await new Promise(r => setTimeout(r, 500)); // debounce 400ms
+  // This assertion covers BOTH scopes: main uses the shrunken debounce, the
+  // ad-hoc `sub` scope keeps the production window.
+  await new Promise(r => setTimeout(r, 500));
   assert.deepEqual(stored.composerState.history, ['main q'], 'main pushes stay in the composerState row');
   assert.deepEqual(stored.subInputHistory, { history: ['sub q'] },
     'the card scope persists under its own key, history only — no draft field');
@@ -255,7 +263,7 @@ test('a card-scope list persists and restores across a panel reopen', async () =
   const cs = await freshModule();
   const a = cs.createInputHistory({ storageKey: 'cardHist' });
   a.pushInputHistory('earlier follow-up');
-  await new Promise(r => setTimeout(r, 500)); // debounce 400ms
+  await new Promise(r => setTimeout(r, 500)); // ad-hoc scope: production debounce
 
   // "Reopened panel": a brand-new scope instance over the same key.
   const b = cs.createInputHistory({ storageKey: 'cardHist' });

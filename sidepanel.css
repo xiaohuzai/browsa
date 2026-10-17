@@ -3147,13 +3147,12 @@ dialog.lightbox-overlay:not([open]) {
    that is ONLY a fence (no lead-in text) collapses the fit-content bubble to
    the block's min-width and the viewer renders into a sliver (user report:
    bare ```pdb → 185px Mol* column). Give the bubble a definite width so the
-   viewer has something to fill. :has re-evaluates when the fence swaps in. */
-.msg.assistant:has(.pdb-block),
-.msg.assistant:has(.smiles-block),
-.msg.assistant:has(.echarts-diagram),
-.msg.assistant:has(.markmap-diagram),
-.msg.assistant:has(.mermaid-diagram),
-.msg.assistant:has(.dot-diagram) {
+   viewer has something to fill.
+   2026-10-17: the renderer stamps `.has-live-diagram` on the bubble when it
+   swaps the fence for its wrapper (render.js markBubbleWide) instead of six
+   `:has()` rules here — streaming mutates the bubble every frame, and each
+   mutation made the browser re-match these rules on the ancestor. */
+.msg.assistant.has-live-diagram {
   width: 100%;
   max-width: 100%;
 }
