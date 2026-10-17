@@ -206,8 +206,11 @@ test('CHAT handler idle-timeout abort path also stops the server-side Hermes run
   const catchIdx = src.indexOf("if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {", src.indexOf('} catch (e)'));
   assert.ok(catchIdx > 0, 'abort catch block must exist');
   const block = src.slice(catchIdx, src.indexOf('throw e;', catchIdx));
-  assert.match(block, /stopHermesRun\(activeRunIds\.get\(tabId\)\)/,
-    'the abort catch must call stopHermesRun with the still-registered run');
+  // Must stop the run registered by THIS turn. Prefer the record captured in
+  // this turn's onRunId over the per-tab slot: a concurrent turn on the same
+  // tabId may own that slot (ownership gate, 2026-10-17).
+  assert.match(block, /stopHermesRun\(ownRunRecord \|\| activeRunIds\.get\(tabId\)\)/,
+    'the abort catch must call stopHermesRun with the still-registered run (own record preferred)');
 });
 
 test('CHAT handler stores AbortController in chatControllers before stream', async () => {
