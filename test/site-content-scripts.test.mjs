@@ -142,6 +142,46 @@ function loadContentScript(name) {
     }
   });
 
+  // Regression (user report 2026-10-19): festival/活动页（/festival/jzj2023?bvid=BV…）
+  // has no /video/ path segment and its __INITIAL_STATE__ carries no videoData
+  // (实测 bvid 字段为 null) — the active fetch threw 'no bvid on page' and attach
+  // never saw the video's subtitles. Fix: also read ?bvid= from the query.
+  test('bilibili: activeFetchBilibiliVideo reads ?bvid= from festival-page URLs', async () => {
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    try {
+      globalThis.window = {
+        location: { href: 'https://www.bilibili.com/festival/jzj2023?bvid=BV1zK4y1F7pk&spm_id_from=333.1387.homepage.video_card.click' },
+        // festival 页的 __INITIAL_STATE__ 无 videoData — 故意不给
+      };
+      const calls = [];
+      globalThis.fetch = async (url) => {
+        calls.push(url);
+        if (url.includes('/x/web-interface/view')) {
+          return {
+            ok: true,
+            json: async () => ({
+              code: 0,
+              data: {
+                bvid: 'BV1zK4y1F7pk', title: '【硬核】在诉讼与骂名中崛起的英伟达GPU', desc: 'desc',
+                owner: { name: 'up' }, tname: '科技', duration: 1800,
+                pages: [{ cid: 456789 }], stat: { view: 1 },
+              },
+            }),
+          };
+        }
+        return { ok: false };
+      };
+      const result = await activeFetchBilibiliVideo();
+      assert.equal(result.bvid, 'BV1zK4y1F7pk', 'must take bvid from the ?bvid= query param');
+      assert.equal(result.cid, 456789);
+      assert.ok(calls.some(u => u.includes('/x/web-interface/view?bvid=BV1zK4y1F7pk')), 'must fetch the view API with the festival-page bvid');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
   test('bilibili: activeFetchBilibiliVideo prefers __INITIAL_STATE__ for meta', async () => {
     const prevWindow = globalThis.window;
     const prevFetch = globalThis.fetch;
