@@ -1063,6 +1063,26 @@
     "message": "Reset",
     "description": "Sidepanel: diagram reset title"
   },
+  "mermaidToggleVertical": {
+    "message": "Switch to vertical layout",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidToggleHorizontal": {
+    "message": "Switch to horizontal layout",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidErrTooComplex": {
+    "message": "Diagram is too complex to render",
+    "description": "Sidepanel: mermaid over-limit error"
+  },
+  "mermaidToggleFailed": {
+    "message": "Couldn't switch the layout",
+    "description": "Sidepanel: diagram direction toggle failure toast"
+  },
+  "mermaidZoomHint": {
+    "message": "Diagram: + / − to zoom, arrow keys to pan, 0 to reset",
+    "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
+  },
   "mermaidExportPng": {
     "message": "Export PNG",
     "description": "Sidepanel: chart export png title"

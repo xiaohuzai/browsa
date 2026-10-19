@@ -216,3 +216,68 @@ test('lockstep: the message-font-family setting is wired end to end', () => {
     assert.ok(fontChoicesJs.includes(`key: '${key}'`), `font-choices lost the '${key}' option`);
   }
 });
+
+// ─── 5. Mermaid 宿主责任（2026-10-19，借 pele 的 limit/host-policy 模型）
+// 四条不变量，任何一条被改掉都会静默削弱不可信图源的处理：
+// ① 上限显式 pin 且 %%{init}%% 不能覆盖（secure 列表）；
+// ② securityLevel:'loose' 只为标签内 KaTeX，我们永不调用 mermaid 的
+//    bindFunctions（否则模型可绑 click 回调）；
+// ③ sanitize 之后还有一道链接/图片协议白名单；
+// ④ 方向切换与宽度重排都在（重排只在宽度变化 ≥40px 时防抖触发）。
+test('lockstep: mermaid host responsibilities (limits, no click binding, link policy, direction, reflow)', () => {
+  assert.match(renderJs, /securityLevel:\s*'loose'/);
+  assert.match(renderJs, /maxTextSize:\s*MERMAID_MAX_TEXT_SIZE/,
+    'maxTextSize must be pinned to the named constant (mermaid default drift would loosen it silently)');
+  assert.match(renderJs, /maxEdges:\s*MERMAID_MAX_EDGES/);
+  assert.match(renderJs, /secure:\s*\[[^\]]*'securityLevel'[^\]]*'maxEdges'/,
+    '%%{init}%% directives must not be able to override the security/limit keys');
+  // mermaid 的 secure 是整表替换默认值：默认五项 + CSS/布局相关键都要在。
+  for (const key of ['suppressErrorRendering', 'themeCSS', 'themeVariables', 'fontFamily', 'fontSize']) {
+    assert.ok(renderJs.includes(`'${key}'`), `secure must include ${key}`);
+  }
+  // front matter 的 config: 不走 directive 消毒器——必须在进 mermaid 前剥掉。
+  assert.match(renderJs, /const safeSource = stripFrontMatterConfig\(source\);[\s\S]{0,120}?renderMermaidWithRetry\(m, id, safeSource, host\)/);
+  // 只禁止「调用」；注释里出现这个名字是解释上述不变量。
+  assert.doesNotMatch(renderJs, /\.bindFunctions\s*\(/,
+    'never bind mermaid click callbacks — securityLevel:loose would let model output register handlers');
+  assert.match(renderJs, /export function enforceSafeDiagramLinks/);
+  assert.match(renderJs, /MERMAID_LINK_SCHEMES\s*=\s*new Set\(\['http:', 'https:', 'mailto:', 'tel:'\]\)/);
+  assert.match(renderJs, /MERMAID_IMAGE_SCHEMES\s*=\s*new Set\(\['http:', 'https:'\]\)/);
+  assert.match(renderJs, /toggleMermaidDirection\(state\.source, state\.horizontalDirection\)/);
+  assert.match(renderJs, /_ensureMermaidReflowObserver/);
+  assert.match(renderJs, /Math\.abs\(width - _mermaidReflowWidth\) < 40/, 'reflow must ignore sub-40px width jitter');
+  assert.match(renderJs, /state\.busy = true;[\s\S]{0,400}?if \(changed\) _commitMermaidSvg/,
+    're-renders must be transactional (commit only after a successful render+sanitize)');
+});
+
+// ─── 6. Mermaid 缩放 / 字体重排 / 宽度（2026-10-19 第二批，pele zoom+mount）──
+test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, sequence wraps', () => {
+  // 缩放下限 1（<1 只会露出图外空白）与光标锚定。
+  assert.match(renderJs, /const _MM_ZOOM_MIN = 1/);
+  assert.match(renderJs, /export function computeAnchoredZoom/);
+  assert.match(renderJs, /tabIndex = 0/);
+  assert.match(renderJs, /mermaidZoomHint/);
+  assert.match(renderJs, /addEventListener\('keydown'/);
+  assert.match(renderJs, /addEventListener\('dblclick'/);
+  assert.match(renderJs, /addEventListener\('pointerdown'/);
+  assert.doesNotMatch(renderJs, /_mermaidDrag/,
+    'drag must use pointer capture on the element, not a module-level window listener');
+  assert.match(css, /\.mermaid-btn:disabled/, 'zoom buttons need a disabled state at the bounds');
+  // 字体/字号设置变更必须重排已渲染的图（mermaid 布局按字体宽度算）。
+  assert.match(renderJs, /export function refreshMermaidDiagrams/);
+  assert.match(renderJs, /initMermaidTheme\(state\.m\)/,
+    're-renders must re-initialize mermaid so a font change actually reaches the layout');
+  // 输入短路：宽度/主题都没变的图不付一次完整渲染。
+  assert.match(renderJs, /width === state\.width && mermaidThemeKey === state\.themeKey/);
+  // 字体刷新先可见后空闲；旧批次由 generation 取消。
+  assert.match(renderJs, /_mermaidRefreshGen/);
+  assert.match(renderJs, /requestIdleCallback/);
+  // OS 主题热切换时已渲染的图也重排（pele mount().refresh() 的宿主责任）。
+  assert.match(renderJs, /matchMedia\('\(prefers-color-scheme: dark\)'\)[\s\S]{0,220}?addEventListener\?\.\('change', \(\) => refreshMermaidDiagrams\(\)\)/);
+  assert.match(sidepanelJs, /refreshMermaidDiagrams\(\)/,
+    'applyFontSize/applyFontFamily must refresh existing diagrams');
+  // 时序图长消息在窄侧栏折行。
+  assert.match(renderJs, /sequence:\s*\{\s*wrap:\s*true\s*\}/);
+  // 布局宽度必须扣掉 padding（pele room()）。
+  assert.match(renderJs, /function _contentWidth/);
+});

@@ -31,8 +31,13 @@ const {
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
-  wantsChartVendors, FENCED_RENDERERS, renderUserContent, renderMathInPlainText
+  wantsChartVendors, FENCED_RENDERERS, renderUserContent, renderMathInPlainText,
+  enforceSafeDiagramLinks, mermaidErrorKind, summarizeMermaidErrorMessage, computeAnchoredZoom
 } = await import('../lib/sidepanel/render.js');
+const {
+  findMermaidFlowDirection, toggleMermaidDirection, getMermaidDiagramKind, estimateMermaidPreviewHeight,
+  stripFrontMatterConfig
+} = await import('../lib/sidepanel/mermaid-utils.js');
 
 test('wantsChartVendors detects every FENCED_RENDERERS language fence, nothing else', () => {
   const fence = '```';
@@ -631,7 +636,8 @@ test('render.js pipes Mermaid\'s SVG output through sanitizeMermaidSvg before as
   // sanitizeMermaidSvg is its ONLY use and mermaid itself is already lazy.
   assert.match(src, /sanitizeModule\s*=\s*import\(\s*['"]\.\.\/vendor\/stream-markdown-parser\.bundle\.js['"]\s*\)/);
   assert.match(src, /const\s+sanitizeMermaidSvg\s*=\s*await\s+getSanitizeMermaidSvg\(\)/);
-  assert.match(src, /svgWrap\.innerHTML\s*=\s*sanitizeMermaidSvg\(svg\)/);
+  assert.match(src, /clean:\s*sanitizeMermaidSvg\(svg\)\s*\?\?\s*''/, 'the sanitizer result must be what gets committed');
+  assert.match(src, /svgWrap\.innerHTML\s*=\s*out\.clean/);
 });
 
 test('render.js estimates a placeholder height before rendering and retries via renderMermaidWithRetry (mermaid-utils.js)', async () => {
@@ -639,7 +645,7 @@ test('render.js estimates a placeholder height before rendering and retries via 
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
   assert.match(src, /import\s*\{[^}]*renderMermaidWithRetry[^}]*\}\s*from\s*['"]\.\/mermaid-utils\.js['"]/);
   assert.match(src, /pre\.style\.minHeight\s*=\s*estimatedHeight/, 'the code-fence placeholder must get the estimated height before the async render starts');
-  assert.match(src, /await renderMermaidWithRetry\(m, id, source, (?:host|ownHost)\)/, 'must render through the retry helper, not a raw m.render() call');
+  assert.match(src, /await renderMermaidWithRetry\(m, id, safeSource, host\)/, 'must render through the retry helper (with front-matter config stripped), not a raw m.render() call');
 });
 
 test('render.js regression: the mermaid render host must be sized from the real container width, not a hardcoded pixel value', async () => {
@@ -1120,6 +1126,176 @@ test('timelineBreakLongRuns: 非 timeline 原样返回；前导注释行后仍�
   const commented = '%% 注释\ntimeline\n    1892 : 电灯泡照亮曼哈顿约一平房大小的区域';
   assert.ok(timelineBreakLongRuns(commented).includes('<br>'), '注释行不是 anchor 障碍');
   void 0;
+});
+
+test('timelineBreakLongRuns: 收尾标点不被顶到行首，开头标点不吊在行尾（pele CJK 规则）', () => {
+  // 第 10 个字符后紧跟「。」——旧实现把句号甩到下一行行首。
+  const closing = 'timeline\n    1892 : 一二三四五六七八九十。甲乙丙丁';
+  const out1 = timelineBreakLongRuns(closing);
+  assert.ok(out1.includes('一二三四五六七八九十。<br>'), JSON.stringify(out1));
+  assert.ok(!out1.includes('<br>。'), 'no break before closing punctuation');
+
+  // 第 10 个字符是「「」——旧实现把开引号吊在行尾。
+  const opening = 'timeline\n    1892 : 一二三四五六七八九「甲乙丙丁」';
+  const out2 = timelineBreakLongRuns(opening);
+  assert.ok(!out2.includes('九「<br>'), JSON.stringify(out2));
+  assert.ok(out2.includes('<br>'), 'still breaks somewhere');
+
+  // 幂等：标点避让后的行宽仍 ≤ _TL_RUN_LIMIT，第二轮不得再切。
+  assert.equal(timelineBreakLongRuns(out1), out1);
+  assert.equal(timelineBreakLongRuns(out2), out2);
+});
+
+// ── Flowchart 方向识别/切换（2026-10-19，pele autoDirection 的用户可控版）──
+test('findMermaidFlowDirection: 只认显式方向；front matter/注释/指令行跳过', () => {
+  assert.deepEqual(findMermaidFlowDirection('flowchart LR\n  A-->B'), {
+    lineIndex: 0, keyword: 'flowchart', direction: 'LR', horizontal: true, rest: '',
+  });
+  assert.equal(findMermaidFlowDirection('graph TD\n  A-->B').direction, 'TD');
+  assert.equal(findMermaidFlowDirection('flowchart-elk RL\n  A-->B').keyword, 'flowchart-elk');
+  const fm = '---\ntitle: x\n---\nflowchart LR\n  A-->B';
+  assert.equal(findMermaidFlowDirection(fm).lineIndex, 3);
+  assert.equal(findMermaidFlowDirection('%% 注释\n%%{init: {"theme":"dark"}}%%\nflowchart TD\n A-->B').lineIndex, 2);
+  assert.equal(findMermaidFlowDirection('flowchart\n  A-->B'), null, 'no explicit direction → no toggle');
+  assert.equal(findMermaidFlowDirection('sequenceDiagram\n  A->>B: hi'), null);
+});
+
+test('toggleMermaidDirection: LR↔TD、RL 可还原、缩进/行尾内容保留', () => {
+  const lr = toggleMermaidDirection('  flowchart LR\n  A-->B');
+  assert.equal(lr.source, '  flowchart TD\n  A-->B');
+  assert.equal(toggleMermaidDirection(lr.source).source, '  flowchart LR\n  A-->B');
+  const rl = toggleMermaidDirection('graph RL; A-->B');
+  assert.equal(rl.from, 'RL');
+  assert.equal(rl.to, 'TD');
+  assert.equal(rl.source, 'graph TD; A-->B');
+  assert.equal(toggleMermaidDirection(rl.source, 'RL').source, 'graph RL; A-->B', 'remember the original RL');
+  assert.equal(toggleMermaidDirection('flowchart\n A-->B'), null);
+  assert.equal(toggleMermaidDirection('sequenceDiagram\n A->>B: hi'), null);
+});
+
+// ── 光标锚定缩放（pele zoom.ts：keeps the point under the cursor）──────────
+test('computeAnchoredZoom: 光标下的图坐标在缩放前后不动', () => {
+  const orig = { x: 0, y: 0, w: 400, h: 200 };
+  const svgW = 300;
+  const svgH = 150;
+  const viewAt = (scale, tx, ty) => {
+    const vbW = orig.w / scale;
+    const vbH = orig.h / scale;
+    return {
+      x: orig.x + (orig.w - vbW) / 2 - tx * vbW / svgW,
+      y: orig.y + (orig.h - vbH) / 2 - ty * vbH / svgH,
+      w: vbW,
+      h: vbH,
+    };
+  };
+  for (const c of [
+    { from: 1, to: 2, tx: 0, ty: 0, px: 0.25, py: 0.75 },
+    { from: 1.5, to: 3, tx: 20, ty: -12, px: 0.8, py: 0.2 },
+    { from: 2, to: 1.25, tx: -30, ty: 40, px: 0.5, py: 0.5 },
+  ]) {
+    const out = computeAnchoredZoom(orig, c.from, c.to, c.tx, c.ty, c.px, c.py, svgW, svgH);
+    const before = viewAt(c.from, c.tx, c.ty);
+    const after = viewAt(c.to, out.tx, out.ty);
+    assert.ok(Math.abs(before.x + c.px * before.w - (after.x + c.px * after.w)) < 1e-6, `x anchor drifted: ${JSON.stringify(c)}`);
+    assert.ok(Math.abs(before.y + c.py * before.h - (after.y + c.py * after.h)) < 1e-6, `y anchor drifted: ${JSON.stringify(c)}`);
+  }
+});
+
+// ── Front matter 不是图内容（pele preprocess：front matter 单独处理）────────
+test('getMermaidDiagramKind/estimateMermaidPreviewHeight: front matter 不计入图内容', () => {
+  const src = '---\ntitle: 系统架构\n---\nflowchart LR\n  A-->B';
+  assert.equal(getMermaidDiagramKind(src), 'flowchart');
+  assert.equal(estimateMermaidPreviewHeight(src), estimateMermaidPreviewHeight('flowchart LR\n  A-->B'));
+  assert.equal(getMermaidDiagramKind('\n\n---\ntitle: x\n---\nsequenceDiagram\n  A->>B: hi'), 'sequencediagram');
+});
+
+// ── Front matter config 剥离（mermaid 12 的 front matter 绕过 directive 消毒）──
+test('stripFrontMatterConfig: 剥掉 config: 子树（含内联），保留 title/displayMode', () => {
+  const src = '---\ntitle: Arch\nconfig:\n  themeCSS: "body{display:none}"\n  maxEdges: 999999\ndisplayMode: compact\n---\nflowchart LR\n  A-->B';
+  const out = stripFrontMatterConfig(src);
+  assert.doesNotMatch(out, /config:/);
+  assert.doesNotMatch(out, /themeCSS|maxEdges/);
+  assert.match(out, /title: Arch/);
+  assert.match(out, /displayMode: compact/);
+  assert.ok(out.endsWith('flowchart LR\n  A-->B'));
+  assert.equal(out.split('\n').length, src.split('\n').length, 'line count must stay stable (error line numbers point at the original source)');
+
+  const inline = '---\ntitle: x\nconfig: {themeCSS: "body{display:none}"}\n---\nflowchart TD\n A-->B';
+  const out2 = stripFrontMatterConfig(inline);
+  assert.doesNotMatch(out2, /config:|themeCSS/);
+  assert.match(out2, /title: x/);
+
+  // 嵌套 config 后面还有别的顶层键（按缩进判断子树边界）。
+  const nested = '---\nconfig:\n  gantt:\n    displayMode: compact\ntitle: T\n---\ntimeline\n A : x';
+  const out3 = stripFrontMatterConfig(nested);
+  assert.doesNotMatch(out3, /config:/);
+  assert.match(out3, /title: T/);
+  assert.match(out3, /timeline/);
+
+  // 无 config / 无 front matter：逐字不变。
+  assert.equal(stripFrontMatterConfig('flowchart LR\n A-->B'), 'flowchart LR\n A-->B');
+  assert.equal(stripFrontMatterConfig('---\ntitle: x\n---\nflowchart LR'), '---\ntitle: x\n---\nflowchart LR');
+});
+
+test('stripFrontMatterConfig: 重复/引号键/多行 flow/块标量都剥掉，行数不变', () => {
+  const dup = '---\nconfig:\n  themeCSS: x\nconfig:\n  maxEdges: 999\n---\nflowchart LR\n A-->B';
+  const out = stripFrontMatterConfig(dup);
+  assert.doesNotMatch(out, /config:|themeCSS|maxEdges/);
+  assert.equal(out.split('\n').length, dup.split('\n').length);
+
+  const quoted = '---\n"config":\n  themeCSS: x\n---\nflowchart LR';
+  assert.doesNotMatch(stripFrontMatterConfig(quoted), /config|themeCSS/);
+
+  const flow = '---\nconfig: {\n  themeCSS: "x"\n}\ntitle: T\n---\nflowchart LR';
+  const outFlow = stripFrontMatterConfig(flow);
+  assert.doesNotMatch(outFlow, /config:|themeCSS/);
+  assert.match(outFlow, /title: T/);
+  assert.equal(outFlow.split('\n').length, flow.split('\n').length);
+
+  const block = '---\nconfig: |\n  themeCSS: x\ntitle: T\n---\nflowchart LR';
+  const outBlock = stripFrontMatterConfig(block);
+  assert.doesNotMatch(outBlock, /config:|themeCSS/);
+  assert.match(outBlock, /title: T/);
+});
+
+// ── 图内链接/图片协议白名单（pele host policy）──────────────────────────────
+test('enforceSafeDiagramLinks: 非白名单 scheme 全部剥离，外链统一 target/rel', () => {
+  const root = document.createElement('div');
+  root.innerHTML = [
+    '<a href="javascript:alert(1)">js</a>',
+    '<a href="data:text/html,x">data</a>',
+    '<a href="./local">relative</a>',
+    '<a href="//evil.example/a">protocol-relative</a>',
+    '<a href="https://example.com/a">https</a>',
+    '<a href="mailto:a@b.c">mail</a>',
+    '<a href="tel:+123">tel</a>',
+    '<img src="data:image/png;base64,AA">',
+    '<img src="https://example.com/x.png">',
+  ].join('');
+  enforceSafeDiagramLinks(root);
+  const links = [...root.querySelectorAll('a')];
+  for (const i of [0, 1, 2, 3]) assert.equal(links[i].hasAttribute('href'), false, `link ${i} must lose href`);
+  for (const i of [4, 5, 6]) {
+    assert.equal(links[i].getAttribute('href'), ['https://example.com/a', 'mailto:a@b.c', 'tel:+123'][i - 4]);
+    assert.equal(links[i].target, '_blank');
+    assert.equal(links[i].rel, 'noopener noreferrer');
+  }
+  const imgs = [...root.querySelectorAll('img')];
+  assert.equal(imgs[0].hasAttribute('src'), false, 'data: image must be stripped');
+  assert.equal(imgs[1].getAttribute('src'), 'https://example.com/x.png');
+});
+
+// ── 渲染上限/错误分型（pele PeleErrorCode 思路）──────────────────────────────
+test('mermaidErrorKind / summarizeMermaidErrorMessage: limit vs syntax vs other', () => {
+  assert.equal(mermaidErrorKind(new RangeError('Maximum call stack size exceeded')), 'limit');
+  assert.equal(mermaidErrorKind(new Error('Edge limit exceeded. 2001 edges found, but the limit is 2000')), 'limit');
+  assert.equal(mermaidErrorKind(new Error('Maximum text size in diagram exceeded')), 'limit');
+  const parse = new Error('Parse error on line 2:\nA[{\n  ^\nExpecting X');
+  assert.equal(mermaidErrorKind(parse), 'syntax');
+  assert.equal(mermaidErrorKind(new Error('boom')), 'other');
+  // pele 的 summary 规则：首行（在哪）+ 末行（什么错）。
+  assert.equal(summarizeMermaidErrorMessage(new Error('first line\nsecond line')), 'first line second line');
+  assert.equal(summarizeMermaidErrorMessage(new Error('single')), 'single');
 });
 
 // ── fitSvgShapesToText：jsdom + getBBox/getCTM 桩 ──────────────────────────
