@@ -130,6 +130,71 @@ test('Bilibili active fallback: injects content script file on-demand before cal
   );
 });
 
+// Regression (user report 2026-10-19): festival/活动页（/festival/jzj2023?bvid=BV…）
+// was rejected by the tryBilibiliActiveFallback URL gate (`bilibili.com\/video\/`),
+// so the whole bilibili pipeline never ran and attach degraded to the generic
+// page dump (llms.txt + DOM text). The gate must accept activity pages whose
+// bvid rides the query string.
+test('Bilibili festival page (?bvid= query): active fallback must run, not fall through to generic extraction', async () => {
+  const festivalUrl = 'https://www.bilibili.com/festival/jzj2023?bvid=BV1zK4y1F7pk&spm_id_from=333.1387.homepage.video_card.click';
+  chromeMock.tabs.query = async () => [{ id: 4, url: festivalUrl, title: '拜年祭' }];
+  chromeMock.tabs.get = async (id) => ({ id, url: festivalUrl, title: '拜年祭', favIconUrl: '' });
+  const sawBilibiliFetch = { v: false };
+  chromeMock.scripting.executeScript = async (opts) => {
+    executeScriptCalls.push(opts);
+    if (opts.files) return [{ result: undefined }];
+    const body = opts.func?.toString() || '';
+    if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+    if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+    if (body.includes('activeFetchBilibiliVideo')) {
+      sawBilibiliFetch.v = true;
+      return [{ result: { bvid: 'BV1zK4y1F7pk', title: '英伟达GPU', upMid: 1, cid: 1298613617, duration: 1800, desc: 'desc', transcript: '[00:01] 字幕', stat: {} } }];
+    }
+    // generic extraction — if we ever get here, the gate failed its job
+    return [{ result: { text: 'GENERIC PAGE DUMP', rawTextLength: 17, wasCapped: false } }];
+  };
+
+  executeScriptCalls = [];
+  const res = await handle({ type: 'ATTACH_PAGE', tabId: 4, mode: 'auto' }, { tab: { id: 4 } });
+  assert.equal(res.ok, true);
+  assert.ok(sawBilibiliFetch.v, 'festival page must reach activeFetchBilibiliVideo (not the generic extractor)');
+  assert.ok(
+    (res.ctx?.text || '').includes('[00:01] 字幕'),
+    'attached ctx must carry the bilibili transcript, not the generic page dump'
+  );
+});
+
+// Regression (same-day): /shorts/、/live/、/embed/ pages were rejected by the
+// tryYoutubeActiveFallback gate (`youtube.com\/watch\?`) — the videoId path
+// extraction added for those forms was dead code behind the gate.
+test('YouTube Shorts page (/shorts/): active fallback must run', async () => {
+  const shortsUrl = 'https://www.youtube.com/shorts/dQw4w9WgXcQ';
+  chromeMock.tabs.query = async () => [{ id: 5, url: shortsUrl, title: 'Short' }];
+  chromeMock.tabs.get = async (id) => ({ id, url: shortsUrl, title: 'Short', favIconUrl: '' });
+  const sawYoutubeFetch = { v: false };
+  chromeMock.scripting.executeScript = async (opts) => {
+    executeScriptCalls.push(opts);
+    if (opts.files) return [{ result: undefined }];
+    const body = opts.func?.toString() || '';
+    if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+    if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+    if (body.includes('activeYouTubeFetch')) {
+      sawYoutubeFetch.v = true;
+      return [{ result: { videoId: 'dQw4w9WgXcQ', title: 'Short', author: 'A', lengthSeconds: 30, shortDescription: 'd', transcript: '[00:01] hi', chapters: null, rawAt: Date.now() } }];
+    }
+    return [{ result: { text: 'GENERIC PAGE DUMP', rawTextLength: 17, wasCapped: false } }];
+  };
+
+  executeScriptCalls = [];
+  const res = await handle({ type: 'ATTACH_PAGE', tabId: 5, mode: 'auto' }, { tab: { id: 5 } });
+  assert.equal(res.ok, true);
+  assert.ok(sawYoutubeFetch.v, 'shorts page must reach activeYouTubeFetch');
+  assert.ok(
+    (res.ctx?.text || '').includes('[00:01] hi'),
+    'attached ctx must carry the youtube transcript, not the generic page dump'
+  );
+});
+
 // X/Twitter variant: the passive interceptor never runs in MAIN world (chrome.runtime
 // is undefined there — same lesson as YouTube), so SITE_CACHES.twitter is never
 // populated and tweet pages would otherwise fall through to the generic DOM dump.
