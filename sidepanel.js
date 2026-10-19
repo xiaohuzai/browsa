@@ -14,7 +14,7 @@ import {
   renderSafe, renderStreamingSafe, preloadChartVendors, chartVendorLangs, finishBubble,
   addCodeCopyButtons, linkifyTimestamps, disposeChartObservers, disposeMolstarViewers, disposeRenderInstancesIn,
   makeStreamRenderer, setThoughtAutoCollapse, stripThinkSegments, decorateFigureRefs, figuresBeforeEntry,
-  renderUserContent
+  renderUserContent, refreshMermaidDiagrams
 } from './lib/sidepanel/render.js';
 import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/msg-search.js';
 import { initMathCopy } from './lib/sidepanel/math-copy.js';
@@ -3641,6 +3641,8 @@ async function renderHistory() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--msg-font-size', px + 'px');
+  // 已渲染的图按新字号重排（延迟防抖；设置初始化时没有图 = no-op）。
+  refreshMermaidDiagrams();
 }
 
 // 「正文字体」设置（设置页 fontFamily: system/serif/mono）：写 --msg-font-family
@@ -3650,6 +3652,9 @@ function applyFontFamily(key) {
   const stack = msgFontStackOf(key);
   if (stack) document.documentElement.style.setProperty('--msg-font-family', stack);
   else document.documentElement.style.removeProperty('--msg-font-family');
+  // mermaid 的布局按字体宽度算：已渲染的图必须跟着设置重排（其余 SVG 渲染器
+  // 下次渲染即跟手，mermaid 是唯一有异步布局缓存的）。
+  refreshMermaidDiagrams();
 }
 
 

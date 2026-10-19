@@ -1063,6 +1063,26 @@
     "message": "재설정",
     "description": "Sidepanel: diagram reset title"
   },
+  "mermaidToggleVertical": {
+    "message": "세로 레이아웃으로 전환",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidToggleHorizontal": {
+    "message": "가로 레이아웃으로 전환",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidErrTooComplex": {
+    "message": "다이어그램이 너무 복잡하여 렌더링할 수 없습니다",
+    "description": "Sidepanel: mermaid over-limit error"
+  },
+  "mermaidToggleFailed": {
+    "message": "레이아웃을 전환하지 못했습니다",
+    "description": "Sidepanel: diagram direction toggle failure toast"
+  },
+  "mermaidZoomHint": {
+    "message": "다이어그램: + / − 확대·축소, 방향키 이동, 0 초기화",
+    "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
+  },
   "mermaidExportPng": {
     "message": "PNG 내보내기",
     "description": "Sidepanel: chart export png title"

@@ -1289,6 +1289,9 @@ html { interpolate-size: allow-keywords; }
   line-height: 1;
 }
 .mermaid-btn:hover { background: var(--bg-4); color: var(--fg); }
+/* Zoom bounds（pele 的按钮禁用态）：静止时 −/重置不可用，最大倍率时 + 不可用。 */
+.mermaid-btn:disabled { opacity: .35; cursor: default; }
+.mermaid-btn:disabled:hover { background: var(--bg-3); color: var(--fg-2); }
 .mermaid-error {
   color: var(--error);
   font-size: 12px;

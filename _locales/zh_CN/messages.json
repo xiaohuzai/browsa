@@ -1063,6 +1063,26 @@
     "message": "重置",
     "description": "Sidepanel: diagram reset title"
   },
+  "mermaidToggleVertical": {
+    "message": "切换为纵向布局",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidToggleHorizontal": {
+    "message": "切换为横向布局",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidErrTooComplex": {
+    "message": "图过于复杂，超出渲染上限",
+    "description": "Sidepanel: mermaid over-limit error"
+  },
+  "mermaidToggleFailed": {
+    "message": "切换布局失败",
+    "description": "Sidepanel: diagram direction toggle failure toast"
+  },
+  "mermaidZoomHint": {
+    "message": "图表：+ / − 缩放，方向键平移，0 重置",
+    "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
+  },
   "mermaidExportPng": {
     "message": "导出 PNG",
     "description": "Sidepanel: chart export png title"

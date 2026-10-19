@@ -1063,6 +1063,26 @@
     "message": "Сбросить",
     "description": "Sidepanel: diagram reset title"
   },
+  "mermaidToggleVertical": {
+    "message": "Переключить на вертикальную схему",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidToggleHorizontal": {
+    "message": "Переключить на горизонтальную схему",
+    "description": "Sidepanel: diagram direction toggle"
+  },
+  "mermaidErrTooComplex": {
+    "message": "Схема слишком сложна для отрисовки",
+    "description": "Sidepanel: mermaid over-limit error"
+  },
+  "mermaidToggleFailed": {
+    "message": "Не удалось переключить схему",
+    "description": "Sidepanel: diagram direction toggle failure toast"
+  },
+  "mermaidZoomHint": {
+    "message": "Схема: + / − масштаб, стрелки для перемещения, 0 для сброса",
+    "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
+  },
   "mermaidExportPng": {
     "message": "Экспорт в PNG",
     "description": "Sidepanel: chart export png title"
