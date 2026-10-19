@@ -21,7 +21,7 @@ function loadContentScript(name) {
 // bilibili-content-script.js
 // ============================================================================
 {
-  const { isBilibiliViewUrl, isBilibiliPlayerUrl, extractBilibiliVideo, installBilibiliInterceptor, md5, wbiSign, activeFetchBilibiliVideo } =
+  const { isBilibiliViewUrl, isBilibiliPlayerUrl, extractBilibiliVideo, installBilibiliInterceptor, md5, wbiSign, activeFetchBilibiliVideo, bilibiliBvidFromUrl, bilibiliAidFromUrl, bilibiliPageFromUrl } =
     loadContentScript('bilibili-content-script.js');
 
   test('bilibili: isBilibiliViewUrl matches the video-view endpoint only', () => {
@@ -182,6 +182,60 @@ function loadContentScript(name) {
     }
   });
 
+  test('bilibili: bvid/aid/page URL extraction covers watch, festival, player.html', () => {
+    // 路径优先（普通播放页）
+    assert.equal(bilibiliBvidFromUrl('https://www.bilibili.com/video/BV1zK4y1F7pk/?p=2'), 'BV1zK4y1F7pk');
+    // festival/活动页：bvid 在查询参数
+    assert.equal(bilibiliBvidFromUrl('https://www.bilibili.com/festival/jzj2023?bvid=BV1zK4y1F7pk&spm_id_from=x'), 'BV1zK4y1F7pk');
+    assert.equal(bilibiliBvidFromUrl('https://www.bilibili.com/festival/jzj2023?bvid=not-a-bv'), '');
+    // player.html 嵌入页只有 aid
+    assert.equal(bilibiliAidFromUrl('https://player.bilibili.com/player.html?aid=873834214&cid=1298613617&page=1'), 873834214);
+    assert.equal(bilibiliAidFromUrl('https://player.bilibili.com/player.html?bvid=BV1zK4y1F7pk'), 0);
+    assert.equal(bilibiliAidFromUrl('https://player.bilibili.com/player.html?aid=junk'), 0);
+    // player.html 的分 P 参数是 ?page=（与 ?p= 等价）
+    assert.equal(bilibiliPageFromUrl('https://player.bilibili.com/player.html?bvid=BV1x&page=2'), 2);
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1x?p=3'), 3);
+    assert.equal(bilibiliPageFromUrl('https://www.bilibili.com/video/BV1x'), 1);
+    assert.equal(bilibiliBvidFromUrl(''), '');
+    assert.equal(bilibiliAidFromUrl(''), 0);
+  });
+
+  test('bilibili: activeFetchBilibiliVideo supports ?aid= (player.html 嵌入形态)', async () => {
+    const prevWindow = globalThis.window;
+    const prevFetch = globalThis.fetch;
+    try {
+      globalThis.window = {
+        location: { href: 'https://player.bilibili.com/player.html?aid=873834214&page=1' },
+        // 无 __INITIAL_STATE__ — player.html 嵌入页形态
+      };
+      const calls = [];
+      globalThis.fetch = async (url) => {
+        calls.push(url);
+        if (url.includes('/x/web-interface/view')) {
+          assert.ok(url.includes('aid=873834214'), 'must query the view API by aid');
+          return {
+            ok: true,
+            json: async () => ({
+              code: 0,
+              data: {
+                bvid: 'BV1zK4y1F7pk', title: '英伟达GPU', desc: 'd',
+                owner: { name: 'up' }, tname: '科技', duration: 1800,
+                pages: [{ cid: 1298613617 }], stat: {},
+              },
+            }),
+          };
+        }
+        return { ok: false }; // nav / player / conclusion — short-circuit before WBI
+      };
+      const result = await activeFetchBilibiliVideo();
+      assert.equal(result.bvid, 'BV1zK4y1F7pk', 'downstream bvid comes from the view API response');
+      assert.equal(result.cid, 1298613617);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+    }
+  });
+
   test('bilibili: activeFetchBilibiliVideo prefers __INITIAL_STATE__ for meta', async () => {
     const prevWindow = globalThis.window;
     const prevFetch = globalThis.fetch;
@@ -284,7 +338,7 @@ function loadContentScript(name) {
 // youtube-content-script.js
 // ============================================================================
 {
-  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, innertubeCaptionTracks, fetchInnertubeTranscript, triggerCaptionTranscript, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText } =
+  const { isYouTubePlayerUrl, extractVideoMeta, fetchTranscript, readYouTubeRichMeta, extractYouTubeChapters, activeYouTubeFetch, innertubeCaptionTracks, fetchInnertubeTranscript, triggerCaptionTranscript, installYouTubeInterceptor, isTimedtextUrl, extractVideoIdFromTimedtextUrl, parseTimedtextJson, parseTimedtextXml, normalizeSubtitleText, youtubeVideoIdFromLocation } =
     loadContentScript('youtube-content-script.js');
 
   test('youtube: isYouTubePlayerUrl matches both apex and www hosts, prefix-matches the path', () => {
@@ -586,6 +640,61 @@ function loadContentScript(name) {
       if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
       if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
       if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+    }
+  });
+
+  // Regression (user question 2026-10-20): videoId used to come only from ?v= —
+  // /shorts/、/live/、/embed/ 页在 activeYouTubeFetch 第一步就 return null。
+  test('youtube: youtubeVideoIdFromLocation covers watch/shorts/live/embed, rejects videoseries', () => {
+    assert.equal(youtubeVideoIdFromLocation({ search: '?v=ABC123', pathname: '/watch' }), 'ABC123');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/shorts/dQw4w9WgXcQ' }), 'dQw4w9WgXcQ');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/live/dQw4w9WgXcQ' }), 'dQw4w9WgXcQ');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/embed/dQw4w9WgXcQ' }), 'dQw4w9WgXcQ');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/v/dQw4w9WgXcQ' }), 'dQw4w9WgXcQ');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/embed/videoseries?list=PL123' }), '', 'embed playlist is not a video');
+    assert.equal(youtubeVideoIdFromLocation({ pathname: '/feed/subscriptions' }), '');
+    assert.equal(youtubeVideoIdFromLocation({ search: '?v=', pathname: '/' }), '');
+    assert.equal(youtubeVideoIdFromLocation({}), '');
+  });
+
+  test('youtube: activeYouTubeFetch reads videoId from a /shorts/ path (no ?v=)', async () => {
+    const prevWindow = globalThis.window;
+    const prevPerf = globalThis.performance;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      globalThis.window = {
+        location: { pathname: '/shorts/dQw4w9WgXcQ' },
+        ytInitialData: {},
+        ytcfg: { get: (k) => k === 'INNERTUBE_CONTEXT' ? { client: { clientName: 'WEB' } } : undefined }
+        // ytInitialPlayerResponse absent — falls through to Stage 3, which must
+        // receive the Shorts videoId from the path
+      };
+      globalThis.document = { getElementById: () => null };
+      globalThis.performance = { getEntriesByType: () => [] };
+      globalThis.fetch = async (url, opts) => {
+        if (typeof url === 'string' && url.includes('/youtubei/v1/player')) {
+          const body = JSON.parse(opts.body);
+          assert.equal(body.videoId, 'dQw4w9WgXcQ', 'Stage 3 must use the Shorts videoId from the path');
+          return {
+            ok: true,
+            json: async () => ({
+              videoDetails: { videoId: 'dQw4w9WgXcQ', title: 'Short', author: 'A', lengthSeconds: '30', shortDescription: 'd' },
+              captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ languageCode: 'en', baseUrl: 'https://example.com/timedtext' }] } }
+            })
+          };
+        }
+        return { ok: true, text: async () => JSON.stringify({ events: [{ tStartMs: 1000, segs: [{ utf8: 'hi' }] }] }) };
+      };
+      const result = await activeYouTubeFetch();
+      assert.ok(result, 'must return a result for a Shorts page');
+      assert.equal(result.videoId, 'dQw4w9WgXcQ');
+      assert.equal(result.title, 'Short');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
     }
   });
 
