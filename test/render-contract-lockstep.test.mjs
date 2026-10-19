@@ -252,8 +252,12 @@ test('lockstep: mermaid host responsibilities (limits, no click binding, link po
 
 // ─── 6. Mermaid 缩放 / 字体重排 / 宽度（2026-10-19 第二批，pele zoom+mount）──
 test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, sequence wraps', () => {
-  // 缩放下限 1（<1 只会露出图外空白）与光标锚定。
-  assert.match(renderJs, /const _MM_ZOOM_MIN = 1/);
+  // 缩放范围 0.2–4（用户拍板：静止也要能缩小；<1 露出图外留白属预期）。
+  assert.match(renderJs, /const _MM_ZOOM_MIN = 0\.2/);
+  assert.match(renderJs, /const _MM_FIT = 1/, 'pan/arrow gates key off the fit scale, not the zoom floor');
+  // 方向档位：纵向（TD）布局用宽松间距，防 edge label 挤节点。
+  assert.match(renderJs, /flowchart: vertical \? \{ nodeSpacing: 50, rankSpacing: 60 \} : \{ nodeSpacing: 30, rankSpacing: 40 \}/);
+  assert.match(renderJs, /initMermaidTheme\(m, dirHit && !dirHit\.horizontal \? 'vertical' : 'horizontal'\)/);
   assert.match(renderJs, /export function computeAnchoredZoom/);
   assert.match(renderJs, /tabIndex = 0/);
   assert.match(renderJs, /mermaidZoomHint/);
@@ -265,8 +269,8 @@ test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, 
   assert.match(css, /\.mermaid-btn:disabled/, 'zoom buttons need a disabled state at the bounds');
   // 字体/字号设置变更必须重排已渲染的图（mermaid 布局按字体宽度算）。
   assert.match(renderJs, /export function refreshMermaidDiagrams/);
-  assert.match(renderJs, /initMermaidTheme\(state\.m\)/,
-    're-renders must re-initialize mermaid so a font change actually reaches the layout');
+  assert.match(renderJs, /initMermaidTheme\(state\.m, dirHit && !dirHit\.horizontal \? 'vertical' : 'horizontal'\)/,
+    're-renders must re-initialize mermaid so a font/direction change actually reaches the layout');
   // 输入短路：宽度/主题都没变的图不付一次完整渲染。
   assert.match(renderJs, /width === state\.width && mermaidThemeKey === state\.themeKey/);
   // 字体刷新先可见后空闲；旧批次由 generation 取消。
