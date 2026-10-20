@@ -155,3 +155,40 @@ test('per-family: narrow triggers avoid the known false positives', () => {
   assert.equal(buildRenderHints({ userText: 'what is the dot product' }), '', '"dot product" is not Graphviz');
   assert.equal(buildRenderHints({ userText: 'charter schools' }), '', '"charter" must not trigger the chart family');
 });
+
+// browsa ships seven UI languages; the hint gate must not silently be
+// English/Chinese-only or those users never get the render contract.
+test('per-family: triggers cover the seven UI languages plus de/fr reply languages', () => {
+  const cases = [
+    ['フローチャートを描いて', ['mermaid', 'routing']],
+    ['순서도를 그려줘', ['mermaid', 'routing']],
+    ['dibuja un diagrama de flujo', ['mermaid', 'routing']],
+    ['desenhe um gráfico de barras', ['echarts', 'routing']],
+    ['нарисуй блок-схему', ['mermaid', 'routing']],
+    ['zeichne ein Flussdiagramm', ['mermaid', 'routing']],
+    ['dessine un organigramme', ['mermaid', 'routing']],
+    ['Wasser-Molekül', ['smiles']],
+    ['Proteinstruktur', ['pdb']],
+  ];
+  for (const [text, expected] of cases) {
+    const out = buildRenderHints({ userText: text });
+    for (const id of expected) {
+      assert.ok(out.includes(MARKERS[id]), `${text} must carry the ${id} family`);
+    }
+    assert.ok(!out.includes(MARKERS.article), `${text} must not carry the article family`);
+  }
+});
+
+test('per-family: multilingual article reads do NOT trigger the article-style contract', () => {
+  for (const text of [
+    'この記事を要約して',
+    '이 기사를 요약해',
+    'este artículo es interesante',
+    'resuma este artigo',
+    'эта статья интересная',
+    'dieser Artikel ist gut',
+  ]) {
+    assert.ok(!buildRenderHints({ userText: text }).includes(MARKERS.article),
+      `reading an article must not trigger article style: ${text}`);
+  }
+});

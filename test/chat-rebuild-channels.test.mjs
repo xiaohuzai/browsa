@@ -1034,3 +1034,36 @@ test('per-family hints: a chart turn carries echarts but not the chemistry/prote
     restore();
   }
 });
+
+// browsa 里同时会配各种模型/渠道（chat, responses, anthropic, Hermes runs）——
+// 家族选择必须对每个 LLM 通道一致，不能只有 chat-completions 拿到新行为。
+test('per-family hints ride EVERY LLM channel, not just chat-completions', async () => {
+  const cases = [
+    { name: 'chat', provider: CHAT_PROVIDER, fetch: () => chatLeg({ text: 'ok' }), sysOf: (c) => JSON.stringify(c.body) },
+    { name: 'responses', provider: RESPONSES_PROVIDER, fetch: () => responsesLeg({ text: 'ok' }), sysOf: (c) => JSON.stringify(c.body.instructions) },
+    { name: 'anthropic', provider: ANTHROPIC_PROVIDER, fetch: () => anthropicLeg({ text: 'ok' }), sysOf: (c) => JSON.stringify(c.body.system) },
+    {
+      name: 'hermes',
+      provider: HERMES_PROVIDER,
+      fetch: (call) => (call.method === 'POST' ? hermesRunCreated('run_h') : hermesEventsLeg({ text: 'ok' })),
+      sysOf: (c) => JSON.stringify(c.body.instructions),
+    },
+  ];
+  for (let i = 0; i < cases.length; i++) {
+    const cs = cases[i];
+    await seedProvider(cs.provider);
+    const { calls, restore } = installFetch(cs.fetch);
+    const cap = captureChunks(92 + i);
+    try {
+      await handleChat({ tabId: 92 + i, userText: '画个柱状图对比一下' }, HINTS, '');
+      const sys = cs.sysOf(calls[0]);
+      assert.ok(sys.includes(HINTS), `${cs.name}: the ALWAYS base must ride`);
+      assert.ok(sys.includes('xAxis'), `${cs.name}: the selected ECharts family must ride`);
+      assert.ok(!sys.includes('RCSB Protein Data Bank'), `${cs.name}: no unselected protein family`);
+      assert.ok(!sys.includes('machine-writing tells'), `${cs.name}: no unselected article family`);
+    } finally {
+      cap.release();
+      restore();
+    }
+  }
+});
