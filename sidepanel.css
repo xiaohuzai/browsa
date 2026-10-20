@@ -921,7 +921,9 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #000;
+  /* The crop backdrop is a panel surface, not a literal black — the theme
+     owns the ground colour (and light mode gets the paper-white one). */
+  background: var(--bg);
   padding: 4px;
 }
 .crop-canvas { display: block; cursor: crosshair; max-width: 100%; max-height: 100%; }
@@ -1766,7 +1768,7 @@ html { interpolate-size: allow-keywords; }
   min-height: 24px;
   border-radius: 50%;
   background: rgba(0,0,0,0.65);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
   font-size: 13px;
   line-height: 24px;
@@ -2163,7 +2165,7 @@ code.language-patch {
   display: block;
 }
 code.language-diff .hljs-addition,
-code.language-patch .hljs-addition { color: #7ee787; }
+code.language-patch .hljs-addition { color: var(--code-addition); }
 
 /* ── Sessions drawer ─────────────────────────────────────────────────────── */
 .sessions-drawer {
@@ -2610,42 +2612,31 @@ code.language-patch .hljs-addition { color: #7ee787; }
 }
 .transcript-follow-pill:hover { background: var(--bg-3); color: var(--accent); }
 
-/* ── Syntax highlighting (highlight.js dark theme) ───────────────────────── */
+/* ── Syntax highlighting (highlight.js) ────────────────────────────────────
+   The hues live in lib/theme.css as --code-* tokens (one list for every
+   colour the product uses); the light-mode remap lives there too, which is
+   why there is no duplicated @media block here any more. The hues themselves
+   are UNCHANGED — they are what every other code viewer taught users' eyes
+   to read. */
 .msg.assistant pre code.hljs { background: transparent; padding: 0; }
 /* U6: no font-style:italic on any CJK-possible text — browsers synthesize
    obliques that render Chinese glyphs as slanted strokes (same reasoning as
    the .msg.assistant blockquote rule). Color carries the "comment" signal. */
-.hljs-comment, .hljs-quote { color: #8b949e; }
-.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #ff7b72; }
+.hljs-comment, .hljs-quote { color: var(--code-comment); }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: var(--code-keyword); }
 .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
-.hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #a5d6ff; }
-.hljs-deletion, .hljs-selector-pseudo { color: #ff7b72; }
-.hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #ffa657; }
-.hljs-meta { color: #d2a8ff; }
-.hljs-number { color: #79c0ff; }
-.hljs-title.class_, .hljs-class .hljs-title { color: #ffa657; }
-.hljs-function, .hljs-title.function_ { color: #d2a8ff; }
+.hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: var(--code-string); }
+.hljs-deletion, .hljs-selector-pseudo { color: var(--code-keyword); }
+.hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: var(--code-symbol); }
+.hljs-meta { color: var(--code-meta); }
+.hljs-number { color: var(--code-number); }
+.hljs-title.class_, .hljs-class .hljs-title { color: var(--code-symbol); }
+.hljs-function, .hljs-title.function_ { color: var(--code-meta); }
 .hljs-params { color: var(--fg); }
-.hljs-attr { color: #7ee787; }
-.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #7ee787; }
+.hljs-attr { color: var(--code-attr); }
+.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: var(--code-attr); }
 .hljs-subst { color: var(--fg); }
 .hljs-strong { font-weight: bold; }
-@media (prefers-color-scheme: light) {
-  .hljs-comment, .hljs-quote { color: #6e7781; }
-  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #cf222e; }
-  .hljs-deletion, .hljs-selector-pseudo { color: #cf222e; }
-  .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
-  .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #0a3069; }
-  .hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #953800; }
-  .hljs-meta { color: #8250df; }
-  .hljs-number { color: #0550ae; }
-  .hljs-title.class_, .hljs-class .hljs-title { color: #953800; }
-  .hljs-function, .hljs-title.function_ { color: #8250df; }
-  .hljs-attr { color: #116329; }
-  .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #116329; }
-  code.language-diff .hljs-addition,
-  code.language-patch .hljs-addition { color: #116329; }
-}
 
 /* ── Message edit mode ───────────────────────────────────────────────────── */
 .msg-edit-textarea {
@@ -2814,7 +2805,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   background: rgba(0,0,0,0.5);
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 50%;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 16px;
   width: 30px;
   height: 30px;

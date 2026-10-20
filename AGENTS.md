@@ -49,6 +49,8 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **焦点只有一套**：`--focus-ring` 令牌（2px 底色垫 + 4px accent 环）+ `@media (forced-colors: active)` 兜底（High Contrast 会剥掉 box-shadow，没有兜底等于键盘用户没有焦点指示）。文本框自己一套（见上），控件用全局环；**不要再出现第三种**（金环、金色 outline 都已并掉）。
 - **z-index 只走 `--z-*` 阶梯**（theme.css 定义，sidepanel.css 里不许出现裸数字）。两条已修的层级事故：截图裁剪弹窗（模态）与抽屉同层；确认弹窗在 toast 之下（toast 会盖住用户正在回答的对话框）。Tests: `render-contract-lockstep`「stacking order comes from the token ladder」。
 - **设置页页眉用普通发丝线**（原是「缝线」虚线，注释说它呼应侧栏的 Margin Rail——那个 Rail 2026-09-23 就删了，回声比它的原型活得久）。
+- **代码高亮调色板收进 `theme.css` 的 `--code-*` 令牌**（2026-10-20）：代码块曾是唯一一处颜色来自外部的地方（GitHub 的 ~15 个裸 hex + 一份重复的亮色 @media 块）。**色相一个字都没动**——那套配色是用户眼睛从别的代码阅读器里学来的肌肉记忆；迁移只改结构，色相由 lockstep 钉死（改色相必须是有意的）。slot 按 highlight.js 类名实际扮演的角色划分（`--code-symbol` 也承载 class 标题；`--code-addition` 独立成槽，日前与 `--code-attr` 同值，将来可分开调）。**sidepanel.css 里不许再出现 hljs 的裸 hex 或自己的 `@media (prefers-color-scheme: light)` 块**。Tests: `render-contract-lockstep` 第 8 节。
+- **动效令牌迁移是单独一件事，别混进视觉修复**：`--t`（0.15s ease，22 处）与 2026-10-17 引入的 `--dur-*` 五档 + `--ease-*` + `--spring-bounce` 是两套并行体系，`theme.css:100` 的注释已经写成「已替换」但其实只迁了一半。22 处是那轮动效批逐条手工调过的，映射过去会让 22 个元素一起变快——**要动就单独出一版给真机对比手感**，别搭进别的改动里。
 
 ## Docs sync convention (user-visible changes, 2026-09-20)
 

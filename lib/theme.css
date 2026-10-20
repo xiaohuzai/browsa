@@ -186,6 +186,30 @@
      reads as a single drawn edge rather than two stacked outlines. */
   --focus-ring:   0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 
+  /* ── Syntax highlighting (highlight.js) ───────────────────────────────────
+     The code block used to be the ONE place whose palette came from outside
+     this file: GitHub's, written as ~15 raw hex values in sidepanel.css and
+     then duplicated into a light-mode override block. The HUES are unchanged —
+     they are what every other code viewer taught users' eyes to read — but
+     they now live here as tokens, so "every colour this product uses" is one
+     list, and retuning the code palette is one edit instead of thirty.
+
+     The light remap lives in the light block below, like every other token
+     here — which is why the duplicated @media block in sidepanel.css is gone.
+
+     Slots follow the roles the highlight.js classes actually play, not the
+     class names: --code-symbol also carries class titles (same green-brown
+     hue today), --code-addition is its own slot so a diff "+" line can be
+     retuned apart from attributes even though they share a value for now. */
+  --code-comment:  #8b949e;
+  --code-keyword:  #ff7b72;
+  --code-string:   #a5d6ff;
+  --code-symbol:   #ffa657;
+  --code-meta:     #d2a8ff;
+  --code-number:   #79c0ff;
+  --code-attr:     #7ee787;
+  --code-addition: #7ee787;
+
   --shadow-sm:    0 1px 4px rgba(0,0,0,0.4);
   --shadow-md:    0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg:    0 8px 32px rgba(0,0,0,0.50);
@@ -248,7 +272,20 @@
     --shadow-ink:   rgba(0, 0, 0, 0.12);
     --edge-hi:      0 0 0 0 transparent; /* no-op layer — see the dark block */
     --hover-bg:     rgba(0,0,0,0.04);
-    --code-bg:      rgba(0,0,0,0.05);
+    --code-bg:      rgba(148,160,171,0.05);
+
+    /* Syntax highlighting, light mode (see the dark block for the slots).
+       Same GitHub-light hues the code blocks have always used — only the
+       ADDRESS changed, so this panel's code palette no longer needs its own
+       duplicated @media block. */
+    --code-comment:  #6e7781;
+    --code-keyword:  #cf222e;
+    --code-string:   #0a3069;
+    --code-symbol:   #953800;
+    --code-meta:     #8250df;
+    --code-number:   #0550ae;
+    --code-attr:     #116329;
+    --code-addition: #116329;
   }
 }
 

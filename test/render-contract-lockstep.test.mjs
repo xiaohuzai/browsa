@@ -375,3 +375,53 @@ test('lockstep: chemistry drawings are cropped to their ink, and the 3D viewport
   assert.match(renderJs, /viewportBackgroundColor:\s*_themeColor\('--bg-2'/,
     'the Mol* viewport background must follow the theme surface, not a hard-coded black/white');
 });
+
+// ─── 8. Syntax-highlight palette is tokenized (2026-10-20) ─────────────────
+// The code block used to be the one place whose colors came from outside
+// lib/theme.css: GitHub's, as ~15 raw hex values in sidepanel.css plus a
+// duplicated light-mode @media block. The migration was structure-only —
+// the hues are pinned below so a future retune has to be deliberate.
+const CODE_TOKENS = {
+  '--code-comment':  { dark: '#8b949e', light: '#6e7781' },
+  '--code-keyword':  { dark: '#ff7b72', light: '#cf222e' },
+  '--code-string':   { dark: '#a5d6ff', light: '#0a3069' },
+  '--code-symbol':   { dark: '#ffa657', light: '#953800' },
+  '--code-meta':     { dark: '#d2a8ff', light: '#8250df' },
+  '--code-number':   { dark: '#79c0ff', light: '#0550ae' },
+  '--code-attr':     { dark: '#7ee787', light: '#116329' },
+  '--code-addition': { dark: '#7ee787', light: '#116329' },
+};
+
+test('lockstep: the code palette lives in theme.css as tokens, both themes, unchanged hues', () => {
+  const darkRoot = themeCss.match(/^:root\s*\{([^}]*)\}/m);
+  assert.ok(darkRoot, 'the dark :root block is gone from theme.css');
+  const lightBlock = themeCss.match(/@media \(prefers-color-scheme: light\)\s*\{[\s\S]*?:root\s*\{([^}]*)\}/);
+  assert.ok(lightBlock, 'the light-mode :root block is gone from theme.css');
+  for (const [token, hues] of Object.entries(CODE_TOKENS)) {
+    const dark = (darkRoot[1].match(new RegExp(`${token}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1];
+    const light = (lightBlock[1].match(new RegExp(`${token}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1];
+    assert.equal(dark, hues.dark, `${token} dark hue changed — the migration was structure-only; a retune must be deliberate`);
+    assert.equal(light, hues.light, `${token} light hue changed — same rule`);
+  }
+});
+
+test('lockstep: sidepanel.css paints hljs through the tokens, with no raw hex left', () => {
+  const hljsRules = (css.match(/[^\n{]*\.hljs[^\n{]*\{[^}]*\}/g) || []);
+  assert.ok(hljsRules.length >= 10, 'the hljs palette rules are gone from sidepanel.css');
+  for (const rule of hljsRules) {
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,6}/, `hljs rule still carries a raw hex: ${rule.trim()}`);
+  }
+  // Every hljs rule that sets a color must go through a --code-* token.
+  for (const rule of hljsRules) {
+    const color = (rule.match(/color:\s*([^;]+);/) || [])[1];
+    if (!color) continue;
+    assert.match(color, /var\(--(code|fg)[a-z0-9-]*\)/, `hljs rule sets a non-token color: ${rule.trim()}`);
+  }
+  // The duplicated light-mode override block is gone — the remap lives in
+  // theme.css with every other token.
+  assert.doesNotMatch(css, /@media \(prefers-color-scheme: light\)\s*\{\s*\.hljs-comment/,
+    'sidepanel.css must not carry its own hljs light-mode block — it duplicates the theme and drifts');
+  // The diff "+" line keeps its own slot so it can be retuned apart from
+  // attributes (they share a hue today).
+  assert.match(css, /code\.language-diff \.hljs-addition,\s*\ncode\.language-patch \.hljs-addition \{ color: var\(--code-addition\); \}/);
+});
