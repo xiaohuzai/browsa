@@ -47,7 +47,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
-import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT, renderHintsForLastUserTurn, renderHintFamiliesForLastUserTurn, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
+import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses, stickIntent } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
@@ -3421,18 +3421,11 @@ async function showEffectivePrompt() {
   // C5：所见即所发——分节视图与发送组装共用 prompt-assembly 的同一套零件
   //（此前是不完整镜像：缺 capabilityHints 与 choiceRequestHint，用户看到的
   // 比实际发出的少两块）。
-  // 渲染契约按家族启用（2026-10-20 第二批）：检视器必须重算「上一轮用户消息
-  // 实际选中的家族」，不能把整个 6.3K 契约都列出来——否则说个 hi 也会看到
-  // 化学/蛋白/成文，与真正发出的 system prompt 不符。这里定点读 history 是
-  // 用户手动触发的低频操作；禁止 get(null)。
+  // 渲染契约每轮全量下发（2026-10-20 回滚按家族门控）：检视器列出的就是
+  // 实际发送的全部文本，不需要再读 history 重算家族。
   const cfg = await storage.get(['systemPrompt', 'replyLanguage']);
-  const history = await storage.get('history');
-  const renderHints = renderHintsForLastUserTurn(history);
-  const renderFamilies = renderHintFamiliesForLastUserTurn(history);
   const sections = effectiveSystemPromptSections(cfg, {
-    capabilityHints: CAPABILITY_HINTS_ALWAYS,
-    renderHints,
-    renderFamilies,
+    capabilityHints: CAPABILITY_HINTS,
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
 
