@@ -156,13 +156,13 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
   const defCount = (promptSrc.match(/const CAPABILITY_HINTS_ENTRIES = \[/g) || []).length;
   assert.equal(defCount, 1, 'CAPABILITY_HINTS_ENTRIES must be defined exactly once (shared by CHAT, SUBCHAT and AGENT_RENDER_HINT)');
   const src = await readBackgroundSrc();
-  assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
+  assert.match(src, /import \{ CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
   const subchatSrc = await readSubchatHandlerSrc();
-  // 2026-10-20 两段式：SUBCHAT 与 CHAT 同一触发门——渲染契约细节按需追加，
+  // 2026-10-20 两段式：SUBCHAT 与 CHAT 同一触发门——渲染契约按家族追加，
   // 未触发时回落共享的 ALWAYS 底座（不再是把整个 pool 无条件当 sysPrompt）。
-  assert.match(subchatSrc, /const sysPrompt = renderHintsTriggered\(\{ history: \[\], userText: subText \}\)\s*\?\s*capabilityHints\s*:\s*CAPABILITY_HINTS_ALWAYS/,
-    'SUBCHAT must gate the capabilityHints param (background.js\'s CAPABILITY_HINTS) through the shared two-tier trigger, falling back to CAPABILITY_HINTS_ALWAYS');
+  assert.match(subchatSrc, /const sysPrompt = \[\s*capabilityHints \|\| CAPABILITY_HINTS_ALWAYS,\s*buildRenderHints\(\{ history: subHistory, userText: subUserText \}\),\s*\]\.filter\(Boolean\)\.join\(' '\)/,
+    'SUBCHAT must compose the ALWAYS base with the per-family buildRenderHints selection');
 
   // CHAT still builds effectiveSystemPrompt from the same constant (passed
   // in as the capabilityHints param from background.js's CAPABILITY_HINTS).
