@@ -64,8 +64,9 @@ import { ensureReadabilityInjected } from './lib/readability-injector.js';
 // — add a new renderer to both, and to the assertion in
 // test/lib-agent-turn.test.mjs that guards the pair.
 // 系统提示常量与组装已收拢到 lib/prompt-assembly.js（C5：/prompt 检视器此前
-// 显示 ≠ 发送）。CHAT 用两块、SUBCHAT 只用 capabilityHints——原样传参，通道差异不变。
-import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT } from './lib/prompt-assembly.js';
+// 显示 ≠ 发送）。worker 只传 ALWAYS 底座；渲染契约由 handler 按家族从
+// prompt-assembly.js 现选（2026-10-20 第二批）。
+import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT } from './lib/prompt-assembly.js';
 
 
 // Allow side panel to open on action click (Chrome MV3)
@@ -1262,7 +1263,7 @@ async function handle(msg, sender) {
     }
 
     case 'SUBCHAT':
-      return handleSubchat(msg, CAPABILITY_HINTS);
+      return handleSubchat(msg, CAPABILITY_HINTS_ALWAYS);
 
     case 'SUBCHAT_ABORT':
       return handleSubchatAbort(msg);
@@ -1287,7 +1288,7 @@ async function handle(msg, sender) {
     }
 
     case 'CHAT':
-      return handleChat(msg, CAPABILITY_HINTS, CHOICE_REQUEST_HINT);
+      return handleChat(msg, CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT);
 
     default:
       throw new Error(`Unknown message type: ${msg.type}`);

@@ -552,7 +552,7 @@ test('timestamp-rewrite (anthropic): messages rebuilt from the RAW video entry, 
     assert.equal(calls.length, 2);
     assert.match(calls[1].url, /\/v1\/messages$/);
     assertRewriteShape(normTurns(calls[1].body.messages), JSON.stringify(calls[0].body.messages));
-    assert.ok(JSON.stringify(calls[1].body.system).includes('fenced code blocks'),
+    assert.ok(JSON.stringify(calls[1].body.system).includes(HINTS),
       'anthropicSystem must survive the rewrite rebuild');
   } finally {
     cap.release();
@@ -1011,7 +1011,24 @@ test('two-tier hints: a casual turn carries the ALWAYS base, not the render cont
     await handleChat({ tabId: 90, userText: 'hi' }, HINTS, '');
     const sys = JSON.stringify(calls[0].body); // chat-completions rides messages[0], not body.system
     assert.ok(!sys.includes('sankey-beta'), 'the render contract must NOT ride a casual turn');
-    assert.ok(sys.includes('fenced code blocks'), 'the ALWAYS fence menu must still ride');
+    assert.ok(sys.includes(HINTS), 'the ALWAYS base (passed in by background) must still ride');
+  } finally {
+    cap.release();
+    restore();
+  }
+});
+
+test('per-family hints: a chart turn carries echarts but not the chemistry/protein/article contracts', async () => {
+  await seedProvider(CHAT_PROVIDER);
+  const { calls, restore } = installFetch(() => chatLeg({ text: 'ok' }));
+  const cap = captureChunks(91);
+  try {
+    await handleChat({ tabId: 91, userText: '画个柱状图对比一下' }, HINTS, '');
+    const sys = JSON.stringify(calls[0].body);
+    assert.ok(sys.includes('\\"xAxis\\"') || sys.includes('"xAxis"'), 'the ECharts option contract must ride a chart turn');
+    assert.ok(!sys.includes('RCSB Protein Data Bank'), 'no protein contract on a chart turn');
+    assert.ok(!sys.includes('chemically valid'), 'no chemistry contract on a chart turn');
+    assert.ok(!sys.includes('machine-writing tells'), 'no article-style contract on a chart turn');
   } finally {
     cap.release();
     restore();
