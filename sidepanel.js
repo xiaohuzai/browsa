@@ -47,7 +47,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
-import { CAPABILITY_HINTS_ALWAYS, RENDER_CONTRACT_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
+import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT, renderHintsForLastUserTurn, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
@@ -3399,14 +3399,25 @@ function scrollToBottom(force = false) {
 async function showEffectivePrompt() {
   // C5：所见即所发——分节视图与发送组装共用 prompt-assembly 的同一套零件
   //（此前是不完整镜像：缺 capabilityHints 与 choiceRequestHint，用户看到的
-  // 比实际发出的少两块）。定点读两个键，不 get(null)（会全量反序列化
-  // history/savedSessions 的重键）。
+  // 比实际发出的少两块）。
+  // 渲染契约按家族启用（2026-10-20 第二批）：检视器必须重算「上一轮用户消息
+  // 实际选中的家族」，不能把整个 6.3K 契约都列出来——否则说个 hi 也会看到
+  // 化学/蛋白/成文，与真正发出的 system prompt 不符。这里定点读 history 是
+  // 用户手动触发的低频操作；禁止 get(null)。
   const cfg = await storage.get(['systemPrompt', 'replyLanguage']);
+  const history = await storage.get('history');
+  const renderHints = renderHintsForLastUserTurn(history);
   const sections = effectiveSystemPromptSections(cfg, {
     capabilityHints: CAPABILITY_HINTS_ALWAYS,
-    renderHints: RENDER_CONTRACT_HINTS,
+    renderHints,
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
+  if (!renderHints) {
+    sections.push({
+      label: 'Capability hints (render contract — not active)',
+      text: 'No render family is active for this conversation. A drawing/chart/chemistry/article ask appends only the matching family for that turn; once its fenced block appears in the conversation, that family stays on.',
+    });
+  }
 
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
