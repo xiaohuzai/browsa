@@ -47,7 +47,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
-import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
+import { CAPABILITY_HINTS_ALWAYS, RENDER_CONTRACT_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
@@ -3403,7 +3403,8 @@ async function showEffectivePrompt() {
   // history/savedSessions 的重键）。
   const cfg = await storage.get(['systemPrompt', 'replyLanguage']);
   const sections = effectiveSystemPromptSections(cfg, {
-    capabilityHints: CAPABILITY_HINTS,
+    capabilityHints: CAPABILITY_HINTS_ALWAYS,
+    renderHints: RENDER_CONTRACT_HINTS,
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
 
