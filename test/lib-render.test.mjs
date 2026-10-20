@@ -36,8 +36,21 @@ const {
 } = await import('../lib/sidepanel/render.js');
 const {
   findMermaidFlowDirection, toggleMermaidDirection, getMermaidDiagramKind, estimateMermaidPreviewHeight,
-  stripFrontMatterConfig
+  stripFrontMatterConfig, isMermaidFenceLanguage
 } = await import('../lib/sidepanel/mermaid-utils.js');
+
+test('isMermaidFenceLanguage accepts diagram-type fence aliases, rejects ordinary code languages', () => {
+  for (const lang of [
+    'mermaid', 'quadrantChart', 'sequenceDiagram', 'stateDiagram-v2', 'erDiagram',
+    'gantt', 'journey', 'gitGraph', 'requirementDiagram', 'sankey-beta',
+    'xychart-beta', 'kanban', 'C4Context', 'mindmap', 'timeline', 'flowchart',
+  ]) {
+    assert.equal(isMermaidFenceLanguage(lang), true, `${lang} must be treated as a mermaid fence`);
+  }
+  for (const lang of ['js', 'json', 'python', 'mermaidxyz', '', null]) {
+    assert.equal(isMermaidFenceLanguage(lang), false, `${lang} must not be treated as a mermaid fence`);
+  }
+});
 
 test('wantsChartVendors detects every FENCED_RENDERERS language fence, nothing else', () => {
   const fence = '```';
@@ -272,6 +285,8 @@ test('initMermaidTheme passes panel typography into initialize and re-inits when
     assert.equal(cfgs[0].theme, 'dark');
     assert.match(cfgs[0].fontFamily, /sans-serif/, 'jsdom falls back to the sidepanel.css body stack');
     assert.equal(cfgs[0].themeVariables.fontSize, '13.5px', 'jsdom falls back to the :root --msg-font-size default');
+    assert.match(cfgs[0].themeVariables.quadrantPointFill, /^#[0-9a-f]{6}$/i,
+      'mermaid 12.2 darken(quadrant1Fill) without an amount yields hsl(240, 100%, NaN%); pin a valid fill');
     // 档位变化 → 重新 initialize（键含字号）。jsdom 的 getComputedStyle 不
     // 反映自定义属性——桩一层模拟 applyFontSize 写入后的 live 值。
     const origGCS = globalThis.getComputedStyle;
