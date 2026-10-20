@@ -1855,5 +1855,17 @@
   "screenshotOpenFull": {
     "message": "클릭하여 크게 보기",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrApiKeyLabel": {
+    "message": "API Key",
+    "description": "ASR: API key field label"
+  },
+  "asrBaseUrlLabel": {
+    "message": "Base URL",
+    "description": "ASR: base URL field label"
+  },
+  "tipHelp": {
+    "message": "도움말",
+    "description": "Tooltip trigger: accessible name for the ? help chip"
   }
 }

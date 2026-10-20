@@ -766,18 +766,35 @@ async function init() {
   // the bottom of the conversation is pushed out of view exactly when the
   // user opens a chat that contains a diagram.
   //
-  // A MutationObserver, NOT a ResizeObserver: the scroll container's own box
-  // never changes (only its scrollHeight does), so observing IT never fires.
-  // The growth always arrives as DOM insertion — an SVG, a MathML tree, a
-  // canvas — so mutations are the right signal. Gated on the INTENT, so a
-  // user who scrolled up to read is never yanked back.
-  if (typeof MutationObserver !== 'undefined') {
-    const stickObserver = new MutationObserver(() => {
-      if (!stickToBottom) return;
-      const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
-      if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
-    stickObserver.observe(messagesEl, { childList: true, subtree: true, characterData: true });
+  // The signal has to be the CONTENT, not the container: the scroll
+  // container's own box never changes (only its scrollHeight does), so
+  // observing IT never fires. And the growth is not always a DOM insertion —
+  // a style change (a wider left margin in multiselect mode), a font-size
+  // change or a window resize re-wraps the text and changes the height with
+  // NO mutation at all. So: observe every direct CHILD (a child's box
+  // changes when it re-wraps or when a late diagram lands inside it) and
+  // re-observe when the child list changes.
+  //
+  // Gated on the INTENT, so a user who scrolled up to read is never yanked
+  // back. One re-anchor per frame (ResizeObserver delivers all changed
+  // entries in a single callback).
+  const reanchorToBottom = () => {
+    if (!stickToBottom) return;
+    const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
+  };
+  if (typeof ResizeObserver !== 'undefined') {
+    const stickObserver = new ResizeObserver(reanchorToBottom);
+    const observeChildren = () => {
+      for (const child of messagesEl.children) stickObserver.observe(child);
+    };
+    observeChildren();
+    if (typeof MutationObserver !== 'undefined') {
+      // Direct-children only: a subtree observer would re-observe every
+      // child on every streamed chunk (O(n) per chunk).
+      new MutationObserver(() => { observeChildren(); reanchorToBottom(); })
+        .observe(messagesEl, { childList: true });
+    }
   }
   // The follower cooldown timestamps REAL input, not the (also programmatic)
   // scroll event — see lastUserScrollInputAt above.

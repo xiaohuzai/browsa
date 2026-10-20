@@ -198,8 +198,15 @@ function syncAsrProviderUI() {
   }
   const doc = document.getElementById('asrDocLink');
   if (doc) {
-    doc.href = p.docUrl || '';
-    doc.textContent = '📖 ' + _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
+    // An empty href resolves to the CURRENT page — clicking it would reload
+    // the settings page while still looking like a link. Hide the link
+    // outright when the provider ships no doc URL.
+    const hasDoc = !!p.docUrl;
+    doc.hidden = !hasDoc;
+    if (hasDoc) {
+      doc.href = p.docUrl;
+      doc.textContent = '📖 ' + _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
+    }
   }
 }
 
@@ -322,6 +329,10 @@ function renderLlmGroup(details, entries) {
       b.type = 'button';
       b.className = 'provider-tab' + (name === llmEditorTab ? ' on' : '');
       b.textContent = (cfg.alias || '').trim() || name.replace(/^llm-/, 'LLM ');
+      // These ARE tabs (one panel per tab) — say so, and expose which one is
+      // open. The active state used to be carried by colour alone.
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', name === llmEditorTab ? 'true' : 'false');
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         if (llmEditorTab === name) return;
@@ -333,6 +344,7 @@ function renderLlmGroup(details, entries) {
     const addTab = document.createElement('button');
     addTab.type = 'button';
     addTab.className = 'provider-tab provider-tab-add';
+    addTab.setAttribute('role', 'tab');
     addTab.textContent = '＋';
     addTab.title = _t('addProviderBtn', '＋ Add Provider');
     addTab.setAttribute('aria-label', addTab.title);
@@ -403,6 +415,8 @@ function renderAgentGroup(details, providers, entries) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'provider-tab' + (tab === id ? ' on' : '') + (agentConfigured(id) ? ' configured' : '');
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', tab === id ? 'true' : 'false');
       b.title = agentConfigured(id) ? _t('localAgentConfiguredTitle', '此类型已有配置（切换查看）') : '';
       b.textContent = id === 'bridge'
         ? _t('localAgentTabBridge', 'Agent Bridge')
@@ -537,7 +551,7 @@ function localAgentTab() {
 // One bridge endpoint row: URL + alias + its own API key (a bridge can require
 // its own token — loopback bridges usually need none) + remove. Shared
 // verbatim by the card render and the ＋ button (addBridgeRow) so the two
-// never drift. Two lines per row because the options page is 660px wide —
+// never drift. Two lines per row because the options page is 720px wide —
 // three inputs on one line would squeeze every field below legibility.
 function bridgeRowHtml(url, alias, apiKey, state = '') {
   const dotTitle = state === 'reachable' ? _t('statusReachableBadge', '● reachable')
@@ -772,32 +786,13 @@ function wireBridgeEndpointEditor(card) {
     });
   }
 
-  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
-  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
-  const activate = async () => {
-    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
-    // can't be the active provider, so don't highlight/persist a click on it.
-    if (!cachedCfg.providers[name]) return;
-    document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
-    card.classList.add('active');
-    // Persist! This handler used to only toggle the CSS class, so the highlight
-    // silently reverted to the stored provider on reload / language switch.
-    cachedCfg.activeProvider = name;
-    cachedCfg.activeModel = '';
-    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
-  };
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('input, button, select, textarea')) return;
-    activate();
-  });
-  const cardH3 = card.querySelector('.provider-h3');
-  if (cardH3) {
-    cardH3.tabIndex = 0;
-    cardH3.addEventListener('keydown', (e) => {
-      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
-      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
-    });
-  }
+  // 卡片激活不在这里接线：wireProviderActivation(card, name) 负责，它拿到
+  // 真正的 provider 名。这个函数曾经有一份**逐字重复**的激活逻辑，而它引用的
+  // `name` 并不在本函数的参数里——浏览器里 `name` 解析成全局 `window.name`
+  // （空串），于是 `cachedCfg.providers['']` 为 undefined，激活静默失效。
+  // 因为两份监听器都注册在同一个卡片上，正常路径下"恰好"能用（正确的那份
+  // 兜住了），但只要日后有人只调 wireBridgeEndpointEditor，桥接卡片就会
+  // 变成"点了没反应"。重复即地雷，删掉。
 }
 
 // Card click / keyboard activation. Extracted from buildProviderCard
@@ -823,7 +818,9 @@ function wireProviderActivation(card, name) {
     activate();
   });
   const cardH3 = card.querySelector('.provider-h3');
-  if (cardH3) {
+  // The reserved slot is render-only — it can never be activated, so it must
+  // not be a focusable "button" that does nothing.
+  if (cardH3 && !card.classList.contains('reserved')) {
     cardH3.tabIndex = 0;
     cardH3.addEventListener('keydown', (e) => {
       // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
@@ -847,12 +844,12 @@ function buildProviderCard(name, cfg, opts = {}) {
   // deep inside card.innerHTML's template made V8's parser bail with
   // "missing ) after argument list" — same HTML, one less nesting level.
   const agentBaseUrlTip = !isAgent ? '' : cfg.isBridge
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。API Key 仅当桥配置了 apiKey 时才需要——本机回环地址上的无钥桥会忽略此栏（填错也能连通）。')}</span></span>`
+    ? `<span class="tip" tabindex="0" role="button" aria-label="${_t('tipHelp', 'Help')}">?<span class="tip-bubble">${_t('bridgeTip', '本地桥的安装与启动见 <a href="https://github.com/xiaohuzai/agent-bridge" target="_blank" rel="noopener noreferrer">agent-bridge 文档</a>。一行填一个桥地址。API Key 仅当桥配置了 apiKey 时才需要——本机回环地址上的无钥桥会忽略此栏（填错也能连通）。')}</span></span>`
     : cfg.isOpencode
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
+    ? `<span class="tip" tabindex="0" role="button" aria-label="${_t('tipHelp', 'Help')}">?<span class="tip-bubble">${_t('opencodeTip', '先在终端启动 <code>opencode serve --port 4096</code>，把它打印的地址填到这里（建议固定端口；不固定则每次重启端口都会变）。<a href="https://opencode.ai/docs/server/" target="_blank" rel="noopener noreferrer">opencode Server 文档</a>')}</span></span>`
     : cfg.isSquilla
-    ? `<span class="tip" tabindex="0">?<span class="tip-bubble">${_t('squillaTip', 'OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 ~/.opensquilla/config.toml 的 cors.allowed_origins（v0.5.5 起原生支持扩展 origin）。<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>')}</span></span>`
-    : `<span class="tip" tabindex="0">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
+    ? `<span class="tip" tabindex="0" role="button" aria-label="${_t('tipHelp', 'Help')}">?<span class="tip-bubble">${_t('squillaTip', 'OpenSquilla gateway 的 WebSocket 地址，默认 ws://127.0.0.1:18791/ws。gateway 需把本扩展 origin 写进 ~/.opensquilla/config.toml 的 cors.allowed_origins（v0.5.5 起原生支持扩展 origin）。<a href="https://github.com/opensquilla/opensquilla" target="_blank" rel="noopener noreferrer">OpenSquilla 文档</a>')}</span></span>`
+    : `<span class="tip" tabindex="0" role="button" aria-label="${_t('tipHelp', 'Help')}">?<span class="tip-bubble"><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server" target="_blank" rel="noopener noreferrer">${_t('hermesApiDocsLink', 'Hermes API Server 启动与配置文档')}</a></span></span>`;
 
   // Thinking level field (LLM cards only): the OPTION LIST follows the card's
   // model ids — filling in `glm-5` offers {关,开}, `gpt-5.6` offers the effort
@@ -922,10 +919,10 @@ function buildProviderCard(name, cfg, opts = {}) {
   const badgeTxt  = pinged === 'reachable' ? _t('statusReachableBadge', '● reachable') : pinged === 'unreachable' ? _t('statusUnreachableBadge', '● unreachable') : (isConfigured ? _t('badgeNotPinged', '○ not pinged') : _t('badgeNotSet', '○ not set'));
 
   card.innerHTML = `
-    <h3 class="provider-h3" title="${reserved ? _t('reservedSlotTitle', 'Reserved empty slot — configure and Save to commit it') : _t('clickToActivateTitle', 'Click to set as active provider')}">
+    <h3 class="provider-h3"${reserved ? '' : ' role="button" tabindex="0" aria-pressed="' + (name === cachedCfg.activeProvider ? 'true' : 'false') + '"'} title="${reserved ? _t('reservedSlotTitle', 'Reserved empty slot — configure and Save to commit it') : _t('clickToActivateTitle', 'Click to set as active provider')}">
       <span class="name">${escapeHtml(displayName)}</span>
       <span class="provider-badge ${badgeCls}">${badgeTxt}</span>
-      ${!isAgent && !reserved ? `<button type="button" class="provider-delete" data-act="delete" title="${_t('removeProviderTitle', 'Remove this provider')}">${ICON_CLOSE}</button>` : ''}
+      ${!isAgent && !reserved ? `<button type="button" class="provider-delete" data-act="delete" title="${_t('removeProviderTitle', 'Remove this provider')}" aria-label="${_t('removeProviderTitle', 'Remove this provider')}">${ICON_CLOSE}</button>` : ''}
     </h3>
     <div class="fields">
     ${!isAgent ? `
@@ -960,7 +957,7 @@ function buildProviderCard(name, cfg, opts = {}) {
       ${thinkingField}
     </div>
     <div class="row action-row">
-      <button data-act="save">${_t('saveBtn', 'Save')}</button>
+      <button data-act="save" class="primary">${_t('saveBtn', 'Save')}</button>
       <button data-act="ping">${_t('pingBtn', 'Ping')}</button>
       <button data-act="reset">${_t('resetBtn', 'Reset')}</button>
       <span class="card-status">${reserved ? _t('emptySlotStatus', 'Empty slot — configure and Save') : ''}</span>

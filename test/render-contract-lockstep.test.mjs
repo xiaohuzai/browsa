@@ -312,20 +312,33 @@ function paddingRightOf(rule) {
 test('lockstep: the outline rail draws in the margin gutter, never over the text', () => {
   const msgs = css.match(/\.messages\s*\{[^}]*\}/);
   assert.ok(msgs, 'the .messages block is gone from sidepanel.css');
-  const pr = paddingRightOf(msgs[0]);
-  assert.ok(pr && pr >= 20,
-    'the messages column must reserve a ≥20px right gutter for the outline rail — a narrower gutter puts the ticks on top of the last glyph of a line');
+  // The gutter is ONE variable, read by both the column's padding and the
+  // rail's negative margin. When they were two literals, the narrow-width
+  // rule (which shrank the padding to 10px) left the rail assuming 20px —
+  // the ticks hung 8px OUTSIDE a 320px panel and across the last word.
+  const gutter = (msgs[0].match(/--rail-gutter:\s*(\d+)px/) || [])[1];
+  assert.ok(gutter && Number(gutter) >= 20,
+    'the messages column must reserve a ≥20px right gutter (--rail-gutter) for the outline rail — a narrower gutter puts the ticks on top of the last glyph of a line');
+  assert.match(msgs[0], /padding:[^;]*var\(--rail-gutter\)/,
+    'the column padding must read --rail-gutter, not a literal');
   const rail = css.match(/\.outline-rail\s*\{[^}]*\}/);
   assert.ok(rail, 'the .outline-rail block is gone from sidepanel.css');
-  assert.match(rail[0], /margin-right:\s*-\d+px/,
-    'the rail must reach back into that gutter (negative right margin) so its ticks are measured from the PANEL edge, not the text column');
+  assert.match(rail[0], /margin-right:\s*calc\(-1\s*\*\s*var\(--rail-gutter\)\)/,
+    'the rail must reach back into that gutter BY DERIVING it from the same variable — two literals drift apart (that is how the 320px panel lost its ticks off-screen)');
   // The tick's own width must fit inside the gutter: strip width + right offset ≤ gutter.
   const strip = css.match(/\.outline-rail-strip\s*\{[^}]*\}/);
   assert.ok(strip, 'the .outline-rail-strip block is gone from sidepanel.css');
   const stripW = Number((strip[0].match(/width:\s*(\d+)px/) || [])[1]);
   const stripRight = Number((strip[0].match(/right:\s*(\d+)px/) || [])[1]);
-  assert.ok(stripW + stripRight <= pr,
-    `the rail strip (${stripW}px + ${stripRight}px) must fit inside the ${pr}px gutter`);
+  assert.ok(stripW + stripRight <= Number(gutter),
+    `the rail strip (${stripW}px + ${stripRight}px) must fit inside the ${gutter}px gutter`);
+  // The narrow-width rule must shrink only the LEFT margin — the right one
+  // IS the gutter.
+  const narrow = css.match(/@media \(max-width: 320px\)\s*\{([\s\S]*?)\n\}/);
+  if (narrow) {
+    assert.doesNotMatch(narrow[1], /\.messages\s*\{[^}]*padding-inline/,
+      'the narrow-width rule must not use padding-inline on .messages — that would eat the rail gutter');
+  }
 });
 
 test('lockstep: the stacking order comes from the token ladder, never from free-hand numbers', () => {

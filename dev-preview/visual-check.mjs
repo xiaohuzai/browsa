@@ -141,7 +141,27 @@ const CHECKS = [
         if (!n.nodeValue || !n.nodeValue.trim()) continue;
         const r = document.createRange(); r.selectNodeContents(n);
         const b = r.getBoundingClientRect();
-        if (b.width > 0 && b.height > 0) texts.push(b);
+        if (!(b.width > 0 && b.height > 0)) continue;
+        // A text range's geometry ignores ancestor clipping — the Mol*
+        // sequence strip's position numbers report a rect that runs past the
+        // strip's overflow:hidden edge even though nothing is painted there.
+        // Clip to the nearest clipping ancestor so the test asks about what
+        // the user can actually SEE.
+        let clip = null;
+        for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) {
+          const cs = getComputedStyle(p);
+          if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') { clip = p.getBoundingClientRect(); break; }
+        }
+        if (clip) {
+          const left = Math.max(b.left, clip.left);
+          const right = Math.min(b.right, clip.right);
+          const top = Math.max(b.top, clip.top);
+          const bottom = Math.min(b.bottom, clip.bottom);
+          if (!(right > left && bottom > top)) continue;
+          texts.push({ left, right, top, bottom });
+        } else {
+          texts.push({ left: b.left, right: b.right, top: b.top, bottom: b.bottom });
+        }
       }
       let hits = 0;
       for (const t of ticks) for (const b of texts) {
@@ -151,13 +171,33 @@ const CHECKS = [
     },
   },
   {
-    name: '快捷操作条抱住药丸（不撑满）',
+    name: '快捷操作条没有被拉满（抱住自己的药丸）',
+    // "Not stretched" is the real invariant — NOT "narrower than the panel":
+    // at 320px the five pills genuinely need 286px, and that is correct.
+    // What was wrong was the box being STRETCHED to the panel width with 45%
+    // of it empty (offsetWidth >> scrollWidth).
     run: () => {
       const q = document.querySelector('.quickbar');
       if (!q) return { ok: false, detail: '找不到 .quickbar' };
-      const w = q.getBoundingClientRect().width;
-      const panel = document.body.getBoundingClientRect().width;
-      return { ok: w < panel * 0.85, detail: `宽度 ${Math.round(w)}px / 面板 ${Math.round(panel)}px` };
+      const slack = q.offsetWidth - q.scrollWidth;
+      return {
+        ok: slack <= 2,
+        detail: `盒子 ${q.offsetWidth}px / 内容 ${q.scrollWidth}px（多出 ${Math.round(slack)}px）`,
+      };
+    },
+  },
+  {
+    name: '大纲侧栏刻度不伸出面板右缘',
+    // At 320px the narrow-width rule used to shrink the message padding while
+    // the rail kept assuming the old gutter — the ticks hung 8px OUTSIDE the
+    // panel and across the last word of the line.
+    run: () => {
+      const strip = document.querySelector('.outline-rail-strip');
+      if (!strip) return { ok: true, detail: '本次没有大纲侧栏（跳过）' };
+      const r = strip.getBoundingClientRect();
+      const panel = document.body.getBoundingClientRect().right;
+      const over = Math.round(r.right - panel);
+      return { ok: over <= 0, detail: `刻度条右缘 ${Math.round(r.right)} / 面板右缘 ${Math.round(panel)}（超出 ${over}px）` };
     },
   },
   {
@@ -312,6 +352,22 @@ const CHECKS = [
     },
   },
   {
+    name: '多选模式的复选框不被面板左缘切掉',
+    // It used to sit at left:-22px — 22px left of the bubble, while the
+    // message column reserves only a 14px left margin. On the left-aligned
+    // (assistant) bubbles the checkbox landed at x = -8 and was cut in half.
+    run: () => {
+      const cb = document.querySelector('.msg-select-cb');
+      if (!cb) return { ok: true, detail: '当前不在多选模式（跳过）' };
+      const r = cb.getBoundingClientRect();
+      const panel = document.getElementById('messages').getBoundingClientRect();
+      return {
+        ok: r.left >= panel.left - 0.5,
+        detail: `复选框左缘 ${Math.round(r.left)} / 消息列左缘 ${Math.round(panel.left)}`,
+      };
+    },
+  },
+  {
     name: '代码高亮走 --code-* 令牌（没有裸 hex）',
     run: () => {
       const rules = [...document.styleSheets]
@@ -327,6 +383,7 @@ const CHECKS = [
 const schemes = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const wantShots = process.argv.includes('--shots');
 const useSchemes = schemes.length ? schemes : ['dark', 'light'];
+const WIDTHS = (process.env.VISUAL_CHECK_WIDTHS || '420,320').split(',').map(Number);
 
 const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'] })
   .catch((e) => {
@@ -340,7 +397,11 @@ const browser = await chromium.launch({ executablePath: exe, headless: true, arg
 let failures = 0;
 try {
   for (const scheme of useSchemes) {
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, deviceScaleFactor: 1, colorScheme: scheme });
+    // 420 is the common panel width; 320 is the narrow end (the width where
+    // the outline rail's ticks first collided with the text) — the gate has
+    // to cover BOTH, or it would miss the exact regression it was written for.
+    for (const width of WIDTHS) {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1, colorScheme: scheme });
     const page = await ctx.newPage();
     await page.goto(PREVIEW, { waitUntil: 'networkidle' });
     // Wait for the seeded conversation to actually RENDER before checking
@@ -353,14 +414,28 @@ try {
       .then(() => true)
       .catch(() => false);
     if (!rendered) {
-      console.log(`\n[${scheme}]`);
+      console.log(`\n[${scheme} @${width}px]`);
       console.log('  ✗ 预览没有渲染出对话 — 门禁无法执行（这是硬失败，不是跳过）');
       failures++;
       await ctx.close();
       continue;
     }
     await page.waitForTimeout(1500); // let the live renderers (mermaid/rdkit/mol*) settle
-    console.log(`\n[${scheme}]`);
+    // Enter multiselect mode so the checkbox-gutter check has something to
+    // measure (the check skips itself when the mode is off).
+    await page.evaluate(() => {
+      const t = document.getElementById('toolbar-tools');
+      if (t) t.open = true;
+      document.getElementById('multiselect-toggle')?.click();
+    });
+    await page.waitForTimeout(400);
+    console.log(`\n[${scheme} @${width}px]`);
+    if (process.env.VISUAL_CHECK_DEBUG) {
+      console.log('   [debug] before checks', JSON.stringify(await page.evaluate(() => {
+        const m = document.getElementById('messages');
+        return { d: Math.round(m.scrollHeight - m.scrollTop - m.clientHeight), h: m.scrollHeight, c: m.clientHeight };
+      })));
+    }
     for (const check of CHECKS) {
       const res = await page.evaluate(check.run);
       if (!res.ok) failures++;
@@ -372,6 +447,7 @@ try {
       console.log(`  · 截图 ${out}`);
     }
     await ctx.close();
+    }
   }
 } finally {
   await browser.close();

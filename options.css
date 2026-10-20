@@ -15,15 +15,48 @@
   --err:    var(--error);
   --ok-bg:  rgba(74, 222, 128, 0.08);
   --err-bg: rgba(240, 104, 90, 0.08);
+  /* The ? tooltip's OWN palette — deliberately fixed dark in BOTH themes (a
+     real user report: a theme-derived --fg made the tooltip dark-on-dark).
+     Named here so the decision is explicit, not six stray hex literals. */
+  --tip-bg:        #1e2126;
+  --tip-fg:        #e6e8eb;
+  --tip-fg-strong: #f0f2f5;
+  --tip-border:    #3a3f47;
+  --tip-code-bg:   #343a43;
+  --tip-link:      #6ea8ff;
 }
 @media (prefers-color-scheme: light) {
   :root {
     --ok:  #166534;
     --err: #991b1b;
+    /* The badge fills follow the light-mode TEXT colours, not the dark
+       ones: the tints are translucent, so on the light ground they were
+       compositing the dark theme's green/red over white. */
+    --ok-bg:  rgba(22, 101, 52, 0.08);
+    --err-bg: rgba(153, 27, 27, 0.08);
   }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Focus — ONE recipe, shared with the side panel (lib/theme.css --focus-ring:
+   a 2px ground-coloured spacer under a 4px accent ring). Before this, the
+   settings page had NO global focus rule at all: links and the focusable
+   provider title fell back to the UA's default ring while every form control
+   used an accent border — two focus languages on one page. */
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Windows High Contrast strips box-shadow — without this a keyboard user
+   gets no focus indicator at all. Same fallback as the side panel. */
+@media (forced-colors: active) {
+  *:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI",
@@ -99,7 +132,9 @@ main {
   border-top-width: 2px;
   border-radius: var(--radius);
   padding: 0;
-  box-shadow: 0 5px 18px color-mix(in srgb, #000 10%, transparent);
+  /* The theme's own shadow token, not a literal black: a black shadow on the
+     light ground reads heavier than the 5% the token was tuned to. */
+  box-shadow: var(--shadow-md);
   /* overflow visible, not hidden: the ? tooltip bubbles (which open below
      their icon and can be taller than the card) must never be clipped. */
   overflow: visible;
@@ -117,13 +152,18 @@ main {
   gap: 14px;
 }
 
+/* Section heading. It used to be 11px in --muted while the GROUP titles
+   nested inside it ("LLM 服务商") were 12.5px in full --fg — the hierarchy
+   was inverted: the child shouted, the parent whispered. Now: section (this)
+   sits above group (12px, --fg-2) above card title (13px, --fg, a proper
+   noun you act on). */
 .card h2 {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: .09em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--fg-2);
 }
 
 .hint {
@@ -175,15 +215,22 @@ main {
    常驻新建 tab」。控件住进可见卡的标题行（该卡的 .name 隐藏，tab 即标题），
    同屏只显示当前标签的那张卡；组内没有可见卡时（reserved 态）控件独占一条
    band 落在组头之下。 */
+/* The tab strip must stay REACHABLE: with several providers the labels
+   overflowed and `overflow: hidden` clipped the ＋ "add provider" tab out
+   of sight entirely — the one control a user needs to add a provider. It
+   now scrolls horizontally, and the ＋ tab stays pinned to the right edge. */
 .provider-tabs {
   display: inline-flex;
   flex: 1;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
+  border-radius: var(--radius-pill);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   background: var(--bg);
   min-width: 0;
 }
+.provider-tabs::-webkit-scrollbar { display: none; }
 .provider-group > .provider-tabs {
   /* reserved 态：没有可见卡可住，控件独占 band（flex:1 在列向组里会竖向
      撑开，这里锁回内容高度并融进分组头的条带语言）。 */
@@ -203,7 +250,7 @@ main {
   color: var(--fg-dim);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--dur-snap), color var(--dur-snap);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,9 +259,9 @@ main {
 .provider-tab:hover { color: var(--fg); background: var(--bg-2); }
 .provider-tab.on {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
-.provider-tab.on:hover { color: #fff; }
+.provider-tab.on:hover { color: var(--on-accent); }
 /* 已配置指示点：该 tab 背后的 provider 存有配置（可能是多个桥 agent） */
 .provider-tab.configured::after {
   content: '';
@@ -226,12 +273,18 @@ main {
   margin-left: 5px;
   vertical-align: middle;
 }
-.provider-tab.on.configured::after { background: #fff; }
+.provider-tab.on.configured::after { background: var(--on-accent); }
+/* Pinned to the right edge of the scrolling strip so it is always
+   clickable, no matter how many providers are configured. */
 .provider-tab-add {
   flex: 0 0 auto;
+  position: sticky;
+  right: 0;
+  background: var(--bg);
   color: var(--muted);
   font-size: 13px;
   line-height: 1;
+  box-shadow: -6px 0 6px -6px var(--border-strong);
 }
 .provider-tab-add:hover { color: var(--accent); }
 
@@ -256,7 +309,7 @@ main {
   content: '▶';
   font-size: 9px;
   color: var(--muted);
-  transition: transform 0.15s;
+  transition: transform var(--dur-base);
   flex-shrink: 0;
 }
 details.provider-group[open] > .provider-group-header::before {
@@ -281,7 +334,7 @@ details.provider-group[open] > .provider-group-header::before {
   padding: 14px 16px;
   position: relative;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--dur-fast);
 }
 .provider:not(.active):hover { background: var(--hover-bg); }
 .provider::before {
@@ -290,7 +343,7 @@ details.provider-group[open] > .provider-group-header::before {
   left: 0; top: 0; bottom: 0;
   width: 3px;
   background: transparent;
-  transition: background 0.15s;
+  transition: background var(--dur-base);
 }
 /* Red accent bar on hover AND on the active card — same focus affordance for
    both Agent and LLM groups (marks what you're currently focused on). */
@@ -314,14 +367,13 @@ details.provider-group[open] > .provider-group-header::before {
   gap: 8px;
   padding-left: 8px;
 }
-.provider-h3 { margin-bottom: 8px; }
 .provider h3 .name { flex: 1; }
 
 .provider-badge {
   font-size: 10.5px;
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   letter-spacing: 0.02em;
 }
 .provider-badge.configured   { background: var(--accent-bg); color: var(--accent); }
@@ -373,7 +425,7 @@ details.provider-group[open] > .provider-group-header::before {
   background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
   color: var(--fg);
   width: 100%;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 .row input:focus,
 .row select:focus {
@@ -428,7 +480,7 @@ details.provider-group[open] > .provider-group-header::before {
   color: var(--fg);
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 .field input:focus,
 .field select:focus {
@@ -451,7 +503,7 @@ details.provider-group[open] > .provider-group-header::before {
   border-radius: var(--radius-sm);
   background: var(--bg);
   padding: 6px 10px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 .model-chips:focus-within {
   border-color: var(--accent);
@@ -463,7 +515,7 @@ details.provider-group[open] > .provider-group-header::before {
   gap: 3px;
   max-width: 100%;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 4px 1px 9px;
   font-size: 12px;
   font-family: var(--mono);
@@ -500,7 +552,7 @@ details.provider-group[open] > .provider-group-header::before {
 .model-chips .chip-add {
   background: none;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 9px;
   cursor: pointer;
   font-size: 12px;
@@ -514,7 +566,7 @@ details.provider-group[open] > .provider-group-header::before {
 /* Same box geometry as .field input (border/radius/bg/focus ring/padding),
    mirroring how .model-chips mirrors it — every editor on the card reads as
    one more form control. Two lines per row on purpose: the options page is
-   660px wide, so URL + alias + key on one line would squeeze all three below
+   720px wide, so URL + alias + key on one line would squeeze all three below
    legibility. */
 .bridge-endpoints {
   display: flex;
@@ -560,7 +612,7 @@ details.provider-group[open] > .provider-group-header::before {
   cursor: pointer;
   color: var(--muted);
   font-size: 14px;
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color var(--dur-base), color var(--dur-base);
 }
 .bridge-row .bridge-row-ping:hover { color: var(--accent); border-color: var(--border); }
 .bridge-row-sub {
@@ -579,7 +631,7 @@ details.provider-group[open] > .provider-group-header::before {
   color: var(--fg);
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 .bridge-row input:focus {
   outline: none;
@@ -598,7 +650,7 @@ details.provider-group[open] > .provider-group-header::before {
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--muted);
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color var(--dur-base), color var(--dur-base);
 }
 .bridge-row .bridge-row-x { color: var(--fg-2, var(--muted)); }
 .bridge-row .bridge-row-x:hover { color: var(--err); border-color: var(--border); }
@@ -623,13 +675,13 @@ details.provider-group[open] > .provider-group-header::before {
   align-self: flex-start;
   background: none;
   border: 1px dashed var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 12px;
   cursor: pointer;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.4;
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color var(--dur-base), color var(--dur-base);
 }
 .bridge-add:hover { border-color: var(--border-strong); color: var(--fg); }
 
@@ -652,8 +704,12 @@ details.provider-group[open] > .provider-group-header::before {
   color: var(--fg);
 }
 .provider .row .api-style-select:focus {
+  /* Was the one control whose focus state was a border-colour change alone —
+     a hairline tint is easy to miss. Every other control gets the shared
+     ring; this one now does too. */
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 /* ── Action row ──────────────────────────────────────────────────────────── */
 .provider .row.action-row {
@@ -663,9 +719,12 @@ details.provider-group[open] > .provider-group-header::before {
 
 /* ── Provider delete button ──────────────────────────────────────────────── */
 .provider-h3 {
+  /* Was declared twice, 350 lines apart — the second block silently
+     overrode the first one's margin-bottom. One declaration now. */
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-bottom: 8px;
 }
 .provider-delete {
   display: inline-flex;
@@ -700,7 +759,7 @@ textarea {
   color: var(--fg);
   width: 100%;
   resize: vertical;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 textarea:focus {
   outline: none;
@@ -716,11 +775,11 @@ button {
   font-weight: 500;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--fg-2);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color var(--dur-base), color var(--dur-base), background var(--dur-base);
   white-space: nowrap;
   letter-spacing: 0.01em;
 }
@@ -731,7 +790,7 @@ button:hover {
 }
 button.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
   box-shadow: 0 4px 12px var(--accent-glow);
 }
@@ -778,13 +837,17 @@ input[type="range"] { accent-color: var(--accent); }
 .inline-field input[type="number"] {
   font: inherit;
   font-size: 13px;
+  /* Same 36px control height as every other input on the page — the UI
+     language select and the reply-language select used to come out 3px
+     shorter than the fields beside them. */
+  min-height: 36px;
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   width: 140px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 /* Same treatment for selects — without this the Reply language dropdown in
    the System prompt card rendered with the browser-native (white, dark-mode
@@ -795,12 +858,13 @@ input[type="range"] { accent-color: var(--accent); }
   flex: 1;
   font: inherit;
   font-size: 13px;
+  min-height: 36px;
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
 .inline-field input:focus,
 .inline-field select:focus {
@@ -839,7 +903,7 @@ input[type="range"] { accent-color: var(--accent); }
 .tip:focus-visible,
 .tip:focus-within {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   outline: none;
 }
 .tip .tip-bubble {
@@ -849,13 +913,15 @@ input[type="range"] { accent-color: var(--accent); }
   top: calc(100% + 8px);
   max-width: 300px;
   min-width: 180px;
-  /* Fixed high-contrast dark bubble + light text — do NOT tie to theme
-     variables: under some themes --fg resolves dark, making dark-on-dark
-     tooltip text unreadable (real user report 2026-08-26). */
-  background: #1e2126;
-  color: #e6e8eb;
-  border: 1px solid #3a3f47;
-  border-radius: 8px;
+  /* A deliberately FIXED dark bubble with light text — do NOT tie these to the
+     page theme: under some themes --fg resolves dark, making dark-on-dark
+     tooltip text unreadable (real user report 2026-08-26). The values live
+     in --tip-* tokens so the "this is its own palette" decision is explicit
+     instead of being six unexplained hex literals. */
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  border: 1px solid var(--tip-border);
+  border-radius: var(--radius);
   padding: 9px 11px;
   font-size: 12px;
   font-weight: 400;
@@ -892,17 +958,19 @@ input[type="range"] { accent-color: var(--accent); }
   user-select: text;
   cursor: auto;
 }
-.tip-bubble b { color: #f0f2f5; font-weight: 600; }
+.tip-bubble b { color: var(--tip-fg-strong); font-weight: 600; }
 .tip-bubble code {
   font-family: var(--mono);
   font-size: 11px;
-  background: #343a43;
+  background: var(--tip-code-bg);
   padding: 1px 4px;
-  border-radius: 3px;
-  color: #e6e8eb;
+  border-radius: var(--radius-sm);
+  color: var(--tip-fg);
 }
 .tip-bubble a {
-  color: #6ea8ff;
+  /* A light-blue that reads on the fixed dark bubble (7:1) — the page accent
+     would be unreadable here, which is why the bubble has its own palette. */
+  color: var(--tip-link);
   text-decoration: underline;
 }
 
@@ -931,12 +999,26 @@ input[type="range"] { accent-color: var(--accent); }
 .card-status.err { color: var(--err); }
 
 /* ── Global status bar ───────────────────────────────────────────────────── */
+/* The save confirmation. It used to live at the very bottom of a ~1900px
+   page — so changing the font size at the TOP flashed a confirmation that
+   was off-screen. It is now a transient pill pinned to the top of the
+   viewport, visible wherever the user happens to be. */
 .status {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
   font-size: 13px;
-  color: var(--muted);
-  min-height: 1.4em;
-  padding: 0 4px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--edge-hi), var(--shadow-md);
+  padding: 6px 16px;
+  max-width: calc(100vw - 32px);
 }
+.status:empty { display: none; }
 .status.ok  { color: var(--ok); }
 .status.err { color: var(--err); }
 
@@ -987,7 +1069,7 @@ input[type="range"] { accent-color: var(--accent); }
 .advanced-summary::after {
   content: '▶';
   font-size: 10px;
-  transition: transform 0.15s;
+  transition: transform var(--dur-base);
 }
 .advanced-section[open] .advanced-summary::after {
   transform: rotate(90deg);
@@ -1023,8 +1105,11 @@ button:focus-visible, summary:focus-visible {
   outline-offset: 2px;
 }
 
+/* --gold is reserved for margin-note content (timestamps, citations) and
+   must not double as a card accent — but a card DOES need to be marked as
+   "the common one", so the marker is the product's primary accent. */
 .common-settings-card {
-  border-top-color: var(--gold);
+  border-top-color: var(--accent);
 }
 .common-settings-card .card-actions {
   align-items: center;

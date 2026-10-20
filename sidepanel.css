@@ -268,12 +268,16 @@ body {
      boundary gestures) into the page around the panel. y-axis only — the
      container never scrolls horizontally. */
   overscroll-behavior-y: contain;
-  /* Right padding is the OUTLINE-RAIL GUTTER: the rail's ticks are a
-     navigation affordance, not content — they must never land on top of the
-     last glyph of a line. 20px holds the 12px tick plus 6px of breathing
-     room; the rail reaches back into this gutter (see .outline-rail's
-     negative margin) so the ticks draw in the margin, not over the text. */
-  padding: 18px 20px 16px 14px;
+  /* The OUTLINE-RAIL GUTTER — the single source of truth. The rail's ticks
+     are a navigation affordance, not content: they must never land on top of
+     the last glyph of a line. 20px holds the 12px tick plus 6px of breathing
+     room, and the rail reaches back into this gutter (its negative margin is
+     DERIVED from this variable) so the ticks draw in the margin, not over
+     the text. Keep the two in step: a hard-coded -20px on the rail while a
+     narrow-width rule shrinks this padding is exactly how the ticks ended
+     up hanging 8px outside a 320px panel and across the last word. */
+  --rail-gutter: 20px;
+  padding: 18px var(--rail-gutter) 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2757,12 +2761,18 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   cursor: pointer;
 }
 .multiselect-cancel-btn:hover { color: var(--fg); }
-/* Checkbox on message bubbles */
+/* Checkbox on message bubbles.
+   It used to sit at left:-22px — 22px LEFT of the bubble, while the message
+   column only reserves a 14px left margin. On the left-aligned (assistant)
+   bubbles the checkbox therefore landed at x = -8 and was cut in half by the
+   panel edge. Multiselect mode now widens the column's left margin to a real
+   gutter and the checkbox lives IN it, top-aligned with its bubble (a list
+   you scan top-to-bottom reads better than one you scan down the middle). */
+.messages.multiselect-on { padding-left: 36px; }
 .msg-select-cb {
   position: absolute;
-  left: -22px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: -24px;
+  top: 6px;
   width: 15px;
   height: 15px;
   cursor: pointer;
@@ -2882,7 +2892,13 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .approval-btn:hover { opacity: 0.85; }
 .approval-btn:active { transform: scale(0.96); transition: transform var(--dur-fast) ease-out; }
 .approval-btn-allow { background: var(--accent); color: var(--on-accent); }
+/* A broader grant (session / always) reads as SECONDARY: outlined, not
+   filled. Two filled buttons side by side made "allow for the whole
+   session" look like the same kind of click as "allow once". */
+.approval-btn-allow-wide { background: transparent; border-color: var(--accent); color: var(--accent); }
+.approval-btn-allow-wide:hover { background: var(--accent-dim); opacity: 1; }
 .approval-btn-deny  { background: transparent; border-color: var(--border-strong); color: var(--fg-2); }
+.approval-btn-deny:hover { border-color: var(--error); color: var(--error); opacity: 1; }
 
 /* ── Clarify card (Hermes /v1/runs clarification.request) ─────────────── */
 /* (base styling shared with .approval-card above) */
@@ -3175,8 +3191,9 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   display: none;
   /* Reach back into the gutter .messages reserved on the right, so the
      strip's absolute `right` is measured from the PANEL edge rather than from
-     the text column's edge — that is what keeps the ticks off the text. */
-  margin-right: -20px;
+     the text column's edge — that is what keeps the ticks off the text.
+     DERIVED from --rail-gutter: the two must never drift apart. */
+  margin-right: calc(-1 * var(--rail-gutter));
 }
 .outline-rail.visible { display: block; }
 .outline-rail-strip {
@@ -3482,7 +3499,10 @@ body { container-type: inline-size; }
 @media (max-width: 320px) {
   .topbar { gap: 5px; padding-inline: 8px; }
   .topbar .iconbtn { width: 25px; }
-  .messages { padding-inline: 10px; }
+  /* Only the LEFT margin shrinks — the right one is the rail gutter, and the
+     ticks have to fit in it. (This rule used to set `padding-inline: 10px`,
+     which ate the gutter while the rail kept assuming 20px.) */
+  .messages { padding-left: 10px; }
   .quickbar { margin-inline: 8px; overflow-x: auto; justify-content: flex-start; }
   .qa-btn { flex-shrink: 0; }
   .composer { padding-inline: 8px; }
