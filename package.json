@@ -9,8 +9,7 @@
     "test": "node --test --test-concurrency=2 test/*.test.mjs",
     "package": "node build/package.mjs",
     "postversion": "node -e \"const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json','utf8'));m.version=require('./package.json').version;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2)+'\\n');console.log('manifest.json synced to',m.version);\"",
-    "check-compat": "bash check-compat.sh",
-    "visual-check": "node dev-preview/visual-check.mjs"
+    "check-compat": "bash check-compat.sh"
   },
   "license": "MIT",
   "devDependencies": {

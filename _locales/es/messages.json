@@ -1855,17 +1855,5 @@
   "screenshotOpenFull": {
     "message": "Clic para ver a tamaño completo",
     "description": "Panel: screenshot preview tooltip"
-  },
-  "asrApiKeyLabel": {
-    "message": "API Key",
-    "description": "ASR: API key field label"
-  },
-  "asrBaseUrlLabel": {
-    "message": "Base URL",
-    "description": "ASR: base URL field label"
-  },
-  "tipHelp": {
-    "message": "Ayuda",
-    "description": "Tooltip trigger: accessible name for the ? help chip"
   }
 }

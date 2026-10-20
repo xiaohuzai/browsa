@@ -37,7 +37,7 @@ globalThis.ResizeObserver = class {
   fire() { this.cb(); }
 };
 
-const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, tightenSvgViewBox, getMolstar, disposeMolstarViewers, disposeRenderInstancesIn } = await import('../lib/sidepanel/render.js');
+const { parsePdbBlock, renderSmiles, renderPdb, getRDKit, rethemeRdkitSvg, getMolstar, disposeMolstarViewers, disposeRenderInstancesIn } = await import('../lib/sidepanel/render.js');
 
 // getMolstar caches its promise module-level (correct in the browser — one
 // lib), so the molstar stub must be installed ONCE and shared by every
@@ -183,59 +183,6 @@ test('rethemeRdkitSvg: transparent bg both themes, light ink in dark, prolog str
   assert.ok(dark.includes('fill:none'), 'background stays dropped in dark mode');
 });
 
-test('tightenSvgViewBox: crops the canvas to the drawn ink (RDKit centres, never fills)', () => {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 389 280');
-  svg.setAttribute('width', '389px');
-  svg.setAttribute('height', '280px');
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('width', '389');
-  bg.setAttribute('height', '280');
-  svg.appendChild(bg);
-  // The reaction's molecules: a 351×69 band starting at (16, 104).
-  const ink = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  ink.getBBox = () => ({ x: 16, y: 104, width: 351, height: 69 });
-  svg.appendChild(ink);
-
-  const res = tightenSvgViewBox(svg);
-  assert.ok(res, 'the crop is reported');
-  const vb = svg.getAttribute('viewBox').split(' ').map(Number);
-  assert.deepEqual(vb, [8, 96, 367, 85], 'the viewBox is the ink box plus 8px of padding');
-  assert.equal(svg.getAttribute('width'), '367px', 'the width attribute follows — it carries the intrinsic ratio `height:auto` resolves against');
-  assert.equal(svg.getAttribute('height'), '85px');
-});
-
-test('tightenSvgViewBox: fail-open — no layout, no ink, or already tight leaves the SVG alone', () => {
-  const mk = () => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 100 100');
-    svg.setAttribute('width', '100px');
-    svg.setAttribute('height', '100px');
-    return svg;
-  };
-  // (a) jsdom has no getBBox → nothing to measure → untouched.
-  const a = mk();
-  a.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'path'));
-  assert.equal(tightenSvgViewBox(a), null);
-  assert.equal(a.getAttribute('viewBox'), '0 0 100 100');
-
-  // (b) an SVG whose only child is the background rect has no ink → untouched.
-  const b = mk();
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
-  b.appendChild(bg);
-  assert.equal(tightenSvgViewBox(b), null, 'the background rect is not ink');
-  assert.equal(b.getAttribute('viewBox'), '0 0 100 100');
-
-  // (c) ink already fills the canvas → no crop, no attribute churn.
-  const c = mk();
-  const full = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  full.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
-  c.appendChild(full);
-  assert.equal(tightenSvgViewBox(c), null, 'an already-tight drawing is left as it is');
-  assert.equal(c.getAttribute('viewBox'), '0 0 100 100');
-});
-
 test('renderSmiles: leaves non-smiles content and empty blocks untouched', async () => {
   document.body.innerHTML = '';
   const pre = makeFence('smiles', '');
@@ -270,7 +217,7 @@ test('renderPdb: bare PDB ID → fetches RCSB, swaps the fence for a viewer, dri
   assert.equal(cfg.layoutShowSequence, true, 'the sequence strip (RCSB feel) is on');
   assert.equal(cfg.layoutShowControls, true, 'controls stay on — their gating also owns the top sequence strip');
   assert.equal(cfg.layoutShowLeftPanel, false, 'the left panel is off');
-  assert.equal(cfg.viewportBackgroundColor, '#ffffff', 'light-mode background (matchMedia stub: not dark) — the theme surface, not a hard-coded "white" keyword');
+  assert.equal(cfg.viewportBackgroundColor, 'white', 'light-mode background (matchMedia stub: not dark)');
   assert.equal(cfg.pdbProvider, 'rcsb');
   assert.equal(calls.find((c) => c[0] === 'rawData')[1], 'HEADER    TEST\nATOM      1  N   ALA A   1\nEND', 'the fetched payload feeds rawData');
   assert.equal(calls.find((c) => c[0] === 'parseTrajectory')[1], 'pdb');

@@ -10,20 +10,6 @@
 /* ─── Reset ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-
-/* The `hidden` attribute must WIN over any author `display` rule. The UA
-   stylesheet's `[hidden] { display: none }` is a plain (non-important) rule,
-   so ANY author rule that sets `display` on the same element silently
-   defeats it — that is how the scroll-to-bottom button ended up visible in
-   the empty state (a `display: flex` added for the arrow's centring), and
-   how `#transcript-btn` stayed visible in conversations with no video.
-   One global !important rule closes the whole class instead of patching
-   each victim: `.sessions-drawer[hidden]`, `.transcript-drawer[hidden]`,
-   `.msg-search-bar[hidden]` and `.multiselect-bar[hidden]` each carried
-   their own copy of this — which is exactly why the uncovered ones kept
-   slipping through. */
-[hidden] { display: none !important; }
-
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -52,7 +38,7 @@ body {
    .composer-box/.sendbtn/.composer-footer/.composerinfo and is gone. */
 .topbar {
   position: relative;
-  z-index: var(--z-sticky);
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -206,29 +192,24 @@ body {
   flex: 1;
   min-width: 0;
   padding: 5px 10px;
-  /* Ghost control. The provider picker used to draw a bordered, filled box
-     that out-shouted the wordmark and the message column — the loudest thing
-     in a 420px panel was a label. At rest it is now just the caption text and
-     the chevron; the surface appears on hover, the focus ring on keyboard. */
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background-color: transparent;
+  background-color: color-mix(in srgb, var(--bg-2) 80%, transparent);
   color: var(--fg);
   font: inherit;
   font-size: 12px;
   font-weight: 500;
   outline: none;
   cursor: pointer;
-  transition: border-color var(--dur-snap), background-color var(--dur-snap);
+  transition: border-color var(--t), background var(--t);
   appearance: none;
   -webkit-appearance: none;
   /* 箭头在 .provider-control::after（mask + --fg-dim，随主题）——这里只留出右侧空间 */
   padding-right: 26px;
 }
-.provider:hover {
-  border-color: var(--border);
-  background-color: var(--hover-bg);
-}
+.provider:focus-visible { border-color: var(--accent); }
+.provider:hover { border-color: var(--fg-dim); }
+
 
 .iconbtn {
   display: flex;
@@ -268,16 +249,7 @@ body {
      boundary gestures) into the page around the panel. y-axis only — the
      container never scrolls horizontally. */
   overscroll-behavior-y: contain;
-  /* The OUTLINE-RAIL GUTTER — the single source of truth. The rail's ticks
-     are a navigation affordance, not content: they must never land on top of
-     the last glyph of a line. 20px holds the 12px tick plus 6px of breathing
-     room, and the rail reaches back into this gutter (its negative margin is
-     DERIVED from this variable) so the ticks draw in the margin, not over
-     the text. Keep the two in step: a hard-coded -20px on the rail while a
-     narrow-width rule shrinks this padding is exactly how the ticks ended
-     up hanging 8px outside a 320px panel and across the last word. */
-  --rail-gutter: 20px;
-  padding: 18px var(--rail-gutter) 16px 14px;
+  padding: 18px 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -899,7 +871,7 @@ body {
 .crop-modal {
   position: fixed;
   inset: 0;
-  z-index: var(--z-modal);
+  z-index: 200;
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -938,9 +910,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* The crop backdrop is a panel surface, not a literal black — the theme
-     owns the ground colour (and light mode gets the paper-white one). */
-  background: var(--bg);
+  background: #000;
   padding: 4px;
 }
 .crop-canvas { display: block; cursor: crosshair; max-width: 100%; max-height: 100%; }
@@ -1009,11 +979,12 @@ body {
   vertical-align: baseline;
 }
 .msg.assistant .browsa-ts:hover { opacity: 0.8; }
-/* The timestamp chip used to carry its own gold focus outline — a third
-   focus style next to the accent halo and the accent offset outline. One
-   system for the whole panel: the global ring. */
 .msg.assistant .browsa-ts:focus-visible {
-  box-shadow: var(--focus-ring);
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  /* U3: single ring — this rule's own outline. The global *:focus-visible
+     halo (a box-shadow) would otherwise paint a second ring around it. */
+  box-shadow: none;
 }
 .msg.assistant blockquote {
   margin: 0.5em 0;
@@ -1214,7 +1185,7 @@ html { interpolate-size: allow-keywords; }
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: 0 -4px 16px var(--shadow-ink);
-  z-index: var(--z-toolbar);
+  z-index: 10;
 }
 .slash-item {
   display: flex;
@@ -1268,7 +1239,7 @@ html { interpolate-size: allow-keywords; }
   gap: 2px;
   opacity: 0;
   transition: opacity var(--t);
-  z-index: var(--z-toolbar);
+  z-index: 10;
   user-select: none;
 }
 .mermaid-diagram:hover .mermaid-toolbar,
@@ -1389,7 +1360,7 @@ html { interpolate-size: allow-keywords; }
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--t), color var(--t);
-  z-index: var(--z-rail);
+  z-index: 1;
   user-select: none;
 }
 .msg.assistant pre:hover .code-copy-btn { opacity: 1; }
@@ -1411,6 +1382,7 @@ html { interpolate-size: allow-keywords; }
   flex-shrink: 0;
 }
 .diagnostics::before { content: "⚠"; flex-shrink: 0; font-size: 13px; line-height: 1.5; }
+.diagnostics[hidden] { display: none; }
 .diagnostics code {
   font-family: var(--mono);
   font-size: 11px;
@@ -1430,13 +1402,6 @@ html { interpolate-size: allow-keywords; }
   margin: 0 12px 8px;
   padding: 5px 6px;
   flex-shrink: 0;
-  /* Hug the pills. As a stretched flex item the dock drew a full-width
-     capsule with ~45% of it empty — a bar that reads as "unfinished" and
-     out-weighs the conversation it sits under. fit-content + align-self
-     keeps it a compact pill that still wraps when the pills overflow. */
-  align-self: flex-start;
-  width: fit-content;
-  max-width: calc(100% - 24px);
   /* border shorthand (was border-top) — the merged effective state draws the
      hairline on all four sides of the capsule dock. */
   border: 1px solid var(--border-soft);
@@ -1500,6 +1465,7 @@ html { interpolate-size: allow-keywords; }
   padding: 5px 10px 0;
   flex-wrap: wrap;
 }
+.followups-dock[hidden] { display: none; }
 .followups-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -1585,15 +1551,9 @@ html { interpolate-size: allow-keywords; }
   box-shadow: var(--edge-hi), var(--shadow-lg);
 }
 .composer-box:focus-within {
-  /* The box is the panel's only permanent control, so it was painted with a
-     full saturated accent border the moment the textarea took focus — the
-     loudest thing on screen, louder than the conversation. Keep the border
-     neutral and let a soft accent HALO carry the focus state: the ring still
-     reads instantly, but the composer stops shouting over the content. */
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-strong));
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border-strong));
   background: var(--bg-2);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent),
-    var(--edge-hi), var(--shadow-lg);
+  box-shadow: 0 0 0 3px var(--accent-dim), var(--edge-hi), var(--shadow-lg);
 }
 
 #input {
@@ -1783,7 +1743,7 @@ html { interpolate-size: allow-keywords; }
   min-height: 24px;
   border-radius: 50%;
   background: rgba(0,0,0,0.65);
-  color: var(--on-accent);
+  color: #fff;
   border: none;
   font-size: 13px;
   line-height: 24px;
@@ -1829,22 +1789,13 @@ html { interpolate-size: allow-keywords; }
   /* box-shadow already follows the element's own border-radius — declaring
      border-radius here used to reshape round controls (the circular send
      button visibly squared off while focused). */
-  box-shadow: var(--focus-ring);
-}
-/* Windows High Contrast (forced-colors) strips box-shadow, so the halo above
-   would leave a keyboard user with NO focus indicator at all. Fall back to a
-   real outline — the one case where the system palette wins. */
-@media (forced-colors: active) {
-  *:focus-visible {
-    outline: 2px solid Highlight;
-    outline-offset: 2px;
-    box-shadow: none;
-  }
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 /* Textarea is inside composer-box which already shows focus via border+shadow */
 #input:focus-visible { box-shadow: none; }
 /* "Single outline system" list — these controls take an offset outline for
    focus and suppress the halo above. */
+.provider:focus-visible,
 .iconbtn:focus-visible,
 .attachbtn:focus-visible,
 .sendbtn:focus-visible,
@@ -1871,7 +1822,7 @@ html { interpolate-size: allow-keywords; }
   background: var(--accent);
   color: var(--on-accent);
   padding: 6px 12px;
-  z-index: var(--z-skip);
+  z-index: 1000;
   text-decoration: none;
   border-radius: var(--radius);
   font-size: 12px;
@@ -1895,35 +1846,21 @@ html { interpolate-size: allow-keywords; }
      only right for a one-line composer: once the textarea grows (multi-line
      draft, image previews), 134px lands the button on top of the quickbar. */
   bottom: 134px;
-  /* Right edge aligned with the TEXT COLUMN's right edge (the messages
-     gutter is 20px) — the button used to hang 6px further out, breaking the
-     alignment of every other right-aligned edge in the panel. */
-  right: 20px;
-  z-index: var(--z-float);
-  width: 28px; height: 28px;
+  right: 14px;
+  z-index: 20;
+  width: 30px; height: 30px;
   border-radius: 50%;
-  /* Translucent + blurred so the text it floats over stays readable through
-     it; a solid disc punched a hole in the last message. */
-  background: color-mix(in srgb, var(--bg-3) 82%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--fg-2);
-  font-size: 13px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 14px;
+  line-height: 28px;
+  text-align: center;
   cursor: pointer;
-  box-shadow: var(--edge-hi), var(--shadow-md);
-  transition: background var(--dur-snap), color var(--dur-snap),
-    border-color var(--dur-snap), transform var(--dur-snap);
+  box-shadow: var(--shadow-md);
+  transition: background var(--t), opacity var(--t);
 }
-.scroll-to-bottom-btn:hover {
-  background: var(--bg-4);
-  border-color: var(--border-strong);
-  color: var(--accent);
-  transform: translateY(-1px);
-}
+.scroll-to-bottom-btn:hover { background: var(--bg-4); color: var(--accent); }
 
 /* ─── Toast notifications ────────────────────────────────────────────────────── */
 .toast-container {
@@ -1934,7 +1871,7 @@ html { interpolate-size: allow-keywords; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: var(--z-toast);
+  z-index: 9999;
   pointer-events: none;
   width: calc(100% - 32px);
   max-width: 360px;
@@ -1981,7 +1918,7 @@ html { interpolate-size: allow-keywords; }
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.55);
-  z-index: var(--z-confirm);
+  z-index: 9998;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2180,7 +2117,7 @@ code.language-patch {
   display: block;
 }
 code.language-diff .hljs-addition,
-code.language-patch .hljs-addition { color: var(--code-addition); }
+code.language-patch .hljs-addition { color: #7ee787; }
 
 /* ── Sessions drawer ─────────────────────────────────────────────────────── */
 .sessions-drawer {
@@ -2189,12 +2126,13 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   width: 280px;
   background: var(--surface);
   border-left: var(--hairline) solid var(--border);
-  z-index: var(--z-drawer);
+  z-index: 200;
   display: flex;
   flex-direction: column;
   box-shadow: var(--edge-hi), -4px 0 16px var(--shadow-ink);
   animation: slideInRight var(--dur-sheet) var(--ease-swift);
 }
+.sessions-drawer[hidden] { display: none !important; }
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -2233,6 +2171,7 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   color: var(--fg-faint);
   flex-shrink: 0;
 }
+.agent-session-line[hidden] { display: none; }
 .agent-session-label { flex-shrink: 0; }
 .agent-session-id {
   font-family: var(--mono);
@@ -2262,10 +2201,10 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
 .sessions-new-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
 /* Shared text-input base (2026-10-17 token pass): drawer search, in-chat
    search, the clarify card and the detail-thread input speak ONE input
-   language; per-site rules keep only size/layout deltas. Text fields match
-   the focus state on ANY focus (mouse included) — same rule as the settings
-   page; the provider <select> keeps the keyboard-only ring, its own popup
-   serving as click feedback. */
+   language; per-site rules keep only size/layout deltas. Focus feedback is
+   unified on :focus-visible — text fields match it on ANY focus (mouse
+   included); the provider <select> gets keyboard-only ring + its own popup
+   as click feedback. */
 .sessions-search,
 .transcript-search,
 .msg-search-input,
@@ -2277,18 +2216,13 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   color: var(--fg);
   outline: none;
 }
-/* A text field's own focus treatment — an accent edge plus a soft 3px wash.
-   The global ring (a 4px hard halo) is too loud on a filled input and used to
-   stack on top of the accent border, painting the field twice. Text fields
-   match on ANY focus, mouse included (same rule as the settings page);
-   the controls around them use the ring. */
-.sessions-search:focus,
-.transcript-search:focus,
-.msg-search-input:focus,
-.clarify-input:focus,
-.detail-thread-input:focus {
+.sessions-search:focus-visible,
+.transcript-search:focus-visible,
+.msg-search-input:focus-visible,
+.clarify-input:focus-visible,
+.detail-thread-input:focus-visible,
+.provider:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 .sessions-search {
   width: 100%;
@@ -2493,7 +2427,7 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: var(--z-drawer);
+  z-index: 199;
   background: rgba(0,0,0,0.25);
 }
 .sessions-backdrop.active { display: block; }
@@ -2508,12 +2442,13 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   width: 300px;
   background: var(--surface);
   border-left: var(--hairline) solid var(--border);
-  z-index: var(--z-drawer);
+  z-index: 200;
   display: flex;
   flex-direction: column;
   box-shadow: var(--edge-hi), -4px 0 16px var(--shadow-ink);
   animation: slideInRight var(--dur-sheet) var(--ease-swift);
 }
+.transcript-drawer[hidden] { display: none !important; }
 .transcript-drawer-header {
   display: flex;
   align-items: center;
@@ -2611,7 +2546,7 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   position: absolute;
   bottom: 14px;
   right: 14px;
-  z-index: var(--z-float);
+  z-index: 5;
   border: 1px solid var(--border);
   background: var(--bg-2);
   color: var(--fg-2);
@@ -2624,31 +2559,42 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
 }
 .transcript-follow-pill:hover { background: var(--bg-3); color: var(--accent); }
 
-/* ── Syntax highlighting (highlight.js) ────────────────────────────────────
-   The hues live in lib/theme.css as --code-* tokens (one list for every
-   colour the product uses); the light-mode remap lives there too, which is
-   why there is no duplicated @media block here any more. The hues themselves
-   are UNCHANGED — they are what every other code viewer taught users' eyes
-   to read. */
+/* ── Syntax highlighting (highlight.js dark theme) ───────────────────────── */
 .msg.assistant pre code.hljs { background: transparent; padding: 0; }
 /* U6: no font-style:italic on any CJK-possible text — browsers synthesize
    obliques that render Chinese glyphs as slanted strokes (same reasoning as
    the .msg.assistant blockquote rule). Color carries the "comment" signal. */
-.hljs-comment, .hljs-quote { color: var(--code-comment); }
-.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: var(--code-keyword); }
+.hljs-comment, .hljs-quote { color: #8b949e; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #ff7b72; }
 .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
-.hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: var(--code-string); }
-.hljs-deletion, .hljs-selector-pseudo { color: var(--code-keyword); }
-.hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: var(--code-symbol); }
-.hljs-meta { color: var(--code-meta); }
-.hljs-number { color: var(--code-number); }
-.hljs-title.class_, .hljs-class .hljs-title { color: var(--code-symbol); }
-.hljs-function, .hljs-title.function_ { color: var(--code-meta); }
+.hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #a5d6ff; }
+.hljs-deletion, .hljs-selector-pseudo { color: #ff7b72; }
+.hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #ffa657; }
+.hljs-meta { color: #d2a8ff; }
+.hljs-number { color: #79c0ff; }
+.hljs-title.class_, .hljs-class .hljs-title { color: #ffa657; }
+.hljs-function, .hljs-title.function_ { color: #d2a8ff; }
 .hljs-params { color: var(--fg); }
-.hljs-attr { color: var(--code-attr); }
-.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: var(--code-attr); }
+.hljs-attr { color: #7ee787; }
+.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #7ee787; }
 .hljs-subst { color: var(--fg); }
 .hljs-strong { font-weight: bold; }
+@media (prefers-color-scheme: light) {
+  .hljs-comment, .hljs-quote { color: #6e7781; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name, .hljs-tag { color: #cf222e; }
+  .hljs-deletion, .hljs-selector-pseudo { color: #cf222e; }
+  .hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal,
+  .hljs-template-tag, .hljs-template-variable, .hljs-type, .hljs-addition { color: #0a3069; }
+  .hljs-regexp, .hljs-symbol, .hljs-variable, .hljs-bullet, .hljs-link { color: #953800; }
+  .hljs-meta { color: #8250df; }
+  .hljs-number { color: #0550ae; }
+  .hljs-title.class_, .hljs-class .hljs-title { color: #953800; }
+  .hljs-function, .hljs-title.function_ { color: #8250df; }
+  .hljs-attr { color: #116329; }
+  .hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #116329; }
+  code.language-diff .hljs-addition,
+  code.language-patch .hljs-addition { color: #116329; }
+}
 
 /* ── Message edit mode ───────────────────────────────────────────────────── */
 .msg-edit-textarea {
@@ -2684,6 +2630,7 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
 .msg-edit-save:hover { filter: brightness(1.1); }
 .msg-edit-cancel:hover { color: var(--fg); }
 
+
 /* ── Font size CSS variable (default 13.5px, adjustable via settings) ─────── */
 /* 正文排版变量：字号（设置档位）+ 字体族（设置「正文字体」，'system' 时
    JS 移除内联值、落回这里 = body 同款栈）。render.js 的兜底字面量与本
@@ -2694,7 +2641,9 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
+
 /* ── In-conversation search bar ─────────────────────────────────────────── */
+.msg-search-bar[hidden] { display: none !important; }
 .msg-search-bar {
   display: flex;
   align-items: center;
@@ -2730,6 +2679,7 @@ mark.search-highlight { background: color-mix(in srgb, var(--gold) 35%, transpar
 mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, transparent); outline: 1px solid var(--gold); }
 
 /* ── Multi-select bar ───────────────────────────────────────────────────── */
+.multiselect-bar[hidden] { display: none !important; }
 .multiselect-bar {
   display: flex;
   align-items: center;
@@ -2761,18 +2711,12 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   cursor: pointer;
 }
 .multiselect-cancel-btn:hover { color: var(--fg); }
-/* Checkbox on message bubbles.
-   It used to sit at left:-22px — 22px LEFT of the bubble, while the message
-   column only reserves a 14px left margin. On the left-aligned (assistant)
-   bubbles the checkbox therefore landed at x = -8 and was cut in half by the
-   panel edge. Multiselect mode now widens the column's left margin to a real
-   gutter and the checkbox lives IN it, top-aligned with its bubble (a list
-   you scan top-to-bottom reads better than one you scan down the middle). */
-.messages.multiselect-on { padding-left: 36px; }
+/* Checkbox on message bubbles */
 .msg-select-cb {
   position: absolute;
-  left: -24px;
-  top: 6px;
+  left: -22px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 15px;
   height: 15px;
   cursor: pointer;
@@ -2787,7 +2731,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.85);
-  z-index: var(--z-lightbox);
+  z-index: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2819,7 +2763,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   background: rgba(0,0,0,0.5);
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 50%;
-  color: var(--on-accent);
+  color: #fff;
   font-size: 16px;
   width: 30px;
   height: 30px;
@@ -2831,6 +2775,8 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .lightbox-close:hover { background: rgba(255,255,255,0.15); }
 /* Clickable images in messages */
 .msg.assistant img { cursor: zoom-in; }
+
+
 
 /* ── Approval card (Hermes /v1/runs approval.request) ─────────────────── */
 /* Shared base for the in-flow agent/system cards (2026-10-17 token pass):
@@ -2892,13 +2838,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .approval-btn:hover { opacity: 0.85; }
 .approval-btn:active { transform: scale(0.96); transition: transform var(--dur-fast) ease-out; }
 .approval-btn-allow { background: var(--accent); color: var(--on-accent); }
-/* A broader grant (session / always) reads as SECONDARY: outlined, not
-   filled. Two filled buttons side by side made "allow for the whole
-   session" look like the same kind of click as "allow once". */
-.approval-btn-allow-wide { background: transparent; border-color: var(--accent); color: var(--accent); }
-.approval-btn-allow-wide:hover { background: var(--accent-dim); opacity: 1; }
 .approval-btn-deny  { background: transparent; border-color: var(--border-strong); color: var(--fg-2); }
-.approval-btn-deny:hover { border-color: var(--error); color: var(--error); opacity: 1; }
 
 /* ── Clarify card (Hermes /v1/runs clarification.request) ─────────────── */
 /* (base styling shared with .approval-card above) */
@@ -2976,12 +2916,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .detail-thread-quote {
   padding: 4px 8px;
   margin: 0 20px 8px 0;
-  /* The quote is a MARGIN NOTE — a reference to a passage, not a reply. It
-     wore the accent rail, the same colour as the assistant's own reply rail
-     below it, so the excerpt and the answer read as siblings. The palette
-     already has the right colour for this: --gold is reserved for
-     margin-note content (timestamps, citation markers, highlights). */
-  border-left: 2px solid var(--gold);
+  border-left: 2px solid var(--accent);
   color: var(--fg-2);
   /* No font-style:italic — the quoted text is frequently CJK, and synthesized
      obliques render Chinese glyphs as slanted strokes (see the blockquote
@@ -3104,7 +3039,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   position: fixed;
   /* 150: above in-content chrome (10/20/30), BELOW the drawers (200) — a stale
      ask-button must not float over an open drawer. (skip-link keeps 1000.) */
-  z-index: var(--z-toolbar);
+  z-index: 150;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -3192,19 +3127,14 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   position: sticky;
   top: 0;
   height: 0;
-  z-index: var(--z-rail);
+  z-index: 6;
   display: none;
-  /* Reach back into the gutter .messages reserved on the right, so the
-     strip's absolute `right` is measured from the PANEL edge rather than from
-     the text column's edge — that is what keeps the ticks off the text.
-     DERIVED from --rail-gutter: the two must never drift apart. */
-  margin-right: calc(-1 * var(--rail-gutter));
 }
 .outline-rail.visible { display: block; }
 .outline-rail-strip {
   position: absolute;
   right: 2px;
-  width: 18px;
+  width: 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -3215,12 +3145,12 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .outline-rail-strip::-webkit-scrollbar { display: none; }
 .outline-rail .tick {
   flex: none;
-  width: 18px;
+  width: 24px;
   /* U13: 16px was under the 20px floor for this rail's hit rows. The dense
      overflow mode keeps its deliberate 12px (its whole point is a smaller,
      scrollable hit area — see outline-rail.js layoutStrip()). */
   height: 20px;
-  padding: 0;   /* the dash hugs the panel edge; the gutter supplies the air */
+  padding: 0 4px 0 0;   /* 视觉线距右缘 6px，留呼吸感 */
   border: 0;
   background: none;
   appearance: none;
@@ -3238,21 +3168,15 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   height: 3px;
   border-radius: var(--radius-sm);
   background: var(--border-strong);
-  opacity: 0.6;
+  opacity: 0.75;
   transition: width var(--dur-snap), background-color var(--dur-snap), opacity var(--dur-snap);
 }
-.outline-rail .tick:hover::before { width: 16px; background: var(--fg); opacity: 0.7; }
-/* A 3px dash can't carry a 1px outline — the ring would be invisible. Focus
-   widens and brightens the dash instead, and the ring is dropped so the
-   control doesn't paint two focus systems at once. */
+.outline-rail .tick:hover::before { width: 16px; background: var(--fg); opacity: 0.6; }
 .outline-rail .tick:focus-visible {
-  outline: none;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  /* U3: single ring — suppress the global *:focus-visible halo (double ring). */
   box-shadow: none;
-}
-.outline-rail .tick:focus-visible::before {
-  width: 18px;
-  background: var(--accent);
-  opacity: 1;
 }
 .outline-rail .tick.active::before { width: 16px; background: var(--accent); opacity: 1; }
 .outline-rail-strip.dense .tick { height: 12px; }
@@ -3270,7 +3194,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   line-height: 1.55;
   box-shadow: var(--edge-hi), var(--shadow-md);
   pointer-events: none;
-  z-index: var(--z-rail-preview);
+  z-index: 7;
   word-break: break-word;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -3283,6 +3207,7 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 }
 .outline-rail-preview.show { opacity: 1; visibility: visible; transform: none; }
 .msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }
+
 
 /* ─── 长历史渲染性能：content-visibility（Chrome 85+，114 基线内）─────────────
    视口外的历史气泡跳过布局与绘制。必须配 contain-intrinsic-size——否则屏外元素
@@ -3342,67 +3267,6 @@ dialog.lightbox-overlay:not([open]) {
    把新尺寸推给 molstar 的 requestResize */
 .pdb-block {
   margin: 8px 0;
-}
-
-/* ── Mol* 嵌入界面改用面板主题 ─────────────────────────────────────────────
-   molstar.css 把 LIGHT 调色板写死了（.msp-plugin / .msp-sequence 都是
-   #eeece7），在我们的暗色面板里就是一块贴上来的白板——化学回复里最扎眼的
-   东西。这里用自己的令牌重画嵌入 chrome；规则限定在 .pdb-viewer 内，独立
-   的 Mol* 应用永远不受影响。
-
-   选择器统一写成 `.pdb-viewer .msp-plugin X`（三级）：vendor 的规则是
-   `.msp-plugin .msp-sequence`（两级），同级时 molstar.css 赢——它是运行时
-   追加进 <head> 的，排在 sidepanel.css 之后。 */
-.pdb-viewer .msp-plugin { background: var(--bg-2); }
-.pdb-viewer .msp-plugin .msp-plugin-content { color: var(--fg); }
-.pdb-viewer .msp-plugin .msp-sequence { background: var(--bg-2); }
-.pdb-viewer .msp-plugin .msp-sequence-select {
-  background: var(--bg-3);
-  color: var(--fg);
-  border-bottom: var(--hairline) solid var(--border);
-}
-.pdb-viewer .msp-plugin .msp-sequence-select > select {
-  background-color: var(--bg-3);
-  color: var(--fg);
-}
-.pdb-viewer .msp-plugin .msp-sequence-select option { background: var(--bg-2); color: var(--fg); }
-.pdb-viewer .msp-plugin .msp-sequence-wrapper-non-empty { background: var(--bg); color: var(--fg-2); }
-.pdb-viewer .msp-plugin .msp-sequence-chain-label { color: var(--gold); }
-.pdb-viewer .msp-plugin .msp-viewport-controls-buttons .msp-btn {
-  background: var(--bg-3);
-  color: var(--fg-dim);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.pdb-viewer .msp-plugin .msp-viewport-controls-buttons .msp-btn:hover {
-  background: var(--bg-4);
-  color: var(--accent);
-}
-.pdb-viewer .msp-plugin .msp-hover-box-wrapper .msp-hover-box-body {
-  background-color: var(--bg-3);
-  color: var(--fg);
-}
-/* The layout regions / section headers / flex rows carry molstar's own light
-   fills (#eeece7 / #e0ddd4) and the residue letters carry its dark-brown ink
-   (#332b1f) — on the dark ground the residues were unreadable. */
-.pdb-viewer .msp-plugin .msp-layout-region,
-.pdb-viewer .msp-plugin .msp-section-header,
-.pdb-viewer .msp-plugin .msp-flex-row,
-.pdb-viewer .msp-plugin .msp-viewport {
-  background: var(--bg-2);
-  color: var(--fg);
-}
-.pdb-viewer .msp-plugin .msp-btn-block {
-  background: var(--bg-3);
-  color: var(--fg-2);
-}
-.pdb-viewer .msp-plugin .msp-sequence-wrapper .msp-sequence-present { color: var(--fg-2); }
-.pdb-viewer .msp-plugin .msp-sequence-wrapper .msp-sequence-number { color: var(--gold); }
-.pdb-viewer .msp-plugin .msp-sequence-residue-missing { color: var(--fg-faint); }
-/* The viewport buttons sit on molstar's own light backdrop tiles
-   (.msp-semi-transparent-background) — those are the grey squares. */
-.pdb-viewer .msp-plugin .msp-semi-transparent-background {
-  background: color-mix(in srgb, var(--bg-3) 78%, transparent);
 }
 .pdb-viewer {
   position: relative;
@@ -3504,10 +3368,7 @@ body { container-type: inline-size; }
 @media (max-width: 320px) {
   .topbar { gap: 5px; padding-inline: 8px; }
   .topbar .iconbtn { width: 25px; }
-  /* Only the LEFT margin shrinks — the right one is the rail gutter, and the
-     ticks have to fit in it. (This rule used to set `padding-inline: 10px`,
-     which ate the gutter while the rail kept assuming 20px.) */
-  .messages { padding-left: 10px; }
+  .messages { padding-inline: 10px; }
   .quickbar { margin-inline: 8px; overflow-x: auto; justify-content: flex-start; }
   .qa-btn { flex-shrink: 0; }
   .composer { padding-inline: 8px; }
