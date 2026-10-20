@@ -152,10 +152,10 @@ test('usageChipModel: provider numbers + cache hit rate + a turn-scoped decode r
   }, 'turn', 2000);
   assert.match(m.text, /↑ 2\.0k/);
   assert.match(m.text, /↓ 100/);
-  assert.match(m.text, /cache 80%/);
+  assert.match(m.text, /cache 80\.0%/);
   assert.match(m.text, /50 t\/s/); // 100 completion / 2s — this turn's tokens only
   assert.match(m.text, /2\.0s/);
-  assert.match(m.title, /Cached: 1600 \(80%\)/);
+  assert.match(m.title, /Cached: 1600 \(80\.0%\)/);
   assert.match(m.title, /this turn's completion/);
   assert.match(m.title, /Generation time: 2\.00s \(first token → done\)/);
 });
@@ -180,5 +180,14 @@ test('usageChipModel: no cache fields -> no cache fragment (no fake 0%)', () => 
 
 test('usageChipModel: a real 0 cached value still renders 0%', () => {
   const m = usageChipModel({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 0 } });
-  assert.match(m.text, /cache 0%/);
+  assert.match(m.text, /cache 0\.0%/);
+});
+
+test('usageChipModel: cache hit rate keeps one decimal (no rounding to whole %)', () => {
+  const m = usageChipModel({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 875 } });
+  assert.match(m.text, /cache 87\.5%/);
+  assert.match(m.title, /Cached: 875 \(87\.5%\)/);
+  // 99.6% must not read as a fully cached prompt.
+  const almost = usageChipModel({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 996 } });
+  assert.match(almost.text, /cache 99\.6%/);
 });
