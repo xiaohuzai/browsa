@@ -47,7 +47,7 @@ import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.
 import { hasPdfTrace } from './lib/sidepanel/pdf-extractor.js';
 import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
-import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT, renderHintsForLastUserTurn, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
+import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT, renderHintsForLastUserTurn, renderHintFamiliesForLastUserTurn, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
@@ -3407,9 +3407,11 @@ async function showEffectivePrompt() {
   const cfg = await storage.get(['systemPrompt', 'replyLanguage']);
   const history = await storage.get('history');
   const renderHints = renderHintsForLastUserTurn(history);
+  const renderFamilies = renderHintFamiliesForLastUserTurn(history);
   const sections = effectiveSystemPromptSections(cfg, {
     capabilityHints: CAPABILITY_HINTS_ALWAYS,
     renderHints,
+    renderFamilies,
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
   if (!renderHints) {
