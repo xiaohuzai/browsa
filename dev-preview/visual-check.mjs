@@ -421,6 +421,7 @@ try {
       continue;
     }
     await page.waitForTimeout(1500); // let the live renderers (mermaid/rdkit/mol*) settle
+
     // Enter multiselect mode so the checkbox-gutter check has something to
     // measure (the check skips itself when the mode is off).
     await page.evaluate(() => {
@@ -441,6 +442,49 @@ try {
       if (!res.ok) failures++;
       console.log(`  ${res.ok ? '✓' : '✗'} ${check.name} — ${res.detail}`);
     }
+    // ── 追问卡（detail thread）：在陈列架里开一张真实的卡 ──────────────────
+    // 不走「选中文本 → 弹按钮 → 起卡」那条交互链：程序化设置选区会被
+    // 浏览器清掉（rangeCount=0），自动化下不可靠。改用陈列架——它调用的是
+    // 同一个 openDetailThread，卡片是真实模块造出来的。
+    {
+      const gal = await ctx.newPage();
+      try {
+        await gal.goto(`http://127.0.0.1:${PORT}/dev-preview/ui-gallery.preview.html`, { waitUntil: 'domcontentloaded' });
+        await gal.waitForSelector('.detail-thread-card', { timeout: 20000 });
+        await gal.waitForTimeout(800);
+        const r = await gal.evaluate(() => {
+          const card = document.querySelector('.detail-thread-card');
+          const quote = card.querySelector('.detail-thread-quote');
+          const reply = card.querySelector('.detail-thread-messages .msg.assistant');
+          const column = card.closest('.messages') || document.getElementById('messages');
+          const colRect = (column || card).getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          return {
+            quoteRail: quote ? getComputedStyle(quote).borderLeftColor : null,
+            replyRail: reply ? getComputedStyle(reply).borderLeftColor : null,
+            hasInput: !!card.querySelector('.detail-thread-input'),
+            hasSend: !!card.querySelector('.detail-thread-send'),
+            hasClose: !!card.querySelector('.detail-thread-close'),
+            hasResize: !!card.querySelector('.detail-thread-resize-handle'),
+            hasToolChrome: !!card.querySelector('.detail-thread-messages .tool-history, .detail-thread-messages .tool-progress'),
+            hasUsage: !!card.querySelector('.detail-thread-messages .token-usage'),
+            overflowsRight: Math.round(cardRect.right - colRect.right),
+          };
+        });
+        // 引文与卡内回复必须可区分：引文是「页边批注」性质（--gold），
+        // 回复是「答案」（accent）。两者同色时，引文和回答读起来像兄弟。
+        const distinct = r.quoteRail && r.replyRail && r.quoteRail !== r.replyRail;
+        const ok = distinct && r.hasInput && r.hasSend && r.hasClose && r.hasResize && r.hasToolChrome && r.overflowsRight <= 1;
+        if (!ok) failures++;
+        console.log(`  ${ok ? '✓' : '✗'} 追问卡（detail thread）— 引文条 ${r.quoteRail} / 回复条 ${r.replyRail}${distinct ? '（可区分）' : '（同色！）'}，输入行${r.hasInput ? '✓' : '✗'} 发送${r.hasSend ? '✓' : '✗'} 关闭${r.hasClose ? '✓' : '✗'} 手柄${r.hasResize ? '✓' : '✗'} 工具${r.hasToolChrome ? '✓' : '✗'} 用量${r.hasUsage ? '✓' : '✗'}，右侧溢出 ${r.overflowsRight}px`);
+      } catch (e) {
+        failures++;
+        console.log('  ✗ 追问卡（detail thread）— 陈列架没能起卡：' + String(e.message || e).split('\n')[0]);
+      } finally {
+        await gal.close();
+      }
+    }
+
     if (wantShots) {
       const out = `/tmp/visual-check-${scheme}.png`;
       await page.screenshot({ path: out });

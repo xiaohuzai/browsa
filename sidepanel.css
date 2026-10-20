@@ -2976,7 +2976,12 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .detail-thread-quote {
   padding: 4px 8px;
   margin: 0 20px 8px 0;
-  border-left: 2px solid var(--accent);
+  /* The quote is a MARGIN NOTE — a reference to a passage, not a reply. It
+     wore the accent rail, the same colour as the assistant's own reply rail
+     below it, so the excerpt and the answer read as siblings. The palette
+     already has the right colour for this: --gold is reserved for
+     margin-note content (timestamps, citation markers, highlights). */
+  border-left: 2px solid var(--gold);
   color: var(--fg-2);
   /* No font-style:italic — the quoted text is frequently CJK, and synthesized
      obliques render Chinese glyphs as slanted strokes (see the blockquote

@@ -63,6 +63,9 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **变异验证过门禁有效**：去掉全局 `[hidden]` 规则 → 门禁立刻变红并点名 6 个泄漏元素；把 `display:flex` 加回滚动按钮 → 同样被点名。
 - **门禁不接进 `npm test`**（需要浏览器，且 CI 用的是共享工作流改不动）；它是 `npm run visual-check`，**改面板 CSS/布局后应手动跑一次**。没有浏览器时它大声 SKIP 而不是失败。
 - **门禁要覆盖 320px**（`VISUAL_CHECK_WIDTHS=420,320`）：420px 放行、320px 失败的缺陷存在——装订线槽被窄屏媒体查询吃掉，刻度伸出面板 8px 还压着最后一个字。
+- **追问卡（detail thread）也要进门禁**，走**陈列架**而不是「选中文本 → 弹按钮 → 起卡」那条交互链：程序化设置选区会被浏览器清掉（`rangeCount=0`），自动化下不可靠；陈列架调用的是同一个 `openDetailThread`，卡是真实模块造出来的。断言：引文条与卡内回复条**必须可区分**、输入行/发送/关闭/缩放手柄/工具 chrome/用量 chip 齐全、卡片不横向溢出消息列。
+- **追问卡的引文条是 `--gold` 不是 `--accent`**：引文是「页边批注」性质的引用（`--gold` 在配色规则里专供页边批注/引用标记/时间戳），而卡内回复的左边条是 accent（"browsa 在说话"）。两者同色时，引文和回答读起来像兄弟——已改。
+- **`detail-thread.js` 在 IMPORT 时就绑 `#messages`**（`messagesEl().addEventListener('mouseup'/'scroll')`）：任何要加载它的页面**必须先有真的 `<main id="messages">`**，否则 import 即抛 `Cannot read properties of null`。陈列架的追问卡这一节因此用真容器，不是普通 div。
 - **`dev-preview/ui-gallery.preview.html` 是"界面陈列架"**：把平时只在出错/流式中才出现的面（错误卡、审批卡、澄清卡、工具进度、选项卡、多选条、搜索条、排队 dock、灯箱、裁剪弹窗、prompt 检视器）渲染出来看。它用**真实模块**（turn-chrome / ui-utils）渲染；只有 sidepanel.js 私有函数造的那几个（错误卡、选项请求卡）在这里复刻同一份标记，**漂移会体现成要修的 diff**。只做开发用，不进商店包（package.mjs 是白名单）。
 
 ## UI/UX 全量审计（2026-10-20 第二批 — 设置页 + 条件面 + 页面级面）
