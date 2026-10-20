@@ -1023,10 +1023,6 @@
     "message": "caracteres",
     "description": "Sidepanel: char count unit"
   },
-  "tokensUnit": {
-    "message": "tokens",
-    "description": "Sidepanel: token count unit"
-  },
   "mermaidLoadFailed": {
     "message": "No se pudo cargar el módulo de Mermaid — revisa la consola.",
     "description": "Sidepanel: mermaid module load failure"

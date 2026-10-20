@@ -118,7 +118,6 @@ function sniffStreamingChartFence(state, delta) {
   if (langs.size) warmChartVendors(langs);
 }
 const charCountEl = $('charcount');
-const tokCountEl = $('tokcount');
 const composerInfoEl = $('composerinfo');
 const attachBtn = $('attach');
 if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user types
@@ -1493,53 +1492,20 @@ function stopWatchingStream() { cancelStream({ detach: true }); }
 // already point at a DIFFERENT tab than the stream's.
 function streamTabIdOf() { return activeController?.tabId ?? currentTabId; }
 
-let outputTokens = 0;
-// CJK count without allocation: `.match(re).length` builds one array entry
-// per CJK char, and estimateTokens runs over the WHOLE composer text on
-// every keystroke (a 50K-char pasted draft = a 50K-element array per key).
-function countCjk(text) {
-  let n = 0;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) || (c >= 0xf900 && c <= 0xfaff)) n++;
-  }
-  return n;
-}
-
-function updateOutputTokenCount(delta) {
-  const cjk = countCjk(delta);
-  const rest = delta.length - cjk;
-  outputTokens += Math.round(cjk + rest / 4);
-  tokCountEl.textContent = `~${outputTokens}`;
-}
-
-// Approximate character / token counter. We avoid bundling gpt-tokenizer
-// (~1MB BPE table) because:
-//   1. The exact count is non-critical — users just need a sense of size.
-//   2. Each LLM tokenizes differently (o200k_base, cl100k_base, etc.) and
-//      we have no way to know which the active provider uses.
-//   3. Token count for a "feel" is good enough: 1 CJK char ≈ 0.5-1.0 token,
-//      1 English word ≈ 1.0-1.3 tokens. We use a simple heuristic:
-//        cjk chars  : 1.0 token each
-//        non-cjk    : ceil(length / 4)  (rough word+punctuation count)
-function estimateTokens(text) {
-  if (!text) return 0;
-  const cjk = countCjk(text);
-  const rest = text.length - cjk;
-  return Math.round(cjk + rest / 4);
-}
-
+// Exact character count only. The old `~N tokens` figure was a client-side
+// heuristic (CJK 1 char/token, non-CJK 4 chars/token) — every provider/model
+// tokenizes differently, so it could mislead context-budget decisions. Token
+// numbers are shown only AFTER a turn, from the provider's own usage payload.
 function updateComposerInfo() {
-  if (!charCountEl || !tokCountEl) return;
+  if (!charCountEl || !composerInfoEl) return;
   const t = inputEl.value;
-  const est = estimateTokens(t);
   charCountEl.textContent = t.length.toLocaleString();
-  tokCountEl.textContent = '~' + est.toLocaleString();
-  // Hide when empty, show and color when there's content
+  // Hide when empty, show and color when there's content. Thresholds are raw
+  // character counts (exact), not a token guess.
   composerInfoEl.style.display = t.length === 0 ? 'none' : '';
   composerInfoEl.classList.remove('warn', 'danger');
-  if (est > 50_000) composerInfoEl.classList.add('danger');
-  else if (est > 10_000) composerInfoEl.classList.add('warn');
+  if (t.length > 100_000) composerInfoEl.classList.add('danger');
+  else if (t.length > 20_000) composerInfoEl.classList.add('warn');
 }
 
 async function openSettingsPage() {
@@ -1806,10 +1772,9 @@ function waitForStreamHelloAck(port, tabId, { onAck, resume = false } = {}) {
 //   target         — StreamTarget { getEl, getRenderer, onElementChanged } (see
 //                    above): fixed bubble for onSend, drifting for resume.
 //   state          — mutable { acc, toolEvents, startedAt } shared with the
-//                    caller. startedAt = first-chunk timestamp for the usage
-//                    chip's t/s (resume seeds it from STREAM_PEEK.startedAt so
-//                    the rate reflects the WHOLE stream, not the post-resume
-//                    part).
+//                    caller. startedAt = first-chunk timestamp retained for
+//                    resume/PEEK parity; the usage chip no longer derives a
+//                    rate from it (only provider-reported numbers are shown).
 //   hooks          — the genuinely caller-specific bits, all optional:
 //     stopKeepAlive()— clears the caller's SW_PING setInterval.
 //     onRetry(m)   — caller-specific RETRY reset, run BEFORE the shared
@@ -1833,7 +1798,6 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       if (!state.startedAt) state.startedAt = Date.now(); // mark first-token time
       state.acc += m.delta;
       target.getRenderer()(m.delta, false); // pass delta, not accumulated text
-      updateOutputTokenCount(m.delta);
       // Fence sniff: the instant a diagram fence appears in the stream, warm
       // the matching chart vendors so the render at DONE finds them cached.
       // Rolling-window scan (see sniffStreamingChartFence) — only the
@@ -1894,11 +1858,12 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       // 的 isDone 路径里跑完（C3）；provider 铭牌等站点差异在渲染后补。
       if (m.providerLabel) addProviderChip(el, m.providerLabel);
       if (m.providerKey) lastReplyKey = m.providerKey;
-      outputTokens = 0;
-      // Show token usage if the provider returned it — explicit timer start
-      // (state.startedAt), de-duplicated per bubble inside showTokenUsage.
+      // Provider-reported token/cache numbers; the decode rate is derived only
+      // for turn-scoped usage over the first-token → DONE window (session-
+      // scoped channels get no rate — see lib/usage.js).
       if (m.usage) {
-        turnChrome.showTokenUsage(el, m.usage, state.startedAt);
+        const durationMs = state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0;
+        turnChrome.showTokenUsage(el, m.usage, m.usageScope, durationMs);
         state.startedAt = 0;
       }
       // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
@@ -2043,16 +2008,12 @@ async function onSend() {
   clearPersistedDraft();
   updateComposerInfo();
   setStreamingUI(true);
-  // Per-turn token counter: reset HERE (the single start point), not only on
-  // DONE — a cancelled or errored turn used to leave its count in place, so
-  // the next turn's live count started from the previous turn's total.
-  outputTokens = 0;
-  if (tokCountEl) tokCountEl.textContent = '~0';
 
   // Placeholder assistant bubble
   const assistantEl = appendAssistant('');
-  // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel;
-  // startedAt is the first-chunk timestamp for the usage chip's t/s.
+  // toolEvents accumulate TOOL_PROGRESS events for post-stream history panel.
+  // (startedAt is kept for resume/PEEK parity — the chip shows provider data
+  // only, no derived rate.)
   const state = { acc: '', toolEvents: [], startedAt: 0 };
   _chartFenceScanPos = 0; // fresh rolling fence scan for this turn
   let renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
@@ -2096,7 +2057,6 @@ async function onSend() {
           // shows only the new attempt's content, not stale content from the failed one.
           state.acc = '';
           state.toolEvents = [];
-          outputTokens = 0;
           // Remove any stale live-think block from the previous attempt.
           // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
           const prevSib = assistantEl.previousElementSibling;
@@ -2249,8 +2209,6 @@ async function resumeInFlightStream(tabId) {
   // the send button said "send" while clicking it actually cancelled, and
   // #messages kept aria-live=polite so every streamed frame was announced.
   setStreamingUI(true);
-  outputTokens = 0;
-  if (tokCountEl) tokCountEl.textContent = '~0';
   // From here, the background is still streaming. The DOM is whatever
   // the previous panel session left behind (or just renderHistory()
   // output if the panel was opened fresh). We need to:

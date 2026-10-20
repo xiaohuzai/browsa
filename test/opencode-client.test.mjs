@@ -159,7 +159,7 @@ test('opencodeStream — happy path: prompt, deltas, active-poll completion, fin
     },
     "/message": () => jsonResponse({ data: [
       { type: 'user', content: [{ type: 'text', text: 'q' }] },
-      { type: 'assistant', content: [{ type: 'text', text: '你好，世界' }], tokens: { input: 10, output: 5 }, finish: 'stop' },
+      { type: 'assistant', content: [{ type: 'text', text: '你好，世界' }], tokens: { input: 10, output: 5, cache: { read: 30, write: 5 } }, finish: 'stop' },
     ] }),
   });
   const deltas = [];
@@ -172,7 +172,12 @@ test('opencodeStream — happy path: prompt, deltas, active-poll completion, fin
     });
     assert.deepEqual(deltas, ['你好', '，世界']);
     assert.equal(r.full, '你好，世界');   // final message is authoritative
-    assert.deepEqual(r.usage, { prompt_tokens: 10, completion_tokens: 5 });
+    assert.deepEqual(r.usage, {
+      prompt_tokens: 45, // opencode tokens.input is non-cached: 10 + 30 + 5
+      completion_tokens: 5,
+      prompt_tokens_details: { cached_tokens: 30 },
+      cache_write_tokens: 5,
+    });
     assert.equal(r.finishReason, 'stop');
     assert.equal(r.sessionId, SES);
     assert.ok(ff.calls.some(c => c.url.includes('/prompt') && c.body.includes('"text":"q"')));

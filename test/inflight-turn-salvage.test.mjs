@@ -341,6 +341,11 @@ function scriptGateway() {
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: { subscribed: true } }];
     }
+    if (frame.method === 'usage.status') {
+      // This mock doesn't model usage accounting — fail fast so the
+      // best-effort snapshot resolves to null instead of waiting 3s.
+      return [{ type: 'res', id: frame.id, ok: false, error: { code: 'UNAVAILABLE', message: 'no usage' } }];
+    }
     if (frame.method === 'sessions.send') {
       accepted = true;
       return [{ type: 'res', id: frame.id, ok: true, payload: { ok: true, task_id: 'task-1' } }];
