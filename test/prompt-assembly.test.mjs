@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAPABILITY_HINTS, CAPABILITY_HINTS_ALWAYS_ENTRIES, CAPABILITY_HINTS_ALWAYS,
-  RENDER_CONTRACT_HINTS, RENDER_HINT_GROUPS, buildRenderHints, renderHintsTriggered,
+  RENDER_CONTRACT_HINTS, RENDER_HINT_GROUPS, buildRenderHints, renderHintsForLastUserTurn, renderHintsTriggered,
 } from '../lib/prompt-assembly.js';
 
 test('two-tier split: ALWAYS entries ride the full pool, RENDER is exactly the complement', () => {
@@ -191,4 +191,24 @@ test('per-family: multilingual article reads do NOT trigger the article-style co
     assert.ok(!buildRenderHints({ userText: text }).includes(MARKERS.article),
       `reading an article must not trigger article style: ${text}`);
   }
+});
+
+// /prompt 检视器不能把「所有家族」当成「已发送」——它按存储的对话重算上一轮。
+test('inspector selection: recomputes the last user turn, so "hi" shows no render family', () => {
+  assert.equal(renderHintsForLastUserTurn([]), '');
+  assert.equal(renderHintsForLastUserTurn([
+    { role: 'user', text: 'hi' },
+    { role: 'assistant', text: 'hello' },
+  ]), '');
+
+  const chart = renderHintsForLastUserTurn([{ role: 'user', text: '画个柱状图' }]);
+  assert.ok(chart.includes(MARKERS.echarts));
+  assert.ok(!chart.includes(MARKERS.smiles), 'unselected families stay out of the inspector too');
+
+  const followUp = renderHintsForLastUserTurn([
+    { role: 'user', text: '画个柱状图' },
+    { role: 'assistant', text: '```echarts\n{"series":[]}\n```' },
+    { role: 'user', text: '继续' },
+  ]);
+  assert.ok(followUp.includes(MARKERS.echarts), 'history hysteresis is reflected for follow-up turns');
 });
