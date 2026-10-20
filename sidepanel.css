@@ -2411,6 +2411,16 @@ code.language-patch .hljs-addition { color: #7ee787; }
   max-height: 200px;
   overflow-y: auto;
 }
+/* Inspector status line — deliberately NOT a prompt section: muted, left rule,
+   and excluded from the copy-full-prompt output. */
+.prompt-inspector-status {
+  margin: 12px 0 0;
+  padding: 7px 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
 .pi-copy {
   background: none;
   border: 1px solid var(--border);
