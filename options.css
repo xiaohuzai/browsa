@@ -51,17 +51,12 @@ main {
   display: flex;
   align-items: center;
   gap: 14px;
-  /* Stitched-line divider — same visual vocabulary as the sidepanel's Rail
-     signature element, echoed here as a horizontal binding line rather than
-     a plain hairline border. */
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--border-strong) 0px, var(--border-strong) 5px,
-    transparent 5px, transparent 9px
-  );
-  background-position: bottom;
-  background-size: 100% 2px;
-  background-repeat: no-repeat;
+  /* Plain hairline divider. This used to be a "stitched" dashed rule, kept as
+     an echo of the side panel's original Margin Rail — but that rail was
+     removed from the panel in 2026-09-23 (it read as an odd, unexplained
+     vertical line), so the echo outlived its referent. The panel's top bar
+     now draws a plain hairline; this page draws the same one. */
+  border-bottom: var(--hairline) solid var(--border);
   padding: 4px 2px 22px;
   margin-bottom: 6px;
 }
@@ -869,7 +864,7 @@ input[type="range"] { accent-color: var(--accent); }
   letter-spacing: 0;
   white-space: normal;
   box-shadow: 0 4px 18px rgba(0,0,0,0.35);
-  z-index: 100;
+  z-index: var(--z-toolbar);
 }
 .tip:hover .tip-bubble,
 .tip:focus-visible .tip-bubble,
@@ -1020,7 +1015,13 @@ input[type="range"] { accent-color: var(--accent); }
   .provider-tabs .provider-tab { min-height: 28px; }
 }
 
-button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* One focus recipe across both extension pages (the side panel draws the
+   same offset outline on its controls) — a slightly softened accent so the
+   ring reads as a drawn edge rather than a solid painted rectangle. */
+button:focus-visible, summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+  outline-offset: 2px;
+}
 
 .common-settings-card {
   border-top-color: var(--gold);

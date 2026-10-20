@@ -36,6 +36,20 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **`applyI18n` 不毁子节点**（有元素子节点时只替换首个文本节点）；**`composer-state` 的 debounce 只由测试注入**。
 - **测试基建**：`test/helpers/chrome-mock.mjs` 的 `makeStorageArea(initial, {clone})` 是唯一实现，勿再在测试文件里手写 storage 桩。
 
+## UI/UX 视觉审计（2026-10-20 — 截图驱动，勿回退）
+
+不是「换皮」：这一轮全部来自**把真实面板渲染出来逐帧找问题**（420px 窄栏，Chrome 截图 + DOM 几何断言）。叙事：wiki **Architecture → "The 2026-10-20 UI/UX visual audit"**。卡片如下，全部有 lockstep 钉子（`render-contract-lockstep` 第 7 节 / `lib-chem-render`）。
+
+- **大纲侧栏必须画在装订线槽里，不能压正文**（真 bug，截图实测刻度落在每行最后一个字上）。做法：`.messages` 右padding ≥20px 当装订线槽 + `.outline-rail` 负 margin 伸进槽里 + strip 宽度 ≤ 槽宽。**加宽 `.messages` 的右padding 时必须同步改 rail 的负 margin**，否则刻度立刻回到字上。Tests: `render-contract-lockstep`「outline rail draws in the margin gutter」。
+- **化学结构图按墨迹裁剪**（真 bug：RDKit 画完居中不缩放，酯化反应式被塞进 389×280 画布，反应式只占 69px，图块上方空 190px）。`render.js` 的 `tightenSvgViewBox(svgEl)` 在 SVG 入文档后按子元素 bbox 裁 viewBox，**必须同步改 width/height 属性**（它们承载 `height:auto` 解析用的内在比例），且**跳过背景 `<rect>`**（它不是墨迹）。失败开放：无 getBBox（jsdom）/退化框/本来就紧 → 原样不动。
+- **Mol\* 嵌入 chrome 必须用面板主题**（vendor 把 LIGHT 调色板写死：`.msp-plugin`/`.msp-sequence` = `#eeece7`，残基字母 = `#332b1f`）。覆盖写法固定为 **`.pdb-viewer .msp-plugin X`（三级）**——vendor 规则是两级，同级时 molstar.css 赢（它是运行时追加进 `<head>` 的，排在 sidepanel.css 之后）。3D 视口底色走 `_themeColor('--bg-2')` 而非硬编码 black/white。
+- **快捷操作条要「抱住」自己的药丸**（`.quickbar` 用 `width: fit-content` + `align-self: flex-start`）——撑满宽度的胶囊有 45% 是空的，比对话本身还抢眼。
+- **顶栏模型选择器是幽灵控件**（默认无边框无底色，hover 才出表面）——它原来是一只带边框的填充盒子，比 wordmark 和消息列都重。
+- **输入框聚焦不要喊**：中性边框 + 柔和 accent 光晕（`color-mix(--accent 14%)`），不要满饱和 accent 边框。输入框的焦点配方 = accent 边框 + `0 0 0 3px var(--accent-bg)`，**与设置页同一套**（跨页一致）。
+- **焦点只有一套**：`--focus-ring` 令牌（2px 底色垫 + 4px accent 环）+ `@media (forced-colors: active)` 兜底（High Contrast 会剥掉 box-shadow，没有兜底等于键盘用户没有焦点指示）。文本框自己一套（见上），控件用全局环；**不要再出现第三种**（金环、金色 outline 都已并掉）。
+- **z-index 只走 `--z-*` 阶梯**（theme.css 定义，sidepanel.css 里不许出现裸数字）。两条已修的层级事故：截图裁剪弹窗（模态）与抽屉同层；确认弹窗在 toast 之下（toast 会盖住用户正在回答的对话框）。Tests: `render-contract-lockstep`「stacking order comes from the token ladder」。
+- **设置页页眉用普通发丝线**（原是「缝线」虚线，注释说它呼应侧栏的 Margin Rail——那个 Rail 2026-09-23 就删了，回声比它的原型活得久）。
+
 ## Docs sync convention (user-visible changes, 2026-09-20)
 
 **Any user-visible change — feature, behavior, capability — syncs the public docs in the SAME PR**, without waiting to be asked. The rule was made explicit after the Office-document attach landed with its README/docs edits already bundled (2026-09-20, the intended shape) and a follow-up scan caught one missed sentence — that scan-then-fix pass is the routine to repeat:

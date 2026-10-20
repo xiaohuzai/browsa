@@ -285,3 +285,93 @@ test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, 
   // 布局宽度必须扣掉 padding（pele room()）。
   assert.match(renderJs, /function _contentWidth/);
 });
+
+// ─── 7. UI/UX layer invariants (2026-10-20 visual pass) ─────────────────────
+// These are the defects the 2026-10-20 screenshot audit found in a 420px
+// panel: the outline rail's ticks drew ON TOP of the last glyph of a line,
+// the quick-action dock stretched to full width with half of it empty, the
+// stacking order was free-hand (a toast could cover an open confirm dialog),
+// and three different focus styles competed. Each pin below names the
+// regression it stops.
+const themeCss = readFileSync(join(ROOT, 'lib', 'theme.css'), 'utf8');
+
+// Padding-right of a rule, from either `padding-right:` or the `padding:`
+// shorthand (1–4 values). Returns null when neither is present.
+function paddingRightOf(rule) {
+  const longhand = rule.match(/padding-right:\s*(\d+)px/);
+  if (longhand) return Number(longhand[1]);
+  const shorthand = rule.match(/padding:\s*([^;]+);/);
+  if (!shorthand) return null;
+  const parts = shorthand[1].trim().split(/\s+/).map((v) => parseFloat(v));
+  if (!parts.length || parts.some((n) => Number.isNaN(n))) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2 || parts.length === 3) return parts[1];
+  return parts[1];
+}
+
+test('lockstep: the outline rail draws in the margin gutter, never over the text', () => {
+  const msgs = css.match(/\.messages\s*\{[^}]*\}/);
+  assert.ok(msgs, 'the .messages block is gone from sidepanel.css');
+  const pr = paddingRightOf(msgs[0]);
+  assert.ok(pr && pr >= 20,
+    'the messages column must reserve a ≥20px right gutter for the outline rail — a narrower gutter puts the ticks on top of the last glyph of a line');
+  const rail = css.match(/\.outline-rail\s*\{[^}]*\}/);
+  assert.ok(rail, 'the .outline-rail block is gone from sidepanel.css');
+  assert.match(rail[0], /margin-right:\s*-\d+px/,
+    'the rail must reach back into that gutter (negative right margin) so its ticks are measured from the PANEL edge, not the text column');
+  // The tick's own width must fit inside the gutter: strip width + right offset ≤ gutter.
+  const strip = css.match(/\.outline-rail-strip\s*\{[^}]*\}/);
+  assert.ok(strip, 'the .outline-rail-strip block is gone from sidepanel.css');
+  const stripW = Number((strip[0].match(/width:\s*(\d+)px/) || [])[1]);
+  const stripRight = Number((strip[0].match(/right:\s*(\d+)px/) || [])[1]);
+  assert.ok(stripW + stripRight <= pr,
+    `the rail strip (${stripW}px + ${stripRight}px) must fit inside the ${pr}px gutter`);
+});
+
+test('lockstep: the stacking order comes from the token ladder, never from free-hand numbers', () => {
+  // Every z-index in the stylesheet must name a layer token.
+  const raw = (css.match(/z-index:\s*([^;]+);/g) || [])
+    .map((d) => d.replace(/^z-index:\s*/, '').replace(/;\s*$/, '').trim())
+    .filter((v) => !v.startsWith('var(--z-'));
+  assert.deepEqual(raw, [], `z-index must go through the --z-* ladder; found raw values: ${raw.join(', ')}`);
+  for (const layer of ['--z-rail', '--z-toolbar', '--z-float', '--z-sticky', '--z-drawer', '--z-modal', '--z-lightbox', '--z-skip', '--z-toast', '--z-confirm']) {
+    assert.ok(themeCss.includes(`${layer}:`), `theme.css must define the ${layer} layer`);
+  }
+  // The confirm dialog must sit ABOVE the toast: a toast must never cover
+  // the dialog the user is answering.
+  const toast = Number((themeCss.match(/--z-toast:\s*(\d+)/) || [])[1]);
+  const confirm = Number((themeCss.match(/--z-confirm:\s*(\d+)/) || [])[1]);
+  assert.ok(confirm > toast, 'the confirm dialog must be above the toast layer');
+  // A blocking in-panel modal (the screenshot crop) must be above the drawers.
+  const drawer = Number((themeCss.match(/--z-drawer:\s*(\d+)/) || [])[1]);
+  const modal = Number((themeCss.match(/--z-modal:\s*(\d+)/) || [])[1]);
+  assert.ok(modal > drawer, 'the crop modal must be above the slide-in drawers');
+});
+
+test('lockstep: one focus system — a single ring token, and a forced-colors fallback', () => {
+  assert.ok(themeCss.includes('--focus-ring:'), 'theme.css must own the focus ring recipe');
+  assert.match(css, /\*:focus-visible\s*\{[^}]*box-shadow:\s*var\(--focus-ring\)/,
+    'the global focus ring must use the shared token');
+  assert.match(css, /@media \(forced-colors: active\)/,
+    'Windows High Contrast strips box-shadow — a forced-colors focus fallback is mandatory');
+  // The timestamp chip used to carry a THIRD focus style (a gold outline next
+  // to the accent halo and the accent offset outline).
+  const ts = css.match(/\.msg\.assistant \.browsa-ts:focus-visible\s*\{[^}]*\}/);
+  assert.ok(ts, 'the timestamp focus rule is gone');
+  assert.doesNotMatch(ts[0], /outline:/, 'the timestamp chip must not paint its own focus outline');
+});
+
+test('lockstep: the quick-action dock hugs its pills instead of stretching to the panel width', () => {
+  const q = css.match(/\.quickbar\s*\{[^}]*\}/);
+  assert.ok(q, 'the .quickbar block is gone from sidepanel.css');
+  assert.match(q[0], /width:\s*fit-content/, 'the dock must shrink to its content');
+  assert.match(q[0], /max-width:\s*calc\(100%\s*-\s*\d+px\)/, 'the dock must still be able to wrap on a narrow panel');
+});
+
+test('lockstep: chemistry drawings are cropped to their ink, and the 3D viewport follows the theme', () => {
+  assert.match(renderJs, /export function tightenSvgViewBox/);
+  assert.match(renderJs, /tightenSvgViewBox\(svgEl\)/,
+    'renderSmiles must crop the RDKit canvas — RDKit centres the drawing and never fills it, which left a tall empty box around every reaction');
+  assert.match(renderJs, /viewportBackgroundColor:\s*_themeColor\('--bg-2'/,
+    'the Mol* viewport background must follow the theme surface, not a hard-coded black/white');
+});
