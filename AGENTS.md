@@ -87,6 +87,13 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **选区工具条的 `.btn-ask` 根本没有 CSS 规则**：工具条上唯一的主动作（"Ask"，打开 browsa）跟旁边的次级按钮长得一模一样。**改为主按钮**（暗色 `#e0542c` / 亮色 `#c2410c`）。工具条的调色板在 Shadow DOM 里自成一套（必须如此：它浮在任意网页上），但色相跟侧栏一致。
 - 提示气泡的暗色板是**有意固定**的（真实用户报告：主题化的 `--fg` 曾导致暗底暗字）→ 保留观感，把六个魔数命名成 `--tip-*` 令牌并写清理由。
 
+### 宣传素材现状（2026-10-20 审计后：**需要重拍，不是「保留」**）
+
+- 上面两批改动**改了宣传片与 demo GIF 里看得见的面**：面板顶栏的模型选择器现在是幽灵控件（原来是一只带边框的盒子）、快捷操作条抱住了药丸（原来是撑满的胶囊）、设置页的「保存」是橙色实心按钮、聊天偏好卡的顶条从金色换成 accent、控件高度统一了。**在 GIF 的原生 720px 交付分辨率下逐帧核对过：可辨**（demo-v16 的 #1/#2 帧就是设置页，#4–#9 帧的顶栏带着框的选择器）。
+- 但**没有任何演示操作、结果、能力表述被改变**：仍是「附加文章 → 提问 → 选区追问 → 看渲染 → 点时间戳 → 换 Agent → 复制/下载 → 存取会话」，逐帧核对过。
+- **因此：当前成片与产品已经不一致，下次宣传片升级（v8）必须重拍受影响镜头**——至少是 demo GIF 的设置页段与所有露出面板顶栏的镜头，以及主片里出现设置页/面板 chrome 的镜头。触发条件已经写清楚，不用再猜。**本轮未重拍**：v7 的冻结采集与 Remotion 公共资源不在当前机器上（`video-v7/public` 为空、冻结截图在 store-assets 侧），重拍是整条生产线的活，不该在一次 UI 审计里顺手做掉。
+- 指南截图（6 张）**已按同尺寸重拍**——它们是文档的一部分，必须与产品一致。
+
 ## Docs sync convention (user-visible changes, 2026-09-20)
 
 **Any user-visible change — feature, behavior, capability — syncs the public docs in the SAME PR**, without waiting to be asked. The rule was made explicit after the Office-document attach landed with its README/docs edits already bundled (2026-09-20, the intended shape) and a follow-up scan caught one missed sentence — that scan-then-fix pass is the routine to repeat:
