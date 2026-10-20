@@ -3414,12 +3414,6 @@ async function showEffectivePrompt() {
     renderFamilies,
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
-  if (!renderHints) {
-    sections.push({
-      label: 'Capability hints (render contract — not active)',
-      text: 'No render family is active for this conversation. A drawing/chart/chemistry/article ask appends only the matching family for that turn; once its fenced block appears in the conversation, that family stays on.',
-    });
-  }
 
   const overlay = document.createElement('div');
   overlay.className = 'confirm-overlay';
@@ -3452,6 +3446,15 @@ async function showEffectivePrompt() {
     emptyEl.style.cssText = 'color:var(--muted);font-size:13px';
     emptyEl.textContent = _t('noSystemPrompt', '未配置系统提示词。');
     modal.appendChild(emptyEl);
+  }
+  // 状态说明必须 OUTSIDE the prompt sections: it is not sent, and it must not
+  // be included in the copy-full-prompt output. The old version pushed it into
+  // `sections`, so "copy full prompt" appended the explanation to the prompt.
+  if (!renderHints) {
+    const statusEl = document.createElement('p');
+    statusEl.className = 'prompt-inspector-status';
+    statusEl.textContent = 'Not sent — no render family is active. A drawing / chart / chemistry / article ask appends only the matching family for that turn; once its fenced block appears in the conversation, that family stays on.';
+    modal.appendChild(statusEl);
   }
   const actionsEl = document.createElement('div');
   actionsEl.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:12px';
