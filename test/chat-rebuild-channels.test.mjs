@@ -183,7 +183,7 @@ test('stateless anthropic turn completes and anthropicSystem reaches the wire (R
   const { calls, restore } = installFetch(() => anthropicLeg({ text: 'ok' }));
   const cap = captureChunks(43);
   try {
-    const result = await handleChat({ tabId: 43, userText: 'ping' }, HINTS, '');
+    const result = await handleChat({ tabId: 43, userText: 'ping 画个流程图' }, HINTS, '');
     assert.equal(result.full, 'ok');
     assert.equal(calls.length, 1);
     assert.match(calls[0].url, /\/v1\/messages$/);
@@ -252,7 +252,7 @@ test('continuation (responses): input is rebuilt with v1 + the continue instruct
     : responsesLeg({ text: V2 })));
   const cap = captureChunks(44);
   try {
-    const result = await handleChat({ tabId: 44, userText: 'long notes please' }, HINTS, '');
+    const result = await handleChat({ tabId: 44, userText: 'long notes please 画个流程图' }, HINTS, '');
     assert.equal(calls.length, 2);
     assert.match(calls[1].url, /\/v1\/responses$/);
     assert.equal(calls[1].body.input.length, calls[0].body.input.length + 2);
@@ -282,7 +282,7 @@ test('continuation (anthropic): messages rebuilt with v1 + instruction, anthropi
     : anthropicLeg({ text: V2 })));
   const cap = captureChunks(45);
   try {
-    const result = await handleChat({ tabId: 45, userText: 'long notes please' }, HINTS, '');
+    const result = await handleChat({ tabId: 45, userText: 'long notes please 画个流程图' }, HINTS, '');
     assert.equal(calls.length, 2);
     assert.match(calls[1].url, /\/v1\/messages$/);
 
@@ -552,7 +552,7 @@ test('timestamp-rewrite (anthropic): messages rebuilt from the RAW video entry, 
     assert.equal(calls.length, 2);
     assert.match(calls[1].url, /\/v1\/messages$/);
     assertRewriteShape(normTurns(calls[1].body.messages), JSON.stringify(calls[0].body.messages));
-    assert.ok(JSON.stringify(calls[1].body.system).includes(HINTS),
+    assert.ok(JSON.stringify(calls[1].body.system).includes('fenced code blocks'),
       'anthropicSystem must survive the rewrite rebuild');
   } finally {
     cap.release();
@@ -708,7 +708,7 @@ test('overflow rescue (anthropic): rebuildFrom rebuilds the messages and keeps a
     : anthropicLeg({ text: 'STUBBED-ANSWER' })));
   const cap = captureChunks(58);
   try {
-    const result = await handleChat({ tabId: 58, userText: 'What does the document say?' }, HINTS, '');
+    const result = await handleChat({ tabId: 58, userText: 'What does the document say? draw a diagram' }, HINTS, '');
     assert.equal(calls.length, 2);
     assert.ok(JSON.stringify(calls[0].body.messages).includes(BIG_MARKER));
     assertStubbed(calls[1].body.messages, 'anthropic retry');
@@ -1001,4 +1001,19 @@ test('site-image attach entry: hermes /v1/runs history flattens pixels to [image
     assert.match(attach.content, /苏州两日行程/);
     assert.ok(!JSON.stringify(body).includes('base64,'), 'no pixel bytes may leak into the runs string history');
   } finally { cap.release(); restore(); }
+});
+
+test('two-tier hints: a casual turn carries the ALWAYS base, not the render contract', async () => {
+  await seedProvider(CHAT_PROVIDER);
+  const { calls, restore } = installFetch(() => chatLeg({ text: 'ok' }));
+  const cap = captureChunks(90);
+  try {
+    await handleChat({ tabId: 90, userText: 'hi' }, HINTS, '');
+    const sys = JSON.stringify(calls[0].body); // chat-completions rides messages[0], not body.system
+    assert.ok(!sys.includes('sankey-beta'), 'the render contract must NOT ride a casual turn');
+    assert.ok(sys.includes('fenced code blocks'), 'the ALWAYS fence menu must still ride');
+  } finally {
+    cap.release();
+    restore();
+  }
 });

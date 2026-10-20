@@ -159,7 +159,10 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
   assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
   const subchatSrc = await readSubchatHandlerSrc();
-  assert.match(subchatSrc, /const sysPrompt = capabilityHints/, 'SUBCHAT must use the capabilityHints param (background.js\'s CAPABILITY_HINTS) as its system prompt, fed to the shared builders/dispatcher');
+  // 2026-10-20 两段式：SUBCHAT 与 CHAT 同一触发门——渲染契约细节按需追加，
+  // 未触发时回落共享的 ALWAYS 底座（不再是把整个 pool 无条件当 sysPrompt）。
+  assert.match(subchatSrc, /const sysPrompt = renderHintsTriggered\(\{ history: \[\], userText: subText \}\)\s*\?\s*capabilityHints\s*:\s*CAPABILITY_HINTS_ALWAYS/,
+    'SUBCHAT must gate the capabilityHints param (background.js\'s CAPABILITY_HINTS) through the shared two-tier trigger, falling back to CAPABILITY_HINTS_ALWAYS');
 
   // CHAT still builds effectiveSystemPrompt from the same constant (passed
   // in as the capabilityHints param from background.js's CAPABILITY_HINTS).
