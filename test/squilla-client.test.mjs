@@ -68,12 +68,13 @@ globalThis.WebSocket = MockWebSocket;
 // `events` (frames) after the send is accepted. `renameReply` overrides the
 // sessions.rename answer (default: ok); a function form receives the request
 // frame so the res id can echo it.
-function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4', renameReply } = {}) {
+function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4', renameReply, usageRows } = {}) {
   MockWebSocket.instances = [];
   let accepted = false;
+  let usageCalls = 0;
   MockWebSocket.respond = (ws, frame) => {
     if (frame.method === 'connect') {
-      return [{ type: 'hello-ok', protocol: 4, server: { version: helloVersion, conn_id: 'c1' }, features: { methods: ['sessions.send'] } }];
+      return [{ type: 'hello-ok', protocol: 4, server: { version: helloVersion, conn_id: 'c1' }, features: { methods: ['sessions.send', 'usage.status'] } }];
     }
     if (frame.method === 'sessions.create') {
       return [{ type: 'res', id: frame.id, ok: true, payload: { key: 'agent:main:webchat:deadbeef', sessionId: 'deadbeef' } }];
@@ -84,6 +85,13 @@ function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4',
     }
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: { subscribed: true, current_stream_seq: 1 } }];
+    }
+    if (frame.method === 'usage.status') {
+      const rows = Array.isArray(usageRows)
+        ? usageRows
+        : [{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }];
+      const row = rows[Math.min(usageCalls++, rows.length - 1)] || {};
+      return [{ type: 'res', id: frame.id, ok: true, payload: { sessions: [{ sessionKey: frame.params.sessionKey, ...row }] } }];
     }
     if (frame.method === 'sessions.send') {
       accepted = true;
@@ -103,9 +111,14 @@ function scriptGateway({ events = [], taskId = 'task-1', helloVersion = '0.5.4',
     origServerOpen.call(this);
     queueMicrotask(() => this.serverSend({ type: 'event', event: 'connect.challenge', payload: { nonce: 'n1' }, seq: 1 }));
   };
-  // Deferred event push: the test calls pushEvents() once the send landed.
+  // Deferred event push: wait until the send landed (usage.status adds a
+  // round trip before it), then deliver the scripted frames once.
+  let pushed = false;
   return {
-    pushEvents() {
+    async pushEvents() {
+      for (let i = 0; i < 100 && !accepted; i++) await flush();
+      if (pushed) return;
+      pushed = true;
       const ws = MockWebSocket.instances[0];
       for (const ev of events) ws.serverSend(ev);
     },
@@ -147,14 +160,15 @@ test('squillaStream: full handshake + turn — connect frame shape, delta stream
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
 
   const result = await resultP;
   const ws = lastSocket();
   const methods = ws.sent.filter(f => f.type === 'req').map(f => f.method);
 
-  // Handshake: connect first (with protocol bounds), then subscribe, then send.
-  assert.deepEqual(methods, ['connect', 'sessions.messages.subscribe', 'sessions.send']);
+  // Handshake: connect first (with protocol bounds), then subscribe, then the
+  // before/after usage snapshots around the send.
+  assert.deepEqual(methods, ['connect', 'sessions.messages.subscribe', 'usage.status', 'sessions.send', 'usage.status']);
   const connect = ws.sent[0];
   assert.equal(connect.id, 'connect');
   assert.equal(connect.params.minProtocol, 1);
@@ -163,7 +177,7 @@ test('squillaStream: full handshake + turn — connect frame shape, delta stream
   const subscribe = ws.sent[1];
   assert.equal(subscribe.params.key, 'agent:main:cli:s1');
 
-  const send = ws.sent[2];
+  const send = ws.sent.find((f) => f.method === 'sessions.send');
   assert.equal(send.method, 'sessions.send');
   assert.equal(send.params.message, 'hi');
   assert.equal(send.params.key, 'agent:main:cli:s1');
@@ -189,6 +203,34 @@ test('squillaStream: full handshake + turn — connect frame shape, delta stream
   gw.restore();
 });
 
+test('squillaStream: per-turn usage delta comes from usage.status (cache subset included)', async () => {
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [{ type: 'event', event: 'session.event.done', payload: {} }],
+    usageRows: [
+      { input_tokens: 1000, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 },
+      { input_tokens: 2500, output_tokens: 300, cache_read_tokens: 1200, cache_write_tokens: 100 },
+    ],
+  });
+  const resultP = squillaStream({
+    baseUrl: 'ws://127.0.0.1:18791/ws', apiKey: '', message: 'hi', sessionKey: 'agent:main:cli:s1',
+  });
+  await flush();
+  lastSocket().serverOpen();
+  await flush();
+  await flush();
+  await gw.pushEvents();
+
+  const result = await resultP;
+  assert.deepEqual(result.usage, {
+    prompt_tokens: 1500,       // delta: 2500 - 1000 (these counters are cumulative)
+    completion_tokens: 300,
+    prompt_tokens_details: { cached_tokens: 1200 },
+    cache_write_tokens: 100,
+  });
+  gw.restore();
+});
+
 test('squillaStream: apiKey is sent as auth.token in the connect params', async () => {
   const { squillaStream } = await import('../lib/squilla-client.js');
   const gw = scriptGateway({ events: [{ type: 'event', event: 'session.event.done', payload: {} }] });
@@ -200,7 +242,7 @@ test('squillaStream: apiKey is sent as auth.token in the connect params', async 
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   await resultP;
 
   const connect = lastSocket().sent[0];
@@ -226,7 +268,7 @@ test('squillaStream: events of another task in the same session are ignored', as
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
 
   assert.deepEqual(deltas, ['mine']);
@@ -252,7 +294,7 @@ test('squillaStream: thinking deltas are wrapped in a <thinking> block that clos
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
 
   assert.ok(result.full.includes('<thinking>\nlet me think\n</thinking>\n'), JSON.stringify(result.full));
@@ -273,7 +315,7 @@ test('squillaStream: sessions.changed task_terminal(status succeeded) is a termi
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(result.finishReason, 'completed');
   gw.restore();
@@ -292,7 +334,7 @@ test('squillaStream: task.failed / failed terminal reject with ProviderAPIError'
     lastSocket().serverOpen();
     await flush();
     await flush();
-    gw.pushEvents();
+    await gw.pushEvents();
     await assert.rejects(() => resultP, /provider exploded|task failed/i);
     gw.restore();
   }
@@ -308,7 +350,7 @@ test('squillaStream: task.cancelled rejects with AbortError', async () => {
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   await assert.rejects(() => resultP, (e) => e.name === 'AbortError');
   gw.restore();
 });
@@ -329,7 +371,7 @@ test('squillaStream: user abort sends chat.abort over the socket, then rejects w
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   await flush(); // let the first delta land
   await flush();
 
@@ -351,6 +393,9 @@ test('squillaStream: gateway error res on sessions.send rejects with ProviderAPI
     }
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: {} }];
+    }
+    if (frame.method === 'usage.status') {
+      return [{ type: 'res', id: frame.id, ok: false, error: { code: 'UNAVAILABLE', message: 'no usage' } }];
     }
     if (frame.method === 'sessions.send') {
       return [{ type: 'res', id: frame.id, ok: false, error: { code: 'QUEUE_FULL', message: 'queue full' } }];
@@ -412,6 +457,9 @@ test('squillaStream: image_input_unsupported failure retries once without attach
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: {} }];
     }
+    if (frame.method === 'usage.status') {
+      return [{ type: 'res', id: frame.id, ok: false, error: { code: 'UNAVAILABLE', message: 'no usage' } }];
+    }
     if (frame.method === 'sessions.send') {
       sendCount += 1;
       const taskId = sendCount === 1 ? 't-img' : 't-text';
@@ -465,6 +513,9 @@ test('squillaStream: attachments + failure WITHOUT a reason string still retries
     }
     if (frame.method === 'sessions.messages.subscribe') {
       return [{ type: 'res', id: frame.id, ok: true, payload: {} }];
+    }
+    if (frame.method === 'usage.status') {
+      return [{ type: 'res', id: frame.id, ok: false, error: { code: 'UNAVAILABLE', message: 'no usage' } }];
     }
     if (frame.method === 'sessions.send') {
       sendCount += 1;
@@ -588,7 +639,7 @@ test('squillaStream: field case — the reply opens with [[reply_to_current]] an
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
 
   const joined = deltas.join('');
@@ -614,7 +665,7 @@ test('squillaStream: directive split across deltas still never reaches full', as
   lastSocket().serverOpen();
   await flush();
   await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.ok(!result.full.includes('reply_to'), JSON.stringify(result.full));
   assert.ok(result.full.endsWith('回答正文'), JSON.stringify(result.full));
@@ -858,7 +909,7 @@ test('squillaStream: presentation:intermediate narration lands in the thinking f
   });
   const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
   await flush(); lastSocket().serverOpen(); await flush(); await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(result.full, '<thinking>\n组织回答中\n</thinking>\n最终回答正文');
   gw.restore();
@@ -877,7 +928,7 @@ test('squillaStream: pre-tool preamble (answer-marked) is folded at the tool bou
   });
   const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
   await flush(); lastSocket().serverOpen(); await flush(); await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(
     result.full,
@@ -900,7 +951,7 @@ test('squillaStream: plain Q&A (no tools, all answer) stays byte-identical', asy
   });
   const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
   await flush(); lastSocket().serverOpen(); await flush(); await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(result.full, '你好！有什么可以帮你？');
   assert.ok(!result.full.includes('<thinking>'), 'no fold may appear without process text');
@@ -919,7 +970,7 @@ test('squillaStream: answer_generation_reset drops the stale run and splices the
   });
   const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
   await flush(); lastSocket().serverOpen(); await flush(); await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(result.full, '融合后的最终回答（续写）', JSON.stringify(result.full));
   assert.ok(!result.full.includes('候选A'), 'revoked text must not survive');
@@ -938,7 +989,7 @@ test('squillaStream: whitespace-only preamble is not folded into an empty think 
   });
   const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
   await flush(); lastSocket().serverOpen(); await flush(); await flush();
-  gw.pushEvents();
+  await gw.pushEvents();
   const result = await resultP;
   assert.equal(result.full, '\n\n正文', JSON.stringify(result.full));
   assert.ok(!result.full.includes('<thinking>'), 'no empty fold');

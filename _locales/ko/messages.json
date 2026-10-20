@@ -1023,10 +1023,6 @@
     "message": "자",
     "description": "Sidepanel: char count unit"
   },
-  "tokensUnit": {
-    "message": "토큰",
-    "description": "Sidepanel: token count unit"
-  },
   "mermaidLoadFailed": {
     "message": "Mermaid 모듈을 로드하지 못했습니다 — 콘솔을 확인하세요.",
     "description": "Sidepanel: mermaid module load failure"

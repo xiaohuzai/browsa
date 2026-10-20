@@ -44,7 +44,7 @@ test('bridgeStream: POST /turns body, auth header, event → callback mapping', 
     ': ka\n\n',
     'data: {"type":"tool","name":"command","status":"started","detail":"ls"}\n\n',
     'data: {"type":"tool","name":"command","status":"completed","detail":"ls (exit 0)"}\n\n',
-    'data: {"type":"usage","prompt_tokens":10,"completion_tokens":4}\n\n',
+    'data: {"type":"usage","prompt_tokens":10,"completion_tokens":4,"cached_tokens":6,"cache_write_tokens":2}\n\n',
     'data: {"type":"done","full":"HELLO"}\n\n',
   ]));
   const seen = { deltas: [], tools: [], heartbeats: 0, sessions: [] };
@@ -67,9 +67,30 @@ test('bridgeStream: POST /turns body, auth header, event → callback mapping', 
   assert.match(seen.tools[1], /✓ command/);
   assert.deepEqual(seen.sessions, ['thread-9'], 'changed session id must fire onSessionId');
   assert.equal(r.full, 'HELLO');
-  assert.deepEqual(r.usage, { prompt_tokens: 10, completion_tokens: 4 });
+  assert.deepEqual(r.usage, {
+    prompt_tokens: 10,
+    completion_tokens: 4,
+    prompt_tokens_details: { cached_tokens: 6 },
+    cache_write_tokens: 2,
+  });
   assert.equal(r.finishReason, '');
   assert.equal(r.sessionId, 'thread-9');
+});
+
+test('bridgeStream: usage on done (the real adapter shape) is adopted with cache fields', async () => {
+  captureFetch(() => sseResponse([
+    'data: {"type":"start","sessionId":"thread-9","turnId":"t1"}\n\n',
+    'data: {"type":"done","full":"OK","usage":{"prompt_tokens":100,"completion_tokens":20,"cached_tokens":80,"cache_write_tokens":5}}\n\n',
+  ]));
+  const r = await bridgeStream({
+    baseUrl: 'http://127.0.0.1:3948', apiKey: 'tok-1', sessionId: 'thread-8', text: 'hi',
+  });
+  assert.deepEqual(r.usage, {
+    prompt_tokens: 100,
+    completion_tokens: 20,
+    prompt_tokens_details: { cached_tokens: 80 },
+    cache_write_tokens: 5,
+  });
 });
 
 test('bridgeStream: note events ride the tool-progress line; done.full overrides the delta concat', async () => {

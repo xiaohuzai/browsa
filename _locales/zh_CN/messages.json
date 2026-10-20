@@ -1023,10 +1023,6 @@
     "message": "字符",
     "description": "Sidepanel: char count unit"
   },
-  "tokensUnit": {
-    "message": "tokens",
-    "description": "Sidepanel: token count unit"
-  },
   "mermaidLoadFailed": {
     "message": "mermaid 模块加载失败，请检查控制台",
     "description": "Sidepanel: mermaid module load failure"

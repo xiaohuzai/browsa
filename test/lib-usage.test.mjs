@@ -53,6 +53,52 @@ test('normalizeUsage: Responses input_tokens_details.cached_tokens', () => {
   assert.equal(u.total, 1050);
 });
 
+test('normalizeUsage: Hermes-style input_tokens EXCLUDES cache read/write', () => {
+  // Hermes CanonicalUsage: input_tokens is non-cached; prompt_tokens is the
+  // derived total (not serialized on every path), so the client adds them.
+  const u = normalizeUsage({
+    input_tokens: 200, output_tokens: 50, total_tokens: 1150,
+    cache_read_tokens: 800, cache_write_tokens: 100,
+  });
+  assert.equal(u.prompt, 1100);
+  assert.equal(u.cached, 800);
+  assert.equal(u.cacheWrite, 100);
+  assert.equal(u.total, 1150);
+  assert.ok(Math.abs(u.cacheRate - 800 / 1100) < 1e-9);
+});
+
+test('normalizeUsage: an inclusive input_tokens shape is detected by total_tokens', () => {
+  // OpenSquilla rows: input_tokens is the normalized TOTAL and already
+  // includes cache; adding the cache bucket again would double-count.
+  const u = normalizeUsage({
+    input_tokens: 1000, output_tokens: 100, total_tokens: 1100,
+    cache_read_tokens: 800,
+  });
+  assert.equal(u.prompt, 1000);
+  assert.equal(u.cached, 800);
+  assert.equal(u.cacheRate, 0.8);
+});
+
+test('normalizeUsage: agent-bridge/OpenSquilla inclusive prompt_tokens + top-level cached_tokens', () => {
+  const u = normalizeUsage({
+    prompt_tokens: 1000, completion_tokens: 50,
+    cached_tokens: 800, cache_write_tokens: 100,
+  });
+  assert.equal(u.prompt, 1000, 'inclusive prompt_tokens must not add the cache buckets again');
+  assert.equal(u.cached, 800);
+  assert.equal(u.cacheWrite, 100);
+  assert.equal(u.cacheRate, 0.8);
+});
+
+test('normalizeUsage: Hermes prompt_tokens (when present) wins over the exclusive derivation', () => {
+  const u = normalizeUsage({
+    prompt_tokens: 1100, input_tokens: 200, output_tokens: 50,
+    cache_read_tokens: 800, cache_write_tokens: 100,
+  });
+  assert.equal(u.prompt, 1100);
+  assert.equal(u.cacheRate, 800 / 1100);
+});
+
 test('normalizeUsage: Hermes-style usage has no cache fields', () => {
   const u = normalizeUsage({ input_tokens: 100, output_tokens: 20 });
   assert.equal(u.prompt, 100);
@@ -99,26 +145,40 @@ test('mergeUsage: anthropic cache fields sum; null-safe both ways', () => {
   assert.deepEqual(mergeUsage({ a: 1 }, null), { a: 1 });
 });
 
-test('usageChipModel: cache hit rate appears in the chip text and tooltip', () => {
+test('usageChipModel: provider numbers + cache hit rate + a turn-scoped decode rate', () => {
   const m = usageChipModel({
     prompt_tokens: 2000, completion_tokens: 100, total_tokens: 2100,
     prompt_tokens_details: { cached_tokens: 1600 },
-  }, 1000, 3000);
+  }, 'turn', 2000);
   assert.match(m.text, /↑ 2\.0k/);
   assert.match(m.text, /↓ 100/);
   assert.match(m.text, /cache 80%/);
-  assert.match(m.text, /50 t\/s/);
+  assert.match(m.text, /50 t\/s/); // 100 completion / 2s — this turn's tokens only
   assert.match(m.text, /2\.0s/);
   assert.match(m.title, /Cached: 1600 \(80%\)/);
+  assert.match(m.title, /this turn's completion/);
+  assert.match(m.title, /Generation time: 2\.00s \(first token → done\)/);
+});
+
+test('usageChipModel: cumulative channels render NO chip at all', () => {
+  assert.equal(usageChipModel({
+    input_tokens: 20000, output_tokens: 3400, cache_read_tokens: 100000,
+  }, 'session', 2000), null, 'session totals (even cache %) must not be displayed');
+  assert.equal(usageChipModel({ input_tokens: 20000, output_tokens: 3400 }, 'session', 2000), null);
+});
+
+test('usageChipModel: an all-zero usage produces no chip (lagging counters)', () => {
+  assert.equal(usageChipModel({ prompt_tokens: 0, completion_tokens: 0 }), null);
+  assert.equal(usageChipModel({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 }, 'turn', 2000), null);
 });
 
 test('usageChipModel: no cache fields -> no cache fragment (no fake 0%)', () => {
-  const m = usageChipModel({ input_tokens: 500, output_tokens: 50 }, 0, 0);
+  const m = usageChipModel({ input_tokens: 500, output_tokens: 50 });
   assert.ok(!m.text.includes('cache'), 'providers without cache telemetry must not show a rate');
   assert.equal(m.title, 'Prompt: 500 · Completion: 50 · Total: 550');
 });
 
 test('usageChipModel: a real 0 cached value still renders 0%', () => {
-  const m = usageChipModel({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 0 } }, 0, 0);
+  const m = usageChipModel({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 0 } });
   assert.match(m.text, /cache 0%/);
 });
