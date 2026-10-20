@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAPABILITY_HINTS, CAPABILITY_HINTS_ALWAYS_ENTRIES, CAPABILITY_HINTS_ALWAYS,
-  RENDER_CONTRACT_HINTS, RENDER_HINT_GROUPS, buildRenderHints, renderHintsForLastUserTurn, renderHintsTriggered,
+  RENDER_CONTRACT_HINTS, RENDER_HINT_GROUPS, buildRenderHints, renderHintsForLastUserTurn,
+  renderHintFamiliesForLastUserTurn, renderHintsTriggered,
 } from '../lib/prompt-assembly.js';
 
 test('two-tier split: ALWAYS entries ride the full pool, RENDER is exactly the complement', () => {
@@ -204,6 +205,8 @@ test('inspector selection: recomputes the last user turn, so "hi" shows no rende
   const chart = renderHintsForLastUserTurn([{ role: 'user', text: '画个柱状图' }]);
   assert.ok(chart.includes(MARKERS.echarts));
   assert.ok(!chart.includes(MARKERS.smiles), 'unselected families stay out of the inspector too');
+  assert.deepEqual(renderHintFamiliesForLastUserTurn([{ role: 'user', text: '画个柱状图' }]), ['routing', 'echarts'],
+    'the inspector must name the active families');
 
   const followUp = renderHintsForLastUserTurn([
     { role: 'user', text: '画个柱状图' },
@@ -211,4 +214,6 @@ test('inspector selection: recomputes the last user turn, so "hi" shows no rende
     { role: 'user', text: '继续' },
   ]);
   assert.ok(followUp.includes(MARKERS.echarts), 'history hysteresis is reflected for follow-up turns');
+  assert.deepEqual(renderHintFamiliesForLastUserTurn([{ role: 'user', text: 'hi' }]), [],
+    'a casual turn has no active family to name');
 });
