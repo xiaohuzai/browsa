@@ -20,6 +20,7 @@ import {
   isUserScrolledUp,
   edgeFadeClasses,
   distanceFromBottom,
+  stickIntent,
 } from '../lib/sidepanel/scroll-follow.js';
 
 const geom = (scrollHeight, scrollTop, clientHeight) => ({ scrollHeight, scrollTop, clientHeight });
@@ -89,4 +90,28 @@ test('wiring contract: sidepanel.js gates scrollToBottom on shouldFollowStream a
   assert.ok(listenerBlock, 'wheel/touchstart/keydown must mark the cooldown timestamp');
   assert.match(src, /let lastUserScrollInputAt = -Infinity;/,
     'no input yet must mean -Infinity (first follow never blocked by the doc clock)');
+});
+
+// ─── Stay-at-bottom intent (2026-10-20) ────────────────────────────────────
+// The geometric test cannot tell "the user scrolled up" from "a diagram's
+// SVG just landed and pushed the bottom away". Tracking the INTENT
+// separately is what keeps a conversation with a diagram from opening
+// ~900px above the latest message — while still never yanking a user who
+// deliberately scrolled up to read.
+test('stickIntent: an upward scroll clears the intent', () => {
+  assert.equal(stickIntent({ scrollTop: 400, lastScrollTop: 1000, isUserScrolledUp: true, stickToBottom: true }), false);
+  // a 1px jitter is not a scroll — the epsilon keeps the intent stable
+  assert.equal(stickIntent({ scrollTop: 999, lastScrollTop: 1000, isUserScrolledUp: true, stickToBottom: true }), true);
+});
+
+test('stickIntent: being at the bottom re-arms the intent', () => {
+  assert.equal(stickIntent({ scrollTop: 1000, lastScrollTop: 400, isUserScrolledUp: false, stickToBottom: false }), true);
+});
+
+test('stickIntent: a programmatic re-anchor (downward only) keeps the intent', () => {
+  // scrollToBottom moves the viewport DOWN to the new bottom; that must not
+  // be mistaken for the user letting go.
+  assert.equal(stickIntent({ scrollTop: 2000, lastScrollTop: 1000, isUserScrolledUp: true, stickToBottom: true }), true);
+  // still off the bottom and no upward move → the previous intent stands
+  assert.equal(stickIntent({ scrollTop: 2000, lastScrollTop: 2000, isUserScrolledUp: true, stickToBottom: false }), false);
 });

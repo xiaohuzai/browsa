@@ -49,7 +49,7 @@ import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT, renderHintsForLastUserTurn, renderHintFamiliesForLastUserTurn, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
-import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
+import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses, stickIntent } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
@@ -142,6 +142,20 @@ let isUserScrolledUp = false; // true when user has manually scrolled up during 
 // blocked by the document's own clock.
 let lastUserScrollInputAt = -Infinity;
 let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
+
+// ── Stay-at-bottom INTENT (2026-10-20) ─────────────────────────────────────
+// Content growth is NOT the user scrolling away — but the geometric test
+// cannot tell the two apart. When a diagram's SVG, a formula or a 3D viewer
+// lands, the viewport suddenly sits "above the bottom", so every later
+// decision reads as "the user scrolled up": the panel parks ~900px above the
+// latest message and the jump-to-latest button appears for no reason.
+//
+// Keep the INTENT separately from the geometry:
+//   · an UPWARD scroll clears it (wheel, touch, scrollbar drag, keyboard);
+//   · being at the bottom re-arms it;
+//   · content that lands under us while it holds re-anchors to the bottom.
+let stickToBottom = true;
+let lastScrollTop = 0;
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
 const images = [];             // { dataUrl, name } — attached for this turn
@@ -727,6 +741,18 @@ async function init() {
       clientHeight: messagesEl.clientHeight,
     };
     isUserScrolledUp = calcIsUserScrolledUp(geom);
+    // Intent vs geometry (stickIntent, lib/sidepanel/scroll-follow.js): an
+    // upward scroll means the user let go (any input — wheel, touch,
+    // scrollbar drag, keyboard); being at the bottom means they came back.
+    // A programmatic re-anchor only moves the viewport DOWNWARD, so it
+    // never clears the intent by accident.
+    stickToBottom = stickIntent({
+      scrollTop: messagesEl.scrollTop,
+      lastScrollTop,
+      isUserScrolledUp,
+      stickToBottom,
+    });
+    lastScrollTop = messagesEl.scrollTop;
     scrollToBottomBtn.hidden = !isUserScrolledUp;
     // Scroll-edge feather (sidepanel.css .fade-t/.fade-b): recompute per scroll.
     const { fadeT, fadeB } = edgeFadeClasses(geom);
@@ -735,6 +761,24 @@ async function init() {
   };
   messagesEl.addEventListener('scroll', updateScrollState, { passive: true });
   updateScrollState();
+  // Re-anchor when the content grows under us. The live renderers (mermaid,
+  // KaTeX, RDKit, Mol*) resolve AFTER the initial scroll, so without this
+  // the bottom of the conversation is pushed out of view exactly when the
+  // user opens a chat that contains a diagram.
+  //
+  // A MutationObserver, NOT a ResizeObserver: the scroll container's own box
+  // never changes (only its scrollHeight does), so observing IT never fires.
+  // The growth always arrives as DOM insertion — an SVG, a MathML tree, a
+  // canvas — so mutations are the right signal. Gated on the INTENT, so a
+  // user who scrolled up to read is never yanked back.
+  if (typeof MutationObserver !== 'undefined') {
+    const stickObserver = new MutationObserver(() => {
+      if (!stickToBottom) return;
+      const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+      if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+    stickObserver.observe(messagesEl, { childList: true, subtree: true, characterData: true });
+  }
   // The follower cooldown timestamps REAL input, not the (also programmatic)
   // scroll event — see lastUserScrollInputAt above.
   const markScrollInput = () => { lastUserScrollInputAt = performance.now(); };
@@ -3351,6 +3395,8 @@ function scrollToBottom(force = false) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
   if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
   isUserScrolledUp = false;
+  stickToBottom = true;   // we deliberately follow → the intent is "stay at the bottom"
+  lastScrollTop = messagesEl.scrollTop;
 }
 
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────

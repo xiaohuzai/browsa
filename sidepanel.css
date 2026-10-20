@@ -10,6 +10,20 @@
 /* ─── Reset ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+
+/* The `hidden` attribute must WIN over any author `display` rule. The UA
+   stylesheet's `[hidden] { display: none }` is a plain (non-important) rule,
+   so ANY author rule that sets `display` on the same element silently
+   defeats it — that is how the scroll-to-bottom button ended up visible in
+   the empty state (a `display: flex` added for the arrow's centring), and
+   how `#transcript-btn` stayed visible in conversations with no video.
+   One global !important rule closes the whole class instead of patching
+   each victim: `.sessions-drawer[hidden]`, `.transcript-drawer[hidden]`,
+   `.msg-search-bar[hidden]` and `.multiselect-bar[hidden]` each carried
+   their own copy of this — which is exactly why the uncovered ones kept
+   slipping through. */
+[hidden] { display: none !important; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -215,7 +229,6 @@ body {
   border-color: var(--border);
   background-color: var(--hover-bg);
 }
-
 
 .iconbtn {
   display: flex;
@@ -1394,7 +1407,6 @@ html { interpolate-size: allow-keywords; }
   flex-shrink: 0;
 }
 .diagnostics::before { content: "⚠"; flex-shrink: 0; font-size: 13px; line-height: 1.5; }
-.diagnostics[hidden] { display: none; }
 .diagnostics code {
   font-family: var(--mono);
   font-size: 11px;
@@ -1484,7 +1496,6 @@ html { interpolate-size: allow-keywords; }
   padding: 5px 10px 0;
   flex-wrap: wrap;
 }
-.followups-dock[hidden] { display: none; }
 .followups-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -2180,7 +2191,6 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   box-shadow: var(--edge-hi), -4px 0 16px var(--shadow-ink);
   animation: slideInRight var(--dur-sheet) var(--ease-swift);
 }
-.sessions-drawer[hidden] { display: none !important; }
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -2219,7 +2229,6 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   color: var(--fg-faint);
   flex-shrink: 0;
 }
-.agent-session-line[hidden] { display: none; }
 .agent-session-label { flex-shrink: 0; }
 .agent-session-id {
   font-family: var(--mono);
@@ -2501,7 +2510,6 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
   box-shadow: var(--edge-hi), -4px 0 16px var(--shadow-ink);
   animation: slideInRight var(--dur-sheet) var(--ease-swift);
 }
-.transcript-drawer[hidden] { display: none !important; }
 .transcript-drawer-header {
   display: flex;
   align-items: center;
@@ -2672,7 +2680,6 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
 .msg-edit-save:hover { filter: brightness(1.1); }
 .msg-edit-cancel:hover { color: var(--fg); }
 
-
 /* ── Font size CSS variable (default 13.5px, adjustable via settings) ─────── */
 /* 正文排版变量：字号（设置档位）+ 字体族（设置「正文字体」，'system' 时
    JS 移除内联值、落回这里 = body 同款栈）。render.js 的兜底字面量与本
@@ -2683,9 +2690,7 @@ code.language-patch .hljs-addition { color: var(--code-addition); }
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-
 /* ── In-conversation search bar ─────────────────────────────────────────── */
-.msg-search-bar[hidden] { display: none !important; }
 .msg-search-bar {
   display: flex;
   align-items: center;
@@ -2721,7 +2726,6 @@ mark.search-highlight { background: color-mix(in srgb, var(--gold) 35%, transpar
 mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, transparent); outline: 1px solid var(--gold); }
 
 /* ── Multi-select bar ───────────────────────────────────────────────────── */
-.multiselect-bar[hidden] { display: none !important; }
 .multiselect-bar {
   display: flex;
   align-items: center;
@@ -2817,8 +2821,6 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .lightbox-close:hover { background: rgba(255,255,255,0.15); }
 /* Clickable images in messages */
 .msg.assistant img { cursor: zoom-in; }
-
-
 
 /* ── Approval card (Hermes /v1/runs approval.request) ─────────────────── */
 /* Shared base for the in-flow agent/system cards (2026-10-17 token pass):
@@ -3260,7 +3262,6 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .outline-rail-preview.show { opacity: 1; visibility: visible; transform: none; }
 .msg.outline-flash { box-shadow: 0 0 0 2px var(--accent); }
 
-
 /* ─── 长历史渲染性能：content-visibility（Chrome 85+，114 基线内）─────────────
    视口外的历史气泡跳过布局与绘制。必须配 contain-intrinsic-size——否则屏外元素
    塌成 0 高，滚动条跳动（modern-web-guidance 指南的 MANDATORY 配对要求）。
@@ -3364,7 +3365,8 @@ dialog.lightbox-overlay:not([open]) {
    (#332b1f) — on the dark ground the residues were unreadable. */
 .pdb-viewer .msp-plugin .msp-layout-region,
 .pdb-viewer .msp-plugin .msp-section-header,
-.pdb-viewer .msp-plugin .msp-flex-row {
+.pdb-viewer .msp-plugin .msp-flex-row,
+.pdb-viewer .msp-plugin .msp-viewport {
   background: var(--bg-2);
   color: var(--fg);
 }

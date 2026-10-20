@@ -52,6 +52,17 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **代码高亮调色板收进 `theme.css` 的 `--code-*` 令牌**（2026-10-20）：代码块曾是唯一一处颜色来自外部的地方（GitHub 的 ~15 个裸 hex + 一份重复的亮色 @media 块）。**色相一个字都没动**——那套配色是用户眼睛从别的代码阅读器里学来的肌肉记忆；迁移只改结构，色相由 lockstep 钉死（改色相必须是有意的）。slot 按 highlight.js 类名实际扮演的角色划分（`--code-symbol` 也承载 class 标题；`--code-addition` 独立成槽，日前与 `--code-attr` 同值，将来可分开调）。**sidepanel.css 里不许再出现 hljs 的裸 hex 或自己的 `@media (prefers-color-scheme: light)` 块**。Tests: `render-contract-lockstep` 第 8 节。
 - **动效令牌迁移是单独一件事，别混进视觉修复**：`--t`（0.15s ease，22 处）与 2026-10-17 引入的 `--dur-*` 五档 + `--ease-*` + `--spring-bounce` 是两套并行体系，`theme.css:100` 的注释已经写成「已替换」但其实只迁了一半。22 处是那轮动效批逐条手工调过的，映射过去会让 22 个元素一起变快——**要动就单独出一版给真机对比手感**，别搭进别的改动里。
 
+## 浏览器级视觉门（2026-10-20 — 单元测试看不见的那一层）
+
+**为什么必须有它**：单元测试层有结构性盲区——「某条 CSS 规则破坏了属性语义」这一类 bug，jsdom 看不见（它把 `hidden` 当无条件隐藏，`hidden` + 作者 `display:flex` 在 jsdom 里仍报 `display:none`，与真实浏览器相反）。2026-10-20 的截图审计当场抓到一个我自己引入的回归：给 `.scroll-to-bottom-btn` 加 `display: flex` 顶掉了 `hidden` 的默认 `display:none`，那个「跳到最新」按钮在空状态（没有内容可滚）也一直显示，而 1937 项测试全绿。
+
+- **`dev-preview/visual-check.mjs`（`npm run visual-check`）是唯一能看见这一层的地方**：真 Chromium + dev-preview 预览页，断言**渲染结果**（几何、计算样式），不断言 CSS 文本。**正则 pin 证明不了一条规则是否真的работает**——`display: flex` 满足任何正则 pin 却能毁掉界面。
+- **门禁自己的两个坑（都已修，写下来免得重犯）**：(1) 静态服务器必须设 `Content-Type`——Chrome 对 ES module 做严格 MIME 检查，`.js` 不带 `text/javascript` 会被**拒绝执行**，整个面板脚本不跑、预览渲染成空页，而所有几何断言会「0 处重叠」地空洞通过；(2) 断言前必须等对话**真的渲染出来**（`waitForFunction`），否则门禁在没渲染的页面上跑，每条几何断言都空洞通过。**这两条都是「看起来绿了，其实没测」的形态。**
+- **`[hidden]` 必须有一条全局 `!important` 规则**（`sidepanel.css` 顶部）：UA 的 `[hidden]{display:none}` 是普通规则，任何作者 `display` 都能顶掉它。全局一条 `!important` 关掉整类问题，而不是逐个受害者打补丁（`.sessions-drawer[hidden]` 等 7 条各自的副本正是漏网的根源）。
+- **「留在底部」的意图要和几何分开**（`stickIntent`，lib/sidepanel/scroll-follow.js）：内容变高**不是**用户滚走了，但几何判断分不出这两者——图一落地，视口就「不在底部」，之后所有判断都当成用户滚走，于是**打开带图的对话会停在离最新一条约 900px 的地方**。意图单独跟踪：向上滚=放弃、在底部=恢复、内容迟到且意图仍成立=重新贴底。**重新贴底用 MutationObserver 而不是 ResizeObserver**——滚动容器自身的盒子不变（只有 scrollHeight 变），观察它根本不触发。
+- **变异验证过门禁有效**：去掉全局 `[hidden]` 规则 → 门禁立刻变红并点名 6 个泄漏元素；把 `display:flex` 加回滚动按钮 → 同样被点名。
+- **门禁不接进 `npm test`**（需要浏览器，且 CI 用的是共享工作流改不动）；它是 `npm run visual-check`，**改面板 CSS/布局后应手动跑一次**。没有浏览器时它大声 SKIP 而不是失败。
+
 ## Docs sync convention (user-visible changes, 2026-09-20)
 
 **Any user-visible change — feature, behavior, capability — syncs the public docs in the SAME PR**, without waiting to be asked. The rule was made explicit after the Office-document attach landed with its README/docs edits already bundled (2026-09-20, the intended shape) and a follow-up scan caught one missed sentence — that scan-then-fix pass is the routine to repeat:
