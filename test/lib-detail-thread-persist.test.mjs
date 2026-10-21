@@ -78,6 +78,7 @@ globalThis.chrome = {
 
 const {
   openDetailThread, restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, hideSelectionAskBtn,
+  captureDetailCardsIn, reinsertDetailCards,
 } = await import('../lib/sidepanel/detail-thread.js');
 const { flushDetailThreadStore, loadDetailThreads, saveDetailThread } = await import('../lib/sidepanel/detail-thread-store.js');
 
@@ -180,6 +181,97 @@ test('the anchor path is restored: a card opened on list item 2 comes back under
     'still nested at the original anchor inside the reply bubble');
 
   li2b.nextElementSibling.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('restore anchors by saved text when the rebuilt DOM has a different block structure', async () => {
+  await reset();
+  // The render a card was opened against: the <think> block is ONE <details>,
+  // so the target paragraph is child #3.
+  const bubble = document.createElement('div');
+  bubble.className = 'msg assistant';
+  bubble.dataset.raw = 'think reply';
+  bubble.dataset.hidx = '8';
+  bubble.innerHTML =
+    '<details class="think-block"><summary>思考</summary><p>think a</p><p>think b</p></details>' +
+    '<h2>Title</h2><p>first</p><p>target paragraph</p><p>last</p>';
+  messagesEl().appendChild(bubble);
+  const target = bubble.querySelectorAll(':scope > p')[1];
+  openDetailThread(bubble, 'target paragraph', target, { start: 0, end: 16, text: 'target paragraph' });
+  assert.ok(target.nextElementSibling?.classList.contains('detail-thread-card'));
+  await flushDetailThreadStore();
+
+  // The reopened panel first paints the SYNC render, where the think content
+  // is TWO paragraphs — the saved path [3] now points at "first", and a
+  // longer reply can push it past the end (the card used to land after the
+  // whole reply, 2026-10-21 user report).
+  teardownPanel();
+  const bubble2 = document.createElement('div');
+  bubble2.className = 'msg assistant';
+  bubble2.dataset.raw = 'think reply';
+  bubble2.dataset.hidx = '8';
+  bubble2.innerHTML =
+    '<p>think a</p><p>think b</p><h2>Title</h2><p>first</p><p>target paragraph</p><p>last</p>';
+  messagesEl().appendChild(bubble2);
+
+  await restoreDetailThreads();
+  const card = messagesEl().querySelector('.detail-thread-card');
+  assert.ok(card, 'card must be restored');
+  assert.equal(card.parentElement, bubble2, 'card stays nested in its reply, not after the whole bubble');
+  assert.equal(card.previousElementSibling?.textContent, 'target paragraph',
+    'card must sit under the selected block, located by its saved text');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('a nested card survives an innerHTML upgrade whose block indices shift', async () => {
+  await reset();
+  const before = document.createElement('div');
+  before.innerHTML =
+    '<p>think a</p><p>think b</p><h2>Title</h2><p>first</p><p>target paragraph</p><p>last</p>';
+  const card = document.createElement('div');
+  card.className = 'detail-thread-card';
+  before.querySelectorAll('p')[3].insertAdjacentElement('afterend', card); // "target paragraph"
+  const captured = captureDetailCardsIn(before);
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].text, 'target paragraph', 'the anchor text must be captured');
+
+  // The upgrade collapses the think content into one <details>, shifting
+  // every following block by one.
+  const after = document.createElement('div');
+  after.innerHTML =
+    '<details class="think-block"><summary>思考</summary><p>think a</p><p>think b</p></details>' +
+    '<h2>Title</h2><p>first</p><p>target paragraph</p><p>last</p>';
+  reinsertDetailCards(after, captured);
+  const target = [...after.children].find((e) => e.textContent === 'target paragraph');
+  assert.equal(card.parentElement, after);
+  assert.equal(card.previousElementSibling, target,
+    'the card follows the original block, not the index the old DOM pointed at');
+});
+
+test('a card opened mid-stream still finds its finished reply (fingerprint drift)', async () => {
+  await reset();
+  // The record was written mid-stream: its fingerprint describes the partial
+  // innerText. The finished reply starts with a think summary the partial
+  // render never had, so neither hostHash nor hostPrefix can match.
+  saveDetailThread({
+    subId: 'sub-midstream', hidx: 9, hostHash: 'stale:0', hostPrefix: '思考过程（partial）',
+    anchorPath: [], anchorText: '', quotedText: 'The answer',
+    messages: [], wireMessages: [], draft: '', inFlight: false, streamingText: '',
+    collapsed: false, height: null, videoSrc: '', updatedAt: Date.now(),
+  });
+  await flushDetailThreadStore();
+
+  teardownPanel();
+  const bubble2 = makeAssistantBubble('思考过程\n\nThe answer is now complete.', 9);
+  await restoreDetailThreads();
+  const card = messagesEl().querySelector('.detail-thread-card');
+  assert.ok(card, 'card must attach to the reply at the same history index');
+  assert.equal(card.previousElementSibling, bubble2,
+    'card must sit right after its reply, not at the end of the conversation');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await flushDetailThreadStore();
 });
 
