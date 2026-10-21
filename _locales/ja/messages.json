@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "ドラッグでサイズを変更"
   },
+  "detailThreadCollapse": {
+    "message": "フォローアップを折りたたむ"
+  },
+  "detailThreadExpand": {
+    "message": "フォローアップを展開"
+  },
   "inspectCtx": {
     "message": "確認"
   },

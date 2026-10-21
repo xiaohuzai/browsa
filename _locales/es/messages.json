@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "Arrastra para cambiar el tamaño"
   },
+  "detailThreadCollapse": {
+    "message": "Contraer seguimiento"
+  },
+  "detailThreadExpand": {
+    "message": "Expandir seguimiento"
+  },
   "inspectCtx": {
     "message": "Inspeccionar"
   },

@@ -73,6 +73,7 @@ Object.defineProperty(globalThis, 'chrome', {
 
 const bg = await import('../background.js');
 const { handle } = bg;
+const { parseFigureLabels } = await import('../lib/message-builder.js');
 
 let nextTabId = 400;
 
@@ -147,6 +148,8 @@ test('ATTACH_PDF_CONFIRM: figureImages with captions become a caption-anchored m
   assert.match(entry.content[0].text, /## Figures/);
   assert.match(entry.content[0].text, /1\. Figure 1: a diagram/);
   assert.match(entry.content[0].text, /2\. Figure on page 7/, 'no-caption figure falls back to a page label');
+  assert.match(entry.content[0].text, /refer to them as \[图N\]/,
+    'PDF figures keep the same [图N] citation contract as blog images');
   const imgs = entry.content.filter((b) => b.type === 'image_url');
   assert.equal(imgs.length, 2, 'both figure JPEGs stored as image_url blocks');
   assert.equal(imgs[0].image_url.url, 'data:image/jpeg;base64,AAA');
@@ -168,6 +171,17 @@ test('ATTACH_PDF_CONFIRM: bare-string figureImages still work (normalized to {ur
   assert.ok(Array.isArray(entry.content));
   assert.match(entry.content[0].text, /1\. Figure on page \?/, 'bare strings have no caption/page -> page-label fallback');
   assert.equal(entry.content.filter((b) => b.type === 'image_url').length, 2);
+});
+
+test('parseFigureLabels still reads legacy and transitional PDF sections', () => {
+  assert.deepEqual(
+    parseFigureLabels("body\n\n## Figures\nThe attached images are the document's figures in document order — refer to them as [图N]:\n1. Figure 3: training pipeline\n2. Figure on page 7"),
+    ['Figure 3: training pipeline', 'Figure on page 7'],
+  );
+  assert.deepEqual(
+    parseFigureLabels('body\n\n## Attached PDF figures (visual context only)\n- Figure 1: a diagram\n- Figure on page 2'),
+    ['Figure 1: a diagram', 'Figure on page 2'],
+  );
 });
 
 test('ATTACH_PDF_CONFIRM: empty figureImages keeps the plain-string content shape', async () => {

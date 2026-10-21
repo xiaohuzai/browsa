@@ -1003,32 +1003,19 @@ test('site-image attach entry: hermes /v1/runs history flattens pixels to [image
   } finally { cap.release(); restore(); }
 });
 
-test('two-tier hints: a casual turn carries the ALWAYS base, not the render contract', async () => {
+test('full render contract: a casual turn carries the whole hint pool (no per-family gating)', async () => {
   await seedProvider(CHAT_PROVIDER);
   const { calls, restore } = installFetch(() => chatLeg({ text: 'ok' }));
   const cap = captureChunks(90);
   try {
-    await handleChat({ tabId: 90, userText: 'hi' }, HINTS, '');
+    // '' lets the handler fall back to CAPABILITY_HINTS, the same pool
+    // background.js passes in production.
+    await handleChat({ tabId: 90, userText: 'hi' }, '', '');
     const sys = JSON.stringify(calls[0].body); // chat-completions rides messages[0], not body.system
-    assert.ok(!sys.includes('sankey-beta'), 'the render contract must NOT ride a casual turn');
-    assert.ok(sys.includes(HINTS), 'the ALWAYS base (passed in by background) must still ride');
-  } finally {
-    cap.release();
-    restore();
-  }
-});
-
-test('per-family hints: a chart turn carries echarts but not the chemistry/protein/article contracts', async () => {
-  await seedProvider(CHAT_PROVIDER);
-  const { calls, restore } = installFetch(() => chatLeg({ text: 'ok' }));
-  const cap = captureChunks(91);
-  try {
-    await handleChat({ tabId: 91, userText: '画个柱状图对比一下' }, HINTS, '');
-    const sys = JSON.stringify(calls[0].body);
-    assert.ok(sys.includes('\\"xAxis\\"') || sys.includes('"xAxis"'), 'the ECharts option contract must ride a chart turn');
-    assert.ok(!sys.includes('RCSB Protein Data Bank'), 'no protein contract on a chart turn');
-    assert.ok(!sys.includes('chemically valid'), 'no chemistry contract on a chart turn');
-    assert.ok(!sys.includes('machine-writing tells'), 'no article-style contract on a chart turn');
+    for (const marker of ['sankey-beta', 'RCSB Protein Data Bank', 'machine-writing tells', 'rich Markdown rather than a plain-text wall']) {
+      assert.ok(sys.includes(marker), `casual turn must carry the full contract: missing ${marker}`);
+    }
+    assert.ok(!sys.includes('Err on the side of NOT drawing'), 'the retired negative drawing rule must not ride');
   } finally {
     cap.release();
     restore();
@@ -1036,8 +1023,8 @@ test('per-family hints: a chart turn carries echarts but not the chemistry/prote
 });
 
 // browsa 里同时会配各种模型/渠道（chat, responses, anthropic, Hermes runs）——
-// 家族选择必须对每个 LLM 通道一致，不能只有 chat-completions 拿到新行为。
-test('per-family hints ride EVERY LLM channel, not just chat-completions', async () => {
+// 全量契约必须对每个 LLM 通道一致，不能只有 chat-completions 拿到新行为。
+test('full render contract rides EVERY LLM channel, not just chat-completions', async () => {
   const cases = [
     { name: 'chat', provider: CHAT_PROVIDER, fetch: () => chatLeg({ text: 'ok' }), sysOf: (c) => JSON.stringify(c.body) },
     { name: 'responses', provider: RESPONSES_PROVIDER, fetch: () => responsesLeg({ text: 'ok' }), sysOf: (c) => JSON.stringify(c.body.instructions) },
@@ -1055,12 +1042,11 @@ test('per-family hints ride EVERY LLM channel, not just chat-completions', async
     const { calls, restore } = installFetch(cs.fetch);
     const cap = captureChunks(92 + i);
     try {
-      await handleChat({ tabId: 92 + i, userText: '画个柱状图对比一下' }, HINTS, '');
+      await handleChat({ tabId: 92 + i, userText: '画个柱状图对比一下' }, '', '');
       const sys = cs.sysOf(calls[0]);
-      assert.ok(sys.includes(HINTS), `${cs.name}: the ALWAYS base must ride`);
-      assert.ok(sys.includes('xAxis'), `${cs.name}: the selected ECharts family must ride`);
-      assert.ok(!sys.includes('RCSB Protein Data Bank'), `${cs.name}: no unselected protein family`);
-      assert.ok(!sys.includes('machine-writing tells'), `${cs.name}: no unselected article family`);
+      for (const marker of ['xAxis', 'RCSB Protein Data Bank', 'machine-writing tells', 'rich Markdown rather than a plain-text wall']) {
+        assert.ok(sys.includes(marker), `${cs.name}: missing ${marker}`);
+      }
     } finally {
       cap.release();
       restore();

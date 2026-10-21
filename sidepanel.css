@@ -1699,18 +1699,14 @@ html { interpolate-size: allow-keywords; }
 }
 .pagemeta:hover { opacity: 1; color: var(--accent); }
 
-/* Composer info */
+/* Composer info (image attachment count only) */
 .composerinfo {
   font-size: 10.5px;
   /* U14: contrast in --fg-faint, not a 0.7 alpha dim. */
   color: var(--fg-faint);
-  font-variant-numeric: tabular-nums;
   padding: 0 4px;
   opacity: 1;
 }
-.composerinfo .warn   { color: var(--warn); opacity: 1; }
-.composerinfo .danger { color: var(--error); font-weight: 600; opacity: 1; }
-.imageinfo { margin-left: 6px; }
 
 /* ─── Image previews ────────────────────────────────────────────────────────── */
 .imagepreviews {
@@ -2897,10 +2893,10 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   flex-shrink: 0;
   box-shadow: var(--edge-hi);
 }
-.detail-thread-close {
+.detail-thread-close,
+.detail-thread-fold {
   position: absolute;
   top: 6px;
-  right: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2912,10 +2908,28 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   line-height: 1;
   padding: 2px;
 }
-.detail-thread-close:hover { color: var(--fg); }
+.detail-thread-close { right: 8px; }
+.detail-thread-fold { right: 30px; }
+.detail-thread-close:hover,
+.detail-thread-fold:hover { color: var(--fg); }
+.detail-thread-fold svg { transition: transform var(--t); }
+.detail-thread-card.collapsed .detail-thread-fold svg { transform: rotate(180deg); }
+.detail-thread-card.collapsed .detail-thread-messages,
+.detail-thread-card.collapsed .detail-thread-imgs,
+.detail-thread-card.collapsed .detail-thread-input-row,
+.detail-thread-card.collapsed .detail-thread-resize-handle { display: none; }
+.detail-thread-card.collapsed .detail-thread-quote { margin-bottom: 0; }
+/* The selected passage in the host reply (CSS Custom Highlight API; the range
+   lives in lib/sidepanel/detail-thread.js and is rebuilt after re-renders).
+   --gold is the margin-annotation color — the highlight is the page-margin
+   reference the card's quote rail points at. */
+::highlight(detail-thread-quote) {
+  background-color: color-mix(in srgb, var(--gold) 28%, transparent);
+  color: inherit;
+}
 .detail-thread-quote {
   padding: 4px 8px;
-  margin: 0 20px 8px 0;
+  margin: 0 52px 8px 0;
   border-left: 2px solid var(--accent);
   color: var(--fg-2);
   /* No font-style:italic — the quoted text is frequently CJK, and synthesized

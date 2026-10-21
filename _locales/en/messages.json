@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "Drag to resize"
   },
+  "detailThreadCollapse": {
+    "message": "Collapse follow-up"
+  },
+  "detailThreadExpand": {
+    "message": "Expand follow-up"
+  },
   "inspectCtx": {
     "message": "Inspect"
   },

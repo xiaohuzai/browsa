@@ -156,13 +156,12 @@ test('SUBCHAT prepends the same CAPABILITY_HINTS constant CHAT uses (single defi
   const defCount = (promptSrc.match(/const CAPABILITY_HINTS_ENTRIES = \[/g) || []).length;
   assert.equal(defCount, 1, 'CAPABILITY_HINTS_ENTRIES must be defined exactly once (shared by CHAT, SUBCHAT and AGENT_RENDER_HINT)');
   const src = await readBackgroundSrc();
-  assert.match(src, /import \{ CAPABILITY_HINTS_ALWAYS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
+  assert.match(src, /import \{ CAPABILITY_HINTS, CHOICE_REQUEST_HINT \} from '\.\/lib\/prompt-assembly\.js'/, 'background.js must import the shared constants (no local copy)');
 
   const subchatSrc = await readSubchatHandlerSrc();
-  // 2026-10-20 两段式：SUBCHAT 与 CHAT 同一触发门——渲染契约按家族追加，
-  // 未触发时回落共享的 ALWAYS 底座（不再是把整个 pool 无条件当 sysPrompt）。
-  assert.match(subchatSrc, /const sysPrompt = \[\s*capabilityHints \|\| CAPABILITY_HINTS_ALWAYS,\s*buildRenderHints\(\{ history: subHistory, userText: subUserText \}\),\s*\]\.filter\(Boolean\)\.join\(' '\)/,
-    'SUBCHAT must compose the ALWAYS base with the per-family buildRenderHints selection');
+  // 2026-10-20 回滚：两段式/按家族门控已撤，SUBCHAT 与 CHAT 一样每轮全量下发。
+  assert.match(subchatSrc, /const sysPrompt = capabilityHints \|\| CAPABILITY_HINTS;/,
+    'SUBCHAT must send the full contract every turn');
 
   // CHAT still builds effectiveSystemPrompt from the same constant (passed
   // in as the capabilityHints param from background.js's CAPABILITY_HINTS).

@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "드래그하여 크기 조정"
   },
+  "detailThreadCollapse": {
+    "message": "팔로우업 접기"
+  },
+  "detailThreadExpand": {
+    "message": "팔로우업 펼치기"
+  },
   "inspectCtx": {
     "message": "검사"
   },
