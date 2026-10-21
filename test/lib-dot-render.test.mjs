@@ -85,6 +85,52 @@ test('renderDot with no dot blocks is a no-op (does not load the vendor)', async
   el.remove();
 });
 
+// ─── DOT label math (2026-10-21 user report: formulas in digraph labels) ────
+// Graphviz has no math mode; `n×d_k` used to print the underscore literally.
+// Labels now turn `_x`/`^{…}` into SVG tspans, and paired $…$ / common LaTeX
+// operators are mapped to their plain-text glyphs.
+const { dotMathParts, applyDotMathText } = await import('../lib/sidepanel/render.js');
+
+test('dotMathParts: sub/superscripts, braces, LaTeX glyphs and $…$ wrappers', () => {
+  assert.deepEqual(dotMathParts('n×d_k'), ['n×d', { script: 'sub', text: 'k' }]);
+  assert.deepEqual(dotMathParts('QK^{T}'), ['QK', { script: 'super', text: 'T' }]);
+  assert.deepEqual(dotMathParts('$d_{ij}$'), ['d', { script: 'sub', text: 'ij' }]);
+  assert.deepEqual(dotMathParts('\\sqrt{d_k}'), ['√d', { script: 'sub', text: 'k' }]);
+  assert.deepEqual(dotMathParts('$\\frac{QK^T}{\\sqrt{d_k}}$'),
+    ['(QK', { script: 'super', text: 'T' }, ')/(√d', { script: 'sub', text: 'k' }, ')']);
+  assert.deepEqual(dotMathParts('\\alpha \\leq \\infty'), ['α ≤ ∞']);
+  assert.equal(dotMathParts('plain tensor shape'), null, 'labels without scripts stay untouched');
+});
+
+test('renderDot renders sub/superscript labels as tspans instead of literal _ and ^', async () => {
+  const el = makeDotEl('digraph { rankdir=LR; Q [label="Q\\nn×d_k"]; D [label="QK^{T}"]; Q -> D [label="softmax_行"]; }');
+  await renderDot(el);
+  const svg = el.querySelector('.dot-diagram svg');
+  assert.ok(svg, 'the diagram must render');
+  const labels = [...svg.querySelectorAll('g.node text, g.edge text')].map((t) => t.textContent);
+  assert.ok(labels.includes('n×dk'), 'the underscore must be consumed by a tspan: ' + JSON.stringify(labels));
+  assert.ok(labels.includes('QKT'), 'the caret/braces must be consumed: ' + JSON.stringify(labels));
+  const subs = [...svg.querySelectorAll('g.node text tspan[baseline-shift="sub"], g.edge text tspan[baseline-shift="sub"]')];
+  const sups = [...svg.querySelectorAll('g.node text tspan[baseline-shift="super"], g.edge text tspan[baseline-shift="super"]')];
+  assert.equal(subs.length, 2, 'n×d_k and softmax_行 each contribute a subscript');
+  assert.equal(sups.length, 1, 'QK^{T} contributes a superscript');
+  assert.ok(!svg.outerHTML.includes('d_k'), 'no literal _k may survive in the SVG');
+  assert.ok(!svg.outerHTML.includes('QK^{'), 'no literal braces may survive');
+});
+
+test('applyDotMathText leaves script-free labels (and their text nodes) alone', () => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('class', 'node');
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  t.textContent = 'Mask 可选，置 -∞';
+  g.appendChild(t);
+  svg.appendChild(g);
+  applyDotMathText(svg);
+  assert.equal(t.textContent, 'Mask 可选，置 -∞');
+  assert.equal(t.querySelector('tspan'), null);
+});
+
 // ─── rethemeDotSvg (2026-09-30 field report: black-filled nodes + dark mode) ─
 // viz-js emits default-black ink over a white canvas polygon; models love
 // `style=filled, fillcolor=black` without fontcolor (black-on-black). The

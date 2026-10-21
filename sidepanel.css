@@ -2925,9 +2925,12 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
    reference the card's quote rail points at. */
 ::highlight(detail-thread-quote) {
   /* Plain rgba first: some engines reject color-mix()/var() inside a custom
-     highlight pseudo, and an invalid declaration would paint nothing at all. */
-  background-color: rgba(212, 167, 44, 0.28);
-  background-color: color-mix(in srgb, var(--gold) 28%, transparent);
+     highlight pseudo, and an invalid declaration would paint nothing at all.
+     38% is deliberately stronger than the card quote's 20%: the highlighted
+     passage in the reply is the anchor the card points at, and at 28% it was
+     easy to read as "no highlight" on the light theme. */
+  background-color: rgba(212, 167, 44, 0.38);
+  background-color: color-mix(in srgb, var(--gold) 38%, transparent);
   color: inherit;
 }
 .detail-thread-quote {

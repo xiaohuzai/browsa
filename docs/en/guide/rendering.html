@@ -76,7 +76,7 @@
       </ul>
 
       <h2>LaTeX formulas</h2>
-      <p>Inline <code>$...$</code> and display <code>$$...$$</code> both render via KaTeX. Formula-heavy messages are automatically offloaded to a Web Worker so the panel never janks.</p>
+      <p>Inline <code>$...$</code> and display <code>$$...$$</code> both render via KaTeX. Formula-heavy messages are automatically offloaded to a Web Worker so the panel never janks. Math inside the thinking trace renders too; math inside diagrams follows each renderer — mind-map nodes use native MathML, and Mermaid / ECharts / DOT labels use scripts or Unicode instead of printing raw LaTeX.</p>
 
       <h2>Diagrams: flowcharts · charts · mind maps</h2>
       <p>Just ask — "draw a flowchart of this table", "turn this outline into a mind map". The model emits a code block in the matching format and browsa renders it in place:</p>

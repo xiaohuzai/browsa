@@ -221,7 +221,8 @@ test('withAgentRenderHints: first turn appends the hint block; later turns retur
   assert.match(AGENT_RENDER_HINT, /always use LaTeX notation/i, 'the $...$ math rule must ride along');
   assert.match(AGENT_RENDER_HINT, /never wrap them in backticks/, 'backtick pseudo-math must be forbidden explicitly');
   assert.match(AGENT_RENDER_HINT, /\$\$\.\.\.\$\$/, 'the $$...$$ display-math form must be named');
-  assert.match(AGENT_RENDER_HINT, /Mermaid node labels, write math as \$\$\.\.\.\$\$/, 'the mermaid-label math rule must ride along too');
+  assert.match(AGENT_RENDER_HINT, /In Mermaid labels, formulas render as plain SVG text/, 'the mermaid-label math rule must ride along too');
+  assert.match(AGENT_RENDER_HINT, /never \$\$\.\.\.\$\$ or LaTeX/, 'mermaid labels must steer to Unicode math');
 });
 
 test('the render contract is SHARED byte-identically: both homes embed every channel-neutral entry verbatim', async () => {
