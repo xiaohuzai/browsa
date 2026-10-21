@@ -78,9 +78,9 @@ globalThis.chrome = {
 
 const {
   openDetailThread, restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, hideSelectionAskBtn,
-  captureDetailCardsIn, reinsertDetailCards,
+  captureDetailCardsIn, reinsertDetailCards, moveSiblingDetailCards,
 } = await import('../lib/sidepanel/detail-thread.js');
-const { flushDetailThreadStore, loadDetailThreads, saveDetailThread } = await import('../lib/sidepanel/detail-thread-store.js');
+const { flushDetailThreadStore, loadDetailThreads, saveDetailThread, deleteDetailThread } = await import('../lib/sidepanel/detail-thread-store.js');
 
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 const messagesEl = () => document.getElementById('messages');
@@ -574,6 +574,144 @@ test('a selection containing a formula keeps its highlight (rendered text finger
   await flushDetailThreadStore();
 });
 
+test('closing a card during DONE finalization must not resurrect its record', async () => {
+  // Regression (2026-10-21 release audit, reproduced in real Chromium):
+  // finalize() awaits the final render, then persistNow() in its finally. If
+  // the user clicks X in that window, the queued save landed AFTER
+  // deleteDetailThread and re-created the closed card (and could leak it into
+  // a newly switched conversation). closeCard sets a sticky `closed` flag that
+  // snapshot/persistNow/persistSoon honor.
+  await reset();
+  const bubble = makeAssistantBubble('A host reply for the close race.', 21);
+  openDetailThread(bubble, 'A host reply', bubble);
+  const card = bubble.nextElementSibling;
+  card.querySelector('.detail-thread-input').value = 'quick question';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await tick();
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'partial answer' });
+  lastPort.emit({ type: 'SUBCHAT_DONE', providerLabel: 'T' });
+  // Same tick as DONE: finalize has started and is parked on its async render.
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await tick(80);
+  await flushDetailThreadStore();
+  assert.equal(document.querySelector('.detail-thread-card'), null, 'card must stay removed');
+  assert.equal((await loadDetailThreads()).length, 0, 'the closed card must not write its record back');
+});
+
+test('a card closed during an async re-render is not re-inserted as a zombie', async () => {
+  // The DONE/ABORTED handlers capture nested cards, await the final render,
+  // then reinsert. If X is clicked during that await, reinserting the captured
+  // node would put a card with no persisted record back on screen.
+  await reset();
+  const bubble = makeAssistantBubble('host reply body', 40);
+  const p = document.createElement('p');
+  p.textContent = 'target paragraph';
+  bubble.appendChild(p);
+  openDetailThread(bubble, 'target paragraph', p);
+  const card = p.nextElementSibling;
+  assert.equal(card?.parentElement, bubble, 'card is nested for the capture');
+
+  const captured = captureDetailCardsIn(bubble);
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  bubble.innerHTML = '<p>target paragraph</p>';
+  reinsertDetailCards(bubble, captured);
+  assert.equal(card.isConnected, false, 'the closed card must stay detached');
+  assert.equal(bubble.querySelectorAll('.detail-thread-card').length, 0);
+  await flushDetailThreadStore();
+});
+
+test('a card opened mid-stream restores onto the finished reply even without hidx', async () => {
+  // Regression (2026-10-21 release audit): hidx is stamped only at DONE. A
+  // card opened while the main reply was still streaming persisted hidx:null
+  // plus the partial fingerprint; after the reply finished, findHostBubble
+  // skipped every prefix/text fallback (they lived inside `hidx !== null`), so
+  // the restored card was appended at the very end of the conversation.
+  await reset();
+  const partial = 'Streaming answer first part with enough text to fingerprint.';
+  const bubble = makeAssistantBubble(partial, null);
+  openDetailThread(bubble, 'the selected passage', bubble);
+  await flushDetailThreadStore();
+  assert.equal((await loadDetailThreads())[0].hidx, null, 'mid-stream records have no hidx');
+
+  teardownPanel();
+  const finished = makeAssistantBubble(
+    partial + ' Then the finished reply continues and contains the selected passage here.', 9);
+  await restoreDetailThreads();
+  const card = document.querySelector('.detail-thread-card');
+  assert.ok(card, 'card must be restored');
+  assert.equal(card.previousElementSibling, finished,
+    'the card must follow its finished host, not the last message in the list');
+});
+
+test('an orphaned card is never re-parented into an unrelated reply', async () => {
+  // Regression (2026-10-21 release audit): a record whose host was trimmed is
+  // appended at the end of the message list. The next bubble's full-render
+  // upgrade runs moveSiblingDetailCards on its siblings; a stale path could
+  // resolve inside that unrelated bubble and swallow the orphan.
+  await reset();
+  const hostA = makeAssistantBubble('Host A text with the selected passage.', 31);
+  openDetailThread(hostA, 'selected passage', hostA);
+  const card = hostA.nextElementSibling;
+  assert.ok(card?.classList.contains('detail-thread-card'));
+
+  // Orphan the card at the end, after an unrelated bubble whose DOM has a
+  // child the stale path would match.
+  const hostB = makeAssistantBubble('Unrelated reply body.', 32);
+  hostB.innerHTML = '<p>Unrelated paragraph</p>';
+  messagesEl().appendChild(card);
+  card.dataset.anchorPath = '[0]';
+  card.dataset.anchorText = 'Unrelated paragraph';
+
+  moveSiblingDetailCards(hostB);
+  assert.equal(card.parentElement, messagesEl(),
+    'the orphan must stay at the message-list level');
+  assert.equal(card.previousElementSibling, hostB,
+    'the orphan must not be re-parented into the unrelated bubble');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('asking again on a folded card expands it instead of focusing a hidden input', async () => {
+  await reset();
+  const bubble = makeAssistantBubble('A reply with a quoted passage.', 33);
+  openDetailThread(bubble, 'quoted passage', bubble);
+  const card = bubble.nextElementSibling;
+  card.querySelector('.detail-thread-fold').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.ok(card.classList.contains('collapsed'), 'card starts folded');
+
+  openDetailThread(bubble, 'quoted passage again', bubble);
+  assert.equal(document.querySelectorAll('.detail-thread-card').length, 1,
+    'the same anchor reuses the card');
+  assert.equal(card.classList.contains('collapsed'), false,
+    're-asking must expand the card so the input row is visible');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('cross-document writes serialize through the Web Locks API when available', async () => {
+  // Two side-panel documents (two Chrome windows) each have their own module
+  // queue; without a cross-document lock the read-modify-write on the shared
+  // session key can drop one card's update.
+  await reset();
+  const names = [];
+  const prevLocks = navigator.locks;
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: async (name, fn) => { names.push(name); return fn(); } },
+  });
+  try {
+    await saveDetailThread({ subId: 'lock-test', updatedAt: Date.now(), messages: [], wireMessages: [] });
+    await flushDetailThreadStore();
+  } finally {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: prevLocks });
+  }
+  assert.ok(names.includes('browsa.detailThreads.v1'), 'the shared store key is the lock name');
+  await deleteDetailThread('lock-test');
+  await flushDetailThreadStore();
+});
+
 test('sidepanel wiring pins: renderHistory restores, destructive paths clear', async () => {
   const fs = await import('node:fs/promises');
   const sidepanel = await fs.readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
@@ -583,6 +721,10 @@ test('sidepanel wiring pins: renderHistory restores, destructive paths clear', a
     'multiselect deletion must close the cards of removed bubbles');
   assert.match(sidepanel, /captureDetailCardsIn\(el\)/,
     'every innerHTML rebuild must preserve nested cards');
+  assert.match(sidepanel, /captureDetailCardsIn\(assistantEl\);[\s\S]{0,500}reinsertDetailCards\(assistantEl, nested\)/,
+    'the RETRY innerHTML wipe must reinsert nested cards');
+  assert.match(sidepanel, /const nested = captureDetailCardsIn\(el\);[\s\S]{0,400}reinsertDetailCards\(el, nested\)/,
+    'the ABORTED isDone re-render must reinsert nested cards');
   assert.match(sidepanel, /refreshDetailHighlights\(el\)/,
     'the final render must rebuild the quote highlight');
 

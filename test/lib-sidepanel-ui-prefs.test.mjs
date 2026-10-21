@@ -5,8 +5,8 @@
 // Same harness pattern as test/lib-sidepanel-streaming.test.mjs (sidepanel.js
 // has zero exports, so it's driven via real DOM events against the real
 // sidepanel.html + sidepanel.js), kept in its own file so this file's
-// GET_CONFIG response (quickbarCollapsed: true) doesn't collide with the
-// streaming test file's shared module-level state.
+// persisted quickbar preference doesn't collide with the streaming test file's
+// shared module-level state.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,11 +37,21 @@ globalThis.chrome = makeSidepanelChromeMock({
   storageLocalSet: async (obj) => { storageSetCalls.push(obj); },
   sendMessage: wireSendMessage((msg) => {
     runtimeCalls.push(msg);
-    if (msg.type === 'GET_CONFIG') return { data: { quickbarCollapsed: true } };
+    if (msg.type === 'GET_CONFIG') return { data: {} };
     if (msg.type === 'STREAM_PEEK') return { inFlight: false };
     return { ok: true };
   }),
 });
+
+// The panel reads this targeted key directly (GET_CONFIG's light-key contract
+// deliberately omits it); the old test only fed GET_CONFIG, which production
+// never sees — the false-green that hid the preference never being read.
+chrome.storage.local.get = async (keys) => {
+  const list = keys == null ? [] : typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
+  const out = {};
+  if (list.includes('quickbarCollapsed')) out.quickbarCollapsed = true;
+  return out;
+};
 
 await import('../sidepanel.js');
 await new Promise((r) => setTimeout(r, 100));
@@ -52,7 +62,7 @@ const messagesEl = document.getElementById('messages');
 const quickbarEl = document.getElementById('quickbar');
 const quickbarToggleBtn = document.getElementById('quickbar-toggle');
 
-test('quickbar starts collapsed when cfg.quickbarCollapsed is true', () => {
+test('quickbar starts collapsed when the persisted preference is true', () => {
   assert.ok(quickbarEl.classList.contains('collapsed'),
     'init() must apply the persisted quickbarCollapsed preference to #quickbar');
 });

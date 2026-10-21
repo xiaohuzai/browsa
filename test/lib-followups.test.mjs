@@ -11,6 +11,15 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 
 const sentNow = [];
+const sessionStore = {};
+globalThis.chrome = {
+  storage: {
+    session: {
+      get: async (key) => ({ [key]: sessionStore[key] }),
+      set: async (obj) => { Object.assign(sessionStore, obj); },
+    },
+  },
+};
 const F = await import('../lib/sidepanel/followups.js');
 
 function mount() {
@@ -20,6 +29,7 @@ function mount() {
 
 beforeEach(() => {
   sentNow.length = 0;
+  for (const k of Object.keys(sessionStore)) delete sessionStore[k];
   mount();
 });
 
@@ -59,6 +69,35 @@ test('clicking a chip sends it now via the injected sendNow callback', () => {
     .dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   assert.deepEqual(sentNow, ['send me']);
   assert.equal(F.hasQueuedFollowups(), false);
+});
+
+test('queued text survives a panel teardown via chrome.storage.session', async () => {
+  F.enqueueFollowup('survive me');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(sessionStore['browsa.followupQueue.v1'].items.map((f) => f.text), ['survive me']);
+
+  // Simulate the panel being torn down and reopened: a fresh init restores.
+  F.initFollowups({ mountEl: document.querySelector('.composer'), sendNow: (t) => sentNow.push(t) });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(F.getQueuedFollowups().map((f) => f.text), ['survive me']);
+  assert.equal(document.querySelector('.followups-dock').hidden, false);
+});
+
+test('promoteFollowup puts a clicked chip back at the front', () => {
+  F.enqueueFollowup('a');
+  F.enqueueFollowup('b');
+  F.enqueueFollowup('c');
+  const b = F.getQueuedFollowups().find((f) => f.text === 'b');
+  F.removeFollowup(b.id);
+  F.promoteFollowup(b.id, 'b');
+  assert.deepEqual(F.getQueuedFollowups().map((f) => f.text), ['b', 'a', 'c']);
+});
+
+test('clearFollowups empties the queue and hides the dock', () => {
+  F.enqueueFollowup('a');
+  F.clearFollowups();
+  assert.equal(F.hasQueuedFollowups(), false);
+  assert.equal(document.querySelector('.followups-dock').hidden, true);
 });
 
 test('empty text and overflow beyond the cap are rejected with the queue intact', () => {

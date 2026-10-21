@@ -34,6 +34,32 @@ test('a multi-byte character split across chunks decodes correctly', async () =>
   assert.deepEqual(lines, ['data: 中文']);
 });
 
+test('two concurrent streams never share a decoder (CJK split must not leak)', async () => {
+  // Regression (2026-10-21 release audit): the module-level TextDecoder was
+  // stateful across streams. Stream A ended a chunk inside a 3-byte CJK char,
+  // leaving its lead bytes pending; stream B's next decode consumed them and
+  // corrupted B's first line ("�data: …"), dropping the event. Each call must
+  // own its decoder.
+  const { readSseLines } = await import('../lib/sse-reader.js');
+  const mid = enc.encode('中');
+  const a = new ReadableStream({
+    start(c) {
+      c.enqueue(enc.encode('data: '));
+      c.enqueue(mid.slice(0, 2)); // incomplete character, stream stays open
+    },
+  }).getReader();
+  const linesA = [];
+  const pA = readSseLines(a, { onLine: (l) => linesA.push(l) });
+  await new Promise((r) => setTimeout(r, 20)); // A has decoded the partial bytes
+
+  const linesB = [];
+  await readSseLines(readerOf(['data: 文\n']), { onLine: (l) => linesB.push(l) });
+  assert.deepEqual(linesB, ['data: 文'], 'B must decode independently of A\'s pending bytes');
+
+  await a.cancel();
+  await pA;
+});
+
 test('isAborted ends the loop without consuming the rest of the stream', async () => {
   let aborted = false;
   const lines = [];

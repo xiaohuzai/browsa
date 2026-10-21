@@ -995,3 +995,56 @@ test('squillaStream: whitespace-only preamble is not folded into an empty think 
   assert.ok(!result.full.includes('<thinking>'), 'no empty fold');
   gw.restore();
 });
+
+test('squillaStream: an explicit attachment-limit rejection retries text-only (older gateway)', async () => {
+  // The 16-attachment cap requires gateway >= 0.5.6. An older gateway rejects
+  // the turn before any delta with a limit message; the answer must still
+  // arrive without the page figures instead of failing the whole turn.
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  MockWebSocket.instances = [];
+  let sendCount = 0;
+  MockWebSocket.respond = (ws, frame) => {
+    if (frame.method === 'connect') {
+      return [{ type: 'hello-ok', protocol: 4, server: { version: '0.5.5', conn_id: 'c' }, features: {} }];
+    }
+    if (frame.method === 'sessions.messages.subscribe') {
+      return [{ type: 'res', id: frame.id, ok: true, payload: {} }];
+    }
+    if (frame.method === 'usage.status') {
+      return [{ type: 'res', id: frame.id, ok: false, error: { code: 'UNAVAILABLE', message: 'no usage' } }];
+    }
+    if (frame.method === 'sessions.send') {
+      sendCount += 1;
+      const taskId = sendCount === 1 ? 't-img' : 't-text';
+      return [{ type: 'res', id: frame.id, ok: true, payload: { status: 'accepted', task_id: taskId } }];
+    }
+    return [];
+  };
+  const origServerOpen = MockWebSocket.prototype.serverOpen;
+  MockWebSocket.prototype.serverOpen = function () {
+    origServerOpen.call(this);
+    queueMicrotask(() => this.serverSend({ type: 'event', event: 'connect.challenge', payload: { nonce: 'n' }, seq: 1 }));
+  };
+
+  const resultP = squillaStream({
+    baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k',
+    attachments: [{ type: 'image/png', mime: 'image/png', name: 'red.png', data: 'iVBOR' }],
+  });
+  const drive = (async () => {
+    await flush(); lastSocket().serverOpen(); await flush(); await flush();
+    const ws = lastSocket();
+    ws.serverSend({ type: 'event', event: 'sessions.changed', payload: { reason: 'task_terminal', last_task: { task_id: 't-img', status: 'failed', error_message: 'too many attachments: maximum 10' } } });
+    await flush(); await flush();
+    ws.serverSend({ type: 'event', event: 'session.event.text_delta', payload: { task_id: 't-text', text: 'answer without figures' } });
+    ws.serverSend({ type: 'event', event: 'session.event.done', payload: { task_id: 't-text' } });
+  })();
+  const result = await resultP;
+  await drive;
+
+  const sendFrames = lastSocket().sent.filter(f => f.method === 'sessions.send');
+  assert.equal(sendFrames.length, 2, 'one text-only retry');
+  assert.equal(sendFrames[1].params.attachments, undefined);
+  assert.equal(result.full, 'answer without figures');
+  MockWebSocket.prototype.serverOpen = origServerOpen;
+  MockWebSocket.respond = null;
+});

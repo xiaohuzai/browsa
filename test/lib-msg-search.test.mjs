@@ -102,3 +102,13 @@ test('search skips text inside .msg-actions / .token-usage / think-block summary
   // Only the original 2 matches in the assistant bubble should be found.
   assert.equal(document.querySelectorAll('mark.search-highlight').length, 2);
 });
+
+test('search navigation notifies the host before scrolling to a match', async () => {
+  // The host's stick-to-bottom MutationObserver would otherwise re-anchor on
+  // the search's own <mark> mutations and undo the Ctrl+F jump.
+  let navigated = 0;
+  initMsgSearch({ onNavigate: () => { navigated++; } });
+  openMsgSearch();
+  await fireInput('fox');
+  assert.ok(navigated >= 1, 'the host must be told to drop the stay-at-bottom intent');
+});

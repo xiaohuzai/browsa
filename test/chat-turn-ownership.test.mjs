@@ -60,7 +60,7 @@ installChrome();
 const { handleChat } = await import('../lib/handlers/chat-handler.js');
 const {
   streamState, chatControllers, idleTimerResetters, streamPorts,
-  initStreamState, clearStreamState,
+  initStreamState, clearStreamState, streamEpoch,
 } = await import('../lib/state.js');
 
 // A controllable SSE body: the test decides when each turn's stream ends.
@@ -131,6 +131,10 @@ test('a superseded turn persists its reply but does not delete the newer turn\'s
   // finalize the wrong bubble) nor clear the newer turn's state.
   assert.equal(events.filter((e) => e.type === 'DONE').length, 0,
     'a superseded turn must not emit DONE into the newer turn\'s port');
+  assert.equal(events.filter((e) => e.type === 'CHUNK').length, 0,
+    'a superseded turn must not render its deltas into the newer turn\'s bubble');
+  assert.equal(stateB.acc, '',
+    'a superseded turn must not append its text to the newer accumulator');
   assert.equal(chatControllers.get(tabId), controllerB,
     'the newer turn\'s controller must survive the older turn\'s finally block');
   assert.equal(streamState.get(tabId), stateB,
@@ -147,6 +151,59 @@ test('a superseded turn persists its reply but does not delete the newer turn\'s
   streamPorts.delete(tabId);
   idleTimerResetters.delete(tabId);
   chatControllers.delete(tabId);
+});
+
+test('a live turn still finalizes when GC reaped its streamState (age > TTL)', async () => {
+  // Regression (2026-10-21 release audit): the 10-minute GC deleted
+  // streamState for LIVE long agent turns (tool calls / pending approval).
+  // The ownership gate then compared against a missing object and suppressed
+  // DONE forever, leaving the panel spinning even though the reply persisted.
+  let releaseStream;
+  const enc = new TextEncoder();
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({
+      start(c) {
+        releaseStream = () => {
+          c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"late reply"},"finish_reason":"stop"}]}\n\n'));
+          c.close();
+        };
+      },
+    }),
+    text: async () => '',
+  });
+  local.history = [];
+  const tabId = 9;
+  const events = posted(tabId);
+
+  const turn = handleChat({ type: 'CHAT', userText: 'long agent turn', tabId, sessionId: '' }, '', '');
+  for (let i = 0; i < 200 && !streamState.get(tabId); i++) await new Promise((r) => setTimeout(r, 2));
+  assert.ok(streamState.get(tabId), 'the turn registered its state');
+
+  // Simulate gcStreamState() reaping the entry while the controller is live.
+  streamState.delete(tabId);
+  releaseStream();
+  await turn;
+
+  assert.equal(events.filter((e) => e.type === 'DONE').length, 1,
+    'the live turn must still emit DONE after its state was reaped');
+  assert.equal(local.history.filter((m) => m.role === 'assistant').length, 1,
+    'the reply is persisted exactly once');
+  assert.equal(chatControllers.get(tabId), undefined, 'the turn still cleans its controller');
+
+  streamPorts.delete(tabId);
+});
+
+test('streamEpoch bumps per turn, including after the prior turn cleared its state', () => {
+  const tabId = 10;
+  const before = streamEpoch(tabId);
+  const first = initStreamState(tabId, {});
+  assert.equal(first.epoch, before + 1);
+  clearStreamState(tabId);
+  const second = initStreamState(tabId, {});
+  assert.equal(second.epoch, first.epoch + 1,
+    'a new turn must bump the epoch even though the state map was cleared');
+  clearStreamState(tabId);
 });
 
 test('the owning turn does finalize normally (DONE + state cleared)', async () => {
