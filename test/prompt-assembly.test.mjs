@@ -27,6 +27,7 @@ const MARKERS = {
   article: 'machine-writing tells',
   rich: 'rich Markdown rather than a plain-text wall',
   proactive: 'Visualize proactively, not only when explicitly asked',
+  sourceFigure: 'cite those figures with the SAME [图N] markers',
 };
 
 test('every turn carries the full contract — no per-family gating', () => {
@@ -46,6 +47,13 @@ test('rich Markdown is the default presentation contract', () => {
   assert.match(CAPABILITY_HINTS, /Markdown tables/);
   assert.match(CAPABILITY_HINTS, /blockquotes/);
   assert.match(CAPABILITY_HINTS, /fenced code blocks with a language tag/);
+});
+
+test('supplied document figures win over drawing a new one', () => {
+  // 2026-10-21 user report: with proactive drawing in the prompt the model
+  // started re-drawing attached documents' figures instead of citing [图N].
+  assert.match(CAPABILITY_HINTS, /cite those figures with the SAME \[图N\] markers/);
+  assert.match(CAPABILITY_HINTS, /add a generated fenced figure only when the source has no usable figure/);
 });
 
 test('the source no longer exports the per-family selector', async () => {

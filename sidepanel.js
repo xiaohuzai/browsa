@@ -40,7 +40,10 @@ import {
   initMultiselect, isInMultiSelectMode, enterMultiSelect, exitMultiSelect,
   deleteSelectedMessages
 } from './lib/sidepanel/multiselect.js';
-import './lib/sidepanel/detail-thread.js'; // wires its own mouseup/scroll listeners on import
+import {
+  restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, refreshDetailHighlights,
+  captureDetailCardsIn, reinsertDetailCards, moveSiblingDetailCards
+} from './lib/sidepanel/detail-thread.js'; // also wires its own mouseup/scroll listeners on import
 import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orchestrator.js';
 import { warmupPdfInspector } from './lib/sidepanel/pdf-inspector-worker-client.js';
@@ -117,7 +120,6 @@ function sniffStreamingChartFence(state, delta) {
   _chartFenceScanPos = state.acc.length;
   if (langs.size) warmChartVendors(langs);
 }
-const charCountEl = $('charcount');
 const composerInfoEl = $('composerinfo');
 const attachBtn = $('attach');
 if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user types
@@ -375,6 +377,8 @@ async function init() {
     renderHistory,
     scrollToBottom,
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); },
+    // 追问卡属于当前对话：切到另一个保存的会话时整批丢弃（含在途 subchat）。
+    clearDetailThreads: () => { void clearDetailThreads(); },
     // 跨入口接力（2026-10-01）：会话抽屉的「Agent 会话」行数据源——当前
     // provider 在 agent 侧的服务端会话 ID（storage.session，键形状由
     // storage.getAgentSessionInfo 单点持有）。
@@ -392,6 +396,8 @@ async function init() {
     tryLock: () => { if (deleteLock) return false; deleteLock = true; return true; },
     releaseLock: () => { deleteLock = false; },
     reconcile: () => { reconcileHistoryIdx(); },
+    // 被删气泡上的追问卡随宿主一起收掉（记录也删，避免下次 renderHistory 复活）。
+    closeDetailThreadsIn: (el) => closeDetailThreadsIn(el),
   });
 
   // Load config
@@ -473,7 +479,7 @@ async function init() {
     const collapsed = $('quickbar').classList.toggle('collapsed');
     storage.set({ quickbarCollapsed: collapsed });
   });
-  inputEl.addEventListener('input', () => { updateComposerInfo(); updateSlashSuggest(); });
+  inputEl.addEventListener('input', () => { updateSlashSuggest(); });
   inputEl.addEventListener('blur', () => setTimeout(() => hideSlashSuggest(), 150));
   inputEl.addEventListener('keydown', (e) => {
     // Slash autocomplete navigation
@@ -505,7 +511,6 @@ async function init() {
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
         handleHistoryNav(e, () => slashSuggestEl && !slashSuggestEl.hidden)) {
       e.preventDefault();
-      updateComposerInfo();
       return;
     }
     // Send shortcut: Enter (default) or Shift+Enter. `!e.repeat` guards
@@ -788,7 +793,7 @@ async function init() {
   // persistence so unsent text survives the panel being torn down.
   initFollowups({
     mountEl: document.querySelector('.composer'),
-    sendNow: (text) => { resetHistoryNav(inputEl); inputEl.value = text; updateComposerInfo(); onSend(); },
+    sendNow: (text) => { resetHistoryNav(inputEl); inputEl.value = text; onSend(); },
   });
   attachDraftPersistence(inputEl);
   restoreComposerState(inputEl).catch(() => {});
@@ -849,7 +854,6 @@ async function handleSelectionAction(action, text) {
       appendError(res?.data?.error || _t('noSelectionText', '没有获取到选中文字，请重新选择'));
     }
     inputEl.focus();
-    updateComposerInfo();
     return;
   }
 
@@ -858,7 +862,6 @@ async function handleSelectionAction(action, text) {
   if (!prompt) return;
 
   inputEl.value = prompt;
-  updateComposerInfo();
   onSend();
 }
 
@@ -1257,6 +1260,8 @@ async function newSession() {
     }
   }
   await sendMessage({ type: 'CLEAR_HISTORY' });
+  // 追问卡属于被清掉的这段对话：卡片、持久化记录、在途 subchat 一起收掉。
+  void clearDetailThreads();
   // 整屏清空也是「删除路径」：活图表实例/WebGL viewer/ResizeObserver 必须
   // 先全局收掉（此前只有 renderHistory 做这件事，newSession/clear 直接
   // innerHTML='' 会把它们连同 DOM 一起变成永不自杀的孤儿）。
@@ -1283,6 +1288,7 @@ async function clearChatHistory() {
   if (!ok) return;
   cancelStream({ salvage: false }); // 确认后再停流（显式弃置，不收尸）：取消确认不应误杀进行中的回复
   await sendMessage({ type: 'CLEAR_HISTORY' });
+  void clearDetailThreads(); // 同上：对话清空，追问卡不再属于任何内容
   disposeChartObservers();  // 同 newSession：清空前先收掉活实例（见彼处注释）
   disposeMolstarViewers();
   messagesEl.innerHTML = '';
@@ -1398,7 +1404,6 @@ function maybeDrainFollowups() {
     const next = takeFirstFollowup();
     if (!next) return;
     inputEl.value = next;
-    updateComposerInfo();
     onSend();
   }, 50);
 }
@@ -1491,22 +1496,6 @@ function stopWatchingStream() { cancelStream({ detach: true }); }
 // this — the panel document survives tab switches, so currentTabId may
 // already point at a DIFFERENT tab than the stream's.
 function streamTabIdOf() { return activeController?.tabId ?? currentTabId; }
-
-// Exact character count only. The old `~N tokens` figure was a client-side
-// heuristic (CJK 1 char/token, non-CJK 4 chars/token) — every provider/model
-// tokenizes differently, so it could mislead context-budget decisions. Token
-// numbers are shown only AFTER a turn, from the provider's own usage payload.
-function updateComposerInfo() {
-  if (!charCountEl || !composerInfoEl) return;
-  const t = inputEl.value;
-  charCountEl.textContent = t.length.toLocaleString();
-  // Hide when empty, show and color when there's content. Thresholds are raw
-  // character counts (exact), not a token guess.
-  composerInfoEl.style.display = t.length === 0 ? 'none' : '';
-  composerInfoEl.classList.remove('warn', 'danger');
-  if (t.length > 100_000) composerInfoEl.classList.add('danger');
-  else if (t.length > 20_000) composerInfoEl.classList.add('warn');
-}
 
 async function openSettingsPage() {
   // chrome.runtime.openOptionsPage() is unreliable when invoked from a side
@@ -1629,7 +1618,10 @@ function removeImage(idx) {
 function refreshImageStrip() {
   renderImageStrip(imagePreviewsEl, images, removeImage);
   imageInfoEl.textContent = images.length ? tSub('imagesAttachedCount', `+${images.length} image${images.length > 1 ? 's' : ''}`, images.length) : '';
-  updateComposerInfo();
+  // The composer info row now only carries this attachment count. (The old
+  // token estimate and, until 2026-10-21, an exact character count were
+  // removed; token numbers come only from provider usage after a turn.)
+  if (composerInfoEl) composerInfoEl.style.display = imageInfoEl.textContent ? '' : 'none';
 }
 
 async function onPaste(e) {
@@ -1853,10 +1845,16 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       // linkifyTimestamps 靠 data-video-src 门控（无盖章不链，2026-09-26）——
       // 倒置 = 视频笔记回复的时间戳静默失效（resume-streaming 回归测试锁这一点）。
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
+      // isDone replaces the bubble's innerHTML — keep any open 追问 card nested
+      // in this reply (anchored to a paragraph) alive across the final render.
+      const nestedDetailCards = captureDetailCardsIn(el);
       await r(finalText, true);
+      reinsertDetailCards(el, nestedDetailCards);
       // finishBubble（decorate/linkify/thinkCopy/richRender）已在 renderStream
       // 的 isDone 路径里跑完（C3）；provider 铭牌等站点差异在渲染后补。
       if (m.providerLabel) addProviderChip(el, m.providerLabel);
+      // innerHTML was replaced — rebuild any 追问 quote highlight in this bubble.
+      refreshDetailHighlights(el);
       if (m.providerKey) lastReplyKey = m.providerKey;
       // Provider-reported token/cache numbers; the decode rate is derived only
       // for turn-scoped usage over the first-token → DONE window (session-
@@ -1970,7 +1968,6 @@ async function onSend() {
     resetHistoryNav(inputEl); // 同 onSend：先复位召回态再清空
     inputEl.value = '';
     clearPersistedDraft();
-    updateComposerInfo();
     return;
   }
 
@@ -2006,7 +2003,6 @@ async function onSend() {
   resetHistoryNav(inputEl);
   inputEl.value = '';
   clearPersistedDraft();
-  updateComposerInfo();
   setStreamingUI(true);
 
   // Placeholder assistant bubble
@@ -2118,11 +2114,14 @@ async function onSend() {
       sendMessage({ type: 'STREAM_RELEASE', tabId: turnTabId }).catch(() => {});
       // Preserve any partial streaming content; append the error inline.
       const errMsg = res.error || 'Unknown error';
+      const nestedDetailCards = captureDetailCardsIn(assistantEl);
       if (state.acc) {
         await renderStream(state.acc + `\n\n---\n❌ **${errMsg}**`, true);
       } else {
         assistantEl.textContent = `❌ ${errMsg}`;
       }
+      reinsertDetailCards(assistantEl, nestedDetailCards);
+      refreshDetailHighlights(assistantEl);
       // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
       // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
       // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
@@ -2137,11 +2136,14 @@ async function onSend() {
     clearInterval(_swPingInterval);
     activeController = null;
     try { port.disconnect(); } catch (_) {}
+    const nestedDetailCards = captureDetailCardsIn(assistantEl);
     if (state.acc) {
       await renderStream(state.acc + `\n\n---\n❌ **${e.message}**`, true);
     } else {
       assistantEl.textContent = `❌ ${e.message}`;
     }
+    reinsertDetailCards(assistantEl, nestedDetailCards);
+    refreshDetailHighlights(assistantEl);
     // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
     // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
     // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
@@ -2281,6 +2283,7 @@ async function resumeInFlightStream(tabId) {
     seedRenderer.flush?.();
   }
   if (peek.providerLabel) addProviderChip(target.getEl(), peek.providerLabel);
+  refreshDetailHighlights(target.getEl());
   // HELLO the background so it knows this port owns the stream now.
   // Wait for ACK so any in-flight delta that's about to fire from the
   // LLM (after the PEEK/HELLO race window) goes to a port that's
@@ -2675,7 +2678,6 @@ function noteFromTranscript(seconds, line) {
   }
   const note = `[${formatTs(seconds)}] 「${line.label ? line.label + ' ' : ''}${line.text}」`;
   inputEl.value = inputEl.value ? `${inputEl.value}\n${note}` : note;
-  updateComposerInfo();
   inputEl.focus();
   inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
 }
@@ -2763,6 +2765,7 @@ function addMsgActions(el, getRaw) {
     try {
       if (isNaN(idx)) {
         // 不在 storage 里的气泡（如未落库的空泡）：直接移除 DOM。
+        closeDetailThreadsIn(el); // 宿主气泡没了，追问卡与记录一起收掉
         disposeRenderInstancesIn(el); // 气泡里的活图表/WebGL viewer 随 DOM 一起收掉
         el.remove();
       } else {
@@ -2772,6 +2775,7 @@ function addMsgActions(el, getRaw) {
         if (res?.data?.ok) {
           // 确认成功才动 DOM。失败时气泡必须留在屏上：storage 条目还在，
           // 删了 DOM 会在 reload 后复活（multiselect 同款兜底，单删此前缺失）。
+          closeDetailThreadsIn(el); // 宿主要删了，卡与记录一起收掉
           disposeRenderInstancesIn(el); // 定向 dispose：删除路径不走 renderHistory 的全局清扫
           el.remove();
           // Confirmed: shift indices of all remaining bubbles after the deleted slot.
@@ -2948,6 +2952,7 @@ async function regenerateReply(userBubble) {
   let sib = userBubble.nextElementSibling;
   while (sib) {
     const next = sib.nextElementSibling;
+    closeDetailThreadsIn(sib); // 被丢弃轮次的追问卡不能留成孤儿记录
     disposeRenderInstancesIn(sib); // 被丢弃轮次里的活图表/WebGL viewer 定向收掉
     sib.remove();
     sib = next;
@@ -3034,6 +3039,7 @@ function startMsgEdit(el) {
       let sib = el.nextElementSibling;
       while (sib) {
         const next = sib.nextElementSibling;
+        closeDetailThreadsIn(sib); // 被截掉轮次的追问卡随宿主一起收掉
         disposeRenderInstancesIn(sib); // 同 regenerateReply：被截掉轮次的活实例定向收掉
         sib.remove();
         sib = next;
@@ -3539,6 +3545,14 @@ async function renderHistory() {
   // ≤8MB history read (it only needs role/videoSrc/content).
   refreshTranscriptSource(list);
 
+  // Re-attach 追问 cards that were open when the panel was last torn down
+  // (closing the side panel destroys the document, but the card state lives
+  // in chrome.storage.session). Fire-and-forget: restoring re-renders the
+  // card's own replies (KaTeX/diagrams) and must not block init's wiring.
+  restoreDetailThreads()
+    .then(() => { if (!isUserScrolledUp) scrollToBottom(true); })
+    .catch((e) => console.error('[detail-thread] restore failed', e));
+
   // Upgrade all assistant bubbles to the full renderSafe() output (KaTeX
   // math, proper think-block handling, etc.) in the BACKGROUND — deliberately
   // NOT awaited here. init() awaits renderHistory() before wiring every
@@ -3558,7 +3572,19 @@ async function renderHistory() {
     // IntersectionObserver → eager fallback keeps tests and old behavior.
     const runUpgrade = async ({ el, rawContent, figs, providerLabel }) => {
       const html = await renderSafe(rawContent);
+      // A 追问 card can be nested inside this bubble (anchored to a paragraph/
+      // list item), and innerHTML replaces that subtree wholesale. Capture
+      // every nested card with its anchor path, then re-attach it to the
+      // freshly rendered DOM. Cards anchored to the bubble itself are siblings
+      // and survive on their own (querySelectorAll only finds nested ones).
+      const nestedCards = captureDetailCardsIn(el);
       el.innerHTML = html;
+      reinsertDetailCards(el, nestedCards);
+      // A restored card whose anchor block was missing from the SYNC render
+      // (renderStreamingSafe leaves some block structure unresolved) was placed
+      // right after the bubble. Now that the full render exists, move it back
+      // to the real paragraph/list item its record points at.
+      moveSiblingDetailCards(el);
       finishBubble(el); // innerHTML 重建后全部装饰重跑（C3 单一收尾）
       decorateFigureRefs(el, figs);
       // el.innerHTML above wipes out the .msg-actions row appended during the
@@ -3567,6 +3593,11 @@ async function renderHistory() {
       // but since innerHTML just destroyed the old one, this always re-creates it.
       addMsgActions(el, () => rawContent);
       addProviderChip(el, providerLabel);
+      // The upgraded innerHTML replaced the text nodes — rebuild the stored
+      // quote range against the final render (and re-anchor sibling cards
+      // that the sync render could not place because its block structure was
+      // still unresolved).
+      refreshDetailHighlights(el);
     };
     if (typeof IntersectionObserver !== 'function') {
       showHistoryUpgradeIndicator();

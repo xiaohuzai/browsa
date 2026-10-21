@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "Потяните, чтобы изменить размер"
   },
+  "detailThreadCollapse": {
+    "message": "Свернуть уточнение"
+  },
+  "detailThreadExpand": {
+    "message": "Развернуть уточнение"
+  },
   "inspectCtx": {
     "message": "Просмотр"
   },

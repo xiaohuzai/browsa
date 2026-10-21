@@ -1203,6 +1203,12 @@
   "detailThreadResize": {
     "message": "拖拽调整高度"
   },
+  "detailThreadCollapse": {
+    "message": "折叠追问卡"
+  },
+  "detailThreadExpand": {
+    "message": "展开追问卡"
+  },
   "inspectCtx": {
     "message": "检查"
   },
