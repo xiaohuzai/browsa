@@ -32,7 +32,8 @@ const {
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
   wantsChartVendors, FENCED_RENDERERS, renderUserContent, renderMathInPlainText,
-  enforceSafeDiagramLinks, mermaidErrorKind, summarizeMermaidErrorMessage, computeAnchoredZoom
+  enforceSafeDiagramLinks, mermaidErrorKind, summarizeMermaidErrorMessage, computeAnchoredZoom,
+  stripMarkmapKatexHtml, mathToUnicode, mermaidMathToText
 } = await import('../lib/sidepanel/render.js');
 const {
   findMermaidFlowDirection, toggleMermaidDirection, getMermaidDiagramKind, estimateMermaidPreviewHeight,
@@ -177,6 +178,45 @@ test('renderSafe/renderStreamingSafe still strip javascript: URIs from real href
 test('renderSafe renders $...$ LaTeX via KaTeX', async () => {
   const html = await renderSafe('inline $x^2$ math');
   assert.match(html, /<math/, 'must produce MathML output, not a literal dollar-sign string');
+});
+
+test('renderSafe renders math INSIDE a folded think block (reasoning traces)', async () => {
+  // Regression (2026-10-21 audit): think content went through marked without
+  // the math scanner, so a formula in the reasoning trace stayed literal.
+  const html = await renderSafe('<think>we compare $d_k$ with $d_v$</think>final $x^2$');
+  assert.match(html, /<div class="think-body">[\s\S]*<math/, 'think-body math must render as MathML');
+  const thinkBody = html.slice(html.indexOf('<div class="think-body">'));
+  assert.ok(!thinkBody.includes('$d_k$'), 'the reasoning formula must not stay literal');
+  assert.match(html, /final[\s\S]*<math/, 'the visible body still renders its own math');
+});
+
+test('mathToUnicode converts simple scripts/symbols, keeps unsupported scripts readable', () => {
+  assert.equal(mathToUnicode('d_k'), 'dₖ');
+  assert.equal(mathToUnicode('QK^{T}'), 'QKᵀ');
+  assert.equal(mathToUnicode('x^2'), 'x²');
+  assert.equal(mathToUnicode('\\sqrt{d_k}'), '√dₖ');
+  assert.equal(mathToUnicode('\\frac{a}{b}'), '(a)/(b)');
+  assert.equal(mathToUnicode('\\alpha \\times \\beta'), 'α × β');
+  // Unicode has no subscript glyphs for every letter — keep the marker rather
+  // than silently dropping characters.
+  assert.equal(mathToUnicode('d_{model}'), 'd_{model}');
+});
+
+test('mermaidMathToText rewrites $$…$$ labels to Unicode before the sanitizer flattens them', () => {
+  assert.equal(mermaidMathToText('flowchart LR\\n A["$$d_k$$"] --> B'), 'flowchart LR\\n A["dₖ"] --> B');
+  assert.equal(mermaidMathToText('A["plain label"] --> B'), 'A["plain label"] --> B');
+});
+
+test('stripMarkmapKatexHtml keeps MathML, drops the stale KaTeX HTML branch and annotation', () => {
+  const root = {
+    content: 'inline <span class="katex"><span class="katex-mathml"><math><mrow><msub><mi>d</mi><mi>k</mi></msub></mrow><annotation>x</annotation></math></span><span class="katex-html" aria-hidden="true">dk</span></span> end',
+    children: [{ content: '<span class="katex"><span class="katex-html">dup</span></span>' }],
+  };
+  stripMarkmapKatexHtml(root);
+  assert.match(root.content, /<math>/, 'the native MathML branch must survive');
+  assert.ok(!root.content.includes('katex-html'), 'the unstyled HTML duplicate must be gone');
+  assert.ok(!root.content.includes('<annotation'), 'annotation text must not leak into the node');
+  assert.ok(!root.children[0].content.includes('katex-html'), 'children are processed too');
 });
 
 test('renderSafe: bare-dollar bold spans survive intact (2026-09-30 ∗∗、∗∗ report — the $s must not pair into a formula)', async () => {
@@ -660,7 +700,7 @@ test('render.js estimates a placeholder height before rendering and retries via 
   const src = await fs.readFile(new URL('../lib/sidepanel/render.js', import.meta.url), 'utf8');
   assert.match(src, /import\s*\{[^}]*renderMermaidWithRetry[^}]*\}\s*from\s*['"]\.\/mermaid-utils\.js['"]/);
   assert.match(src, /pre\.style\.minHeight\s*=\s*estimatedHeight/, 'the code-fence placeholder must get the estimated height before the async render starts');
-  assert.match(src, /await renderMermaidWithRetry\(m, id, safeSource, host\)/, 'must render through the retry helper (with front-matter config stripped), not a raw m.render() call');
+  assert.match(src, /await renderMermaidWithRetry\(m, id, mathSafeSource, host\)/, 'must render through the retry helper (front-matter + math pre-conversion done), not a raw m.render() call');
 });
 
 test('render.js regression: the mermaid render host must be sized from the real container width, not a hardcoded pixel value', async () => {
@@ -732,6 +772,24 @@ test('sanitizeEchartsText recurses through arrays and nested objects, leaving no
 test('sanitizeEchartsText leaves plain text (no tags) completely unchanged', () => {
   const option = { title: { text: 'GPU利用率' }, series: [{ data: [1, 2] }] };
   assert.deepEqual(sanitizeEchartsText(option), option);
+});
+
+test('sanitizeEchartsText converts $…$ math to Unicode (canvas has no math renderer)', () => {
+  const option = {
+    title: { text: '$d_k$ 注意力缩放' },
+    xAxis: { data: ['$QK^{T}$', '$\\sqrt{d_k}$'] },
+    series: [{ name: '$x^2$', data: [1, 2] }],
+  };
+  const clean = sanitizeEchartsText(option);
+  assert.equal(clean.title.text, 'dₖ 注意力缩放');
+  assert.deepEqual(clean.xAxis.data, ['QKᵀ', '√dₖ']);
+  assert.equal(clean.series[0].name, 'x²');
+});
+
+test('sanitizeEchartsText leaves currency-style dollar pairs alone', () => {
+  // Bare dollars without a math marker must not be swallowed (a chart label
+  // like "收入 $5 到 $10" is prose, not LaTeX).
+  assert.equal(sanitizeEchartsText('收入 $5 到 $10'), '收入 $5 到 $10');
 });
 
 // ─── 宽表格滚动包裹（2026-09-30 批B）────────────────────────────────────────

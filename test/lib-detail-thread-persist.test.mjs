@@ -451,6 +451,37 @@ test('the ask button always uses the CURRENT selection, not the first one', asyn
   await flushDetailThreadStore();
 });
 
+test('a selection containing a formula keeps its highlight (rendered text fingerprint)', async () => {
+  // Regression (2026-10-21): a selection with inline KaTeX has two different
+  // texts — the quote the card/model gets (LaTeX source) and what the bubble
+  // actually renders (MathML + HTML copies, duplicated glyphs). Validating the
+  // offsets against the QUOTE text rejected the correct range, so the reply
+  // highlight silently disappeared. The record now carries the rendered text.
+  await reset();
+  const rendered = 'Math like x=2x=2 is inline.';
+  const quoted = 'Math like $x=2$ is inline.';
+  const bubble = makeAssistantBubble(rendered, 15);
+  openDetailThread(bubble, quoted, bubble, { start: 0, end: rendered.length, text: rendered });
+  const highlight = CSS.highlights.get('detail-thread-quote');
+  assert.equal(highlight?.ranges?.length, 1, 'the range must survive quote/render divergence');
+  assert.equal(highlight.ranges[0].toString(), rendered);
+
+  // The rendered fingerprint is persisted and still wins after a teardown.
+  await flushDetailThreadStore();
+  const rec = (await loadDetailThreads())[0];
+  assert.equal(rec.highlightRange.text, rendered, 'the rendered text must be stored');
+
+  teardownPanel();
+  const bubble2 = makeAssistantBubble(rendered, 15);
+  await restoreDetailThreads();
+  assert.equal(highlight.ranges.length, 1, 'exactly one range after restore');
+  assert.equal(highlight.ranges[0].toString(), rendered);
+
+  bubble2.nextElementSibling.querySelector('.detail-thread-close')
+    .dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
 test('sidepanel wiring pins: renderHistory restores, destructive paths clear', async () => {
   const fs = await import('node:fs/promises');
   const sidepanel = await fs.readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');

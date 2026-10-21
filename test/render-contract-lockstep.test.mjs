@@ -220,8 +220,8 @@ test('lockstep: the message-font-family setting is wired end to end', () => {
 // ─── 5. Mermaid 宿主责任（2026-10-19，借 pele 的 limit/host-policy 模型）
 // 四条不变量，任何一条被改掉都会静默削弱不可信图源的处理：
 // ① 上限显式 pin 且 %%{init}%% 不能覆盖（secure 列表）；
-// ② securityLevel:'loose' 只为标签内 KaTeX，我们永不调用 mermaid 的
-//    bindFunctions（否则模型可绑 click 回调）；
+// ② securityLevel:'loose' 允许 HTML 标签（随后被 sanitize 压平成文本），
+//    我们永不调用 mermaid 的 bindFunctions（否则模型可绑 click 回调）；
 // ③ sanitize 之后还有一道链接/图片协议白名单；
 // ④ 方向切换与宽度重排都在（重排只在宽度变化 ≥40px 时防抖触发）。
 test('lockstep: mermaid host responsibilities (limits, no click binding, link policy, direction, reflow)', () => {
@@ -236,7 +236,12 @@ test('lockstep: mermaid host responsibilities (limits, no click binding, link po
     assert.ok(renderJs.includes(`'${key}'`), `secure must include ${key}`);
   }
   // front matter 的 config: 不走 directive 消毒器——必须在进 mermaid 前剥掉。
-  assert.match(renderJs, /const safeSource = stripFrontMatterConfig\(source\);[\s\S]{0,120}?renderMermaidWithRetry\(m, id, safeSource, host\)/);
+  assert.match(renderJs, /const safeSource = stripFrontMatterConfig\(source\);/);
+  // $$…$$ math must become Unicode BEFORE sanitizeMermaidSvg flattens label
+  // HTML to text (KaTeX output would otherwise degrade to "dk").
+  assert.match(renderJs, /const mathSafeSource = mermaidMathToText\(safeSource\);/,
+    'mermaid label math must be converted to Unicode before rendering');
+  assert.match(renderJs, /renderMermaidWithRetry\(m, id, mathSafeSource, host\)/);
   // 只禁止「调用」；注释里出现这个名字是解释上述不变量。
   assert.doesNotMatch(renderJs, /\.bindFunctions\s*\(/,
     'never bind mermaid click callbacks — securityLevel:loose would let model output register handlers');

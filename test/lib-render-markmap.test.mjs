@@ -38,6 +38,16 @@ test('renderMarkmap transforms the code block source via Transformer and renders
   assert.match(src, /view\.Markmap\.create\(svgEl, \{\}, root\)/);
 });
 
+test('renderMarkmap strips the stale KaTeX HTML branch BEFORE Markmap.create measures the nodes', () => {
+  // This extension ships no katex.css, so .katex-html is an unstyled duplicate
+  // and <annotation> leaks as text. Removing it first keeps layout measurement
+  // on the MathML that actually remains.
+  const stripAt = src.indexOf('stripMarkmapKatexHtml(root)');
+  const createAt = src.indexOf('view.Markmap.create(svgEl, {}, root)');
+  assert.ok(stripAt > 0, 'stripMarkmapKatexHtml(root) must be wired');
+  assert.ok(stripAt < createAt, 'the strip must run before create (layout measures the final content)');
+});
+
 test('renderMarkmap wraps the diagram in .markmap-diagram containing an svg.markmap-svg', () => {
   assert.match(src, /wrapper\.className = 'markmap-diagram'/);
   assert.match(src, /svgEl\.setAttribute\('class', 'markmap-svg'\)/);
