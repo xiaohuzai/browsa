@@ -350,3 +350,19 @@ test('parseTranscriptLines: [说话人:名字] 形态解析出名字标签；[�
   assert.equal(lines[2].fig, 3, '[图N] 仍走截图卡片解析');
   assert.equal(lines[3].label, 'Yushan');
 });
+
+test('Escape in the search box clears the filter without bubbling to the document', () => {
+  // The sidepanel's document-level Esc chain closes the drawer. The search
+  // input's Esc must stop there, or clearing the filter closed the timeline.
+  const vs = mountDom();
+  init(vs);
+  T.__TRANSCRIPT_TESTING__.setSource(RAW, vs);
+  T.openTranscriptDrawer();
+  const input = document.getElementById('transcript-search');
+  let docEsc = 0;
+  const onDoc = (e) => { if (e.key === 'Escape') docEsc++; };
+  document.addEventListener('keydown', onDoc);
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  document.removeEventListener('keydown', onDoc);
+  assert.equal(docEsc, 0, 'the search box must consume its own Escape');
+});

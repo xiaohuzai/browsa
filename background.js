@@ -115,6 +115,9 @@ chrome.storage.onChanged?.addListener((changes, area) => {
 if (chrome.contextMenus.update) refreshSelectionMenus().catch(() => {});
 chrome.runtime.onInstalled.addListener((details) => {
   refreshSelectionMenus(true).catch(() => {});
+  // Panel documents are torn down by an install/update; any session DNR rule
+  // they left behind is orphaned and safe to remove here.
+  sweepOrphanedMediaRules().catch(() => {});
 
   if (details.reason === 'install' || details.reason === 'update') {
     // One-shot self-heal: history blobs bloated by parked images from
@@ -210,6 +213,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // like 小红书 — vanilla chrome.tabs.onUpdated does NOT fire for history-API
 // navigation.
 const navPorts = new Map(); // tabId -> Set<Port>
+
+// DNR cleanup is only safe when no side panel is open: the media-header rules
+// belong to the panel, which can be mid-download while unrelated SW events
+// arrive. A last-panel disconnect is the in-session safe point; browser
+// startup/install are the cold ones.
+function sweepDnrIfNoPanels() {
+  if (navPorts.size === 0) sweepOrphanedMediaRules().catch(() => {});
+}
+chrome.runtime.onStartup?.addListener(() => {
+  sweepOrphanedMediaRules().catch(() => {});
+});
 
 // Deep-extraction progress rides the nav port the side panel already holds,
 // so the attach progress pill updates live while ATTACH_PAGE is still
@@ -423,12 +437,19 @@ chrome.runtime.onConnect.addListener((port) => {
           if (set.size === 0) navPorts.delete(claimedTabId);
         }
         syncNavListeners();
+        sweepDnrIfNoPanels();
       } else if (msg && msg.type === 'NAV_FOLLOW' && typeof msg.tabId === 'number') {
         // Side panel can switch which tab it's watching (e.g. user clicked
         // a different tab in the browser). Re-register.
         if (claimedTabId != null && claimedTabId !== msg.tabId) {
           const oldSet = navPorts.get(claimedTabId);
-          if (oldSet) oldSet.delete(port);
+          if (oldSet) {
+            oldSet.delete(port);
+            // Keep `navPorts.size === 0` an accurate "no panels" signal for
+            // the DNR safe-point sweep — an empty stale tab entry would make
+            // it look like a panel is still open forever.
+            if (oldSet.size === 0) navPorts.delete(claimedTabId);
+          }
         }
         claimedTabId = msg.tabId;
         if (!navPorts.has(claimedTabId)) navPorts.set(claimedTabId, new Set());
@@ -444,6 +465,7 @@ chrome.runtime.onConnect.addListener((port) => {
           if (set.size === 0) navPorts.delete(claimedTabId);
         }
         syncNavListeners();
+        sweepDnrIfNoPanels();
         console.log('browsa[bg]: nav port disconnected for tab', claimedTabId);
       }
     });
@@ -453,8 +475,9 @@ chrome.runtime.onConnect.addListener((port) => {
 
 // GC for stale streamState entries. A stream can be orphaned when a tab
 // is closed (or crashes) mid-stream before the CHAT handler's finally{} runs.
-// Entries older than STREAM_STATE_TTL_MS are safe to drop — the side panel
-// would never PEEK them because the tab is gone.
+// Only entries with NO live controller/run and older than STREAM_STATE_TTL_MS
+// are dropped — a live long turn (agent tools, pending approval) must survive
+// its own age.
 //
 // MV3 service workers can sleep between events, so a setTimeout/setInterval
 // would be cleared on sleep. We use chrome.alarms (which survives sleep) to
@@ -464,7 +487,16 @@ const STREAM_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 function gcStreamState() {
   const now = Date.now();
   for (const [tabId, st] of streamState.entries()) {
-    if (now - st.startedAt > STREAM_STATE_TTL_MS) {
+    // A LIVE turn is never stale, no matter how old it is: agent turns with
+    // tool calls or a pending approval routinely run past 10 minutes. The TTL
+    // exists for entries whose panel/tab died before the handler's finally{},
+    // and those have no controller/run entry. Deleting a live entry made the
+    // ownership gate suppress DONE (it compared against a state object that
+    // no longer existed), leaving the panel spinning forever (2026-10-21
+    // release audit).
+    const live = chatControllers.has(tabId) || activeRunIds.has(tabId);
+    const lastTouch = Math.max(st.startedAt || 0, st.lastDeltaAt || 0);
+    if (!live && now - lastTouch > STREAM_STATE_TTL_MS) {
       streamState.delete(tabId);
       console.log('browsa[bg]: GC stale streamState for tab', tabId);
     }
@@ -510,13 +542,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // the recovered partial deterministically even when this sweep hasn't
 // finished yet. Fire-and-forget here; failures are logged inside.
 ensureDurableSalvage().catch(() => {});
-
-// Same wake-time self-heal for DNR session rules: media-header rules are
-// registered with deterministic ids and removed in a `finally`, but a panel
-// document torn down mid-attach can skip that finally — and session rules
-// outlive the SW. Sweeping on every wake keeps a cookie-injecting rule from
-// surviving the rest of the browser session.
-sweepOrphanedMediaRules().catch(() => {});
 
 // videoUrlMatches now lives in lib/video-url.js (shared with the side
 // panel's live-tab resolution for seekVideo / the transcript drawer).

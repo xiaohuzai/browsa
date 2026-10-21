@@ -261,7 +261,12 @@ test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, 
   assert.match(renderJs, /const _MM_ZOOM_MIN = 0\.2/);
   assert.match(renderJs, /const _MM_FIT = 1/, 'pan/arrow gates key off the fit scale, not the zoom floor');
   // 方向档位：纵向（TD）布局用宽松间距，防 edge label 挤节点。
-  assert.match(renderJs, /flowchart: vertical \? \{ nodeSpacing: 50, rankSpacing: 60 \} : \{ nodeSpacing: 30, rankSpacing: 40 \}/);
+  // `layout` is a TOP-LEVEL MermaidConfig key — putting it inside `flowchart`
+  // is silently ignored by the bundled renderer (verified against mermaid 12).
+  assert.match(renderJs, /^\s*layout: 'dagre',$/m,
+    'mermaid 12 must stay on dagre (top-level) or the narrow-panel spacing is ignored');
+  assert.match(renderJs, /flowchart: vertical \? \{ nodeSpacing: 50, rankSpacing: 60 \} : \{ nodeSpacing: 30, rankSpacing: 40 \}/,
+    'the narrow-panel spacing values must stay in the flowchart block');
   assert.match(renderJs, /initMermaidTheme\(m, dirHit && !dirHit\.horizontal \? 'vertical' : 'horizontal'\)/);
   assert.match(renderJs, /export function computeAnchoredZoom/);
   assert.match(renderJs, /tabIndex = 0/);
@@ -289,4 +294,23 @@ test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, 
   assert.match(renderJs, /sequence:\s*\{\s*wrap:\s*true\s*\}/);
   // 布局宽度必须扣掉 padding（pele room()）。
   assert.match(renderJs, /function _contentWidth/);
+});
+
+test('hidden controls cannot be un-hidden by an author display rule', () => {
+  // The UA's `[hidden] { display:none }` loses to any author display rule
+  // (.iconbtn { display:flex } kept the no-video transcript button painted and
+  // clickable). One global !important rule closes the class of bugs; per-
+  // selector copies are exactly how the leak survived before.
+  assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important\s*;?\s*\}/,
+    'sidepanel.css must hide [hidden] with !important');
+});
+
+test('toasts never paint above the confirmation modal', () => {
+  const z = (sel) => {
+    const m = css.match(new RegExp(sel + '\\s*\\{[^}]*?z-index:\\s*(\\d+)'));
+    assert.ok(m, `${sel} must declare a numeric z-index`);
+    return Number(m[1]);
+  };
+  assert.ok(z('\\.toast-container') < z('\\.confirm-overlay'),
+    'a toast must not cover the dialog the user is answering');
 });

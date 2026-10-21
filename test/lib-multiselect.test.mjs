@@ -64,6 +64,8 @@ test('enterMultiSelect shows the bar, marks the toggle active, and adds a checkb
   assert.equal(isInMultiSelectMode(), true);
   assert.equal(document.getElementById('multiselect-bar').hidden, false);
   assert.ok(document.getElementById('multiselect-toggle').classList.contains('active'));
+  assert.ok(document.getElementById('messages').classList.contains('multiselect-on'),
+    'the message list opens a gutter so checkboxes are not clipped');
   assert.equal(document.querySelectorAll('.msg-select-cb').length, 3);
   assert.equal(document.getElementById('multiselect-count').textContent, '0 selected');
   assert.equal(document.getElementById('multiselect-delete').disabled, true);
@@ -90,6 +92,7 @@ test('exitMultiSelect hides the bar, un-marks the toggle, and removes all checkb
   assert.equal(isInMultiSelectMode(), false);
   assert.equal(document.getElementById('multiselect-bar').hidden, true);
   assert.equal(document.getElementById('multiselect-toggle').classList.contains('active'), false);
+  assert.equal(document.getElementById('messages').classList.contains('multiselect-on'), false);
   assert.equal(document.querySelectorAll('.msg-select-cb').length, 0);
 });
 
@@ -157,4 +160,24 @@ test('deleteSelectedMessages: shifts data-hidx of surviving bubbles above a dele
   // The bubble that was hidx=3 must shift down to hidx=2 (index 1 was removed).
   const last = [...document.querySelectorAll('.msg')].find(el => el.textContent === 'last');
   assert.equal(last.dataset.hidx, '2');
+});
+
+test('a failed delete marker is cleared on the next successful attempt (no index desync)', async () => {
+  setupDom();
+  enterMultiSelect();
+  const target = document.querySelector('[data-hidx="1"]');
+  target.querySelector('.msg-select-cb').checked = true;
+  DELETE_FAIL_INDEX = 1;
+  await deleteSelectedMessages();
+  assert.ok(document.querySelector('[data-hidx="1"]'), 'the failed bubble stays visible');
+  assert.equal(document.querySelector('[data-hidx="1"]').hasAttribute('data-delete-failed'), true);
+
+  DELETE_FAIL_INDEX = Symbol('none');
+  enterMultiSelect();
+  const retry = document.querySelector('[data-hidx="1"]');
+  retry.querySelector('.msg-select-cb').checked = true;
+  await deleteSelectedMessages();
+  assert.equal(retry.isConnected, false,
+    'a successful retry must remove the bubble (stale marker cleared)');
+  assert.equal(document.querySelectorAll('[data-delete-failed]').length, 0);
 });

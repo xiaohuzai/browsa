@@ -936,12 +936,27 @@ input[type="range"] { accent-color: var(--accent); }
 .card-status.err { color: var(--err); }
 
 /* ── Global status bar ───────────────────────────────────────────────────── */
+/* Save/ASR feedback used to live at the very bottom of a ~1900px page: change
+   the font size at the top and the confirmation was off-screen. A fixed
+   bottom-center pill makes the feedback visible from any scroll position. */
 .status {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 50;
+  max-width: min(90vw, 520px);
   font-size: 13px;
   color: var(--muted);
-  min-height: 1.4em;
-  padding: 0 4px;
+  padding: 8px 14px;
+  text-align: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
 }
+.status:empty { display: none; }
 .status.ok  { color: var(--ok); }
 .status.err { color: var(--err); }
 

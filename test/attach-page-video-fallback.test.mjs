@@ -273,3 +273,31 @@ test('Reddit active fallback: injects content script then calls activeRedditFetc
   assert.match(joined, /## 评论/, 'a comments section must be emitted');
   assert.match(joined, /cant fail toolcalling/, 'the comment text must be in the attached content');
 });
+
+// Host gate regression (2026-10-21 release audit): `/status/<digits>` is a
+// generic URL shape. The active fallback must never inject the X script or hit
+// the syndication endpoint on a non-X/Twitter host — otherwise a status/ticket
+// page whose id happens to match a real tweet silently attaches that tweet.
+test('X fallback is host-gated: /status/<digits> on another host is not a tweet', async () => {
+  chromeMock.tabs.query = async () => [{ id: 6, url: 'https://example.com/status/123456', title: 'Status page' }];
+  chromeMock.tabs.get = async (id) => ({ id, url: 'https://example.com/status/123456', title: 'Status page', favIconUrl: '' });
+  chromeMock.scripting.executeScript = async (opts) => {
+    executeScriptCalls.push(opts);
+    if (opts.files) return [{ result: undefined }];
+    const body = opts.func?.toString() || '';
+    if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+    if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+    return [{ result: { text: 'mock content', rawTextLength: 12, wasCapped: false } }];
+  };
+
+  executeScriptCalls = [];
+  const res = await handle({ type: 'ATTACH_PAGE', tabId: 6, mode: 'reader' }, { tab: { id: 6 } });
+  assert.equal(res.ok, true);
+  const fileInjections = executeScriptCalls.filter((c) => Array.isArray(c.files));
+  assert.ok(
+    !fileInjections.some((c) => c.files.some((f) => f.includes('twitter-content-script.js'))),
+    'must not inject the X content script on a non-X host'
+  );
+  assert.doesNotMatch(JSON.stringify(res.ctx || {}), /Okay let me tell you/,
+    'must not attach a tweet fetched via syndication');
+});

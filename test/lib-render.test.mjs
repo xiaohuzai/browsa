@@ -373,6 +373,34 @@ test('renderSafe: markdown-escaped dollars (\\$) are literal currency, never mat
   assert.match(html, /<math/, 'the $6\\times$ formula must still render as math');
 });
 
+test('renderSafe: a display formula containing pipes is not mistaken for a table row', async () => {
+  // |left|x|right| / array column specs contain their own pipes; counting the
+  // whole line (including the formula) misclassified them as table cells and
+  // merged the surrounding paragraphs.
+  const html = await renderSafe('before\n\n$$\\left|x\\right|$$\n\nafter');
+  assert.match(html, /<p>before<\/p>/, 'the preceding paragraph stays separate');
+  assert.match(html, /<p>after<\/p>/, 'the following paragraph stays separate');
+  assert.match(html, /<math/);
+});
+
+test('renderSafe: display math inside a table cell does not split the table', async () => {
+  // The prompt tells models to use $$...$$ in table cells. The old block
+  // placeholder injected blank lines around it, which ended the table and
+  // dumped the rest of the row as prose. Inside a pipe row it must stay inline.
+  const md = [
+    '| A | B |',
+    '|---|---|',
+    '| 1 | $$\\frac{a}{b}$$ |',
+    '| 2 | 3 |',
+  ].join('\n');
+  const html = await renderSafe(md);
+  assert.equal((html.match(/<table/g) || []).length, 1, 'exactly one table');
+  assert.equal((html.match(/<tr/g) || []).length, 3, 'header + both body rows survive');
+  assert.match(html, /<td>2<\/td>/, 'the following row is still part of the table');
+  assert.match(html, /<math/, 'the formula still renders');
+  assert.doesNotMatch(html, /BROWSAMATH/, 'no placeholder may leak');
+});
+
 test('renderSafe: \\\\ before a real delimiter is an escaped backslash, the $ after it still opens math', async () => {
   const html = await renderSafe('\\\\$x^2$');
   assert.doesNotMatch(html, /katex-error/);

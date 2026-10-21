@@ -20,7 +20,7 @@ import { initMsgSearch, openMsgSearch, closeMsgSearch } from './lib/sidepanel/ms
 import { initMathCopy } from './lib/sidepanel/math-copy.js';
 import { classifyErrorText } from './lib/sidepanel/error-classifier.js';
 import {
-  initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups
+  initFollowups, enqueueFollowup, takeFirstFollowup, hasQueuedFollowups, promoteFollowup, clearFollowups
 } from './lib/sidepanel/followups.js';
 import {
   attachDraftPersistence, restoreComposerState, pushInputHistory,
@@ -52,7 +52,7 @@ import { videoUrlMatches, resolveMatchingTabId } from './lib/video-url.js';
 import { applyI18n, initI18n, watchUiLang, uiLocale, t, tSub } from './lib/i18n.js';
 import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } from './lib/prompt-assembly.js';
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
-import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses } from './lib/sidepanel/scroll-follow.js';
+import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses, stickIntent, SCROLL_FOLLOW_COOLDOWN_MS } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
@@ -143,6 +143,12 @@ let isUserScrolledUp = false; // true when user has manually scrolled up during 
 // event too. -Infinity = no input yet, so the first follow after open is never
 // blocked by the document's own clock.
 let lastUserScrollInputAt = -Infinity;
+// Stay-at-bottom INTENT, separate from the 80px geometry test: late-rendered
+// diagrams/formulas grow the content after the initial scroll, which used to
+// read as "the user scrolled up" and parked the panel ~900px above the newest
+// message. See stickIntent() in scroll-follow.js.
+let stickToBottom = true;
+let lastScrollTop = 0;
 let scrollToBottomBtn = null; // lazy-created scroll-to-bottom button
 let navPort = null;             // long-lived port for SPA navigation pushes
 let lastXhsNote = null;         // most-recent XHR-intercepted 小红书 note
@@ -379,6 +385,8 @@ async function init() {
     clearPendingImages: () => { images.length = 0; refreshImageStrip(); },
     // 追问卡属于当前对话：切到另一个保存的会话时整批丢弃（含在途 subchat）。
     clearDetailThreads: () => { void clearDetailThreads(); },
+    // 排队中的追问同样属于当前对话：不清会让 A 的队列在 B 的 DONE 后发出去。
+    clearFollowups: () => { clearFollowups(); },
     // 跨入口接力（2026-10-01）：会话抽屉的「Agent 会话」行数据源——当前
     // provider 在 agent 侧的服务端会话 ID（storage.session，键形状由
     // storage.getAgentSessionInfo 单点持有）。
@@ -407,7 +415,11 @@ async function init() {
   applyContextMode(cfg.contextMode || 'auto');
   // Quickbar collapse: purely a user preference, no auto-hide heuristic —
   // same "user decides, we don't guess" principle as the message fold button.
-  $('quickbar')?.classList.toggle('collapsed', !!cfg.quickbarCollapsed);
+  // GET_CONFIG deliberately omits this targeted UI key (storage.getAll's
+  // light-key contract), so read it directly; the old cfg lookup always saw
+  // undefined and the panel reopened expanded after every teardown.
+  const qbPref = await storage.get(['quickbarCollapsed']);
+  $('quickbar')?.classList.toggle('collapsed', !!qbPref.quickbarCollapsed);
 
   // Load chat preferences
   sendShortcut = cfg.sendShortcut || 'enter';
@@ -732,6 +744,17 @@ async function init() {
       clientHeight: messagesEl.clientHeight,
     };
     isUserScrolledUp = calcIsUserScrolledUp(geom);
+    // Intent vs geometry: an upward scroll means the user let go (wheel,
+    // touch, scrollbar drag, keyboard); being at the bottom means they came
+    // back. Programmatic re-anchors only move downward, so they never clear
+    // the intent by accident.
+    stickToBottom = stickIntent({
+      scrollTop: messagesEl.scrollTop,
+      lastScrollTop,
+      isUserScrolledUp,
+      stickToBottom,
+    });
+    lastScrollTop = messagesEl.scrollTop;
     scrollToBottomBtn.hidden = !isUserScrolledUp;
     // Scroll-edge feather (sidepanel.css .fade-t/.fade-b): recompute per scroll.
     const { fadeT, fadeB } = edgeFadeClasses(geom);
@@ -740,6 +763,24 @@ async function init() {
   };
   messagesEl.addEventListener('scroll', updateScrollState, { passive: true });
   updateScrollState();
+  // Re-anchor when content grows under us. Mermaid/KaTeX/RDKit/Mol* resolve
+  // AFTER the initial scroll, pushing the newest message out of view. A
+  // MutationObserver (not ResizeObserver) is the right signal: the scroll
+  // container's own box never changes — only its scrollHeight does — so
+  // observing the container never fires. Gated on the intent, so a user who
+  // scrolled up to read is never yanked back.
+  if (typeof MutationObserver !== 'undefined') {
+    const stickObserver = new MutationObserver(() => {
+      // `_suppressAutoScroll` covers renderHistory's batched paint (it scrolls
+      // once at the end); the cooldown covers an active wheel/touch gesture,
+      // so a mutation mid-flick cannot yank the viewport back.
+      if (_suppressAutoScroll || !stickToBottom) return;
+      if (performance.now() - lastUserScrollInputAt < SCROLL_FOLLOW_COOLDOWN_MS) return;
+      const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+      if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+    stickObserver.observe(messagesEl, { childList: true, subtree: true, characterData: true });
+  }
   // The follower cooldown timestamps REAL input, not the (also programmatic)
   // scroll event — see lastUserScrollInputAt above.
   const markScrollInput = () => { lastUserScrollInputAt = performance.now(); };
@@ -772,7 +813,14 @@ async function init() {
   });
 
   // Wire search bar
-  initMsgSearch();
+  initMsgSearch({
+    // A search jump is deliberate navigation, not "stay at the bottom": drop
+    // the intent so the growth observer cannot re-anchor over the match.
+    onNavigate: () => {
+      stickToBottom = false;
+      lastScrollTop = messagesEl.scrollTop;
+    },
+  });
   // 复制含公式的选区 → LaTeX 源码（否则 MathML 被序列化成逐符号换行的碎片）
   initMathCopy({ messagesEl });
   $('search-btn')?.addEventListener('click', openMsgSearch);
@@ -793,7 +841,15 @@ async function init() {
   // persistence so unsent text survives the panel being torn down.
   initFollowups({
     mountEl: document.querySelector('.composer'),
-    sendNow: (text) => { resetHistoryNav(inputEl); inputEl.value = text; onSend(); },
+    sendNow: (text, id) => {
+      if (activeController) {
+        // Mid-stream a parallel send corrupts the shared per-tab port; put
+        // the clicked chip back at the FRONT so it is the next auto-send.
+        promoteFollowup(id, text);
+        return;
+      }
+      resetHistoryNav(inputEl); inputEl.value = text; onSend();
+    },
   });
   attachDraftPersistence(inputEl);
   restoreComposerState(inputEl).catch(() => {});
@@ -1260,8 +1316,9 @@ async function newSession() {
     }
   }
   await sendMessage({ type: 'CLEAR_HISTORY' });
-  // 追问卡属于被清掉的这段对话：卡片、持久化记录、在途 subchat 一起收掉。
+  // 追问卡/排队消息属于被清掉的这段对话：一起收掉，避免排空到新会话。
   void clearDetailThreads();
+  clearFollowups();
   // 整屏清空也是「删除路径」：活图表实例/WebGL viewer/ResizeObserver 必须
   // 先全局收掉（此前只有 renderHistory 做这件事，newSession/clear 直接
   // innerHTML='' 会把它们连同 DOM 一起变成永不自杀的孤儿）。
@@ -1289,6 +1346,7 @@ async function clearChatHistory() {
   cancelStream({ salvage: false }); // 确认后再停流（显式弃置，不收尸）：取消确认不应误杀进行中的回复
   await sendMessage({ type: 'CLEAR_HISTORY' });
   void clearDetailThreads(); // 同上：对话清空，追问卡不再属于任何内容
+  clearFollowups(); // 排队消息也不属于任何内容
   disposeChartObservers();  // 同 newSession：清空前先收掉活实例（见彼处注释）
   disposeMolstarViewers();
   messagesEl.innerHTML = '';
@@ -1901,12 +1959,20 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       target.getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
       if (m.code === 'ABORTED') {
         const r = target.getRenderer();
+        const el = target.getEl();
+        // isDone re-renders via innerHTML; a 追问 card nested in this bubble
+        // (anchored to a paragraph/li) must survive the swap like it does on
+        // DONE and the send-failure paths. Without capture/reinsert it
+        // vanished while activeCards still held its highlight.
+        const nested = captureDetailCardsIn(el);
         await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
+        reinsertDetailCards(el, nested);
+        refreshDetailHighlights(el);
         // 后台发起的中止（空闲超时/网络断——端口仍连着才走到这里）已把部分
         // 文本作为 interrupted 条目收尸入库：这个气泡就是那条条目的可见化身，
         // 盖 hidx 保持镜像同步（用户主动 Esc 走 cancelStream 本地盖章，收不
         // 到这条 ERROR）。与 cancelStream 的收尸记账同一不变量。
-        if (m.salvaged) hidxAssign(target.getEl());
+        if (m.salvaged) hidxAssign(el);
       } else {
         appendError(tSub('streamDied', '⚠️ 回复流中断：$1', m.error || '未知错误'));
       }
@@ -2057,7 +2123,12 @@ async function onSend() {
           // thinkEl is inserted BEFORE assistantEl (as a sibling), so innerHTML='' won't catch it.
           const prevSib = assistantEl.previousElementSibling;
           if (prevSib?.classList.contains('live-think')) prevSib.remove();
+          // innerHTML='' also destroys any 追问 card nested in this bubble —
+          // capture first and put it back after the wipe (it stays anchored by
+          // its saved text; the next DONE re-captures it anyway).
+          const nested = captureDetailCardsIn(assistantEl);
           assistantEl.innerHTML = '';
+          reinsertDetailCards(assistantEl, nested);
           renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
           renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
           if (activeController) activeController.renderStream = renderStream;
@@ -3357,6 +3428,8 @@ function scrollToBottom(force = false) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
   if (scrollToBottomBtn) { scrollToBottomBtn.hidden = true; scrollToBottomBtn.classList.remove('has-new'); }
   isUserScrolledUp = false;
+  stickToBottom = true; // deliberate follow → the intent is "stay at the bottom"
+  lastScrollTop = messagesEl.scrollTop;
 }
 
 // ─── Effective system prompt inspector (/prompt command) ─────────────────────

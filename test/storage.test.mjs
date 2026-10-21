@@ -567,6 +567,46 @@ test('cap eviction skips pinned sessions: oldest unpinned are evicted first', as
   assert.ok(list.some(s => s.name === 'Session 50'), 'the newest session must be present');
 });
 
+test('an all-pinned cap must never evict the session being saved', async () => {
+  // Regression (2026-10-21 release audit): with MAX_SESSIONS pinned entries,
+  // `excess` is still 1; the old loop walked to the newly appended unpinned
+  // entry, wrote its body, then removed it in the same call — a silent loss
+  // that left the drawer with no row to click.
+  reset();
+  for (let i = 0; i < 50; i++) {
+    await storage.setHistory([{ role: 'user', content: `pinned conversation ${i}` }]);
+    const s = await storage.saveCurrentSession(`Pinned ${i}`);
+    await storage.pinSession(s.id, true);
+  }
+  await storage.setHistory([{ role: 'user', content: 'the newest conversation' }]);
+  const newest = await storage.saveCurrentSession('Newest');
+  const list = await storage.getSavedSessions();
+  assert.ok(list.some((s) => s.id === newest.id), 'the new session must be listed');
+  const full = await storage.getSessionFull(newest.id);
+  assert.ok(full, 'the new session body must survive');
+});
+
+test('a rescued turn does not borrow the LIVE conversation\'s agent identity', async () => {
+  // The origin session was deleted; the live agentSessionState belongs to the
+  // conversation the user switched to. Copying it made the recovered session
+  // continue another conversation's server-side Hermes/bridge thread. With no
+  // id, loadSession assigns a fresh context (and backfills its text).
+  reset();
+  localArea.agentSessionState = {
+    contextId: 'live-context',
+    ids: { hermesSessionId_hermes: 'live-server-session' },
+  };
+  const rescued = await storage.rescueOrphanedTurn('deleted-origin', {
+    role: 'assistant', content: 'partial reply from the deleted conversation',
+  });
+  assert.ok(rescued, 'the turn is rescued');
+  const list = await storage.getSavedSessions();
+  const meta = list.find((s) => s.id === 'deleted-origin');
+  assert.ok(meta, 'the recovered session is listed');
+  assert.equal(meta.agentContextId, undefined, 'must not copy the live context id');
+  assert.equal(meta.agentSessions, undefined, 'must not copy the live server session ids');
+});
+
 test('getSessionFull returns null for an unknown id', async () => {
   reset();
   assert.equal(await storage.getSessionFull('nope'), null);

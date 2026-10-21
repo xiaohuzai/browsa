@@ -104,6 +104,8 @@ const deps = {
   stoppedWatching: false,
   cancelledDrop: false,
   resumed: false,
+  detailCleared: false,
+  followupsCleared: false,
   agentSessionInfo: null,
 };
 initSessionsUI({
@@ -115,6 +117,8 @@ initSessionsUI({
   renderHistory: async () => { deps.renderHistoryCalled++; },
   scrollToBottom: (force) => { deps.scrollForced = force; },
   clearPendingImages: () => { deps.imagesCleared = true; },
+  clearDetailThreads: () => { deps.detailCleared = true; },
+  clearFollowups: () => { deps.followupsCleared = true; },
   getAgentSessionInfo: async () => deps.agentSessionInfo,
 });
 
@@ -124,7 +128,7 @@ function setupDom() {
   toastContainer?.replaceChildren();
   sentMessages.length = 0;
   deps.renderHistoryCalled = 0; deps.scrollForced = null; deps.imagesCleared = false;
-  deps.streaming = false; deps.stoppedWatching = false; deps.cancelledDrop = false; deps.resumed = false;
+  deps.streaming = false; deps.stoppedWatching = false; deps.cancelledDrop = false; deps.resumed = false; deps.detailCleared = false; deps.followupsCleared = false;
   deps.agentSessionInfo = null;
   localStore = {}; // 归属指针等 local 键随用例复位
   loadSessionOk = true;
@@ -466,7 +470,20 @@ test('a stale agent-session lookup cannot erase a newer session list or overwrit
   assert.equal(agentId, 'new-agent-session', 'old lookup completion must not replace the current agent session');
 });
 
+test('clicking the already-active session row is a no-op (must not delete detail cards)', async () => {
+  setupDom();
+  localStore.activeSessionId = 's2';
+  sentMessages.length = 0;
+  await loadSession('s2', 'Second session');
+  assert.equal(sentMessages.some((m) => m.type === 'LOAD_SESSION'), false, 'no reload');
+  assert.equal(sentMessages.some((m) => m.type === 'SAVE_SESSION'), false, 'no save-to-self');
+  assert.equal(deps.detailCleared, false, 'open 追问 cards must survive');
+  assert.equal(deps.followupsCleared, false, 'a no-op click must not clear the queue');
+  assert.equal(deps.renderHistoryCalled, 0);
+});
+
 test('loadSession keeps an in-flight reply running in the background, saves, loads, and clears pending images', async () => {
+  // (the switch path must also drop the previous conversation's queued texts)
   // 2026-09-24：切换会话不再取消在途回复（旧行为把 thinking 烧几分钟的回复
   // 直接蒸发）——转后台 + 停止观看 + 把写入归属钉到来源会话。
   storageHistory = [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'yo' }];
@@ -482,6 +499,7 @@ test('loadSession keeps an in-flight reply running in the background, saves, loa
   assert.equal(deps.renderHistoryCalled, 1);
   assert.equal(deps.scrollForced, true);
   assert.equal(deps.imagesCleared, true);
+  assert.equal(deps.followupsCleared, true, 'queued follow-ups belong to the previous conversation');
   assert.equal(deps.resumed, true, 'reattach hooks run after the swap (switch-back resumes rendering)');
   assert.equal(getSessionsDrawer().hidden, true, 'drawer must close after loading');
 });

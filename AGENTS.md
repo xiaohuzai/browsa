@@ -38,6 +38,19 @@ Whole-repo audit pass. Full narrative: wiki **Architecture → "The 2026-10-17 w
 - **`applyI18n` 不毁子节点**（有元素子节点时只替换首个文本节点）；**`composer-state` 的 debounce 只由测试注入**。
 - **测试基建**：`test/helpers/chrome-mock.mjs` 的 `makeStorageArea(initial, {clone})` 是唯一实现，勿再在测试文件里手写 storage 桩。
 
+**2026-10-21 发布前审计（P0 修复，勿回退）**
+- **DONE 所有权要在 finally 清理前取快照**：`gcStreamState` 不得删除仍有 `chatControllers`/`activeRunIds` 的活回合（长工具/审批回合 >10 分钟是正常的）；`chat-handler` 的 DONE 门用 `ownsAtEnd`（finally 内、删 map 前计算），不能事后重读 `streamState`——自身清理会被误判成「被取代」，面板会永远转圈。persist/takeTurnUsage 期间可能有新回合接手，因此再用 `streamEpoch(tabId)` 比对 init 时捕获的 epoch（finally 后 controller 已删，单靠 ownsStream 看不出来）。Tests: `chat-turn-ownership`。
+- **SSE decoder per-call**：`lib/sse-reader.js` 的 `TextDecoder` 必须在 `readSseLines` 内新建；模块级共享会在并发 bridge/opencode 流之间串多字节字符（`�data:`，丢事件）。Tests: `sse-reader`。
+- **DNR 清扫只在安全点**：媒体/页面图规则只在 `runtime.onStartup`、`runtime.onInstalled`、最后一个 navPort 断开时清扫；**禁止每次 SW wake 清扫**（会删掉侧栏正在下载的规则 → ASR 403）。`xiaoyuzhou` 不注册规则，`finally` 也不得移除 B 站规则；sweep 覆盖 `9000001/9000002/9000003`。Tests: `media-headers-sweep`。
+- **X 兜底必须 host 门**：`tryXActiveFallback` 只接受 `x.com`/`twitter.com`；`/status/<digits>` 是通用 URL 形状，缺门会把状态页附成真实推文。Tests: `attach-page-video-fallback`。
+- **追问卡持久化两不变量**：`closeCard` 先置 `closed` 并盖 `card.dataset.closed`，异步 finalize/stop/restore 的 `persistNow` 不得复活已删记录（否则切会话会泄漏旧卡），`reinsertDetailCards` 跳过被关的捕获卡（异步 isDone 重渲的僵尸卡）；`hidx` 为 null（流式中途开卡）时 `findHostBubble` 必须扫全部 assistant 气泡，按 streaming prefix/选区文本找宿主；`moveSiblingDetailCards` 以 hostHash 优先、hidx 只作旧记录兜底，孤儿卡不得被塞进无关气泡；跨面板文档（两个窗口）的 read-modify-write 必须走 Web Locks（`navigator.locks.request(STORE_KEY, …)`，模块内队列只串行本 document）。Tests: `lib-detail-thread-persist`。
+- **delta 数据路径也要过所有权门**：被取代回合的 CHUNK 不得写进新回合的 `streamState.acc`/气泡（否则 abort 收尸会把两段回复混存）；`onDelta`/`onToolProgress` 先查 `ownsStream()`。Tests: `chat-turn-ownership`。
+- **Anthropic usage 必须合并两段**：input/cache 在 `message_start`、output 在 `message_delta`；共享循环是 last-wins，parser 要在 `message_delta` 返回合并对象。Tests: `anthropic-usage-merge`。
+- **`MAX_SESSIONS` 驱逐不得删除本次保存**：全部 pinned 时旧循环会把刚 append 的新会话当第 51 条写掉再删掉（静默丢）。保留最后一个 entry。**rescue 不得借当前身份**：`rescueOrphanedTurn` 不能 `snapshotAgentSessions()`（会把用户切到的当前会话的 agent 身份借给被删会话）；缺 `agentContextId` 时 `loadSession` 会自动发新 context + backfill。Tests: `storage`。
+- **Mermaid 12 固定顶层 `layout:'dagre'`**：`layout` 是 MermaidConfig 顶层键，写进 `flowchart` 会被静默忽略；v12 默认 ELK 硬编码 spacing，`nodeSpacing/rankSpacing` 不生效（窄栏调参失效）。`layout` 同时进 `secure`，防止 `%%{init}%%` 把图切回 ELK。表格单元格里的 `$$…$$` 用内联占位符，不能插空行（会把表格截断）；判断表格必须数公式**之外**的管道符（`\left|x\right|` 自带 `|`）。Tests: `render-contract-lockstep`、`lib-render`。
+- **UI 功能性修复与视觉回滚分开保留**：全局 `[hidden]{display:none!important}`、`stickIntent` 贴底意图 + MutationObserver（受 `_suppressAutoScroll`/手势 cooldown 门控；`initMsgSearch({onNavigate})` 在 scrollIntoView 前清意图，否则搜索高亮的 DOM 变更会把视口拽回底部）、多选 `multiselect-on` 左凹槽、toast 低于确认弹窗、审批只有「允许一次」实心、options `#status` 固定浮层。这些修的是死按钮/滚动位置/裁切/遮挡，不是外观改版。
+- **会话/队列/设置的小修**：点当前 active 会话行必须是 no-op（旧路径会重载并清掉全部追问卡）；切会话/新会话/清空都 `clearFollowups`；队列落 `chrome.storage.session`（关面板不丢），流中点击 chip 用 `promoteFollowup` 放回队首而不是尾插/丢弃；抽屉 ↑/↓ 绑可聚焦的 `.session-item-body` 且 `initArrowNav` 按容器幂等；options ASR 在回填 provider 后二次 sync（占位/文档链接）；quickbar 用 targeted `storage.get(['quickbarCollapsed'])`（GET_CONFIG 刻意不含它）；transcript 搜索 Esc `stopPropagation`；多选失败 marker 每轮开始清除。
+
 ## Docs sync convention (user-visible changes, 2026-09-20)
 
 **Any user-visible change — feature, behavior, capability — syncs the public docs in the SAME PR**, without waiting to be asked. The rule was made explicit after the Office-document attach landed with its README/docs edits already bundled (2026-09-20, the intended shape) and a follow-up scan caught one missed sentence — that scan-then-fix pass is the routine to repeat:

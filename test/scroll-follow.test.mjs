@@ -20,6 +20,7 @@ import {
   isUserScrolledUp,
   edgeFadeClasses,
   distanceFromBottom,
+  stickIntent,
 } from '../lib/sidepanel/scroll-follow.js';
 
 const geom = (scrollHeight, scrollTop, clientHeight) => ({ scrollHeight, scrollTop, clientHeight });
@@ -72,6 +73,25 @@ test('edgeFadeClasses: feather only the edge you are NOT pinned to', () => {
   assert.equal(EDGE_FADE_GUARD_PX, 2);
 });
 
+test('stickIntent: an upward scroll clears the intent; returning to the bottom re-arms it', () => {
+  // User scrolled up from the bottom → let go.
+  assert.equal(stickIntent({ scrollTop: 500, lastScrollTop: 600, isUserScrolledUp: true, stickToBottom: true }), false);
+  // Content growth does NOT move scrollTop upward; the geometry may say
+  // "scrolled up" but the intent survives (this is the diagram case).
+  assert.equal(stickIntent({ scrollTop: 600, lastScrollTop: 600, isUserScrolledUp: true, stickToBottom: true }), true);
+  // Back at the bottom → re-arm.
+  assert.equal(stickIntent({ scrollTop: 900, lastScrollTop: 600, isUserScrolledUp: false, stickToBottom: false }), true);
+  // Already let go and still away from the bottom → stay let go.
+  assert.equal(stickIntent({ scrollTop: 500, lastScrollTop: 600, isUserScrolledUp: true, stickToBottom: false }), false);
+});
+
+test('stickIntent: a programmatic downward re-anchor never clears the intent', () => {
+  assert.equal(stickIntent({ scrollTop: 1000, lastScrollTop: 400, isUserScrolledUp: true, stickToBottom: true }), true);
+  // 1px jitter downward/equal is not an upward gesture.
+  assert.equal(stickIntent({ scrollTop: 399, lastScrollTop: 400, isUserScrolledUp: true, stickToBottom: true }), true);
+  assert.equal(stickIntent({ scrollTop: 398, lastScrollTop: 400, isUserScrolledUp: true, stickToBottom: true }), false);
+});
+
 test('wiring contract: sidepanel.js gates scrollToBottom on shouldFollowStream and feeds it real input', async () => {
   const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
 
@@ -89,4 +109,10 @@ test('wiring contract: sidepanel.js gates scrollToBottom on shouldFollowStream a
   assert.ok(listenerBlock, 'wheel/touchstart/keydown must mark the cooldown timestamp');
   assert.match(src, /let lastUserScrollInputAt = -Infinity;/,
     'no input yet must mean -Infinity (first follow never blocked by the doc clock)');
+  // The growth observer must not re-introduce per-bubble reflows during
+  // renderHistory, nor fight an active wheel/touch gesture.
+  assert.match(src, /_suppressAutoScroll \|\| !stickToBottom/,
+    'the stick observer must respect renderHistory\'s batched-paint flag');
+  assert.match(src, /performance\.now\(\) - lastUserScrollInputAt < SCROLL_FOLLOW_COOLDOWN_MS/,
+    'the stick observer must respect the active-scroll cooldown');
 });

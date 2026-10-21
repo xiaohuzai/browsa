@@ -198,8 +198,17 @@ function syncAsrProviderUI() {
   }
   const doc = document.getElementById('asrDocLink');
   if (doc) {
-    doc.href = p.docUrl || '';
-    doc.textContent = '📖 ' + _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
+    // No docUrl → hide the whole link. An empty href resolves to the current
+    // page, so the old code produced a link-looking control that reloaded the
+    // settings page and looked broken.
+    if (p.docUrl) {
+      doc.hidden = false;
+      doc.href = p.docUrl;
+      doc.textContent = '📖 ' + _t(`asrDocLabel_${p.id}`, p.docLabel || _t('asrDocLabelDefault', '配置文档'));
+    } else {
+      doc.hidden = true;
+      doc.removeAttribute('href');
+    }
   }
 }
 
@@ -214,8 +223,12 @@ function applyAsr(cfg) {
   const known = !!ASR_PROVIDERS[a.provider];
   const provSel = document.getElementById('asrProvider');
   if (provSel) {
-    syncAsrProviderUI(); // 先填充选项，再回填已存值
+    syncAsrProviderUI(); // 先填充选项
     provSel.value = known ? (a.provider || 'qwen') : 'ark'; // 空值 = 新默认百炼；未知供应商（storage 已归一）兜底回 ark
+    // Re-sync AFTER selecting the stored provider: the first call ran while
+    // the select still showed its default (qwen), so an Ark config displayed
+    // DashScope placeholders/tips/doc link until the user touched the select.
+    syncAsrProviderUI();
   }
   set('asrApiKey', known ? a.apiKey : '');
   set('asrBaseUrl', known ? a.baseUrl : '');
@@ -772,32 +785,10 @@ function wireBridgeEndpointEditor(card) {
     });
   }
 
-  // 激活逻辑抽成共享（2026-10-01 审计 P3：此前点卡激活仅鼠标可达——卡片是
-  // 普通 div，键盘用户没有把已配置 provider 设为激活的路径）。
-  const activate = async () => {
-    // The reserved empty "LLM 1" slot is render-only (never in storage) — it
-    // can't be the active provider, so don't highlight/persist a click on it.
-    if (!cachedCfg.providers[name]) return;
-    document.querySelectorAll('.provider').forEach(c => c.classList.remove('active'));
-    card.classList.add('active');
-    // Persist! This handler used to only toggle the CSS class, so the highlight
-    // silently reverted to the stored provider on reload / language switch.
-    cachedCfg.activeProvider = name;
-    cachedCfg.activeModel = '';
-    try { await storage.setActiveProvider(name, ''); } catch (_) { persist({ activeProvider: name, activeModel: '' }); }
-  };
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('input, button, select, textarea')) return;
-    activate();
-  });
-  const cardH3 = card.querySelector('.provider-h3');
-  if (cardH3) {
-    cardH3.tabIndex = 0;
-    cardH3.addEventListener('keydown', (e) => {
-      // 焦点在 tab 按钮等交互件上时 Enter 归它们自己；空格滚动也不劫持
-      if ((e.key === 'Enter' || e.key === ' ') && e.target === cardH3) { e.preventDefault(); activate(); }
-    });
-  }
+  // Provider activation is wired by wireProviderActivation(card, name) in
+  // buildProviderCard. A duplicate copy here referenced an undeclared `name`
+  // (→ window.name, empty) and silently no-opped; it was removed because a
+  // future caller could invoke only this one and get a dead card.
 }
 
 // Card click / keyboard activation. Extracted from buildProviderCard

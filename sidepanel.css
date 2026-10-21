@@ -9,6 +9,11 @@
 
 /* ─── Reset ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
+/* The UA's `[hidden] { display:none }` is a normal rule — any author display
+   (e.g. .iconbtn { display:flex }) overrides it, leaving "hidden" controls
+   painted and clickable (the transcript button in chats without a video).
+   Functional, not part of the reverted visual redesign. */
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
@@ -1867,7 +1872,10 @@ html { interpolate-size: allow-keywords; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: 9999;
+  /* Below .confirm-overlay (9998): a toast must never cover the dialog the
+     user is answering (e.g. the prompt inspector's Copy toast). Still far
+     above every panel surface/drawer. */
+  z-index: 9997;
   pointer-events: none;
   width: calc(100% - 32px);
   max-width: 360px;
@@ -2719,6 +2727,11 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   accent-color: var(--accent);
 }
 .msg[data-hidx] { position: relative; }
+/* Multi-select opens a left gutter for the checkbox: `.messages` normally has
+   14px padding, and the checkbox sits at left:-22px, so without the gutter it
+   lands at x=-8 and is clipped by the panel edge. Scoped to the mode so the
+   normal reading layout is untouched. */
+.messages.multiselect-on { padding-left: 36px; }
 /* Active state for multi-select toggle button */
 #multiselect-toggle.active { color: var(--accent); }
 
@@ -2834,6 +2847,9 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .approval-btn:hover { opacity: 0.85; }
 .approval-btn:active { transform: scale(0.96); transition: transform var(--dur-fast) ease-out; }
 .approval-btn-allow { background: var(--accent); color: var(--on-accent); }
+/* Session/always grant a WIDER scope than "allow once" — outline, not filled,
+   so the broader choice is not the visual twin of the narrow one. */
+.approval-btn-secondary { background: transparent; border-color: var(--border-strong); color: var(--fg-2); }
 .approval-btn-deny  { background: transparent; border-color: var(--border-strong); color: var(--fg-2); }
 
 /* ── Clarify card (Hermes /v1/runs clarification.request) ─────────────── */
@@ -3395,7 +3411,10 @@ body { container-type: inline-size; }
 @media (max-width: 320px) {
   .topbar { gap: 5px; padding-inline: 8px; }
   .topbar .iconbtn { width: 25px; }
-  .messages { padding-inline: 10px; }
+  /* At 320px the outline rail's tick line (24px strip, right:2px) reaches
+     x≈302 while the content edge was x=310 — ticks painted over the last
+     characters. Keep a 22px right gutter for the rail. */
+  .messages { padding-inline: 10px 22px; }
   .quickbar { margin-inline: 8px; overflow-x: auto; justify-content: flex-start; }
   .qa-btn { flex-shrink: 0; }
   .composer { padding-inline: 8px; }

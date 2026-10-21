@@ -51,9 +51,20 @@ test('arrow keys inside a row\'s input keep their caret behavior', () => {
   assert.equal(ev.defaultPrevented, false, 'input caret movement must not be hijacked');
 });
 
+test('initArrowNav is idempotent per container (no double-step on re-render)', () => {
+  const { dom, list, rows } = makeList();
+  initArrowNav(list, '.row');
+  initArrowNav(list, '.row'); // renderSessionsList used to call this every render
+  list.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  assert.equal(dom.window.document.activeElement, rows[0]);
+  list.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  assert.equal(dom.window.document.activeElement, rows[1],
+    'one press must move exactly one row, even after repeated init calls');
+});
+
 test('wiring: both drawers call initArrowNav on their row selectors', async () => {
   const sessions = await readFile(new URL('../lib/sidepanel/sessions-ui.js', import.meta.url), 'utf8');
-  assert.match(sessions, /initArrowNav\(listEl, '\.session-item'\)/);
+  assert.match(sessions, /initArrowNav\(listEl, '\.session-item-body'\)/);
   const transcript = await readFile(new URL('../lib/sidepanel/transcript-drawer.js', import.meta.url), 'utf8');
   assert.match(transcript, /initArrowNav\(_listEl, '\.ts-row'\)/);
 });
