@@ -77,7 +77,7 @@ globalThis.chrome = {
 };
 
 const {
-  openDetailThread, restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn,
+  openDetailThread, restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, hideSelectionAskBtn,
 } = await import('../lib/sidepanel/detail-thread.js');
 const { flushDetailThreadStore, loadDetailThreads, saveDetailThread } = await import('../lib/sidepanel/detail-thread-store.js');
 
@@ -402,6 +402,52 @@ test('reopening the panel auto-folds restored cards, while a same-document re-re
   assert.ok(card2.querySelector('.detail-thread-quote'), 'the quote stays visible when folded');
 
   card2.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('the ask button always uses the CURRENT selection, not the first one', async () => {
+  // Regression: the button element is created once and a closure over the
+  // first selection used to anchor/highlight the FIRST passage on every later
+  // use — the newly selected text got no highlight (user-reported).
+  await reset();
+  hideSelectionAskBtn();
+  dom.window.getSelection()?.removeAllRanges();
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 80, height: 20, right: 90, bottom: 30,
+  });
+
+  const first = makeAssistantBubble('Alpha bravo charlie.', 12);
+  const second = makeAssistantBubble('Delta echo foxtrot.', 13);
+  const select = async (bubble, from, to) => {
+    const range = document.createRange();
+    range.setStart(bubble.firstChild, from);
+    range.setEnd(bubble.firstChild, to);
+    const sel = dom.window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    messagesEl().dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+    await tick();
+    return sel.toString();
+  };
+
+  await select(first, 0, 5); // "Alpha"
+  const btn = document.querySelector('.selection-ask-btn');
+  assert.ok(btn, 'the ask button appears after the first selection');
+
+  await select(second, 6, 10); // "echo"
+  btn.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+  const card = second.nextElementSibling;
+  assert.ok(card?.classList.contains('detail-thread-card'), 'the card opens on the CURRENT bubble');
+  assert.equal(first.nextElementSibling, second, 'no card was attached to the stale first bubble');
+  assert.match(card.querySelector('.detail-thread-quote').textContent, /echo/,
+    'the card quotes the current selection');
+  const highlight = CSS.highlights.get('detail-thread-quote');
+  assert.equal(highlight?.ranges?.length, 1);
+  assert.equal(highlight.ranges[0].toString(), 'echo',
+    'the highlight covers the CURRENT selection, not the first one');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await flushDetailThreadStore();
 });
 
