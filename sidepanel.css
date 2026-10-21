@@ -2924,12 +2924,22 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
    --gold is the margin-annotation color — the highlight is the page-margin
    reference the card's quote rail points at. */
 ::highlight(detail-thread-quote) {
+  /* Plain rgba first: some engines reject color-mix()/var() inside a custom
+     highlight pseudo, and an invalid declaration would paint nothing at all. */
+  background-color: rgba(212, 167, 44, 0.28);
   background-color: color-mix(in srgb, var(--gold) 28%, transparent);
   color: inherit;
 }
 .detail-thread-quote {
   padding: 4px 8px;
   margin: 0 52px 8px 0;
+  /* The card's quote is the same selected passage as the reply highlight, so
+     tint it too — that keeps the highlight visible even when the original
+     passage has scrolled out of view (and when a browser refuses to paint the
+     custom highlight pseudo-element). */
+  background: var(--gold-dim);
+  background: color-mix(in srgb, var(--gold) 20%, transparent);
+  border-radius: 3px;
   border-left: 2px solid var(--accent);
   color: var(--fg-2);
   /* No font-style:italic — the quoted text is frequently CJK, and synthesized
