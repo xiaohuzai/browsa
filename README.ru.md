@@ -17,7 +17,7 @@
 
 **Оставайтесь на странице. Спрашивайте рядом.**
 
-browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
+browsa — расширение с боковой панелью для Chrome / Edge. Добавьте статью, видео или PDF в беседу с **вашим собственным ИИ** — без копирования текста и без ухода со страницы. Подключите **Codex / Claude Code / pi / Gemini CLI / dsh / ZCode** через Agent Bridge, используйте **opencode / Hermes / OpenSquilla** или настройте модельный API — OpenAI, Anthropic, Ollama и другие.
 
 **Бесплатное расширение под лицензией MIT.** Модель или агент — ваши собственные. API-ключи хранятся локально и используются для аутентификации в настраиваемых вами сервисах.
 
@@ -40,6 +40,7 @@ browsa — расширение с боковой панелью для Chrome /
 | **pi** (earendil-works) | локальный демон agent-bridge | Любая модель, настроенная в pi |
 | **Gemini CLI** (Google) | локальный демон agent-bridge | Существующая аутентификация CLI |
 | **dsh** (DeepSeek Harness) | локальный демон agent-bridge | API-ключ DeepSeek |
+| **ZCode** | локальный демон agent-bridge (headless CLI) | Вход и модель, уже настроенные в приложении / CLI ZCode |
 | opencode | официальный headless-сервер, напрямую | любая модель, настроенная в opencode |
 | Hermes | собственный сервер, протокол `/v1/runs` | собственный сервер |
 | OpenSquilla | собственный шлюз, WebSocket (`/ws`) | модели, на которые маршрутизирует шлюз |
@@ -62,7 +63,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · ZCode<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -122,9 +123,9 @@ npm run package      # → browsa-v<version>.zip
 - старые диалоги без записанного ID при первом сообщении создают новую сессию агента и передают в неё имеющуюся текстовую историю
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — мост к локальным агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — мост к локальным агентам (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>ZCode</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит локальных агентов (codex, claude, pi, gemini, dsh) к одному локальному HTTP-протоколу. Использует настроенную в агенте аутентификацию:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) — автономный локальный демон, который сводит локальных агентов (codex, claude, pi, gemini, dsh, zcode) к одному локальному HTTP-протоколу. Использует настроенную в агенте аутентификацию:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -138,6 +139,12 @@ agent-bridge serve                                # one bridge per entry; ports 
 - карточки подтверждения опасных действий появляются прямо в панели
 - скриншоты, вставленные изображения и иллюстрации из PDF отправляются вместе с вашим сообщением — до 18 за ход, нужен agent-bridge ≥0.8.0 (старые мосты автоматически деградируют до первых 8 с пометкой в сообщении)
 - контекст многоходового разговора хранится в самом агенте; попутное повествование перед вызовом инструмента (codex объявляет об использовании навыка) сворачивается в историю шагов, а не попадает в текст ответа
+
+**ZCode** подключается через headless-режим официального CLI (нужен agent-bridge ≥0.12.0) и переиспользует вход и модель, уже настроенные в приложении / CLI ZCode — мост сам находит CLI внутри приложения либо берёт `zcode` из PATH. Три отличия от остальных агентов:
+
+- **нет карточек подтверждения**: в headless-ходе подтвердить некому, поэтому `"mode"` в entry — единственный ограничитель прав. По умолчанию `edit` применяет изменения сам; `plan` — только чтение; `guarded` ведёт себя как yolo и останавливается лишь перед опасными командами; `build` ждёт подтверждения и зависает — не используйте его в headless
+- **модель определяется порядком провайдеров в ZCode** (первый провайдер в `providerOrder`, затем первый модель в его `modelOrder`) — мост не передаёт модель и не может; провайдер аккаунт-подписки никогда не выбирается автоматически, поэтому добавьте собственного провайдера или выберите модель в приложении / CLI и продолжайте эту сессию по ID
+- **изображения деградируют до текстовой пометки**: CLI принимает только локальные файлы (`--attach`), а мост никогда не пишет изображения пользователя на диск — скриншоты и иллюстрации из PDF едут текстовым уведомлением вместо пикселей
 
 
 </details>

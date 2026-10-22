@@ -20,7 +20,7 @@
 
 **Stay on the page. Ask beside it.**
 
-browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
+browsa is a Chrome / Edge side-panel extension. Bring an article, video, or PDF into a conversation with **your own AI** — without copying text or leaving the page. Connect **Codex / Claude Code / pi / Gemini CLI / dsh / ZCode** through Agent Bridge, use **opencode / Hermes / OpenSquilla**, or configure a model API such as OpenAI, Anthropic, or Ollama.
 
 **Free, MIT-licensed extension.** Bring your own model or agent. API keys are stored locally and used to authenticate with the services you configure.
 
@@ -43,6 +43,7 @@ Connect your existing local agents through Agent Bridge, using their configured 
 | **pi** (earendil-works) | agent-bridge local daemon | Whatever model you configure pi with |
 | **Gemini CLI** (Google) | agent-bridge local daemon | Existing CLI authentication |
 | **dsh** (DeepSeek) | agent-bridge local daemon | DeepSeek API key |
+| **ZCode** | agent-bridge local daemon (headless CLI) | The login and model your ZCode desktop app / CLI already has |
 | opencode | official headless server, direct | whatever model you configure it with |
 | Hermes | self-hosted, `/v1/runs` protocol | self-hosted |
 | OpenSquilla | self-hosted gateway, WebSocket (`/ws`) | whatever models the gateway routes to |
@@ -65,7 +66,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · ZCode<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -125,9 +126,9 @@ Conversations with agents live on the agent side:
 - older snapshots without recorded IDs start a fresh Agent thread with their text history on the first message
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — bridge local agents (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>ZCode</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh) to one local HTTP protocol. It uses the agent's configured authentication:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) is a standalone local daemon that adapts local agents (codex, claude, pi, gemini, dsh, zcode) to one local HTTP protocol. It uses the agent's configured authentication:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -141,6 +142,12 @@ Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and
 - approval cards for dangerous actions appear right in the panel (an optional sound plays when an approval arrives; toggle in Settings)
 - screenshots, pasted images, and PDF figures ride along with your message — ≤18 per turn, needs agent-bridge ≥0.8.0 (older bridges degrade to the first 8 with a note in the message)
 - multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply
+
+**ZCode** rides the official CLI's headless mode (needs agent-bridge ≥0.12.0) and reuses the login and model your ZCode desktop app / CLI already has — the bridge auto-finds the CLI bundled with the desktop app, or use the `zcode` on PATH. Three things differ from the other agents:
+
+- **no approval cards**: nobody can answer a confirmation in a headless turn, so the entry's `"mode"` is the only permission gate. The default `edit` auto-applies changes; `plan` is read-only Q&A; `guarded` behaves like yolo and stops only before dangerous commands such as `rm -rf`, `git reset --hard`, or a force push (with no one to approve, headless refuses that command); `build` waits for an approval and stalls — don't use it headless
+- **the model is decided by ZCode's own provider ordering** (first provider in `providerOrder`, then the first model in its `modelOrder`) — the bridge never passes a model and cannot; an account-plan provider is never auto-selected, so either add a custom provider or pick the model in the desktop app / CLI and continue that session by ID
+- **images degrade to a note**: the CLI only attaches local files (`--attach`) and the bridge never writes your images to disk — screenshots and PDF figures still ride along as a text notice instead of pixels
 
 
 </details>

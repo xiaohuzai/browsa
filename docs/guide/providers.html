@@ -157,8 +157,8 @@ opensquilla gateway start
       <p>说明：每个 browsa 对话对应一个网关会话（清空 browsa 历史即重置）。聊天记录存放在网关侧——browsa 只转发你的文字，外加你刚附加过的页面（📎 上下文随下一条消息送出一次）；超大页面（超过 6 万字符）会作为 <code>page-context.md</code> 文档上传，由智能体用自己的工具分段阅读。粘贴的截图保留在 browsa 自己的历史里，暂不转发。</p>
 
       <h2 id="agent-bridge">Agent Bridge</h2>
-      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi、gemini、dsh</strong> 等本地智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；Gemini CLI 用 Google 账号登录（也支持 <code>GEMINI_API_KEY</code>）；pi 则用你在它内部配置好的模型供应商；dsh 用 DeepSeek API key，会话也会出现在 dsh 桌面端/Web 界面里。</p>
-      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>；gemini：<code>npm i -g @google/gemini-cli</code> 跑一次 <code>gemini</code> 登录 Google 账号（或设 <code>GEMINI_API_KEY</code>）；pi：<code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>，首次运行 <code>pi</code> 配好模型供应商，要求 Node ≥ 22；dsh：装好 DeepSeek Harness——桌面版或 <code>npm i -g @deepseek-ai/dsh</code>——并存一次 DeepSeek API key：<code>dsh-acp login</code>，或在 dsh Web UI 的设置 → 模型里保存（openma 适配器 <code>dsh-acp</code> 已随 agent-bridge 内置））。</p>
+      <p><a href="https://github.com/xiaohuzai/agent-bridge">agent-bridge</a> 是一个独立的小型本地守护进程：把 <strong>codex、claude、pi、gemini、dsh、zcode</strong> 等本地智能体适配成统一的本地 HTTP 协议。ChatGPT Plus / Claude Pro 的<strong>订阅登录</strong>就能当模型来源——无需另购模型 API；Gemini CLI 用 Google 账号登录（也支持 <code>GEMINI_API_KEY</code>）；pi 则用你在它内部配置好的模型供应商；dsh 用 DeepSeek API key，会话也会出现在 dsh 桌面端/Web 界面里；ZCode 走官方 CLI 的 headless 模式，沿用 ZCode 自己那份登录与模型配置。</p>
+      <p><strong>前提</strong>：本机装有 <a href="https://nodejs.org" rel="noopener noreferrer">Node.js</a> 18+，以及要桥接的 agent CLI 并已登录（codex：<code>npm i -g @openai/codex</code> 后 <code>codex login</code>，用 ChatGPT 订阅账号即可；claude：<code>npm i -g @anthropic-ai/claude-code</code> 跑一次登录，再 <code>npm i -g @agentclientprotocol/claude-agent-acp</code>；gemini：<code>npm i -g @google/gemini-cli</code> 跑一次 <code>gemini</code> 登录 Google 账号（或设 <code>GEMINI_API_KEY</code>）；pi：<code>npm i -g @earendil-works/pi-coding-agent pi-acp</code>，首次运行 <code>pi</code> 配好模型供应商，要求 Node ≥ 22；dsh：装好 DeepSeek Harness——桌面版或 <code>npm i -g @deepseek-ai/dsh</code>——并存一次 DeepSeek API key：<code>dsh-acp login</code>，或在 dsh Web UI 的设置 → 模型里保存（openma 适配器 <code>dsh-acp</code> 已随 agent-bridge 内置）；zcode：装好 ZCode 桌面版并登录一次即可——桥会自动找到桌面版内置的 CLI，不需要额外配置或环境变量）。</p>
       <ol>
         <li>安装桥（已发布到 npm）：
 <pre class="doc-code">npm i -g @xiaohuzai/agent-bridge      # 或免安装试用：npx @xiaohuzai/agent-bridge serve</pre></li>
@@ -173,6 +173,7 @@ chmod 600 agents.json</pre>
     { "name": "pi",        "port": 3950, "apiKey": "" },
     { "name": "gemini",    "port": 3951, "apiKey": "" },
     { "name": "dsh",       "port": 3952, "apiKey": "" },
+    { "name": "zcode",     "port": 3954, "apiKey": "", "mode": "edit" }
   ]
 }</pre></li>
         <li>启动（在 <code>agents.json</code> 所在目录）：
@@ -200,6 +201,16 @@ agent-bridge serve --config /path/to/agents.json  # 指定配置文件
 
 任何一步失败就停下，把关键报错原样发给我，不要反复重试同一命令。</pre>
       <p>截图、粘贴图片与 PDF 图表会随消息发送给 agent（单条 ≤18 张，需 agent-bridge ≥0.8.0，旧版桥自动降级为前 8 张并在消息里注明）。四点提醒：审批卡需要该桥的 entry 配 <code>"approval": "on-request"</code>（默认 <code>never</code> 只会静默拒绝危险操作）；端口写在 <code>agents.json</code> 里，改端口后记得同步改 browsa 里那一行的地址；pi 的内置工具自动执行、通常不弹审批卡，也不上报 token 用量。</p>
+
+      <h3>ZCode（headless CLI，agent-bridge ≥0.12.0）</h3>
+      <p>ZCode 是闭源桌面智能体，没有 ACP，机器接口只有 headless <code>-p</code>、app-server 与 TUI——桥接它走的是最简的那条：<strong>每回合 spawn 一次官方 CLI</strong>（<code>zcode -p … --output-format stream-json</code>），把流式 JSONL 映射成和其他 agent 一样的 start / delta / 工具行 / usage / done，会话靠 <code>sessionId</code> + <code>--resume</code> 续。因此有四点与其他 agent 不同，接之前先看清：</p>
+      <ul>
+        <li><strong>没有审批卡</strong>：headless 回合里没人能点确认，CLI 自己 <code>-p</code> 的默认还是 yolo——所以 entry 的 <code>"mode"</code> 就是唯一的权限闸。默认 <code>edit</code>（自动应用改动）；只想问答设 <code>plan</code>（只读）；<code>guarded</code> 类似 yolo、只在 <code>rm -rf</code> / <code>git reset --hard</code> / force push 这类危险命令前停下（headless 下无人可批，表现为直接拒绝该命令）；<strong><code>build</code> 会等审批而卡死，headless 下别用</strong>，<code>yolo</code> 全放开。</li>
+        <li><strong>模型由 ZCode 侧决定</strong>：<code>providerOrder</code> 第一家 provider 的 <code>modelOrder</code> 首项就是实际模型，桥不传也传不了。想换模型就改 <code>~/.zcode/v2/provider_config.json</code>（改前关掉 ZCode——运行中的服务会用内存覆盖文件），并保持 <code>modelOrder</code> 与 <code>personalModelIds</code> 一致。<strong>账号订阅类 provider（比如登录了智谱 bigmodel 套餐）不会被 headless 自动选中</strong>，这时 <code>zcode -p</code> 会报 <code>Select a model before sending a message</code>；解法是加一个自定义供应商，或先在桌面版/CLI 里选好模型、再用会话 ID 续接（<code>--resume</code> 跳过模型解析，沿用该会话原来的模型）。每回合实际用哪个模型，桥会补发一条 <code>note {kind:"model"}</code>，以它为准。</li>
+        <li><strong>图片降级为文字</strong>：CLI 只接受本地文件的 <code>--attach</code>，桥不往磁盘写用户图片——截图与 PDF 图会以一句提示随消息发出，模型收不到像素。</li>
+        <li><strong>每回合一个新进程</strong>：新会话冷启动约 2–4 秒（PONG 回合实测 ~12.7 秒，带工具的回合 ~18.5 秒），每次都会带上 CLI 自己约 28K token 的系统提示；续接同一会话能命中 provider 前缀缓存。</li>
+      </ul>
+      <p>CLI 的定位顺序：entry 里的 <code>command</code>（非默认值时）&gt; <code>ZCODE_CLI</code> 环境变量 &gt; PATH 上的 <code>zcode</code> &gt; 桌面版自带 CLI 自动发现（Linux 在 <code>~/.zcode/server/bin/zcode</code>，macOS/Windows 在 app 的 <code>resources/glm/zcode.cjs</code>，用 app 自带运行时执行）。零配置通常就能跑通；文件在但 doctor 报找不到时，用前三种任一方式指过去。</p>
 
       <h2>Ollama 本地模型</h2>
       <p>本机跑 Ollama 的话，Base URL 填 <code>http://localhost:11434</code>，API 协议选 Chat Completions（Ollama 兼容 OpenAI 格式）。模型 ID 填已拉取的模型名，如 <code>qwen3:32b</code>。<strong>完全离线</strong>也能用。</p>

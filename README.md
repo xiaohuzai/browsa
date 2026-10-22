@@ -20,7 +20,7 @@
 
 **读到哪里，问到哪里。**
 
-browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
+browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频、PDF 带进对话，让**你自己的 AI** 在旁边帮你读懂。不用复制粘贴，也不用离开页面。通过 Agent Bridge 接入 **Codex / Claude Code / pi / Gemini CLI / dsh / ZCode**，连接 **opencode / Hermes / OpenSquilla**，或配置 OpenAI、Anthropic、Ollama 等模型接口。
 
 **扩展免费，MIT 开源。** 自备模型或 Agent。API Key 保存在本地，用于向你配置的服务进行身份验证。
 
@@ -43,6 +43,7 @@ browsa 是一个 Chrome / Edge 侧边栏扩展：把正在看的文章、视频�
 | **pi**（earendil-works） | agent-bridge 本地桥 | 你在 pi 里配置的模型 |
 | **Gemini CLI**（Google） | agent-bridge 本地桥 | 沿用 CLI 已配置的认证 |
 | **dsh**（DeepSeek） | agent-bridge 本地桥 | DeepSeek API key |
+| **ZCode** | agent-bridge 本地桥（headless CLI） | 沿用 ZCode 桌面版 / CLI 已配置的登录与模型 |
 | opencode | 官方无头服务器直连 | 你给它配置的模型 |
 | Hermes | 自托管部署，`/v1/runs` 协议 | 自托管 |
 | OpenSquilla | 自托管网关，WebSocket（`/ws`）直连 | 网关路由到的模型 |
@@ -65,7 +66,7 @@ flowchart LR
     P["当前标签页<br/>文章 · 视频 · PDF · 复杂页面"]
     B["browsa 侧边栏<br/>读出内容 · 对话 · 审批卡"]
     subgraph Y["你的后端 —— 云端、本机或自托管"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>agent-bridge 桥 · 沿用本地登录"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · ZCode<br/>agent-bridge 桥 · 沿用本地登录"]
         A2["opencode · Hermes · OpenSquilla<br/>本地服务直连"]
         A3["任意 LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -125,9 +126,9 @@ npm run package      # → browsa-v<version>.zip
 - 未记录 ID 的旧存档：首次发消息时创建独立智能体会话，并带上已有文字记录
 
 <details>
-<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>…）</summary>
+<summary><b>🔧 Agent Bridge</b>——桥接本地智能体（<b>Codex</b>、<b>Claude Code</b>、<b>pi</b>、<b>Gemini CLI</b>、<b>dsh</b>、<b>ZCode</b>…）</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) 是一个独立的本地守护进程，把 codex、claude、pi、gemini、dsh、zcode 等本地智能体适配成统一的本地 HTTP 协议。它沿用智能体配置的认证方式：
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # 已发布到 npm（Node 18+）
@@ -141,6 +142,12 @@ agent-bridge serve                                # 每个 entry 一座桥，端
 - 危险操作的审批卡片直接出现在面板里（Agent 请求审批时可播放提示音，设置中可关）
 - 截图、粘贴图片与 PDF 图表随消息发送——单条 ≤18 张，需 agent-bridge ≥0.8.0（旧版桥自动降级为前 8 张并在消息里注明）
 - 多轮上下文由 agent 自己维护；工具调用前的过程自述（codex 宣告使用某技能）折进步骤历史，不混进回复正文
+
+**ZCode**：走官方 CLI 的 headless 模式（需 agent-bridge ≥0.12.0），沿用 ZCode 桌面版 / CLI 已有的登录与模型配置——桥会自动找到桌面版内置的 CLI，改用 PATH 上的 `zcode` 也行。三点与其他 agent 不同：
+
+- **没有审批卡**：headless 回合里没人能点确认，`agents.json` 的 `"mode"` 就是唯一的权限闸。默认 `edit`（自动应用改动）；只想问答设 `plan`（只读）；`guarded` 类似 yolo、只在 `rm -rf` / `git reset --hard` / force push 这类危险命令前停下（headless 下无人可批，表现为直接拒绝该命令）；`build` 会等审批而卡死，headless 下别用
+- **模型由 ZCode 侧的供应商排序决定**（`providerOrder` 第一家 provider 的 `modelOrder` 首项），桥不传模型也传不了；账号订阅类 provider 不会被 headless 自动选中，需要自定义供应商，或先在桌面版/CLI 里选好模型再用会话 ID 续接
+- **图片降级为文字说明**：CLI 只接受本地 `--attach`，桥不往磁盘写用户图片——截图和 PDF 图仍会随消息发出，但以一句提示替代像素
 
 
 </details>
