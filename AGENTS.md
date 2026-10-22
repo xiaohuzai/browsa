@@ -250,7 +250,7 @@ A four-way audit sweep (perf/memory · bugs/correctness · refactor/dead-code ·
 - **opencode/bridge SSE 已收编 sseDataPayload**：逐行「攒 data: 行 → 每行尝试整体 JSON.parse → 拼成即派发」（单行行为与旧版一致，兼容不带空行分隔的流；两个独立 JSON 拼接永远不合法故无误并）。改这两处的解析必须保留该策略，勿退回 first-line parse。
 - **attach-asr 的 streamResponsesText 有 per-chunk CRLF 归一化**（openSseStream 同款 pendingCR）——事件切分按裸 `\n\n` 找边界，勿去掉归一化。
 - **manifest 无 `downloads` 权限**（2026-10-01 移除；媒体下载 2026-09-05 已删，权限是孤儿）。若恢复任何下载类功能需重新评估权限与 CWS 问卷。
-- **build/package.mjs exclude_files 含 CONTEXT.md 与 MANUAL-TEST-2026-09-30.md**——根目录新增任何文档都要同步这份 deny-list（该脚本注释里已记录三次同型事故）。
+- **打包是 allowlist，根目录文档结构性地进不了包**（2026-10-17 起；上一版是 `exclude_files` deny-list，那份 deny-list 与其三次同型事故记录已随机制一并作废）。`build/package.mjs` 从 manifest 引用 + 固定运行根枚举，且显式跳过 `.md`/`.log`/`.test.mjs`，构建后有独立 verifier 二次断言——**新增根目录文档无需同步任何清单**。⚠ 别复活 deny-list：它的失效模式是「新增文档忘了登记 → 静默混进商店包」，allowlist 让这类遗漏不可能发生。
 - **`reasoningByModel` 已删除**（死配置面，无 UI 写入路径）；按模型选档要先补 options UI 再接回 resolveReasoningLevel 的优先级链。
 - **agent 会话命名截题用码点切片**（`Array.from(head)`），勿用 UTF-16 `.slice()`（代理对教训，autoSessionName 同款）。
 - **背景推送的可 i18n 文案带 `msgKey`**（TOOL_PROGRESS/TS_STATUS；panel 侧 `_t(m.msgKey, m.text)`，中文原文 fallback）。模型可见文本（如图片超限注记）保持中文字面量，不在此列。
