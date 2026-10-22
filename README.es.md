@@ -17,7 +17,7 @@
 
 **Quédate en la página. Pregunta a su lado.**
 
-browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh (DeepSeek Harness)** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
+browsa es una extensión de panel lateral para Chrome / Edge. Trae un artículo, un vídeo o un PDF a una conversación con **tu propia IA** — sin copiar texto ni salir de la página. Conecta **Codex / Claude Code / pi / Gemini CLI / dsh / ZCode** mediante Agent Bridge, usa **opencode / Hermes / OpenSquilla** o configura una API de modelos como OpenAI, Anthropic u Ollama.
 
 **Extensión gratuita, con licencia MIT.** Trae tu propio modelo o agente. Las claves de API se guardan localmente y se usan para autenticarte con los servicios que configures.
 
@@ -40,6 +40,7 @@ Conecta tus agentes locales existentes a través de Agent Bridge, usando su inic
 | **pi** (earendil-works) | demonio local agent-bridge | El modelo que le configures a pi |
 | **Gemini CLI** (Google) | demonio local agent-bridge | Autenticación CLI existente |
 | **dsh** (DeepSeek Harness) | demonio local agent-bridge | Clave API de DeepSeek |
+| **ZCode** | demonio local agent-bridge (CLI headless) | El inicio de sesión y el modelo que ya tenga tu app de escritorio / CLI de ZCode |
 | opencode | servidor headless oficial, conexión directa | el modelo que le configures |
 | Hermes | autoalojado, protocolo `/v1/runs` | autoalojado |
 | OpenSquilla | gateway autoalojado, WebSocket (`/ws`) | los modelos que el gateway enrute |
@@ -62,7 +63,7 @@ flowchart LR
     P["Current tab<br/>articles · videos · PDFs · complex pages"]
     B["browsa side panel<br/>read · chat · approvals"]
     subgraph Y["Your backends — cloud, local, or self-hosted"]
-        A1["Codex · Claude Code · pi · Gemini CLI · dsh<br/>via agent-bridge · existing local sign-ins"]
+        A1["Codex · Claude Code · pi · Gemini CLI · dsh · ZCode<br/>via agent-bridge · existing local sign-ins"]
         A2["opencode · Hermes · OpenSquilla<br/>local servers, direct"]
         A3["Any LLM API<br/>OpenAI · Anthropic · Ollama…"]
     end
@@ -122,9 +123,9 @@ Las conversaciones con agentes viven del lado del agente:
 - las conversaciones antiguas sin ID registrado inician una sesión de agente nueva con su historial de texto al enviar el primer mensaje
 
 <details>
-<summary><b>🔧 Agent Bridge</b> — puente para agentes locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>…)</summary>
+<summary><b>🔧 Agent Bridge</b> — puente para agentes locales (<b>Codex</b>, <b>Claude Code</b>, <b>pi</b>, <b>Gemini CLI</b>, <b>dsh</b>, <b>ZCode</b>…)</summary>
 
-[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes locales (codex, claude, pi, gemini, dsh) a un único protocolo HTTP local. Usa la autenticación ya configurada del agente:
+[agent-bridge](https://github.com/xiaohuzai/agent-bridge) es un demonio local independiente que adapta agentes locales (codex, claude, pi, gemini, dsh, zcode) a un único protocolo HTTP local. Usa la autenticación ya configurada del agente:
 
 ```bash
 npm i -g @xiaohuzai/agent-bridge                  # published on npm (Node 18+)
@@ -138,6 +139,12 @@ Abre ⚙ Ajustes, selecciona la tarjeta **Agent Bridge**, haz clic en **＋ Aña
 - las tarjetas de aprobación para acciones peligrosas aparecen directamente en el panel
 - las capturas de pantalla, las imágenes pegadas y las figuras de PDF viajan junto con tu mensaje — ≤18 por turno, requiere agent-bridge ≥0.8.0 (los bridges antiguos degradan a las primeras 8 con una nota en el mensaje)
 - el contexto multi-turno vive en el propio agente; la narración previa a las llamadas a herramientas (codex anunciando un skill) se pliega en el historial de pasos, no en la respuesta
+
+**ZCode** usa el modo headless del CLI oficial (requiere agent-bridge ≥0.12.0) y reutiliza el inicio de sesión y el modelo que tu app de escritorio / CLI de ZCode ya tienen — la bridge encuentra automáticamente el CLI incluido con la app, o usa el `zcode` del PATH. Tres diferencias con los demás agentes:
+
+- **sin tarjetas de aprobación**: nadie puede confirmar en un turno headless, así que el `"mode"` del entry es la única barrera de permisos. El `edit` por defecto aplica los cambios solo; `plan` es solo lectura; `guarded` se comporta como yolo y solo se detiene ante comandos peligrosos; `build` espera una aprobación y se cuelga — no lo uses en headless
+- **el modelo lo decide el orden de proveedores de ZCode** (primer proveedor de `providerOrder`, luego el primer modelo de su `modelOrder`) — la bridge nunca pasa un modelo y no puede; un proveedor de plan de cuenta nunca se selecciona automáticamente, así que añade un proveedor propio o elige el modelo en la app / CLI y continúa esa sesión por ID
+- **las imágenes degradan a una nota de texto**: el CLI solo adjunta archivos locales (`--attach`) y la bridge nunca escribe tus imágenes en disco — las capturas y figuras de PDF viajan como aviso de texto en lugar de píxeles
 
 
 </details>

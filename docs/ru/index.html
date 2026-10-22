@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — ИИ в боковой панели вашего браузера</title>
-<meta name="description" content="browsa — расширение с боковой панелью для Chrome / Edge: добавьте текущую страницу в диалог — статьи, субтитры, PDF — и получайте ответы потоком прямо рядом с ней. Любой OpenAI-совместимый API, агенты Hermes / opencode / OpenSquilla или ваш Codex / Claude Code / pi / Gemini CLI / dsh через agent-bridge.">
+<meta name="description" content="browsa — расширение с боковой панелью для Chrome / Edge: добавьте текущую страницу в диалог — статьи, субтитры, PDF — и получайте ответы потоком прямо рядом с ней. Любой OpenAI-совместимый API, агенты Hermes / opencode / OpenSquilla или ваш Codex / Claude Code / pi / Gemini CLI / dsh / ZCode через agent-bridge.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — ИИ в боковой панели вашего браузера">
@@ -385,7 +385,7 @@
             <li>Hermes Agent: исполнение инструментов, подтверждение рискованных действий, показ прогресса</li>
             <li>OpenCode Agent: прямой канал к CLI — полный цикл инструментов и подтверждений</li>
             <li>OpenSquilla Agent: WebSocket шлюза — память сессий на сервере</li>
-            <li>Agent Bridge: мост к Codex / Claude Code / Gemini CLI / pi / dsh — одна карточка, несколько агентов</li>
+            <li>Agent Bridge: мост к Codex / Claude Code / Gemini CLI / pi / dsh / ZCode — одна карточка, несколько агентов</li>
             <li>Сессии агентов живут на стороне агента — автоимена, легко продолжить</li>
             <li>Любой OpenAI-совместимый API: OpenAI, Ollama, LiteLLM…</li>
             <li>Несколько моделей на карточке — переключение прямо в боковой панели</li>
@@ -509,7 +509,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · подключение локальных агентов</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / zcode · подключение локальных агентов</span></span>
             <span class="prov-badge pb-idle">мост</span>
           </div>
         </div>

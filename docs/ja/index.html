@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — ブラウザサイドパネル AI</title>
-<meta name="description" content="browsa は Chrome / Edge のサイドパネル拡張機能：現在のページ — 記事・字幕・PDF — を会話に取り込み、そのそばで返信をストリーミング表示します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント、agent-bridge 経由であなたの Codex / Claude Code / pi / Gemini CLI / dsh に対応。">
+<meta name="description" content="browsa は Chrome / Edge のサイドパネル拡張機能：現在のページ — 記事・字幕・PDF — を会話に取り込み、そのそばで返信をストリーミング表示します。OpenAI 互換 API、Hermes / opencode / OpenSquilla エージェント、agent-bridge 経由であなたの Codex / Claude Code / pi / Gemini CLI / dsh / ZCode に対応。">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — ブラウザサイドパネル AI">
@@ -383,7 +383,7 @@
             <li>Hermes エージェント：ツール実行、危険な操作の承認、進捗表示</li>
             <li>OpenCode エージェント：CLI に直通 — ツール実行と承認フローもそのまま</li>
             <li>OpenSquilla エージェント：ゲートウェイ WebSocket — サーバー側セッションメモリ</li>
-            <li>Agent Bridge：Codex / Claude Code / Gemini CLI / pi / dsh をブリッジ — 1 枚のカードで複数接続</li>
+            <li>Agent Bridge：Codex / Claude Code / Gemini CLI / pi / dsh / ZCode をブリッジ — 1 枚のカードで複数接続</li>
             <li>エージェントのセッションはエージェント側に保存 — 自動命名で続きも簡単</li>
             <li>OpenAI 互換 API なら何でも：OpenAI、Ollama、LiteLLM…</li>
             <li>カードに複数モデル — サイドバーでその場で切替</li>
@@ -507,7 +507,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · ローカルエージェントを接続</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / zcode · ローカルエージェントを接続</span></span>
             <span class="prov-badge pb-idle">ブリッジ</span>
           </div>
         </div>

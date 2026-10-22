@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){var s;try{s=localStorage.getItem("browsa-scheme")}catch(e){}if(s!=="default"&&s!=="slate"){s=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"slate":"default"}var d=document.documentElement;d.dataset.mdColorScheme=s;d.style.colorScheme=s==="slate"?"dark":"light"})();</script>
 <title>browsa — IA en panel lateral para tu navegador</title>
-<meta name="description" content="browsa es una extensión de panel lateral para Chrome / Edge: lleva la página actual a la conversación — artículos, subtítulos, PDF — y recibe las respuestas en streaming justo al lado. Cualquier API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla, o tu Codex / Claude Code / pi / Gemini CLI / dsh vía agent-bridge.">
+<meta name="description" content="browsa es una extensión de panel lateral para Chrome / Edge: lleva la página actual a la conversación — artículos, subtítulos, PDF — y recibe las respuestas en streaming justo al lado. Cualquier API compatible con OpenAI, los agentes Hermes / opencode / OpenSquilla, o tu Codex / Claude Code / pi / Gemini CLI / dsh / ZCode vía agent-bridge.">
 <link rel="icon" type="image/png" href="../icon48.png">
 <link rel="stylesheet" href="../site.css">
 <meta property="og:title" content="browsa — IA en panel lateral para tu navegador">
@@ -385,7 +385,7 @@
             <li>Agente Hermes: ejecución de herramientas, aprobación de acciones de riesgo, progreso visible</li>
             <li>Agente OpenCode: línea directa con el CLI — flujo completo de herramientas y aprobaciones</li>
             <li>Agente OpenSquilla: gateway WebSocket — memoria de sesión en el servidor</li>
-            <li>Agent Bridge: puente con Codex / Claude Code / Gemini CLI / pi / dsh — una tarjeta, varios agentes</li>
+            <li>Agent Bridge: puente con Codex / Claude Code / Gemini CLI / pi / dsh / ZCode — una tarjeta, varios agentes</li>
             <li>Las sesiones de agente viven en el lado del agente — con nombre automático, fáciles de retomar</li>
             <li>Cualquier API compatible con OpenAI: OpenAI, Ollama, LiteLLM…</li>
             <li>Varios modelos por tarjeta — cambia en la barra lateral</li>
@@ -509,7 +509,7 @@
           </div>
           <div class="prov-card">
             <span class="prov-ava pa-bridge">↔</span>
-            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh · conecta agentes locales</span></span>
+            <span class="prov-info"><span class="prov-name">Agent Bridge</span><span class="prov-model">codex / claude / pi / gemini / dsh / zcode · conecta agentes locales</span></span>
             <span class="prov-badge pb-idle">puente</span>
           </div>
         </div>
