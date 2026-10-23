@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "후속 답변이 출력 한도에 도달했습니다 — \"계속\"이라고 보내면 이어서 작성됩니다."
   },
+  "detailThreadQuotedImage": {
+    "message": "인용된 이미지"
+  },
+  "imageResizeHint": {
+    "message": "드래그하여 이미지 크기 조절"
+  },
   "chemExportPng": {
     "message": "PNG 내보내기"
   },

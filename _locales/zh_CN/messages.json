@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "追问回复已达模型输出上限，可回复「继续」续写"
   },
+  "detailThreadQuotedImage": {
+    "message": "引用的图片"
+  },
+  "imageResizeHint": {
+    "message": "拖动缩放图片"
+  },
   "chemExportPng": {
     "message": "导出PNG"
   },

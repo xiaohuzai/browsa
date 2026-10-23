@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "Follow-up reply reached the output limit — send \"continue\" to extend it."
   },
+  "detailThreadQuotedImage": {
+    "message": "Quoted image"
+  },
+  "imageResizeHint": {
+    "message": "Drag to resize image"
+  },
   "chemExportPng": {
     "message": "Export PNG"
   },

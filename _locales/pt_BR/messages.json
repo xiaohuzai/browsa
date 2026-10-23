@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "A resposta do acompanhamento atingiu o limite de saída — envie \"continuar\" para estendê-la."
   },
+  "detailThreadQuotedImage": {
+    "message": "Imagem citada"
+  },
+  "imageResizeHint": {
+    "message": "Arraste para redimensionar a imagem"
+  },
   "chemExportPng": {
     "message": "Exportar PNG"
   },

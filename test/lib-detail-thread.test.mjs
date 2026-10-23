@@ -8,6 +8,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 
 const dom = new JSDOM(
@@ -776,4 +778,207 @@ test('追问卡宿主无 videoSrc：卡内时间戳维持纯文本不链接（�
   const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
   assert.ok(!liveAi.dataset.videoSrc, '无宿主盖章则卡内不盖章');
   assert.equal(liveAi.querySelectorAll('.browsa-ts').length, 0, '非视频会话卡内时间戳不链接');
+});
+
+// ─── 选区里的图片（2026-10-23 用户报告）─────────────────────────────────────
+// 「追问在选择的时候，似乎没有把图片也选进去」：回复正文里的 [图N] 缩略图是
+// <img>，不是文本，sel.toString() 与 selectionTextWithMath 都看不见它；只选到
+// 图不选到字时连按钮都不出现。现在选区命中的 <img> 会进入引用块并随首轮发出。
+
+const IMG_A = 'data:image/png;base64,AAAA';
+const IMG_B = 'https://cdn.example.com/b.png';
+
+function makeFigureBubble(html, raw) {
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.dataset.raw = raw || html;
+  el.innerHTML = html;
+  document.getElementById('messages').appendChild(el);
+  return el;
+}
+
+test('选区只盖住一张内联图（没有文字）也能开追问卡，引用块展示该图', async () => {
+  sentMessages.length = 0;
+  hideSelectionAskBtn();
+  dom.window.getSelection()?.removeAllRanges();
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 40, height: 40, right: 50, bottom: 50,
+  });
+
+  const bubble = makeFigureBubble(
+    `<p>看图：</p><img class="inline-fig" src="${IMG_A}" alt="图1">`,
+    '看图：\n\n[图1]'
+  );
+  const img = bubble.querySelector('img');
+  const range = document.createRange();
+  range.selectNode(img);
+  const sel = dom.window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.getElementById('messages').dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+
+  const btn = document.querySelector('.selection-ask-btn');
+  assert.ok(btn, '选到图片本身（无文字）也必须给出追问入口');
+  btn.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+  const card = bubble.nextElementSibling;
+  assert.ok(card?.classList.contains('detail-thread-card'));
+  const thumbs = card.querySelectorAll('.detail-thread-quote-imgs img');
+  assert.equal(thumbs.length, 1, '选中图必须出现在引用块的缩略条里');
+  assert.equal(thumbs[0].getAttribute('src'), IMG_A);
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('选区跨「文字 + 两张图」：引用图按文档序全收，首轮 SUBCHAT 随附并点名数量', async () => {
+  sentMessages.length = 0;
+  const bubble = makeFigureBubble(
+    `<p>第一段 ${'text'}</p>` +
+    `<img class="inline-fig" src="${IMG_A}">` +
+    `<p>中间文字</p>` +
+    `<img class="inline-fig" src="${IMG_B}">` +
+    `<p>结尾</p>`,
+    '第一段\n\n[图1]\n\n中间文字\n\n[图2]\n\n结尾'
+  );
+  const para = bubble.querySelectorAll('p');
+  const range = document.createRange();
+  range.setStart(para[0].firstChild, 0);
+  range.setEnd(para[2].firstChild, 2);
+  const sel = dom.window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 80, height: 20, right: 90, bottom: 30,
+  });
+  document.getElementById('messages').dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  document.querySelector('.selection-ask-btn')
+    .dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+  // 跨块选区锚在该段末尾（findBlockAnchor），卡片嵌在气泡里而非其后。
+  const card = bubble.querySelector('.detail-thread-card');
+  assert.ok(card?.classList.contains('detail-thread-card'));
+  const srcs = [...card.querySelectorAll('.detail-thread-quote-imgs img')].map((i) => i.getAttribute('src'));
+  assert.deepEqual(srcs, [IMG_A, IMG_B], '引用图按文档序，去重前保持顺序');
+
+  const input = card.querySelector('.detail-thread-input');
+  input.value = '这两张图分别在讲什么？';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  const sub = sentMessages.find((m) => m.type === 'SUBCHAT');
+  assert.ok(sub, 'must dispatch SUBCHAT');
+  assert.deepEqual(sub.images, [IMG_A, IMG_B], '选区里的两张图随 SUBCHAT 发出');
+  assert.match(sub.messages[0].content, /第一段/, '文字摘录照常在');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('引用图片每轮都随 SUBCHAT 发出（引用是整条追问的上下文，不是一次性附件）', async () => {
+  sentMessages.length = 0;
+  const bubble = makeFigureBubble(
+    `<p>正文</p><img class="inline-fig" src="${IMG_A}">`,
+    '正文\n\n[图1]'
+  );
+  const img = bubble.querySelector('img');
+  const range = document.createRange();
+  range.selectNode(img);
+  const sel = dom.window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 40, height: 40, right: 50, bottom: 50,
+  });
+  document.getElementById('messages').dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  document.querySelector('.selection-ask-btn')
+    .dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const card = bubble.nextElementSibling;
+
+  const input = card.querySelector('.detail-thread-input');
+  const send = () => card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+
+  input.value = '第一问';
+  send();
+  await new Promise((r) => setTimeout(r, 20));
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: '第一答' });
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await new Promise((r) => setTimeout(r, 20));
+
+  input.value = '这张图还有什么问题？';
+  send();
+  await new Promise((r) => setTimeout(r, 20));
+
+  const subs = sentMessages.filter((m) => m.type === 'SUBCHAT');
+  assert.equal(subs.length, 2);
+  assert.deepEqual(subs[0].images, [IMG_A], '首轮带引用图');
+  assert.deepEqual(subs[1].images, [IMG_A],
+    '第二轮也必须带——只发首轮的话，无状态通道上的后续追问看不到像素');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('名片没有引用图时，卡片不渲染空缩略条（旧行为零变化）', () => {
+  const bubble = makeAssistantBubble('纯文字回复。');
+  openDetailThread(bubble, '纯文字', bubble);
+  const card = bubble.nextElementSibling;
+  assert.equal(card.querySelector('.detail-thread-quote-imgs'), null,
+    '没有引用图片时连容器都不建，不占卡片高度');
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('引用图里的非图片协议（blob:/相对路径）被丢弃，不会进卡片或请求', async () => {
+  sentMessages.length = 0;
+  const bubble = makeFigureBubble(
+    `<img class="inline-fig" src="blob:https://x/deadbeef">` +
+    `<img class="inline-fig" src="/relative/path.png">` +
+    `<img class="inline-fig" src="${IMG_B}">`,
+    '[图1][图2][图3]'
+  );
+  const range = document.createRange();
+  range.selectNodeContents(bubble);
+  const sel = dom.window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 200, height: 60, right: 210, bottom: 70,
+  });
+  document.getElementById('messages').dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+  document.querySelector('.selection-ask-btn')
+    .dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const card = bubble.nextElementSibling;
+
+  const srcs = [...card.querySelectorAll('.detail-thread-quote-imgs img')].map((i) => i.getAttribute('src'));
+  assert.deepEqual(srcs, [IMG_B], '只有 http(s)/data:image 形状的图能进引用');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('纯图片选区：折叠后引用缩略条仍可见（否则折叠成空卡片）', async () => {
+  const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const bubble = makeFigureBubble(`<img class="inline-fig" src="${IMG}">`, '[图1]');
+  openDetailThread(bubble, '', bubble, null, [IMG]);
+  const card = bubble.nextElementSibling;
+  assert.ok(card?.classList.contains('detail-thread-card'));
+  assert.equal(card.querySelector('.detail-thread-quote'), null, '无文字引用时引用块不渲染');
+  assert.ok(card.classList.contains('no-quote'), '无文字引用时盖 no-quote 类');
+  assert.equal(card.querySelectorAll('.detail-thread-quote-imgs img').length, 1);
+
+  card.querySelector('.detail-thread-fold').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.ok(card.classList.contains('collapsed'));
+  // 折叠规则只隐藏 messages / 粘贴图条 / 输入行 / 手柄；引用图条必须留在
+  // 视野里，否则纯图选区的卡片一折叠就空了。jsdom 不做布局，直接钉 CSS 规则。
+  const css = readFileSync(fileURLToPath(new URL('../sidepanel.css', import.meta.url)), 'utf8');
+  const collapsedRule = css.slice(
+    css.indexOf('.detail-thread-card.collapsed .detail-thread-messages'),
+    css.indexOf('.detail-thread-card.collapsed .detail-thread-quote {')
+  );
+  assert.ok(collapsedRule.length > 0, '折叠隐藏规则必须存在');
+  assert.doesNotMatch(collapsedRule, /detail-thread-quote-imgs/,
+    '折叠态不得隐藏引用图条（纯图选区会折成空卡片）');
+  assert.match(collapsedRule, /\.detail-thread-imgs/, '粘贴图条仍应在折叠态隐藏');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
 });

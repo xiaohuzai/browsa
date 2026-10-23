@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "返信が出力上限に達しました —「続き」と送信すると続けられます。"
   },
+  "detailThreadQuotedImage": {
+    "message": "引用画像"
+  },
+  "imageResizeHint": {
+    "message": "ドラッグして画像を拡大縮小"
+  },
   "chemExportPng": {
     "message": "PNG をエクスポート"
   },

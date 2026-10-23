@@ -1242,6 +1242,12 @@
   "detailThreadTruncated": {
     "message": "Ответ достиг лимита вывода — отправьте «продолжить», чтобы его продлить."
   },
+  "detailThreadQuotedImage": {
+    "message": "Цитируемое изображение"
+  },
+  "imageResizeHint": {
+    "message": "Перетащите, чтобы изменить размер изображения"
+  },
   "chemExportPng": {
     "message": "Экспорт в PNG"
   },
