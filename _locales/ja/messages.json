@@ -239,6 +239,10 @@
     "message": "エラーの原文",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "設定を開く",
+    "description": "エラーカードのアクション：設定ページを開く（認証・モデル系エラー）"
+  },
   "copyLabel": {
     "message": "コピー",
     "description": "Generic copy button label"
@@ -1242,6 +1246,12 @@
   "detailThreadTruncated": {
     "message": "返信が出力上限に達しました —「続き」と送信すると続けられます。"
   },
+  "detailThreadQuotedImage": {
+    "message": "引用画像"
+  },
+  "imageResizeHint": {
+    "message": "ドラッグして画像を拡大縮小"
+  },
   "chemExportPng": {
     "message": "PNG をエクスポート"
   },
@@ -1595,6 +1605,10 @@
   "chipPdfEncoding": {
     "message": "、テキストにエンコーディングの問題がある可能性",
     "description": "Attach chip label fragment"
+  },
+  "chipPdfScanned": {
+    "message": "、スキャンページを画像で添付",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
   },
   "chipPdfTables": {
     "message": "、$1 ページに表",

@@ -239,6 +239,10 @@
     "message": "Raw error",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Open settings",
+    "description": "Error card action: open the settings page (auth/model errors)"
+  },
   "copyLabel": {
     "message": "Copy",
     "description": "Generic copy button label"
@@ -1242,6 +1246,12 @@
   "detailThreadTruncated": {
     "message": "Follow-up reply reached the output limit — send \"continue\" to extend it."
   },
+  "detailThreadQuotedImage": {
+    "message": "Quoted image"
+  },
+  "imageResizeHint": {
+    "message": "Drag to resize image"
+  },
   "chemExportPng": {
     "message": "Export PNG"
   },
@@ -1595,6 +1605,10 @@
   "chipPdfEncoding": {
     "message": ", text may have encoding issues",
     "description": "Attach chip label fragment"
+  },
+  "chipPdfScanned": {
+    "message": ", scanned pages attached as images",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
   },
   "chipPdfTables": {
     "message": ", tables on $1 pages",

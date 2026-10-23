@@ -801,6 +801,18 @@ body {
   cursor: pointer;
 }
 .err-copy-btn:hover { border-color: var(--error); }
+/* 鉴权/模型类错误的「打开设置」直达按钮（appendError 的 err-actions 行）。 */
+.err-actions { display: flex; gap: 6px; margin-top: 6px; }
+.err-action-btn {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  color: var(--error);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.err-action-btn:hover { border-color: var(--error); }
 /* When the full raw block is open, hide the clamped duplicate above it. */
 .msg.error.has-detail:has(.err-more[open]) .err-detail { display: none; }
 
@@ -2785,6 +2797,46 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 /* Clickable images in messages */
 .msg.assistant img { cursor: zoom-in; }
 
+/* ── 回复里图片的就地拖拽缩放（lib/sidepanel/image-resize.js，2026-10-23）─────
+   点击图片仍是放大查看（lightbox）；拖动右下角这个小手柄改的是图片在正文里的
+   实际显示宽度，松手即定格（尺寸按 src 指纹留在 local storage，重渲后重放）。
+   手柄是固定定位的单例，由 JS 摆到图片右下角，所以这里只管长相与显隐。
+   热区比视觉尺寸大一圈（14px 的 invisible 外扩）——8px 的角点肉眼可见但不好点。 */
+.img-resize-handle {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  /* 外扩热区：撑出 14px 的可点范围而不放大视觉。 */
+  padding: 0;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--bg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  cursor: nwse-resize;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  touch-action: none;
+  user-select: none;
+  transition: opacity var(--t);
+}
+/* 热区（不进布局、不参与截图的透明外扩层） */
+.img-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+}
+.img-resize-handle.visible { opacity: 1; pointer-events: auto; }
+.img-resize-handle.visible:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+/* 手柄出现时图片上给个同款光标提示（不在拖拽时也可直接看到）。 */
+.msg.assistant img:hover { cursor: zoom-in; }
+
 
 
 /* ── Approval card (Hermes /v1/runs approval.request) ─────────────────── */
@@ -2930,6 +2982,8 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
 .detail-thread-fold:hover { color: var(--fg); }
 .detail-thread-fold svg { transition: transform var(--t); }
 .detail-thread-card.collapsed .detail-thread-fold svg { transform: rotate(180deg); }
+/* 折叠态保留引用块与引用图（它们就是「折叠成引用」的那个引用本身）——
+   纯图片选区没有文字引用块，若连缩略条一起隐藏，卡片会整个变空。 */
 .detail-thread-card.collapsed .detail-thread-messages,
 .detail-thread-card.collapsed .detail-thread-imgs,
 .detail-thread-card.collapsed .detail-thread-input-row,
@@ -2999,6 +3053,24 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   padding: 6px 10px 0;
 }
 .detail-thread-imgs:empty { display: none; }
+/* 引用图片缩略条（选区里选中的图，2026-10-23）：与卡片粘贴图同款 .imagepreview
+   视觉，但它们是这段摘录的一部分，所以挨着引用块、缩得比待发附件小一号。
+   这些缩略图不带 × —— 选区是快照，不是待发附件。 */
+.detail-thread-quote-imgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -4px 52px 8px 0;
+}
+.detail-thread-quote-imgs .imagepreview {
+  width: 44px;
+  height: 44px;
+}
+.detail-thread-quote-imgs:empty { display: none; }
+/* 纯图片选区（没有文字摘录）：引用块整个不渲染，由缩略条承担头部——
+   补回它本来靠引用块撑开的右侧避让与下边距。 */
+.detail-thread-card.no-quote .detail-thread-quote-imgs { margin: 0 52px 8px 0; }
+.detail-thread-card.no-quote.collapsed .detail-thread-quote-imgs { margin-bottom: 0; }
 .detail-thread-input-row {
   display: flex;
   gap: 6px;

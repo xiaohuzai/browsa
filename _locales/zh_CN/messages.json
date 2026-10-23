@@ -239,6 +239,10 @@
     "message": "原始错误信息",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "打开设置",
+    "description": "错误卡动作：打开设置页（鉴权/模型类错误）"
+  },
   "copyLabel": {
     "message": "复制",
     "description": "Generic copy button label"
@@ -1242,6 +1246,12 @@
   "detailThreadTruncated": {
     "message": "追问回复已达模型输出上限，可回复「继续」续写"
   },
+  "detailThreadQuotedImage": {
+    "message": "引用的图片"
+  },
+  "imageResizeHint": {
+    "message": "拖动缩放图片"
+  },
   "chemExportPng": {
     "message": "导出PNG"
   },
@@ -1595,6 +1605,10 @@
   "chipPdfEncoding": {
     "message": "，文本可能存在编码问题",
     "description": "Attach chip label fragment"
+  },
+  "chipPdfScanned": {
+    "message": "，扫描件已附页图",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
   },
   "chipPdfTables": {
     "message": "，$1 页含表格",

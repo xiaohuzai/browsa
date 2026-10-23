@@ -82,3 +82,9 @@ test('isEmptyText: catches the case pdf.js itself never throws for (a fully scan
   assert.equal(isEmptyText(undefined), true);
   assert.equal(isEmptyText('a couple pages of real text, even if partial (Mixed doc)'), false);
 });
+
+// NOTE: the scanned-PDF vision fallback and hasEncodingIssues wiring tests
+// live in test/lib-pdf-scanned-fallback.test.mjs — they need a DIFFERENT
+// wasm worker result than the one test 1 above installs, and the
+// worker-client's module-level singleton is shared per process (see the
+// file-header note): a fresh scenario needs its own file.

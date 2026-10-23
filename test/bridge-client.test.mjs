@@ -331,3 +331,46 @@ test('bridgeStream: 400 without the images-bound message does NOT retry (genuine
   );
   assert.equal(calls.length, 1, '非图片上限的 400 不重试');
 });
+
+// ─── tool event → step-ledger meta (2026-10-23) ──────────────────────────────
+// The bridge emits status ∈ {started, completed, failed} (agent-bridge's
+// adapters/acp-stdio.mjs). It has NO is_error field — reading one silently
+// recorded FAILED tool calls as successes in the turn ledger, which then rode
+// the next provider switch as "it worked".
+
+test('bridgeStream: tool meta carries name/target/status, and failed is ok:false', async () => {
+  captureFetch(() => sseResponse([
+    'data: {"type":"tool","name":"command","status":"started","detail":"npm test"}\n\n',
+    'data: {"type":"tool","name":"command","status":"completed","detail":"npm test"}\n\n',
+    'data: {"type":"tool","name":"command","status":"failed","detail":"npm test (failed)"}\n\n',
+    'data: {"type":"done","full":"x"}\n\n',
+  ]));
+  const metas = [];
+  await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 't', onToolProgress: (_s, m) => metas.push(m) });
+
+  assert.equal(metas.length, 3);
+  assert.deepEqual(metas[0], { name: 'command', target: 'npm test', status: 'started' });
+  assert.equal(metas[1].ok, true, 'completed is a success');
+  assert.equal(metas[2].ok, false, 'failed must NOT be reported as success');
+});
+
+test('bridgeStream: the failed glyph differs from the success glyph', async () => {
+  captureFetch(() => sseResponse([
+    'data: {"type":"tool","name":"edit","status":"failed","detail":"a.ts"}\n\n',
+    'data: {"type":"done","full":"x"}\n\n',
+  ]));
+  const texts = [];
+  await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 't', onToolProgress: (s) => texts.push(s) });
+  assert.match(texts[0], /✗ edit: a\.ts/);
+  assert.equal(/✓/.test(texts[0]), false);
+});
+
+test('bridgeStream: note events carry a note kind for the ledger', async () => {
+  captureFetch(() => sseResponse([
+    'data: {"type":"note","text":"checking the tests"}\n\n',
+    'data: {"type":"done","full":"x"}\n\n',
+  ]));
+  const metas = [];
+  await bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: 't', onToolProgress: (_s, m) => metas.push(m) });
+  assert.deepEqual(metas[0], { kind: 'note', text: 'checking the tests' });
+});

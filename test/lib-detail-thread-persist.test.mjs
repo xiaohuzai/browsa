@@ -741,3 +741,79 @@ test('sidepanel wiring pins: renderHistory restores, destructive paths clear', a
   const multiselect = await fs.readFile(new URL('../lib/sidepanel/multiselect.js', import.meta.url), 'utf8');
   assert.match(multiselect, /_deps\.closeDetailThreadsIn\?\.\(el\)/);
 });
+
+// ─── 引用图片的持久化与恢复（2026-10-23）────────────────────────────────────
+// 引用图是选区快照的一部分：重开侧栏后缩略图与「首轮随附」都要能复原，
+// 但受 storage.session 配额约束（超预算的图跳过，不写爆整个 key）。
+
+test('引用图片随卡片持久化，重开侧栏后缩略条恢复', async () => {
+  await reset();
+  const img = 'data:image/png;base64,QUJD';
+  const bubble = makeAssistantBubble('A reply with a figure.', 41);
+  openDetailThread(bubble, 'a figure', bubble, null, [img]);
+  const card = bubble.nextElementSibling;
+  assert.equal(card.querySelectorAll('.detail-thread-quote-imgs img').length, 1);
+  await flushDetailThreadStore();
+
+  const rec = (await loadDetailThreads())[0];
+  assert.deepEqual(rec.quotedImages, [img], '引用图必须进持久化记录');
+
+  teardownPanel();
+  const bubble2 = makeAssistantBubble('A reply with a figure.', 41);
+  await restoreDetailThreads();
+  const restored = bubble2.nextElementSibling;
+  const thumbs = restored.querySelectorAll('.detail-thread-quote-imgs img');
+  assert.equal(thumbs.length, 1, '重开后引用图缩略图恢复');
+  assert.equal(thumbs[0].getAttribute('src'), img);
+
+  restored.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('引用图片持久化受配额约束：http(s) 保留、超大 data URL 跳过且不丢其余字段', async () => {
+  await reset();
+  const small = 'https://cdn.example.com/a.png';
+  // 单张超过 1.5M 字符预算（≈1.1MB 二进制），必须被跳过而不是整体写入失败。
+  const huge = 'data:image/png;base64,' + 'A'.repeat(1_600_000);
+  const bubble = makeAssistantBubble('Reply text here.', 42);
+  openDetailThread(bubble, 'quote', bubble, null, [small, huge]);
+  const card = bubble.nextElementSibling;
+  // 活卡片仍展示两张（内存里不受持久化预算影响）。
+  assert.equal(card.querySelectorAll('.detail-thread-quote-imgs img').length, 2);
+  await flushDetailThreadStore();
+
+  const rec = (await loadDetailThreads())[0];
+  assert.deepEqual(rec.quotedImages, [small], '超预算的那张跳过，便宜的 URL 保留');
+  assert.equal(rec.quotedText, 'quote', '其余字段不受影响');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('恢复后的卡片：首轮仍然随附引用图（重开后追问不丢图）', async () => {
+  await reset();
+  const img = 'https://cdn.example.com/restored.png';
+  const bubble = makeAssistantBubble('Reply about a picture.', 43);
+  openDetailThread(bubble, 'a picture', bubble, null, [img]);
+  await flushDetailThreadStore();
+
+  teardownPanel();
+  const bubble2 = makeAssistantBubble('Reply about a picture.', 43);
+  await restoreDetailThreads();
+  const restored = bubble2.nextElementSibling;
+  assert.ok(restored?.classList.contains('detail-thread-card'));
+
+  restored.querySelector('.detail-thread-fold')?.classList.contains('collapsed')
+    && restored.querySelector('.detail-thread-fold').click();
+  const input = restored.querySelector('.detail-thread-input');
+  input.value = 'what is in it?';
+  restored.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await tick();
+
+  const sub = sentMessages.find((m) => m.type === 'SUBCHAT');
+  assert.ok(sub, 'restored card must still send SUBCHAT');
+  assert.deepEqual(sub.images, [img], '恢复出的卡片首轮同样随附引用图');
+
+  restored.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});

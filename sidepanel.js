@@ -54,6 +54,7 @@ import { CAPABILITY_HINTS, CHOICE_REQUEST_HINT, effectiveSystemPromptSections } 
 import { ingestImageFiles, pastedImageFiles, renderImageStrip } from './lib/sidepanel/image-drop.js';
 import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeClasses, stickIntent, SCROLL_FOLLOW_COOLDOWN_MS } from './lib/sidepanel/scroll-follow.js';
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
+import { initImageResize } from './lib/sidepanel/image-resize.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
@@ -791,6 +792,8 @@ async function init() {
   // Image lightbox — delegate click on all img inside messages. 用户贴图
   // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
   // 排除无注释无测试，20MB 截图只配 180×140 缩略还点不动，属漏配不属设计。
+  // 拖拽缩放（2026-10-23）走 lib/sidepanel/image-resize.js：拖过手柄之后的尾随
+  // click 由那个模块在捕获阶段吞掉（suppressClickUntil），到达这里时已不是图片。
   messagesEl.addEventListener('click', (e) => {
     const ts = e.target.closest('.browsa-ts');
     if (ts) { onTimestampClick(ts); return; }
@@ -799,6 +802,10 @@ async function init() {
       showImageLightbox(img.src, img.alt);
     }
   });
+
+  // 回复里的图片可就地拖拽缩放（2026-10-23 用户要求）。悬停出小手柄、拖拽改
+  // 宽度；尺寸按 src 指纹存进 local，重渲/重开后由 finishBubble 重放。
+  initImageResize({ root: messagesEl });
 
   // Keyboard activation for focusable timestamp links. .browsa-ts carries
   // role="button" tabindex="0" but Enter/Space don't synthesize a click on a
@@ -3374,6 +3381,25 @@ function appendError(text, { compact = false } = {}) {
   title.textContent = _t(cls?.key || 'errGeneric', cls ? '' : 'Something went wrong');
   head.append(icon, title);
   el.appendChild(head);
+
+  // 鉴权/模型类错误的修复动作在设置页——给一个直达按钮，不让用户从文案里
+  // 自己找路（借鉴 web-clipper 的 SaveErrorDetail.primaryAction；retry 需要
+  // 逐调用点回调，不在此列）。
+  if (cls && (cls.key === 'errAuth' || cls.key === 'errModel')) {
+    const actions = document.createElement('div');
+    actions.className = 'err-actions';
+    const settingsBtn = document.createElement('button');
+    settingsBtn.type = 'button';
+    settingsBtn.className = 'err-action-btn';
+    settingsBtn.textContent = _t('errOpenSettings', 'Open settings');
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSettingsPage();
+    });
+    actions.appendChild(settingsBtn);
+    el.appendChild(actions);
+  }
 
   if (raw) {
     const detail = document.createElement('div');

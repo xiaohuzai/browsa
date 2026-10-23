@@ -239,6 +239,10 @@
     "message": "Error original",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Abrir ajustes",
+    "description": "Acción de la tarjeta de error: abrir los ajustes (errores de autenticación/modelo)"
+  },
   "copyLabel": {
     "message": "Copiar",
     "description": "Generic copy button label"
@@ -1242,6 +1246,12 @@
   "detailThreadTruncated": {
     "message": "La respuesta de seguimiento alcanzó el límite de salida — envía «continue» para ampliarla."
   },
+  "detailThreadQuotedImage": {
+    "message": "Imagen citada"
+  },
+  "imageResizeHint": {
+    "message": "Arrastra para cambiar el tamaño de la imagen"
+  },
   "chemExportPng": {
     "message": "Exportar PNG"
   },
@@ -1595,6 +1605,10 @@
   "chipPdfEncoding": {
     "message": ", el texto puede tener problemas de codificación",
     "description": "Attach chip label fragment"
+  },
+  "chipPdfScanned": {
+    "message": ", páginas escaneadas adjuntas como imágenes",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
   },
   "chipPdfTables": {
     "message": ", tablas en $1 páginas",

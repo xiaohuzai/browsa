@@ -239,6 +239,10 @@
     "message": "Исходный текст ошибки",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Открыть настройки",
+    "description": "Действие карточки ошибки: открыть настройки (ошибки аутентификации/модели)"
+  },
   "copyLabel": {
     "message": "Копировать",
     "description": "Generic copy button label"
@@ -1242,6 +1246,12 @@
   "detailThreadTruncated": {
     "message": "Ответ достиг лимита вывода — отправьте «продолжить», чтобы его продлить."
   },
+  "detailThreadQuotedImage": {
+    "message": "Цитируемое изображение"
+  },
+  "imageResizeHint": {
+    "message": "Перетащите, чтобы изменить размер изображения"
+  },
   "chemExportPng": {
     "message": "Экспорт в PNG"
   },
@@ -1595,6 +1605,10 @@
   "chipPdfEncoding": {
     "message": ", возможны проблемы с кодировкой текста",
     "description": "Attach chip label fragment"
+  },
+  "chipPdfScanned": {
+    "message": ", отсканированные страницы приложены изображениями",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
   },
   "chipPdfTables": {
     "message": ", страниц с таблицами: $1",

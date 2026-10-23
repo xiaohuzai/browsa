@@ -28,7 +28,7 @@ function setup({ uiLang, dictionaries = {} } = {}) {
     { url: 'https://example.com/', runScripts: 'outside-only', pretendToBeVisual: true },
   );
   const sent = [];
-  const listeners = [];
+  const messageListeners = [];
   const roots = [];
   const ports = [];
   const w = dom.window;
@@ -37,7 +37,17 @@ function setup({ uiLang, dictionaries = {} } = {}) {
   w.chrome = {
     runtime: {
       getURL: (p) => 'chrome-extension://test/' + p,
-      sendMessage: (m) => { sent.push(m); },
+      sendMessage: (m, cb) => {
+        sent.push(m);
+        // The content script fetches its two settings over a message (storage
+        // is TRUSTED_CONTEXTS-only); answer like the background would — the
+        // handle() dispatch wraps returns in the {ok:true, data} envelope
+        // (真机验证 2026-10-23: 裸形状 mock 曾放过一个信封解析真 bug).
+        if (m?.type === 'CONTENT_SETTINGS_GET' && typeof cb === 'function') {
+          cb({ ok: true, data: { showSelectionToolbar: true, uiLang } });
+        }
+      },
+      onMessage: { addListener: (fn) => messageListeners.push(fn) },
       connect: () => {
         const msgListeners = [];
         const discListeners = [];
@@ -56,14 +66,17 @@ function setup({ uiLang, dictionaries = {} } = {}) {
       lastError: null,
     },
     storage: {
-      local: { get: (k, cb) => { if (typeof cb === 'function') cb({ uiLang }); }, set() {} },
-      onChanged: { addListener: (fn) => { listeners.push(fn); } },
+      local: { get: (k, cb) => { if (typeof cb === 'function') cb({}); }, set() {} },
+      onChanged: { addListener: () => {} },
     },
     i18n: { getMessage: () => '' },
   };
   // jsdom has no fetch; the script's async locale refresh calls it.
   w.fetch = async url => ({ json: async () => dictionaries[String(url).split('/').at(-2)] || {} });
-  return { dom, w, sent, roots, ports, getOnChanged: () => (changes, area) => listeners.forEach(fn => fn(changes, area)) };
+  return {
+    dom, w, sent, roots, ports,
+    emitContentSettings: (payload) => { for (const fn of [...messageListeners]) fn({ type: 'CONTENT_SETTINGS', ...payload }); },
+  };
 }
 
 function selectAll(w, text) {
@@ -152,16 +165,62 @@ test('selection toolbar: selectionchange with an empty selection sends nothing',
   dom.window.close();
 });
 
-test('selection toolbar: registers a storage.onChanged listener; toggling the setting off does not throw', () => {
-  const { dom, w, getOnChanged } = setup();
+// Settings no longer come from chrome.storage (storage.local is
+// TRUSTED_CONTEXTS-only): the initial value rides the CONTENT_SETTINGS_GET
+// response and live toggles ride CONTENT_SETTINGS pushes from the worker.
+test('selection toolbar: settings arrive via CONTENT_SETTINGS messages; disabling hides the toolbar', async () => {
+  const { dom, w, sent, roots, emitContentSettings } = setup();
   w.eval(SRC);
-  const onChanged = getOnChanged();
-  assert.equal(typeof onChanged, 'function', 'must subscribe to storage changes for the live setting toggle');
-  assert.doesNotThrow(() => onChanged({ showSelectionToolbar: { newValue: false } }, 'local'));
-  // A mouseup while disabled must be a clean no-op (toolbar stays hidden).
-  assert.doesNotThrow(() => w.document.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true })));
-  // Re-enabling likewise must not throw.
-  assert.doesNotThrow(() => onChanged({ showSelectionToolbar: { newValue: true } }, 'local'));
+  assert.ok(sent.some((m) => m.type === 'CONTENT_SETTINGS_GET'), 'must fetch settings via a message at load');
+  const shadow = roots[0];
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  await flush();
+
+  // Enabled (default): a mouseup over a real selection shows the bar.
+  selectAll(w);
+  const range = w.getSelection().getRangeAt(0);
+  range.getBoundingClientRect = () => ({ top: 100, bottom: 120, left: 100, right: 220, width: 120, height: 20 });
+  w.document.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS + 40));
+  assert.ok(shadow.querySelector('#bar').classList.contains('on'), 'enabled toolbar must show on selection');
+
+  // Disable push: the same mouseup is a clean no-op (bar never re-appears).
+  emitContentSettings({ showSelectionToolbar: false });
+  w.getSelection().removeAllRanges();
+  selectAll(w);
+  w.document.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS + 40));
+  assert.equal(shadow.querySelector('#bar').classList.contains('on'), false, 'disabled toolbar must not show');
+
+  // Re-enabling likewise must not throw and restores the show path.
+  assert.doesNotThrow(() => emitContentSettings({ showSelectionToolbar: true }));
+  dom.window.close();
+});
+
+// 选区整体落在一个内联元素（链接/加粗）里时，Range.cloneContents() 会丢掉该
+// 祖先——缓存 HTML 必须把它回包回去，Markdown 升级才保得住 [链接]/加粗包装。
+test('selection toolbar: selection wholly inside a link/bold keeps the inline wrappers in cached HTML', async () => {
+  const { dom, w, sent } = setup();
+  w.eval(SRC);
+  sent.length = 0;
+
+  const p = w.document.getElementById('p');
+  p.innerHTML = '前文 <a href="https://example.com/x" id="lnk"><strong>serendipity means finding</strong></a> 后文';
+  const range = w.document.createRange();
+  range.selectNodeContents(w.document.getElementById('lnk'));
+  const sel = w.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  assert.ok(sel.toString().length > 0, 'sanity: jsdom honored the range');
+
+  w.document.dispatchEvent(new w.Event('selectionchange'));
+  await new Promise((r) => setTimeout(r, SELECTION_DEBOUNCE_MS));
+
+  const cache = sent.find((m) => m.type === 'SELECTION_CACHE');
+  assert.ok(cache?.html, 'html must ride along');
+  assert.ok(cache.html.includes('<a'), 'the link ancestor must be re-wrapped');
+  assert.ok(cache.html.includes('https://example.com/x'), 'the href must survive');
+  assert.ok(cache.html.includes('<strong'), 'the nested bold wrapper must survive too');
   dom.window.close();
 });
 
@@ -184,14 +243,14 @@ test('toolbar labels, confirmation and dynamic waiting text follow live UI langu
   const dirs = { en: 'en', zh: 'zh_CN', ja: 'ja', ko: 'ko', es: 'es', pt: 'pt_BR', ru: 'ru' };
   const dictionaries = {};
   for (const dir of Object.values(dirs)) dictionaries[dir] = JSON.parse(await readFile(new URL(`../_locales/${dir}/messages.json`, import.meta.url), 'utf8'));
-  const { dom, w, roots, getOnChanged } = setup({ uiLang: 'zh', dictionaries });
+  const { dom, w, roots, emitContentSettings } = setup({ uiLang: 'zh', dictionaries });
   w.eval(SRC);
   const flush = () => new Promise(r => setTimeout(r, 0));
   try {
     await flush();
     const shadow = roots[0], pop = roots[1];
     for (const [lang, dir] of Object.entries(dirs)) {
-      getOnChanged()({ uiLang: { newValue: lang } }, 'local');
+      emitContentSettings({ uiLang: lang });
       await flush();
       assert.equal(shadow.querySelector('[data-action="explain"]').title, dictionaries[dir].toolbarExplain.message);
       assert.equal(shadow.querySelector('#confirm-cancel').textContent, dictionaries[dir].toolbarCancel.message);
@@ -204,7 +263,7 @@ test('toolbar labels, confirmation and dynamic waiting text follow live UI langu
       assert.ok(pop.querySelector('#pop-body').textContent.includes(dictionaries[dir].inlineExplainWaiting.message));
       pop.querySelector('#pop-close').click();
     }
-    getOnChanged()({ uiLang: { newValue: 'auto' } }, 'local');
+    emitContentSettings({ uiLang: 'auto' });
     await flush();
     assert.equal(shadow.querySelector('[data-action="explain"]').title, 'Explain');
   } finally { dom.window.close(); }

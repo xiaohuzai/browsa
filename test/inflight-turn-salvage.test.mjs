@@ -153,6 +153,74 @@ test('durable mirror: initStreamState writes a record, deltas flush debounced, c
   assert.deepEqual((await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'], [], 'index entry removed');
 });
 
+// Turn step ledger ↔ durable mirror (2026-10-23). The chat-handler's
+// onToolProgress schedules a durable flush when a step lands, because a long
+// tool call can run for minutes with no text delta — a SW death in that window
+// used to salvage the text but lose exactly the tool lines that explain what
+// the turn was doing. This pins BOTH layers:
+//   (a) the mirror itself carries `steps` (state.js durableRecordOf), and
+//   (b) the handler really schedules the flush on a tool event, not only on a
+//       delta — the gap the completion audit found uncovered.
+
+test('durable mirror: a tool step is mirrored after the debounce, even with no delta', async () => {
+  sessionArea._reset();
+  streamState.clear();
+  const { scheduleDurableTurnFlush } = await import('../lib/state.js');
+  const { makeTurnStep, pushTurnStep } = await import('../lib/message-builder.js');
+
+  const st = initStreamState(31, { providerLabel: 'bridge', providerKey: { name: 'bridge' } });
+  st.steps = [];
+  // No appendToStreamState at all: acc stays empty, only the ledger advances.
+  pushTurnStep(st.steps, makeTurnStep({ name: 'edit', target: 'src/app.ts', status: 'done', ok: true }));
+  scheduleDurableTurnFlush(31);
+
+  let rec = (await sessionArea.get('browsa.inflightTurn.31'))['browsa.inflightTurn.31'];
+  assert.equal(rec && rec.steps, undefined, 'flush is debounced, not per-step');
+
+  await flushDurable();
+  rec = (await sessionArea.get('browsa.inflightTurn.31'))['browsa.inflightTurn.31'];
+  assert.ok(Array.isArray(rec.steps), 'the ledger rides the durable record');
+  assert.equal(rec.steps.length, 1);
+  assert.equal(rec.steps[0].name, 'edit');
+  assert.equal(rec.steps[0].target, 'src/app.ts');
+  assert.equal(rec.steps[0].ok, true);
+  assert.equal(rec.acc, '', 'sanity: no text delta was involved');
+
+  clearStreamState(31);
+  await tick();
+});
+
+test('durable mirror: a salvaged turn keeps its steps (SW death mid-tool-call)', async () => {
+  sessionArea._reset();
+  localArea._reset();
+  streamState.clear();
+  const { scheduleDurableTurnFlush } = await import('../lib/state.js');
+  const { makeTurnStep, pushTurnStep } = await import('../lib/message-builder.js');
+
+  const st = initStreamState(32, { providerLabel: 'bridge', providerKey: { name: 'bridge' } });
+  st.steps = [];
+  appendToStreamState(32, 'partial reply');
+  pushTurnStep(st.steps, makeTurnStep({ name: 'bash', target: 'npm test', status: 'done', ok: false }));
+  scheduleDurableTurnFlush(32);
+  await flushDurable();
+
+  // Simulate SW death: the live state evaporates, only the durable record stays.
+  streamState.delete(32);
+  resetDurableSalvageForTests();
+
+  const salvaged = await salvageDurableTurns();
+  assert.ok(salvaged.has(32), 'the turn was salvaged');
+
+  const h = await history();
+  const entry = h.filter((m) => m.role === 'assistant' && m.interrupted).at(-1);
+  assert.ok(entry, 'an interrupted entry was appended');
+  assert.equal(entry.content, 'partial reply');
+  assert.ok(Array.isArray(entry.steps), 'the salvage carried the ledger, not just the text');
+  assert.equal(entry.steps[0].name, 'bash');
+  assert.equal(entry.steps[0].ok, false, 'the failure survives the salvage');
+});
+
+
 // ---- 2. salvage -------------------------------------------------------------
 
 test('salvage: SW death mid-turn appends the partial as an interrupted entry (live-history routing)', async () => {
@@ -319,6 +387,61 @@ test('real error with a LIVE panel: response channel owns it (no tombstone, no d
   streamState.clear();
   streamPorts.clear();
 });
+
+// ---- 3b. THE handler call site: a tool event schedules the durable flush ----
+// The state-layer tests above prove the mirror carries `steps`. They do NOT
+// prove chat-handler's onToolProgress ASKS for the flush — deleting that call
+// left them green (verified by mutation). This walks a real `handle()` bridge
+// turn whose stream emits a tool event and NO text delta, then asserts the
+// durable record gained the step.
+
+test('chat-handler: a tool event alone (no delta) mirrors the step durably', async () => {
+  sessionArea._reset();
+  localArea._reset();
+  streamState.clear();
+  streamPorts.clear();
+  await localArea.set({
+    providers: { br: { isBridge: true, alias: 'codex', baseUrl: 'http://127.0.0.1:3948', apiKey: '', model: '' } },
+    activeProvider: 'br',
+  });
+
+  const enc = new TextEncoder();
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    async pull(c) {
+      c.enqueue(enc.encode('data: {"type":"tool","name":"edit","status":"started","detail":"src/app.ts"}\n\n'));
+      await gate;                       // hold the stream open across the assertion
+      c.enqueue(enc.encode('data: {"type":"done","full":"ok"}\n\n'));
+      c.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+
+  const received = [];
+  const { port, deliver } = fakePort(received);
+  streamPorts.set(41, port.port);
+  deliver({ type: 'STREAM_HELLO', tabId: 41 });
+
+  const chatP = handle({ type: 'CHAT', tabId: 41, userText: 'fix it', sessionId: undefined });
+
+  // Wait for the tool event to be consumed by the handler.
+  for (let i = 0; i < 100 && !(streamState.get(41)?.steps?.length); i++) await tick();
+  assert.equal(streamState.get(41)?.steps?.length, 1, 'the handler recorded the step');
+  assert.equal(streamState.get(41).acc, '', 'no text delta arrived — this is the long-tool-call window');
+
+  await flushDurable();
+  const rec = (await sessionArea.get('browsa.inflightTurn.41'))['browsa.inflightTurn.41'];
+  assert.ok(rec, 'durable record exists');
+  assert.ok(Array.isArray(rec.steps) && rec.steps.length === 1,
+    'the tool step reached the durable mirror WITHOUT any delta — deleting the flush call turns this red');
+  assert.equal(rec.steps[0].name, 'edit');
+  assert.equal(rec.acc, '', 'still no text');
+
+  release();
+  await chatP;
+  globalThis.fetch = undefined;
+});
+
 
 // ---- 4. squilla integration: panel closed mid-stream ------------------------
 
