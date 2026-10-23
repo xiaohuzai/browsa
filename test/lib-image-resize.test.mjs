@@ -135,6 +135,45 @@ test('applyStoredImageSizes：没记录过的图一字不动（旧行为零变�
   assert.equal(img.style.maxWidth, '', '也不能动它的 max-width');
 });
 
+// ─── 缩略条排除（2026-10-23 0.45.1 审计修复）────────────────────────────────
+// 引用图缩略条与正文 [图N] 是同一个 src：重放不排除 .imagepreview 的话，正文里
+// 调过的比例（宽度百分比 + max-width:none）会顶穿 44/58px 的缩略格子；用户气泡
+// 贴图条 / composer 待发条同理。手柄侧（pointerover）共用同一道门——lockstep
+// 断言源码里两处都在（拆任一处这个用例就要跟着改）。
+test('applyStoredImageSizes：.imagepreview 缩略条不被重放（与正文同 src 也不行）', () => {
+  resetImageSizesForTest();
+  const src = 'data:image/png;base64,BBB';
+  // 正文图：调过、有记录
+  const bodyFig = doc.createElement('img');
+  bodyFig.setAttribute('src', src);
+  doc.getElementById('messages').appendChild(bodyFig);
+  storeImageSize(bodyFig, 0.4);
+  // 追问卡引用缩略条：同一 src，.imagepreview 包装
+  const strip = doc.createElement('div');
+  strip.className = 'imagepreview';
+  const quoted = doc.createElement('img');
+  quoted.setAttribute('src', src);
+  strip.appendChild(quoted);
+  doc.getElementById('messages').appendChild(strip);
+
+  assert.equal(applyStoredImageSizes(doc.getElementById('messages')), 1, '只重放正文那张');
+  assert.equal(bodyFig.style.width, '40%');
+  assert.equal(quoted.style.width, '', '缩略条不能被套上百分比宽度');
+  assert.equal(quoted.style.maxWidth, '', '更不能被解锁 max-width');
+
+  bodyFig.remove(); strip.remove();
+});
+
+test('缩略条排除是手柄与重放共用的门（源码 lockstep）', () => {
+  const src = readFileSync(fileURLToPath(new URL('../lib/sidepanel/image-resize.js', import.meta.url)), 'utf8');
+  assert.match(src, /function inResizeScope\(img\) \{\s*\n\s*return !img\.closest\?\.\('\.imagepreview'\);/,
+    'inResizeScope 谓词必须在（缩略条不在这个面）');
+  assert.match(src, /if \(!inResizeScope\(img\)\) \{ hideHandle\(\); return; \}/,
+    'pointerover 悬停判定要过这道门');
+  assert.match(src, /if \(!inResizeScope\(img\)\) continue;/,
+    'applyStoredImageSizes 重放循环要过这道门');
+});
+
 test('storedImageSize：未记录返回 null，记录后取出夹住的值', () => {
   resetImageSizesForTest();
   const img = { getAttribute: () => 'https://x/c.png' };
