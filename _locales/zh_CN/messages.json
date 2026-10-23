@@ -239,6 +239,10 @@
     "message": "原始错误信息",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "打开设置",
+    "description": "错误卡动作：打开设置页（鉴权/模型类错误）"
+  },
   "copyLabel": {
     "message": "复制",
     "description": "Generic copy button label"

@@ -232,3 +232,18 @@ test('menu language updates all actions with Chrome 116 callback-only contextMen
     assert.equal(contextMenuTitles.get('browsa-summarize'), dict.toolbarSummarize.message);
   } finally { chrome.contextMenus.update = update; chrome.contextMenus.removeAll = removeAll; globalThis.fetch = oldFetch; delete storageData.uiLang; }
 });
+
+// ── CONTENT_SETTINGS_GET（2026-10-23，storage TRUSTED_CONTEXTS 配套）──────────
+// selection-toolbar 的两个设置项改为消息获取；缺省值语义必须和旧的
+// chrome.storage 读取一致：undefined → 启用（!== false），uiLang 缺失 → null。
+test('handle CONTENT_SETTINGS_GET returns the two content-script settings with defaults', async () => {
+  storageData.showSelectionToolbar = false;
+  storageData.uiLang = 'zh';
+  const res = await handle({ type: 'CONTENT_SETTINGS_GET' }, {});
+  assert.deepEqual(res, { showSelectionToolbar: false, uiLang: 'zh' });
+
+  delete storageData.showSelectionToolbar;
+  delete storageData.uiLang;
+  const res2 = await handle({ type: 'CONTENT_SETTINGS_GET' }, {});
+  assert.deepEqual(res2, { showSelectionToolbar: true, uiLang: null });
+});

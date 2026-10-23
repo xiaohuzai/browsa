@@ -3382,6 +3382,25 @@ function appendError(text, { compact = false } = {}) {
   head.append(icon, title);
   el.appendChild(head);
 
+  // 鉴权/模型类错误的修复动作在设置页——给一个直达按钮，不让用户从文案里
+  // 自己找路（借鉴 web-clipper 的 SaveErrorDetail.primaryAction；retry 需要
+  // 逐调用点回调，不在此列）。
+  if (cls && (cls.key === 'errAuth' || cls.key === 'errModel')) {
+    const actions = document.createElement('div');
+    actions.className = 'err-actions';
+    const settingsBtn = document.createElement('button');
+    settingsBtn.type = 'button';
+    settingsBtn.className = 'err-action-btn';
+    settingsBtn.textContent = _t('errOpenSettings', 'Open settings');
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSettingsPage();
+    });
+    actions.appendChild(settingsBtn);
+    el.appendChild(actions);
+  }
+
   if (raw) {
     const detail = document.createElement('div');
     detail.className = 'err-detail';

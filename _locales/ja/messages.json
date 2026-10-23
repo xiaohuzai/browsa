@@ -239,6 +239,10 @@
     "message": "エラーの原文",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "設定を開く",
+    "description": "エラーカードのアクション：設定ページを開く（認証・モデル系エラー）"
+  },
   "copyLabel": {
     "message": "コピー",
     "description": "Generic copy button label"

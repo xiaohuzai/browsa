@@ -59,3 +59,25 @@ test('chrome.cookies.getAll is only called for the two media platforms', async (
   assert.match(src, /platform === 'youtube' \? 'https:\/\/www\.youtube\.com' : 'https:\/\/www\.bilibili\.com'/,
     'cookie reads must resolve through the youtube/bilibili allowlist');
 });
+
+// ── storage.local TRUSTED_CONTEXTS（2026-10-23，借鉴 usememos/web-clipper）────
+// storage.local 里躺着各家 provider API key 和全部历史；MV3 里 content script
+// 默认可以读它。背景已调用 setAccessLevel 把读取面锁到扩展页面，因此 content
+// script 一律走消息（selection-toolbar 的两个设置项经 CONTENT_SETTINGS_GET）。
+test('content scripts never touch chrome.storage; background locks storage.local to trusted contexts', async () => {
+  const offenders = [];
+  for (const entry of await readdir(new URL('lib/content-scripts/', root), { withFileTypes: true })) {
+    if (!entry.name.endsWith('.js')) continue;
+    const src = await readFile(new URL('lib/content-scripts/' + entry.name, root), 'utf8');
+    for (const [i, line] of src.split('\n').entries()) {
+      if (line.includes('chrome.storage') && !line.trim().startsWith('//')) {
+        offenders.push(`lib/content-scripts/${entry.name}:${i + 1}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'content scripts must fetch settings via messages (CONTENT_SETTINGS_GET), never read chrome.storage');
+  const bg = await readFile(new URL('background.js', root), 'utf8');
+  assert.match(bg, /setAccessLevel\?\.\(\{ accessLevel: 'TRUSTED_CONTEXTS' \}\)/,
+    'background must lock storage.local to TRUSTED_CONTEXTS at startup');
+});

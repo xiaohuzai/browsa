@@ -239,6 +239,10 @@
     "message": "Raw error",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Open settings",
+    "description": "Error card action: open the settings page (auth/model errors)"
+  },
   "copyLabel": {
     "message": "Copy",
     "description": "Generic copy button label"

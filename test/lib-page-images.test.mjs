@@ -10,6 +10,7 @@ import {
   blobToJpegDataURL,
   inlinePageImages,
   refererGateForImageUrls,
+  isBlockedPageImageUrl,
 } from '../lib/page-images.js';
 
 const BASE = 'https://example.com/post/a';
@@ -43,6 +44,7 @@ const imgFetch = (map) => async (url) => {
   if (!spec) return { ok: false, status: 404 };
   return {
     ok: true,
+    headers: { get: (k) => (k === 'content-type' ? (spec.type || 'image/jpeg') : null) },
     blob: async () => ({ size: spec.size || 1000, type: spec.type || 'image/jpeg', _w: spec.w, _h: spec.h || 500 }),
   };
 };
@@ -236,4 +238,143 @@ test('refererGateForImageUrls: zhimg 各子域命中知乎门，非门域与垃�
   assert.equal(refererGateForImageUrls(['https://sns-webpic-qc.xhscdn.com/a.jpg']), null);
   assert.equal(refererGateForImageUrls([]), null);
   assert.equal(refererGateForImageUrls(null), null);
+});
+
+// --------------- SSRF 门禁（2026-10-23，借鉴 usememos/web-clipper）--------------
+
+test('isBlockedPageImageUrl: 私网/loopback/metadata/单标签/IPv6 内部段整类拦，公网放行', () => {
+  const blocked = [
+    'http://localhost:3000/img.png',
+    'http://localhost/img.png',
+    'https://sub.localhost/a.jpg',
+    'http://127.0.0.1/x.png',
+    'http://127.1.2.3/x.png',
+    'http://10.1.2.3/x.png',
+    'http://192.168.1.1/x.png',
+    'http://172.16.0.9/x.png',
+    'http://172.31.255.1/x.png',
+    'http://100.64.0.1/x.png',                        // CGNAT
+    'http://169.254.169.254/latest/meta-data/',       // 云 metadata
+    'http://0.0.0.0/x.png',
+    'http://224.0.0.1/x.png',                          // 组播
+    'http://240.0.0.1/x.png',                          // 保留段
+    'http://metadata.google.internal/computeMetadata/',
+    'https://metadata.google.internal/x',
+    'https://nas.internal/x.jpg',
+    'https://box.lan/a.png',
+    'https://printer.local/x',
+    'https://myserver.corp/x',
+    'https://host.localdomain/x',
+    'https://intranet/x.jpg',                          // 单标签主机名
+    'http://[::1]/x.png',
+    'http://[::]/x.png',
+    'http://[fd00::1]/x.png',                          // 唯一本地 fc00::/7
+    'http://[fe80::1]/x.png',                          // 链路本地
+    'http://[::ffff:10.0.0.1]/x.png',                  // IPv4-mapped（点分写法）
+    'http://[::ffff:a00:1]/x.png',                     // IPv4-mapped（十六进制写法）
+    'https://user:pass@example.com/x.png',             // URL 内嵌凭据
+    'ftp://example.com/x.png',
+    'javascript:void(0)',
+    'not a url at all',
+    '',
+  ];
+  for (const url of blocked) {
+    assert.equal(isBlockedPageImageUrl(url), true, `must block: ${url}`);
+  }
+  const allowed = [
+    'https://cdn.example.com/a.jpg',
+    'http://cdn.example.com/a.jpg',                    // http 公网仍可下载（附加像素无凭据传输）
+    'https://93.184.216.34/img.png',                   // 公网 IP 字面量
+    'https://pic1.zhimg.com/v2-abc_r.jpg',
+    'http://[2606:4700::6810:85e5]/x.png',             // 公网 IPv6
+  ];
+  for (const url of allowed) {
+    assert.equal(isBlockedPageImageUrl(url), false, `must allow: ${url}`);
+  }
+});
+
+test('inlinePageImages: 黑名单 URL 绝不发 fetch，正文保留 ![alt](url)（fail-open）', async () => {
+  const restore = installDecodeStub();
+  try {
+    const fetched = [];
+    const fetchImpl = async (url, init) => {
+      fetched.push({ url: String(url), init });
+      return imgFetch({ 'https://cdn.example.com/ok.png': { w: 600 } })(url);
+    };
+    const md = [
+      '开头',
+      '![内网](http://169.254.169.254/latest/meta-data/)',
+      '![本机](http://127.0.0.1:8080/admin.png)',
+      '![正常](https://cdn.example.com/ok.png)',
+    ].join('\n');
+    const res = await inlinePageImages(md, { baseUrl: BASE, fetchImpl });
+    // 只有公网那张真正发起了请求
+    assert.deepEqual(fetched.map((f) => f.url), ['https://cdn.example.com/ok.png']);
+    // 被拦的图按下载失败处理：保留原文，模型仍看得到 URL
+    assert.ok(res.text.includes('![内网](http://169.254.169.254/latest/meta-data/)'));
+    assert.ok(res.text.includes('![本机](http://127.0.0.1:8080/admin.png)'));
+    assert.ok(res.text.includes('[图1]'));
+    assert.equal(res.figures.length, 1);
+    // 请求带上 SSRF 配套的 fetch 选项
+    assert.equal(fetched[0].init.redirect, 'error');
+    assert.equal(fetched[0].init.credentials, 'omit');
+    assert.equal(fetched[0].init.referrerPolicy, 'no-referrer');
+  } finally {
+    restore();
+  }
+});
+
+test('inlinePageImages: 非 image content-type 在读 body 前就放弃', async () => {
+  const restore = installDecodeStub();
+  try {
+    let bodyRead = false;
+    const fetchImpl = async () => ({
+      ok: true,
+      headers: { get: (k) => (k === 'content-type' ? 'text/html' : null) },
+      // body 若被读就会走到这里——预检查必须在它之前拦住
+      blob: async () => { bodyRead = true; return { size: 10, type: 'text/html' }; },
+    });
+    const res = await inlinePageImages('![伪装成图的网页](https://cdn.example.com/a.png)', { baseUrl: BASE, fetchImpl });
+    assert.equal(bodyRead, false, 'non-image content-type must bail before reading the body');
+    assert.ok(res.text.includes('![伪装成图的网页]'), 'degrades to the original markdown');
+    assert.equal(res.figures.length, 0);
+  } finally {
+    restore();
+  }
+});
+
+test('inlinePageImages: 流式下载超上限立即 cancel，不整读进内存', async () => {
+  const restore = installDecodeStub();
+  try {
+    let cancelled = false;
+    const CHUNK_OVER = 9 * 1024 * 1024; // 只谎报 byteLength，不真分配内存
+    const fetchImpl = async () => ({
+      ok: true,
+      headers: { get: (k) => (k === 'content-type' ? 'image/jpeg' : null) },
+      body: {
+        getReader: () => ({
+          read: async () => ({ done: false, value: { byteLength: CHUNK_OVER } }),
+          cancel: async () => { cancelled = true; },
+        }),
+      },
+    });
+    const res = await inlinePageImages('![超大图](https://cdn.example.com/huge.png)', { baseUrl: BASE, fetchImpl });
+    assert.equal(cancelled, true, 'oversized stream must be cancelled mid-read');
+    assert.equal(res.figures.length, 0);
+    assert.ok(res.text.includes('![超大图]'));
+  } finally {
+    restore();
+  }
+});
+
+test('inlinePageImages: 302 被禁（redirect:error）时按下载失败降级，不抛出', async () => {
+  const restore = installDecodeStub();
+  try {
+    const fetchImpl = async () => { throw new TypeError('Failed to fetch (redirect)'); };
+    const res = await inlinePageImages('![跳转图](https://cdn.example.com/r.png)', { baseUrl: BASE, fetchImpl });
+    assert.equal(res.figures.length, 0);
+    assert.ok(res.text.includes('![跳转图](https://cdn.example.com/r.png)'));
+  } finally {
+    restore();
+  }
 });

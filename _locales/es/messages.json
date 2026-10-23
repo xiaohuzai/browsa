@@ -239,6 +239,10 @@
     "message": "Error original",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Abrir ajustes",
+    "description": "Acción de la tarjeta de error: abrir los ajustes (errores de autenticación/modelo)"
+  },
   "copyLabel": {
     "message": "Copiar",
     "description": "Generic copy button label"

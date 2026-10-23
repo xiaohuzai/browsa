@@ -239,6 +239,10 @@
     "message": "Исходный текст ошибки",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "Открыть настройки",
+    "description": "Действие карточки ошибки: открыть настройки (ошибки аутентификации/модели)"
+  },
   "copyLabel": {
     "message": "Копировать",
     "description": "Generic copy button label"

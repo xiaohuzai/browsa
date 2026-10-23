@@ -239,6 +239,10 @@
     "message": "원본 오류",
     "description": "Error card raw-text disclosure label"
   },
+  "errOpenSettings": {
+    "message": "설정 열기",
+    "description": "오류 카드 작업: 설정 페이지 열기(인증/모델 오류)"
+  },
   "copyLabel": {
     "message": "복사",
     "description": "Generic copy button label"

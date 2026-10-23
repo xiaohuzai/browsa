@@ -108,9 +108,40 @@ function refreshSelectionMenus(create = false) {
   });
   return menuRefreshChain;
 }
+// Toolbar/locale settings ride a push, not storage.onChanged in the page:
+// storage.local is TRUSTED_CONTEXTS-only (a content script must not be able to
+// read provider API keys), so the worker forwards changes to every tab itself.
+// Changes only happen from the options page, which has just talked to this
+// worker, so it is awake; a missed push self-heals on the next page load via
+// CONTENT_SETTINGS_GET.
+async function broadcastContentSettings() {
+  const [settings, tabs] = await Promise.all([
+    storage.get(['showSelectionToolbar', 'uiLang']),
+    chrome.tabs.query({}).catch(() => []),
+  ]);
+  const payload = {
+    type: 'CONTENT_SETTINGS',
+    showSelectionToolbar: settings.showSelectionToolbar !== false,
+    uiLang: settings.uiLang || null,
+  };
+  for (const tab of tabs) {
+    if (!tab?.id) continue;
+    // Per-tab isolation: one dead receiver must not skip the remaining tabs.
+    try { chrome.tabs.sendMessage?.(tab.id, payload)?.catch?.(() => {}); } catch (_) {}
+  }
+}
 chrome.storage.onChanged?.addListener((changes, area) => {
   if (area === 'local' && changes.uiLang) refreshSelectionMenus().catch(() => {});
+  if (area === 'local' && (changes.uiLang || changes.showSelectionToolbar)) broadcastContentSettings().catch(() => {});
 });
+// Content scripts can read storage.local by default; nothing in a content
+// script needs it anymore (selection-toolbar fetches its two settings via
+// CONTENT_SETTINGS_GET), so lock the area down — provider API keys and history
+// become readable only from extension pages. Optional call: Firefox and older
+// Chromium without the API just keep the default (looser) access level.
+try {
+  chrome.storage.local?.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })?.catch?.(() => {});
+} catch (_) { /* same defense-in-depth posture where unsupported */ }
 // Menus survive worker sleep; a fresh worker refreshes existing titles too.
 if (chrome.contextMenus.update) refreshSelectionMenus().catch(() => {});
 chrome.runtime.onInstalled.addListener((details) => {
@@ -619,6 +650,18 @@ async function handle(msg, sender) {
       // (background-handler.test.mjs).
       const t = msg.tabId;
       return { note: xhsXhrCache.get(t) || null };
+    }
+
+    case 'CONTENT_SETTINGS_GET': {
+      // selection-toolbar's two content-script settings. Sent as a message
+      // (not read from chrome.storage in the page) because storage.local is
+      // locked to TRUSTED_CONTEXTS — see setAccessLevel at the top of the
+      // worker.
+      const [showSelectionToolbar, uiLang] = await Promise.all([
+        storage.get('showSelectionToolbar'),
+        storage.get('uiLang'),
+      ]);
+      return { showSelectionToolbar: showSelectionToolbar !== false, uiLang: uiLang || null };
     }
 
     case 'SELECTION_CACHE': {
