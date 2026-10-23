@@ -1606,6 +1606,10 @@
     "message": ", возможны проблемы с кодировкой текста",
     "description": "Attach chip label fragment"
   },
+  "chipPdfScanned": {
+    "message": ", отсканированные страницы приложены изображениями",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
+  },
   "chipPdfTables": {
     "message": ", страниц с таблицами: $1",
     "description": "Attach chip label fragment"

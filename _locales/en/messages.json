@@ -1606,6 +1606,10 @@
     "message": ", text may have encoding issues",
     "description": "Attach chip label fragment"
   },
+  "chipPdfScanned": {
+    "message": ", scanned pages attached as images",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
+  },
   "chipPdfTables": {
     "message": ", tables on $1 pages",
     "description": "Attach chip label fragment"

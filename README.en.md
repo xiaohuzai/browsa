@@ -53,7 +53,7 @@ One browsa card connects to several agents at once; the sidebar dropdown switche
 ### 2. Reads the whole web — videos included
 
 - **Videos & podcasts**: subtitles or auto-transcription (ASR) → notes with **clickable `[mm:ss]` timestamps**; click one to jump straight back to the moment. Subtitle-less videos can be read visually too; Xiaoyuzhou podcast episodes transcribe with one attach
-- **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models
+- **PDFs / papers**: parsed entirely in-browser — tables, multi-column layout, and headings reconstructed; figure regions cropped out and sent to vision models; scanned documents are auto-converted to page images (first ≤12 pages) for vision models to read directly, with repeating headers/footers/page numbers kept out of the context
 - **Office documents**: direct links to `.docx` / `.pptx` / `.xlsx` / `.epub` / `.odt` / `.rtf`… are converted to Markdown fully on-device (docling compiled to WASM) — tables, headings and lists survive
 - **Articles & complex pages**: clean article text; feed-style pages read the page's own data directly (YouTube, Bilibili, 小红书…)
 
@@ -289,7 +289,7 @@ Click 📎 to attach the current tab — **Auto** mode (clean article text, fall
 | You're reading | What browsa sends |
 |---|---|
 | Articles & docs | clean article text; the site's `llms.txt` instructions folded into the context |
-| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models, cited as `[图N]` (same contract as web article images) |
+| PDFs & papers | full layout — tables, headings, columns — parsed in-browser; figure regions cropped and sent as images to vision models, cited as `[图N]` (same contract as web article images); scanned documents auto-attach their first ≤12 pages as images for vision models to read |
 | Office documents (`.docx` `.pptx` `.xlsx` `.epub` `.odt` `.rtf`…) | converted to Markdown on-device via docling-wasm — headings, lists and tables keep their structure |
 | Videos & podcast episodes | transcript with clickable `[mm:ss]` timestamps; subtitle-less videos auto-transcribed (ASR, optional — an ASR key in Settings: Volcengine Ark or Alibaba Cloud Bailian) or visually analyzed together with the speech; Xiaoyuzhou episodes transcribe the same way |
 | GitHub repos & file pages | file pages fetch the raw source from `raw.githubusercontent.com` — markdown and code keep their structure; repo pages attach structured metadata (description, topics, license, stars) plus the raw README, so the About sidebar stops being discarded as nav chrome |

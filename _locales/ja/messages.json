@@ -1606,6 +1606,10 @@
     "message": "、テキストにエンコーディングの問題がある可能性",
     "description": "Attach chip label fragment"
   },
+  "chipPdfScanned": {
+    "message": "、スキャンページを画像で添付",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
+  },
   "chipPdfTables": {
     "message": "、$1 ページに表",
     "description": "Attach chip label fragment"

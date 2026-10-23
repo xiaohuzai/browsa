@@ -1606,6 +1606,10 @@
     "message": ", 텍스트에 인코딩 문제가 있을 수 있음",
     "description": "Attach chip label fragment"
   },
+  "chipPdfScanned": {
+    "message": ", 스캔 페이지 이미지 첨부됨",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
+  },
   "chipPdfTables": {
     "message": ", $1페이지에 표 포함",
     "description": "Attach chip label fragment"

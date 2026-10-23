@@ -1606,6 +1606,10 @@
     "message": "，文本可能存在编码问题",
     "description": "Attach chip label fragment"
   },
+  "chipPdfScanned": {
+    "message": "，扫描件已附页图",
+    "description": "Attach chip label fragment (scanned PDF vision fallback)"
+  },
   "chipPdfTables": {
     "message": "，$1 页含表格",
     "description": "Attach chip label fragment"
