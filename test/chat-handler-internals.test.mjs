@@ -670,8 +670,13 @@ test('buildAnthropicMessages: history image_url data URLs convert to base64 imag
 test('chat-handler: continuation reuses the silent-second-pass contract (acc reset+merged)', async () => {
   const src = await readFile(CHAT_HANDLER_PATH, 'utf8');
   const block = src.slice(src.indexOf('Auto-continuation on output-cap truncation'), src.indexOf('Auto timestamp rewrite (video notes)'));
-  assert.match(block, /_stCont\.acc = ''/, 'stream-state accumulator reset before the silent pass (no v1+v2 double in PEEK)');
-  assert.match(block, /_stCont\.acc = fullReply/, 'acc holds the MERGED text after the continuation (tab-switch PEEK correctness)');
+  // 2026-10-24: both accumulator writes are identity-gated against turnState —
+  // a superseded turn's continuation leg must never reset/clobber the NEWER
+  // turn's accumulator (the same ownership class as onDelta's gate).
+  assert.match(block, /if \(_stCont === turnState\) _stCont\.acc = ''/,
+    'stream-state accumulator reset before the silent pass, identity-gated (no v1+v2 double in PEEK, no cross-turn clobber)');
+  assert.match(block, /streamState\.get\(tabId\) === turnState\) turnState\.acc = fullReply/,
+    'acc holds the MERGED text after the continuation (tab-switch PEEK correctness), ownership re-checked at write time');
 });
 
 // --------------- buildTimestampRewriteHistory (rewrite pass trimming) -------

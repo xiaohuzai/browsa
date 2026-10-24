@@ -194,6 +194,79 @@ test('a live turn still finalizes when GC reaped its streamState (age > TTL)', a
   streamPorts.delete(tabId);
 });
 
+test('a superseded turn\'s continuation leg must not write the merged text into the newer turn\'s accumulator', async () => {
+  // 2026-10-24: the continuation/retry/overflow/rewrite outer paths reset and
+  // overwrote streamState.get(tabId).acc with NO identity gate. A turn
+  // superseded BEFORE its continuation leg captured the slot clobbered the
+  // newer turn: the pre-pass reset wrote '' over the newer acc, and the merged
+  // write replaced it with the OLD turn's text — poisoning the newer turn's
+  // PEEK view.
+  let releaseV1;
+  let call = 0;
+  const enc = new TextEncoder();
+  globalThis.fetch = async () => {
+    call++;
+    if (call === 1) {
+      // v1's stream parks; the test supersedes BEFORE releasing it, so the
+      // continuation block's streamState.get() capture lands on turn B.
+      return {
+        ok: true, status: 200,
+        body: new ReadableStream({
+          start(c) {
+            releaseV1 = () => {
+              c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"v1 text"},"finish_reason":"length"}]}\n\n'));
+              c.close();
+            };
+          },
+        }),
+        text: async () => '',
+      };
+    }
+    // Continuation stream (starts after the supersede — immediate).
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({
+        start(c) {
+          c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":" (cont)"},"finish_reason":"stop"}]}\n\n'));
+          c.close();
+        },
+      }),
+      text: async () => '',
+    };
+  };
+  local.history = [];
+  const tabId = 11;
+  const events = posted(tabId);
+
+  const turnA = handleChat({ type: 'CHAT', userText: 'from A', tabId, sessionId: '' }, '', '');
+  for (let i = 0; i < 200 && !releaseV1; i++) await new Promise((r) => setTimeout(r, 2));
+  assert.ok(releaseV1, 'turn A must have parked inside its first stream');
+
+  // Turn B supersedes while A's v1 stream is parked, with its own accumulated
+  // text (what B's PEEK/deltas produced).
+  const stateB = initStreamState(tabId, { providerLabel: 'Test', originSessionId: '' });
+  stateB.acc = 'NEW TURN TEXT';
+  chatControllers.set(tabId, new AbortController());
+
+  // Release v1: it hit the output cap → A's continuation leg fires and (in the
+  // old code) captured B's state as its accumulator.
+  releaseV1();
+  await turnA;
+
+  assert.equal(streamState.get(tabId), stateB, 'the newer turn still owns the state slot');
+  assert.equal(stateB.acc, 'NEW TURN TEXT',
+    "the superseded turn's continuation must not reset/overwrite the newer accumulator");
+  const last = local.history.filter((m) => m.role === 'assistant').pop();
+  assert.equal(last?.content, 'v1 text (cont)', 'the superseded turn still persists its own merged reply');
+  assert.equal(events.filter((e) => e.type === 'DONE').length, 0,
+    'a superseded turn must not emit DONE into the newer turn\'s port');
+
+  clearStreamState(tabId);
+  streamPorts.delete(tabId);
+  chatControllers.delete(tabId);
+  idleTimerResetters.delete(tabId);
+});
+
 test('streamEpoch bumps per turn, including after the prior turn cleared its state', () => {
   const tabId = 10;
   const before = streamEpoch(tabId);

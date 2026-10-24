@@ -327,7 +327,10 @@ test('bridgeStream: 400 without the images-bound message does NOT retry (genuine
   const imgs = Array.from({ length: 12 }, (_, i) => `data:image/jpeg;base64,IMG${i}`);
   await assert.rejects(
     bridgeStream({ baseUrl: 'http://127.0.0.1:3948', text: '看图', images: imgs }),
-    /bridge \/turns → 400/
+    // >8-image turns consumed the body in the old-bridge probe — the second
+    // res.text() used to throw and swallow the server message, surfacing a
+    // bare "→ 400". The first read must be reused (2026-10-24 audit).
+    /bridge \/turns → 400: .*text required/
   );
   assert.equal(calls.length, 1, '非图片上限的 400 不重试');
 });
