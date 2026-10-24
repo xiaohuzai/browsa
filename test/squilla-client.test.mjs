@@ -977,6 +977,29 @@ test('squillaStream: answer_generation_reset drops the stale run and splices the
   gw.restore();
 });
 
+test('squillaStream: the revoked run\'s held-back directive prefix must not flush after the reset snapshot', async () => {
+  // 2026-10-24 audit regression: the revoked run ended mid-plausible-tag
+  // ('[[re' is held inside the filter as a possible [[reply_to…]] start and
+  // never emitted). The reset used to splice `full` but NOT re-create the
+  // filter, so the terminal flush() re-emitted the stale prefix AFTER the
+  // authoritative snapshot — revoked bytes inside the final full.
+  const { squillaStream } = await import('../lib/squilla-client.js');
+  const gw = scriptGateway({
+    events: [
+      { type: 'event', event: 'session.event.text_delta', payload: { task_id: 'task-1', text: '候选A的回答[[re' }, seq: 2 },
+      { type: 'event', event: 'session.event.answer_generation_reset', payload: { task_id: 'task-1', authoritative_text_snapshot: '融合后的最终回答' }, seq: 3 },
+      { type: 'event', event: 'session.event.done', payload: { task_id: 'task-1' }, seq: 4 },
+    ],
+  });
+  const resultP = squillaStream({ baseUrl: 'ws://127.0.0.1:18791/ws', message: 'hi', sessionKey: 'k' });
+  await flush(); lastSocket().serverOpen(); await flush(); await flush();
+  await gw.pushEvents();
+  const result = await resultP;
+  assert.equal(result.full, '融合后的最终回答', JSON.stringify(result.full));
+  assert.ok(!result.full.includes('[[re'), 'the revoked run\'s held-back prefix must not leak into the authoritative full');
+  gw.restore();
+});
+
 test('squillaStream: whitespace-only preamble is not folded into an empty think block', async () => {
   const { squillaStream } = await import('../lib/squilla-client.js');
   const gw = scriptGateway({

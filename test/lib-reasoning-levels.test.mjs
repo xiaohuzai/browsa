@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 const {
   reasoningSpecFor, reasoningLevelOptions, resolveReasoningLevel, reasoningFieldsFor, parseReasoningRaw,
-  VOCAB_TOGGLE, VOCAB_EFFORT3, VOCAB_EFFORT6,
+  VOCAB_TOGGLE, VOCAB_EFFORT3, VOCAB_EFFORT4, VOCAB_EFFORT6,
 } = await import('../lib/reasoning-levels.js');
 
 // --------------- vocabulary follows the model id ---------------------------
@@ -24,6 +24,28 @@ test('reasoningSpecFor: model id selects its own level vocabulary', () => {
   assert.deepEqual(reasoningSpecFor('gpt-5.6-sol').levels, VOCAB_EFFORT6, 'GPT-5-class speaks the full effort ladder');
   assert.deepEqual(reasoningSpecFor('claude-sonnet-5').levels, VOCAB_EFFORT3, 'Claude-class is a three-level ladder');
   assert.deepEqual(reasoningSpecFor('qwen3.5-plus-2026-01-01').levels, VOCAB_TOGGLE, 'dated suffixed ids still match');
+});
+
+// 2026-10-24 audit regression: the qwen3.8 rule sat BEFORE the bare /qwen/
+// toggle rule in a last-match-wins table — every qwen3.8-* id also matches
+// /qwen/, so the specific rule was fully shadowed (picker showed 开/关 and
+// picks sent enable_thinking instead of reasoning_effort). Specific rules
+// must come AFTER the broad ones.
+test('reasoningSpecFor: qwen3.8 beats the bare /qwen/ toggle rule (rule order)', () => {
+  assert.deepEqual(reasoningSpecFor('qwen3.8-max').levels, VOCAB_EFFORT4, 'qwen3.8 speaks the effort ladder, not the toggle');
+  assert.deepEqual(reasoningSpecFor('qwen3.8-flash').levels, VOCAB_EFFORT4);
+  assert.deepEqual(reasoningSpecFor('qwen3.8-omni-flash').levels, VOCAB_EFFORT4);
+  // ...while the rest of the qwen family stays a toggle.
+  assert.deepEqual(reasoningSpecFor('qwen3.5-plus').levels, VOCAB_TOGGLE);
+
+  const provider = { reasoningDefault: 'high' };
+  assert.deepEqual(reasoningFieldsFor({ provider, modelId: 'qwen3.8-max', apiStyle: 'chat' }),
+    { reasoning_effort: 'high' }, 'qwen3.8 chat sends reasoning_effort, not enable_thinking');
+  assert.deepEqual(reasoningFieldsFor({ provider, modelId: 'qwen3.8-max', apiStyle: 'responses' }),
+    { reasoning: { effort: 'high' } });
+  // A stale toggle pick outside the effort vocabulary degrades to auto.
+  assert.equal(resolveReasoningLevel({ reasoningDefault: 'enabled' }, 'qwen3.8-max'), 'auto',
+    "'enabled' is not in the effort vocabulary — resolveReasoningLevel must degrade it to 'auto'");
 });
 
 test('reasoningLevelOptions: unknown model is inert — auto only', () => {

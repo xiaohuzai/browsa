@@ -75,7 +75,7 @@ flowchart LR
     Y -->|"流式回复 · 工具进度 · 审批"| B
 ```
 
-面向开发者的代码库导览——消息流、渲染管线、存储模型、Provider 层与 Agent 接入、ASR、安全模型——在[项目 Wiki](https://github.com/xiaohuzai/browsa/wiki)（双语）。
+面向开发者的代码库导览——消息流、渲染管线、存储模型、Provider 层与 Agent 接入、ASR、安全模型——在[项目 Wiki](https://github.com/xiaohuzai/browsa/wiki)（七语）。
 
 ## 安装
 
@@ -311,7 +311,7 @@ opensquilla gateway start
 | 功能 | 说明 |
 |---|---|
 | **流式回复** | token 逐字出现；点击输入框中的 **■** 或按 `Esc` 停止 |
-| **思考块** | ` thinking` / `<thinking>` 内容显示为可折叠块，流式结束后自动收起 |
+| **思考块** | `<think>` / `<thinking>` 内容显示为可折叠块，流式结束后自动收起 |
 | **Markdown 渲染与高亮** | 完整 GFM（表格、代码块、列表）；40+ 种语言（highlight.js）；`diff` 代码块 `+` 标绿 / `-` 标红 |
 | **你输入的代码也会渲染** | 在输入框贴一段 ``` 围栏代码，你自己的气泡里就是带高亮和复制按钮的代码块；不写语言标签也能自动检测。消息里的其他文字逐字保持原样——你写的内容不会被再解释一遍 |
 | **LaTeX** | 行内 `$...$` 和块级 `$$...$$`（KaTeX）——公式多的消息卸载到 Web Worker 渲染，面板不卡顿；思维导图里的公式用原生 MathML，Mermaid / ECharts / DOT 标签内的公式按各自渲染能力呈现为上下标或 Unicode（不伪造 LaTeX 支持） |
