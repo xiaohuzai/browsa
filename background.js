@@ -41,7 +41,7 @@ export {
   initStreamState, appendToStreamState, clearStreamState,
   recordTerminalTombstone, takeTerminalTombstone, clearTerminalTombstone
 };
-import { extractActiveTab, tryXActiveFallback, autoJinaFallbackWarranted } from './lib/page-extractor.js';
+import { extractActiveTab, tryXActiveFallback, autoJinaFallbackWarranted, fetchHighwireTablesInPageWorld } from './lib/page-extractor.js';
 import { maybeDeepExtract } from './lib/agentic-extract.js';
 import { inlinePageImages, collectMarkdownImages, refererGateForImageUrls } from './lib/page-images.js';
 import { registerPageImageReferer, removePageImageReferer, sweepOrphanedMediaRules } from './lib/sidepanel/media-headers.js';
@@ -1014,6 +1014,40 @@ async function handle(msg, sender) {
                 ctx.deepExtract = { clicks: deep.clicks, pages: deep.pages };
               }
             } catch (_) { /* fail-open: baseline result wins */ }
+          }
+
+          // HighWire tables (biorxiv/medrxiv 及同平台期刊，2026-10-25)：该平台把
+          // 表格预渲染成 GIF 藏在 XHR expansion 端点后，主 DOM 只有
+          // [data-table-url] 占位与 caption——reader 正文里表格数据缺失。
+          // extractInPageWorld 已计数占位（highwireTableCount），>0 时回页面
+          // fetch expansion 提取表格图 URL，以 ![Table N: 标题](url) 追加进
+          // 文本——下方 inlineImages 分支会把它们与正文配图一起转成 [图N]
+          // vision 附件，alt 文本（表格标题）留在锚点行供模型文本面阅读。
+          // 全程 fail-open：探测 0 / 注入失败 / 无图 → 原文照旧。
+          // 必须在 deepExtract 之后（deep 可能整体重写 ctx.text）、
+          // inlineImages 之前（注入的图要走 [图N] 转换）。
+          if ((mode === 'reader' || mode === 'auto') && ctx.highwireTableCount > 0 && !ctx.siteSynthesized) {
+            try {
+              const [tablesRes] = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: fetchHighwireTablesInPageWorld,
+              });
+              const tables = tablesRes?.result;
+              if (Array.isArray(tables) && tables.length) {
+                // alt 进 [图N] 锚点行（模型文本面可读）；] 与换行会破坏
+                // markdown 图片语法，换成空格。URL 两侧不加空格——
+                // collectMarkdownImages 的捕获组不容忍前导空白。
+                const figLines = tables
+                  .filter((t) => t && t.imageUrl)
+                  .map((t) => `![${String(t.alt || 'Table').replace(/[\]\n\r]/g, ' ')}](${t.imageUrl})`);
+                if (figLines.length) {
+                  ctx.text = (ctx.text || '') +
+                    '\n\n## Tables\n\n' +
+                    'The tables below are rendered by the site itself as images (HighWire platform); their data is only available as pixels, not HTML.\n\n' +
+                    figLines.join('\n\n');
+                }
+              }
+            } catch (_) { /* fail-open: caption-only text is the floor */ }
           }
         }
         // Deferred-storage handoffs (screenshot crop / pdf.js text / docling

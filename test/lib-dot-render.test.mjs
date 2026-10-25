@@ -214,3 +214,82 @@ test('rethemeDotSvg leaves text without a font-family attribute untouched', () =
     assert.equal(t.getAttribute('font-family'), null, 'no attribute in → no attribute out');
   }
 });
+
+// --- repair: bare-string label shorthand (2026-10-25 PMC flowchart) ---------
+// Models keep emitting ID["label"] (and attrs inside edge statements, which
+// Graphviz only allows at the END of an edge). The capability hint already
+// forbids the shorthand, but compliance is probabilistic — renderDot gets a
+// deterministic repair + one retry after a parse failure.
+
+const { repairDotSource } = await import('../lib/sidepanel/render.js');
+
+test('repairDotSource rewrites bare-string labels inside edge statements into declarations', () => {
+  const src = 'digraph G {\n  A["x<br/>y"] -> B["z"]\n}';
+  const fixed = repairDotSource(src);
+  // attrs split out of the edge statement (Graphviz rejects attrs on the
+  // edge SOURCE and mid-chain), label= added, <br/> becomes \n
+  assert.ok(fixed.includes('A[label="x\\ny"];'), 'edge SOURCE attrs split out as a declaration');
+  assert.ok(fixed.includes('A -> B[label="z"]'), 'edge TARGET keeps attrs in place with label= added');
+  assert.ok(!fixed.includes('A["'), 'no bare-string shorthand remains');
+  assert.ok(!fixed.includes('<br'), 'no literal <br/> remains');
+});
+
+test('repairDotSource extracts mid-chain attrs too', () => {
+  const fixed = repairDotSource('digraph { A -> B[label="y"] -> C; }');
+  assert.ok(fixed.includes('A -> B -> C'), 'chain is attr-free after repair');
+  assert.ok(fixed.includes('B[label="y"];'), 'B attrs split out');
+});
+
+test('repairDotSource adds label= to plain node-statement shorthand', () => {
+  const fixed = repairDotSource('digraph { A["hello"]; }');
+  assert.equal(fixed, 'digraph { A[label="hello"]; }');
+});
+
+test('repairDotSource leaves valid DOT untouched', () => {
+  for (const ok of [
+    'digraph { a [shape=box]; a -> b [label="x"]; }',
+    'digraph { A[label="x"]; A -> B[label="y"]; }',
+    'digraph { node [shape=box]; a -> b }',
+    'digraph { A[label=<b>html</b>]; }',
+  ]) {
+    assert.equal(repairDotSource(ok), ok, 'must not touch: ' + ok);
+  }
+});
+
+test('repairDotSource is quote-aware (] and -> inside labels)', () => {
+  const fixed = repairDotSource('digraph { A["a]b"] -> B["c->d"]; }');
+  assert.ok(fixed.includes('A[label="a]b"];'), '] inside a quoted label must not end the attr list');
+  assert.ok(fixed.includes('B[label="c->d"];'), '-> inside a quoted label must not read as an edge op');
+  assert.ok(fixed.includes('A -> B['), 'the real edge survives with its legal trailing attrs');
+});
+
+test('renderDot repairs and renders the reported PMC-style DOT (real WASM render)', async () => {
+  // exact shape from the user report: bare-string labels on both ends of
+  // every edge, <br/> line breaks, Unicode superscripts, CJK text
+  const el = makeDotEl(`digraph G {
+  rankdir=LR;
+  node [shape=box, style="filled", fillcolor="#eef3fb", fontcolor="#111", fontsize=11];
+  A["ePCR 建库<br/>10⁸~10⁹ 变体"] -> B["酵母展示<br/>一细胞一克隆"]
+  B -> C["MACS 粗筛"]
+  C -> F["NGS 测序<br/>每轮一份快照"]
+  L -> M["产出：0.18 nM"]
+}`);
+  await renderDot(el);
+  const svg = el.querySelector('.dot-diagram svg');
+  assert.ok(svg, 'repaired DOT must render into a real SVG');
+  assert.equal(svg.querySelectorAll('g.node').length, 6, 'all 6 nodes drawn');
+  assert.equal(svg.querySelectorAll('g.edge').length, 4, 'all 4 edges drawn');
+  const texts = [...svg.querySelectorAll('text')].map((t) => t.textContent);
+  assert.ok(texts.includes('ePCR 建库'), 'multi-line label first line');
+  assert.ok(texts.includes('10⁸~10⁹ 变体'), 'superscript label line');
+  assert.ok(!texts.some((t) => t.includes('<br')), 'no literal <br/> text');
+  assert.equal(el.querySelector('.dot-error'), null, 'no error card');
+  assert.equal(el.querySelector('pre'), null, 'code block swapped out');
+});
+
+test('renderDot keeps the original error card for DOT repair cannot fix', async () => {
+  const el = makeDotEl('digraph { A[label= }');
+  await renderDot(el);
+  assert.ok(el.querySelector('.dot-error'), 'unfixable DOT still shows the error');
+  assert.ok(el.querySelector('pre'), 'source block kept for copying');
+});

@@ -35,9 +35,12 @@ async function injectVendor(ctx) {
   const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
   vm.runInContext(rSrc, ctx);
   vm.runInContext(tSrc, ctx);
+  const gSrc = await readFile(join(ROOT, 'lib/vendor/TurndownPluginGfm.iife.js'), 'utf8');
+  vm.runInContext(gSrc, ctx);
   return {
     Readability: ctx.Readability,
-    TurndownService: ctx.TurndownService
+    TurndownService: ctx.TurndownService,
+    TurndownPluginGfm: ctx.TurndownPluginGfm
   };
 }
 
@@ -2179,4 +2182,152 @@ test('extractFullInPageWorld: script/style/noscript text is dropped, CSS-hidden 
   assert.ok(!out.text.includes('Enable JavaScript'), '<noscript> text must not reach the model');
   assert.ok(out.text.includes('隐藏的正文内容'), 'CSS-hidden prose must still be captured — that is why full mode reads textContent');
   assert.ok(out.text.includes('Visible article text.'));
+});
+
+// --- Table normalization for turndown (JATS/PMC band tables) -----------------
+// Regression: turndown-gfm passes any table it cannot grid-ify through as one
+// raw <table> HTML blob (colgroup, colspan band headers, multi-tbody banding,
+// whitespace inside cells -- the JATS/NCBI academic layout, e.g. the PMC
+// article that triggered the 2026-10-24 report). That blob rode to the model
+// as attribute noise. normalizeTablesForTurndown (nested inside
+// extractInPageWorld, lifted here by the same body-extraction the other tests
+// use) rebuilds such tables into clean grids with bold band headers, and
+// RESTORES the original table whenever a guard proves it cannot split
+// losslessly (residual spans, ragged row widths, block-level cell children) --
+// raw-HTML passthrough is the pre-fix status quo and must never become data
+// loss.
+
+async function runTableNormalize(tableHtml) {
+  const fnBody = await loadSiblingFn('normalizeTablesForTurndown');
+  const sdom = new JSDOM('');
+  const ctx = vm.createContext({ DOMParser: sdom.window.DOMParser });
+  const fn = vm.runInContext(`(${fnBody})`, ctx);
+  return fn(tableHtml);
+}
+
+async function turndownWithGfm(html) {
+  const { ctx } = makePageWorld();
+  const { TurndownService, TurndownPluginGfm } = await injectVendor(ctx);
+  const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' });
+  if (TurndownPluginGfm && TurndownPluginGfm.gfm) td.use(TurndownPluginGfm.gfm);
+  return td.turndown(html);
+}
+
+test('normalizeTablesForTurndown: PMC band table -> bold headers interleaved with clean markdown grids', async () => {
+  const tableHtml = `<table>
+    <colgroup><col span="1"><col span="1"><col span="1"></colgroup>
+    <tbody>
+      <tr><th colspan="3" align="center"><span class="text-underline">Group A</span></th></tr>
+      <tr><th>metric</th><th>v1</th><th>v2</th></tr>
+      <tr><td>
+  <em>alpha</em>
+</td><td align="right">
+  <strong>1.5</strong>
+</td><td align="right">2.5</td></tr>
+    </tbody>
+    <tbody>
+      <tr><th colspan="3">Group B</th></tr>
+      <tr><th>metric</th><th>v1</th><th>v2</th></tr>
+      <tr><td><em>beta</em></td><td>3.5</td><td>4.5</td></tr>
+    </tbody>
+  </table>`;
+  const normalized = await runTableNormalize(tableHtml);
+  assert.ok(!normalized.includes('colgroup'), 'colgroup must be stripped');
+  assert.ok(!normalized.includes('colspan'), 'band-header colspan rows must be lifted out');
+  const md = await turndownWithGfm(normalized);
+  assert.ok(!md.includes('<table'), 'no raw HTML table may remain after conversion');
+  assert.ok(md.includes('**Group A**'), 'band header A becomes a bold paragraph');
+  assert.ok(md.includes('**Group B**'), 'band header B becomes a bold paragraph');
+  assert.ok(md.includes('| metric | v1 | v2 |'), 'clean uniform grid rows');
+  assert.ok(md.includes('**1.5**'), 'cell values and inline markup survive');
+  assert.ok(md.includes('| _alpha_ |'), 'multi-line cell whitespace collapsed, emphasis kept');
+  assert.ok(md.indexOf('**Group A**') < md.indexOf('| _alpha_ |'), 'header A sits before its own band');
+  assert.ok(md.indexOf('| _alpha_ |') < md.indexOf('**Group B**'), 'band A grid sits before header B');
+});
+
+test('normalizeTablesForTurndown: clean simple table is passed through byte-identical', async () => {
+  const simple = '<table><tbody><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></tbody></table>';
+  const out = await runTableNormalize(simple);
+  assert.equal(out, simple, 'simple grids are turndown-gfm territory; must not be touched');
+});
+
+test('normalizeTablesForTurndown: rowspan data table is restored untouched (no data loss)', async () => {
+  const rowspanTable = '<table><tbody><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></tbody></table>';
+  const out = await runTableNormalize(rowspanTable);
+  assert.equal(out, rowspanTable, 'unsplitable tables keep the raw passthrough status quo');
+});
+
+test('normalizeTablesForTurndown: ragged row widths are restored untouched', async () => {
+  const ragged = '<table><tbody><tr><td>a</td><td>b</td><td>c</td></tr><tr><td>d</td><td>e</td></tr></tbody></table>';
+  const out = await runTableNormalize(ragged);
+  assert.equal(out, ragged, 'ragged grids would lose cells under gfm conversion; leave them');
+});
+
+test('normalizeTablesForTurndown: single-column table is left to turndown-gfm', async () => {
+  const oneCol = '<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>';
+  const out = await runTableNormalize(oneCol);
+  assert.equal(out, oneCol, 'nothing to lift out of a single-column grid');
+});
+
+test('normalizeTablesForTurndown: trailing footnote cell is lifted out as a bold paragraph', async () => {
+  const foot = '<table><tbody><tr><th>h1</th><th>h2</th></tr><tr><td>a</td><td>b</td></tr>' +
+    '<tr><td colspan="2">Note: values are medians.</td></tr></tbody></table>';
+  const normalized = await runTableNormalize(foot);
+  assert.ok(!normalized.includes('<table><tbody><tr><th>h1</th><th>h2</th></tr><tr><td>a</td><td>b</td></tr><tr><td colspan="2">'),
+    'footnote row must not stay inside the data grid');
+  const md = await turndownWithGfm(normalized);
+  assert.ok(md.includes('| h1 | h2 |'), 'data grid intact');
+  assert.ok(md.includes('**Note: values are medians.**'), 'footnote becomes a paragraph');
+  assert.ok(md.indexOf('| a | b |') < md.indexOf('**Note:'), 'footnote follows the grid');
+});
+
+test('normalizeTablesForTurndown: block-level cell children block the rewrite (restored untouched)', async () => {
+  const listy = '<table><tbody><tr><td>a<ul><li>x</li></ul></td><td>b</td></tr></tbody></table>';
+  const out = await runTableNormalize(listy);
+  assert.equal(out, listy, 'cells whose conversion would emit newlines keep raw HTML passthrough');
+});
+
+test('extractInPageWorld: citation numbering must not rewrite a nested image link (live-Chrome <a><img> wrapper regression)', async () => {
+  // Real-Chrome Readability keeps <a href="landing"><img src="figure.jpg"></a>
+  // wrappers, turndown emits [![Figure N:](figure.jpg)](landing). The
+  // citation-numbering pass used to match that OUTER link and rewrite the
+  // figure URL into the landing page -- the [图N] pipeline then found no
+  // image pixels at all (2026-10-25 PMC report; jsdom hides it because its
+  // Readability drops the wrapper). The numbering pass must skip links whose
+  // text starts with "!".
+  const links = Array.from({ length: 6 }, (_, i) => `<a href="https://example.com/page${i}">link ${i}</a>`).join(' and ');
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <a href="https://example.com/landing" title="Figure 1: a figure caption"><img src="https://cdn.example.com/figure1.jpg" alt="Figure 1:"></a>
+      <p>Check these: ${links}.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /!\[Figure 1:\]\(https:\/\/cdn\.example\.com\/figure1\.jpg\)/,
+    'the image markdown must survive with its real figure URL');
+  assert.doesNotMatch(result.text, /Figure 1:⟨\d+⟩/, 'the figure alt must not be citation-numbered');
+  assert.match(result.text, /link 0⟨1⟩/, 'plain links still get citation markers');
+});
+
+test('extractInPageWorld: PMC citation_author meta fills the byline Readability leaves null', async () => {
+  // Real PMC shape: authors live in <meta name="citation_author"> which
+  // Readability never reads -- byline came out null and the author line was
+  // lost (2026-10-24 audit, user asked to close it 2026-10-25).
+  const html = `<!doctype html><html><head><title>Real Article</title>
+    <meta name="citation_author" content="Steffanie Paul">
+    <meta name="citation_author" content="Edward P Harvey">
+    <meta name="citation_author_institution" content="Harvard Medical School">
+    </head><body>
+    <main><h1>Real Article</h1><p>${'A long paragraph. '.repeat(60)}</p></main>
+    </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12871374/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.equal(result.articleByline, 'Steffanie Paul, Edward P Harvey',
+    'citation_author metas joined with commas; institutions deliberately not appended');
+  assert.equal(result.articleTitle, 'Real Article');
 });
