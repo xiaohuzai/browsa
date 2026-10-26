@@ -50,3 +50,6 @@ store-assets/
 
 # ZCode CLI 工具本地状态
 skills-lock.json
+
+# graphify code-graph output (local dev tooling)
+graphify-out/

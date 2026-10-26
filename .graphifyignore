@@ -1,0 +1,3 @@
+# vendored minified bundles pollute the symbol graph (r()/t() noise)
+lib/vendor/
+fonts/
