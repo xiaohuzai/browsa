@@ -141,3 +141,32 @@ test('xhs lockstep: extractor 内部两份 blobToBase64 ≡（两个 func: 入�
   // 确认真的有两份（防止将来删剩一份时上面的 1≡2 退化为平凡真）
   assert.ok(extractFn(ex, 'function blobToBase64(', 2), '第二份 blobToBase64 必须存在');
 });
+
+// ---------------------------------------------------------------------------
+// 可收编孪生的 delegation pins：这几对曾以字节孪生存在，实现已收编进
+// site-common.js（manifest 顺序注入保证全局先在）。以下断言防止孪生在站点
+// 脚本里重新长出来——魔数与走查器只允许住在 site-common 一处。
+// ---------------------------------------------------------------------------
+
+test('consolidation: zhihu/geektime 的 htmlToArticleText 必须委托 site-common，不得自带走查器', () => {
+  for (const file of ['lib/content-scripts/zhihu-content-script.js', 'lib/content-scripts/geektime-content-script.js']) {
+    const src = read(file);
+    assert.match(src, /siteCommon\.htmlToArticleText\(html, siteCommon\.pageImgUrl\)/, `${file} 必须委托 site-common`);
+    assert.doesNotMatch(src, /document\.createElement\('div'\)/, `${file} 不得再自带 HTML 走查器`);
+  }
+  const common = read('lib/content-scripts/site-common.js');
+  assert.match(common, /function htmlToArticleText\(html, imgUrlOf\)/, '唯一实现必须带 imgUrlOf 参数');
+});
+
+test('consolidation: reddit/twitter 的图片抓取必须委托 site-common，画布常量只住一处', () => {
+  for (const file of ['lib/content-scripts/reddit-content-script.js', 'lib/content-scripts/twitter-content-script.js']) {
+    const src = read(file);
+    assert.match(src, /fetchImagesAsJpegDataUrls/, `${file} 必须引用 site-common 的共享抓取器`);
+    assert.doesNotMatch(src, /toDataURL\('image\/jpeg'/, `${file} 不得再自带画布压缩`);
+    assert.doesNotMatch(src, /slice\(0, 4\)/, `${file} 的 per-attach 张数上限必须走参数`);
+  }
+  const common = read('lib/content-scripts/site-common.js');
+  assert.match(common, /maxDim = 1024/, 'maxDim 1024 只允许住在 site-common');
+  assert.match(common, /toDataURL\('image\/jpeg', 0\.85\)/, 'JPEG 质量 0.85 只允许住在 site-common');
+  assert.match(common, /AbortSignal\.timeout\(10000\)/, '单图 10s 超时只允许住在 site-common');
+});
