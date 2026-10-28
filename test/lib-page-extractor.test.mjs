@@ -36,9 +36,12 @@ test('a genuinely extracted page does not warrant fallback; probe unavailable de
   assert.equal(autoJinaFallbackWarranted({ textLen: 200 }), false, 'exactly at the floor is not a failure');
 });
 
-test('background wires the predicate with a body.innerText probe (source-shape pin)', async () => {
+test('attach flow wires the predicate with a body.innerText probe (source-shape pin)', async () => {
   const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../background.js', import.meta.url), 'utf8');
+  // 2026-10-28: the ATTACH_PAGE body moved to lib/handlers/attach-page.js —
+  // the pin follows the code (same pattern as attach-asr-closure.test.mjs
+  // after the attach-asr-pending extraction).
+  const src = await fs.readFile(new URL('../lib/handlers/attach-page.js', import.meta.url), 'utf8');
   assert.match(src, /autoJinaFallbackWarranted\(\{\s*\n?\s*textLen: ctx\.text\?\.length \|\| 0,/,
     'the gate must route through the shared predicate');
   assert.match(src, /document\.body\?\.innerText \|\| ''\)\.length/,

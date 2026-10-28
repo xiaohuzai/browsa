@@ -7,6 +7,8 @@
 
 Site-specific interceptors (`lib/content-scripts/*-content-script.js`) run in **MAIN world** at `document_start` and wrap `window.fetch` / `XMLHttpRequest` to capture SPA API responses. They send messages to the background, which stores results in `SITE_CACHES` (a registry object in `lib/handlers/site-cache-store.js`（2026-09-23 C7 自 background.js 外迁） — one `Map` per site, keyed by `tabId`). Adding a new site only requires a single entry in `SITE_CACHES`; restore, lookup, and cleanup iterate it automatically. XHS is the one exception — it uses a separate `xhsXhrCache` Map with its own push logic instead of a `SITE_CACHES` entry. `lib/content-scripts/selection-toolbar.js` runs in ISOLATED world at `document_idle` on all `https://` pages.
 
+跨站 helper 收编在 `site-common.js`（relayToHost/htmlToArticleText/图片抓取），经 window 全局或 Node require 桥接；xhs `func:` 副本除外，由 site-twin-lockstep 钉住。
+
 MAIN-world content scripts can't use ES module imports, so URL matchers there must resolve relative paths against the page: use `new URL(url, location.origin)`, not `new URL(url)` — a bare relative fetch/XHR path (e.g. `fetch('/api/...')`) throws and gets silently swallowed otherwise.
 
 Extension resources used inside Shadow DOM or injected pages (e.g. `icons/icon16.png`) must be declared in `web_accessible_resources`. `ShadowRoot` supports both `querySelector('#id')` and `getElementById('id')` in current Chrome — prefer `querySelector` for consistency with the rest of the codebase.
