@@ -1,12 +1,12 @@
 // test/lib-worker-pending-match.test.mjs — pure tests for matchPending(), the
-// reply→request matching rule of the pdf/office worker protocol
-// (lib/sidepanel/pdf-inspector-worker-client.js owns it; office-extractor.js
-// imports + re-exports the same function). This is the defect-B3 data-
-// integrity fix: the clients used to resolve replies with a blind FIFO
-// shift(), so a timed-out request's LATE worker reply landed on the NEXT
-// queued request — one document's parse result answering a different
-// document's call. No Worker, no wasm, no big buffers here — just queue
-// bookkeeping (dev-box discipline: 2C/4G, keep tests cheap).
+// reply→request matching rule of the pdf/office worker protocol (owned by
+// lib/sidepanel/match-pending.js; both worker clients re-export the same
+// function). This is the defect-B3 data-integrity fix: the clients used to
+// resolve replies with a blind FIFO shift(), so a timed-out request's LATE
+// worker reply landed on the NEXT queued request — one document's parse
+// result answering a different document's call. No Worker, no wasm, no big
+// buffers here — just queue bookkeeping (dev-box discipline: 2C/4G, keep
+// tests cheap).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ import { matchPending as officeMatchPending } from '../lib/sidepanel/office-extr
 const entry = (requestId) => ({ requestId, resolve: () => {} });
 const ids = (pending) => pending.map((e) => e.requestId);
 
-test('both worker clients share ONE matchPending implementation (office re-exports the pdf client\'s — no second copy to drift)', () => {
+test('both worker clients share ONE matchPending implementation (each re-exports match-pending.js — no second copy to drift)', () => {
   assert.equal(officeMatchPending, matchPending);
 });
 
@@ -85,7 +85,9 @@ test('the worker scripts echo requestId on every reply, and the clients send it 
     }
   }
 
-  for (const f of ['pdf-inspector-worker-client.js', 'office-extractor.js']) {
+  // 请求发送点 2026-10-28 起唯一地住在 worker-rpc.js（createWorkerRpc.call）；
+  // 两个客户端只剩 worker URL/timeout/payload。warmup 行豁免（协议外，无 id）。
+  for (const f of ['worker-rpc.js']) {
     const requests = (await read(f)).split('\n')
       .filter((l) => l.includes('postMessage(') && !l.includes('warmup'));
     assert.ok(requests.length >= 1, `${f} must send at least one real worker request`);
