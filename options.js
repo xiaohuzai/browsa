@@ -646,7 +646,7 @@ async function rowPingBridge(card, row) {
     const aliasInput = row.querySelector('[data-bridge-alias]');
     if (aliasInput && !aliasInput.value.trim()) aliasInput.value = r.agent;
   }
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cfg);
   updateBridgeRowDots(card, cfg);
   if (rowBtn) rowBtn.innerHTML = ICON_REFRESH;
   const states = Object.values(cfg.endpointPing);
@@ -1182,7 +1182,7 @@ async function pingCard(name, card) {
           // 每端点状态（用户拍板：Bridge 多 Agent 各自维护 Ping 结果）——
           // 主页下拉按 agent 逐条显示，卡片行内状态点就地更新。
           cfg.endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
-          await persist({ providers: cachedCfg.providers });
+          await persistProvider(name, cfg);
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
           for (const row of card.querySelectorAll('.bridge-row')) {
@@ -1236,7 +1236,7 @@ async function pingCard(name, card) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
         cachedCfg.providers[name].isHermes = hasRuns;
-        await persist({ providers: cachedCfg.providers });
+        await persistProvider(name, cachedCfg.providers[name]);
       }
       flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]${activeNote}`);
     } else {
@@ -1293,7 +1293,7 @@ async function resetCard(name, card) {
   // blank template — a user-added card's "stored default" is just its own
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
   forgetPingState(name);
@@ -1312,7 +1312,7 @@ async function addProvider() {
   while (cachedCfg.providers[`llm-${n}`]) n++;
   const name = `llm-${n}`;
   cachedCfg.providers[name] = { ...BLANK_LLM };
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   // 新服务商即刻成为选中标签（它就是标签栏里横着出现的那一个）。
   llmEditorTab = name;
   renderProviders({ keepDirty: true });
@@ -1336,7 +1336,7 @@ async function removeProvider(name) {
   if (!cfg || (cfg.type || 'llm') === 'agent') return;
   if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, undefined);
   forgetPingState(name);
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';

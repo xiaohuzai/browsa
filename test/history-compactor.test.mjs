@@ -1,8 +1,8 @@
 // test/history-compactor.test.mjs
 // History-image lifecycle: pure policy (compactEntryImageParts /
 // parseFigureLabels / prepareHistoryForModel — the request-side model view)
-// plus the two storage mutators' behavior (markImagesSeenInHistory's seen
-// stamp and boundUnseenImageBytes' thumbnail budget). Storage pixels must
+// plus the storage mutator behavior (stampImagesSeenInArray's seen stamp and
+// boundUnseenImageBytes' thumbnail budget). Storage pixels must
 // NEVER be destroyed by these paths — that invariant (气泡里该有啥就有啥) is
 // pinned here.
 
