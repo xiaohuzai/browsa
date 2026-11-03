@@ -451,6 +451,46 @@ function wireScrollFollowing() {
 }
 
 /**
+ * Delegated interactions on the message stream: timestamp links (click AND keyboard
+ * — a <span role="button"> gets no synthesized click from Enter/Space), the image
+ * lightbox and in-place image resizing. One delegation surface, so the capture-order
+ * contract with lib/sidepanel/image-resize.js (it swallows the trailing click of a
+ * drag before it reaches this handler) is documented where it is enforced.
+ * Extracted from init() 2026-11-03.
+ */
+function wireMessageAreaInteractions() {
+  // Image lightbox — delegate click on all img inside messages. 用户贴图
+  // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
+  // 排除无注释无测试，20MB 截图只配 180×140 缩略还点不动，属漏配不属设计。
+  // 拖拽缩放（2026-10-23）走 lib/sidepanel/image-resize.js：拖过手柄之后的尾随
+  // click 由那个模块在捕获阶段吞掉（suppressClickUntil），到达这里时已不是图片。
+  messagesEl.addEventListener('click', (e) => {
+    const ts = e.target.closest('.browsa-ts');
+    if (ts) { onTimestampClick(ts); return; }
+    const img = e.target.closest('img');
+    if (img && img.src) {
+      showImageLightbox(img.src, img.alt);
+    }
+  });
+
+  // 回复里的图片可就地拖拽缩放（2026-10-23 用户要求）。悬停出小手柄、拖拽改
+  // 宽度；尺寸按 src 指纹存进 local，重渲/重开后由 finishBubble 重放。
+  initImageResize({ root: messagesEl });
+
+  // Keyboard activation for focusable timestamp links. .browsa-ts carries
+  // role="button" tabindex="0" but Enter/Space don't synthesize a click on a
+  // <span> — so it was focusable yet unusable by keyboard (worse than not
+  // being in the tab order).
+  messagesEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    const ts = e.target.closest?.('.browsa-ts');
+    if (!ts) return;
+    e.preventDefault();
+    onTimestampClick(ts);
+  });
+}
+
+/**
  * Panel-wide keyboard shortcuts. Extracted from init() (2026-11-03): the Esc chain
  * encodes a real ordering decision (overlays and native dialogs own Esc first, then
  * search, multiselect, drawers — only then does Esc cancel the stream) and it used
@@ -821,35 +861,7 @@ async function init() {
 
   const updateScrollState = wireScrollFollowing();
 
-  // Image lightbox — delegate click on all img inside messages. 用户贴图
-  // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
-  // 排除无注释无测试，20MB 截图只配 180×140 缩略还点不动，属漏配不属设计。
-  // 拖拽缩放（2026-10-23）走 lib/sidepanel/image-resize.js：拖过手柄之后的尾随
-  // click 由那个模块在捕获阶段吞掉（suppressClickUntil），到达这里时已不是图片。
-  messagesEl.addEventListener('click', (e) => {
-    const ts = e.target.closest('.browsa-ts');
-    if (ts) { onTimestampClick(ts); return; }
-    const img = e.target.closest('img');
-    if (img && img.src) {
-      showImageLightbox(img.src, img.alt);
-    }
-  });
-
-  // 回复里的图片可就地拖拽缩放（2026-10-23 用户要求）。悬停出小手柄、拖拽改
-  // 宽度；尺寸按 src 指纹存进 local，重渲/重开后由 finishBubble 重放。
-  initImageResize({ root: messagesEl });
-
-  // Keyboard activation for focusable timestamp links. .browsa-ts carries
-  // role="button" tabindex="0" but Enter/Space don't synthesize a click on a
-  // <span> — so it was focusable yet unusable by keyboard (worse than not
-  // being in the tab order).
-  messagesEl.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
-    const ts = e.target.closest?.('.browsa-ts');
-    if (!ts) return;
-    e.preventDefault();
-    onTimestampClick(ts);
-  });
+  wireMessageAreaInteractions();
 
   // Wire search bar
   initMsgSearch({
