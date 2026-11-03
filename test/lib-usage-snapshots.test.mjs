@@ -94,3 +94,24 @@ test('takeTurnUsage: persists the baseline and returns per-turn deltas', async (
   const afterReset = await takeTurnUsage('hermes:ctx-1', { input_tokens: 20, output_tokens: 9, cache_read_tokens: 0 });
   assert.deepEqual(afterReset, { input_tokens: 13, output_tokens: 6, cache_read_tokens: 0 });
 });
+
+test('takeTurnUsage: refreshing a baseline keeps it out of the FIFO eviction window', async () => {
+  // The map is capped at 200 keys and evicts from the FRONT of Object.keys order.
+  // Seed 200 keys with the hot conversation inserted FIRST, then refresh it: a
+  // live conversation's baseline must move to the back, otherwise one new
+  // conversation later evicts the baseline a user is actively using (their next
+  // Hermes reply would show the session total instead of this turn's delta).
+  const seeded = {};
+  seeded['hermes:hot'] = { input_tokens: 10, output_tokens: 2, cache_read_tokens: 0 };
+  for (let i = 0; i < 199; i++) {
+    seeded['hermes:filler-' + i] = { input_tokens: i, output_tokens: 1, cache_read_tokens: 0 };
+  }
+  await chrome.storage.local.set({ usageSnapshots: seeded });
+
+  await takeTurnUsage('hermes:hot', { input_tokens: 30, output_tokens: 5, cache_read_tokens: 0 });
+  await takeTurnUsage('hermes:new', { input_tokens: 1, output_tokens: 1, cache_read_tokens: 0 });
+
+  const { usageSnapshots } = await chrome.storage.local.get('usageSnapshots');
+  assert.ok(usageSnapshots['hermes:hot'], 'a refreshed baseline must survive eviction');
+  assert.equal(usageSnapshots['hermes:filler-0'], undefined, 'the oldest untouched key is the one evicted');
+});
