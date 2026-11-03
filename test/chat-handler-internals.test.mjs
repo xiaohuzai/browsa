@@ -673,8 +673,15 @@ test('chat-handler: continuation reuses the silent-second-pass contract (acc res
   // 2026-10-24: both accumulator writes are identity-gated against turnState —
   // a superseded turn's continuation leg must never reset/clobber the NEWER
   // turn's accumulator (the same ownership class as onDelta's gate).
-  assert.match(block, /if \(_stCont === turnState\) _stCont\.acc = ''/,
-    'stream-state accumulator reset before the silent pass, identity-gated (no v1+v2 double in PEEK, no cross-turn clobber)');
+  // 2026-11-03: the gate was extracted into resetAccIfOwned() after four copies
+  // of it had accumulated (retry / overflow rescue / continuation / rewrite);
+  // a missed copy is what produced the 2026-10-24 regression, so the pin moved
+  // to the helper definition plus the call sites.
+  assert.match(block, /resetAccIfOwned\(\)/,
+    'stream-state accumulator reset before the silent pass (identity-gated in the shared helper — no v1+v2 double in PEEK)');
+  const helper = src.slice(src.indexOf('const resetAccIfOwned'), src.indexOf('let ownRunRecord'));
+  assert.match(helper, /if \(st === turnState\) st\.acc = ''/,
+    'resetAccIfOwned must stay STRICTLY identity-gated (ownsStream is reap-tolerant and would resurrect a superseded turn)');
   assert.match(block, /streamState\.get\(tabId\) === turnState\) turnState\.acc = fullReply/,
     'acc holds the MERGED text after the continuation (tab-switch PEEK correctness), ownership re-checked at write time');
 });
