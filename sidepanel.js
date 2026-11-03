@@ -127,6 +127,20 @@ if (composerInfoEl) composerInfoEl.style.display = 'none'; // hidden until user 
 const settingsBtn = $('settings');
 const ctxRadios = document.querySelectorAll('input[name="ctx"]');
 const pagemetaEl = $('pagemeta');
+
+/**
+ * Paint the "which page will 📎 attach" bar. The same three-field write used to
+ * be repeated at the initial render and in both tab listeners — and had already
+ * drifted once (an edit read `tab.url` where only the resolved `t` was in
+ * scope). One writer means the field set (text / href / hover title) cannot
+ * differ between the call sites.
+ */
+function setPageMeta(title, url) {
+  pagemetaEl.textContent = title || url || '';
+  pagemetaEl.href = url || '#';
+  pagemetaEl.title = url || '';
+}
+
 const diagnosticsEl = $('diagnostics');
 const imagePreviewsEl = $('imagepreviews');
 const imageInfoEl = $('imageinfo');
@@ -277,9 +291,7 @@ function onNavPortMessage(msg) {
   if (msg.type !== 'NAVIGATED') return;
   if (msg.tabId !== currentTabId) return; // firehose filter
   if (msg.closed) {
-    pagemetaEl.textContent = _t('tabClosed', '(tab closed)');
-    pagemetaEl.href = '#';
-    pagemetaEl.title = '';
+    setPageMeta(_t('tabClosed', '(tab closed)'), '');
     diagnosticsEl.hidden = true;
     diagnosticsEl.innerHTML = '';
     lastXhsNote = null;
@@ -343,6 +355,36 @@ function connectNavPort() {
         try { connectNavPort(); } catch (_) {}
       }
     }, 1000);
+  });
+}
+
+/**
+ * Tab-switch plumbing for the panel. Extracted from init() (2026-11-03) because
+ * these two listeners are "register only" wiring: they repaint the page-meta bar,
+ * retarget currentTabId and follow the new tab with the nav port. The comments
+ * below record why NOTHING else may happen here — the panel document survives tab
+ * switches, so touching the chat DOM would wipe in-flight bubbles (pinned by
+ * test/scroll-snap.test.mjs).
+ */
+function wirePageMetaListeners() {
+  chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+    // The side panel document stays alive across tab switches (Chrome does NOT
+    // tear it down). So we never touch the DOM here — no renderHistory(), no
+    // stream resume. The chat UI, in-flight bubbles, and system messages all
+    // remain exactly as the user left them. We only update:
+    //   1. currentTabId  — so the next ATTACH_PAGE / CHAT targets the right tab
+    //   2. page-meta bar — cosmetic, shows which page 📎 will attach
+    //   3. nav port      — so SPA nav events route to the new tab
+    currentTabId = tabId;
+
+    const t = await chrome.tabs.get(tabId).catch(() => null);
+    if (t) setPageMeta(t.title, t.url);
+    if (navPort) {
+      try { navPort.postMessage({ type: 'NAV_FOLLOW', tabId }); } catch (_) {}
+    }
+  });
+  chrome.tabs.onUpdated.addListener(async (tabId, _info, t) => {
+    if (tabId === currentTabId) setPageMeta(t.title, t.url);
   });
 }
 
@@ -577,40 +619,9 @@ async function init() {
   });
 
   // Show current page meta
-  if (tab) {
-    pagemetaEl.textContent = tab.title || tab.url || '';
-    pagemetaEl.href = tab.url || '#';
-    pagemetaEl.title = tab.url || '';
-  }
+  if (tab) setPageMeta(tab.title, tab.url);
 
-  // Update page meta when tab changes — save/restore conversation DOM
-  chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-    // The side panel document stays alive across tab switches (Chrome does NOT
-    // tear it down). So we never touch the DOM here — no renderHistory(), no
-    // stream resume. The chat UI, in-flight bubbles, and system messages all
-    // remain exactly as the user left them. We only update:
-    //   1. currentTabId  — so the next ATTACH_PAGE / CHAT targets the right tab
-    //   2. page-meta bar — cosmetic, shows which page 📎 will attach
-    //   3. nav port      — so SPA nav events route to the new tab
-    currentTabId = tabId;
-
-    const t = await chrome.tabs.get(tabId).catch(() => null);
-    if (t) {
-      pagemetaEl.textContent = t.title || t.url || '';
-      pagemetaEl.href = t.url || '#';
-      pagemetaEl.title = t.url || '';
-    }
-    if (navPort) {
-      try { navPort.postMessage({ type: 'NAV_FOLLOW', tabId }); } catch (_) {}
-    }
-  });
-  chrome.tabs.onUpdated.addListener(async (tabId, _info, t) => {
-    if (tabId === currentTabId) {
-      pagemetaEl.textContent = t.title || t.url || '';
-      pagemetaEl.href = t.url || '#';
-      pagemetaEl.title = t.url || '';
-    }
-  });
+  wirePageMetaListeners();
 
   connectNavPort();
 
