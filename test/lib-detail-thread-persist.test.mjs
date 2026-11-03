@@ -719,14 +719,11 @@ test('sidepanel wiring pins: renderHistory restores, destructive paths clear', a
   assert.match(sidepanel, /void clearDetailThreads\(\);/, 'new chat / clear history must drop the records');
   assert.match(sidepanel, /closeDetailThreadsIn: \(el\) => closeDetailThreadsIn\(el\)/,
     'multiselect deletion must close the cards of removed bubbles');
-  assert.match(sidepanel, /captureDetailCardsIn\(el\)/,
-    'every innerHTML rebuild must preserve nested cards');
-  assert.match(sidepanel, /captureDetailCardsIn\(assistantEl\);[\s\S]{0,500}reinsertDetailCards\(assistantEl, nested\)/,
-    'the RETRY innerHTML wipe must reinsert nested cards');
-  assert.match(sidepanel, /const nested = captureDetailCardsIn\(el\);[\s\S]{0,400}reinsertDetailCards\(el, nested\)/,
-    'the ABORTED isDone re-render must reinsert nested cards');
-  assert.match(sidepanel, /refreshDetailHighlights\(el\)/,
-    'the final render must rebuild the quote highlight');
+  // 气泡替换事务的顺序不变量改由下方 swapBubbleContent 行为测试钉住（源码正则
+  // 只能证明「某处存在 capture…reinsert」，钉不住第 8 处缺失——2026-11-03 审计）；
+  // 各调用点经事务的接线由 lib-sidepanel-streaming / resume-streaming 执行测试钉住。
+  assert.match(sidepanel, /swapBubbleContent/,
+    'bubble-content replacement must go through the detail-thread transaction');
 
   const css = await fs.readFile(new URL('../sidepanel.css', import.meta.url), 'utf8');
   assert.match(css, /::highlight\(detail-thread-quote\)/,
@@ -815,6 +812,93 @@ test('恢复后的卡片：首轮仍然随附引用图（重开后追问不丢�
   assert.deepEqual(sub.images, [img], '恢复出的卡片首轮同样随附引用图');
 
   restored.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+// ─── 气泡替换事务（2026-11-03 审计 panel-1 结构修）─────────────────────────────
+// capture→swap→reinsert→(move)→(decorate)→(refresh) 的顺序此前在 sidepanel.js
+// 8 处手写并已漂移（cancelStream 漏 refresh）。顺序不变量改钉在事务函数的
+// 行为上；各调用点的接线由 lib-sidepanel-streaming / resume-streaming 执行测试钉。
+
+function makeParagraphBubble(raw, hidx) {
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.dataset.raw = raw;
+  if (hidx != null) el.dataset.hidx = String(hidx);
+  el.innerHTML = `<p>${raw}</p>`;
+  messagesEl().appendChild(el);
+  return el;
+}
+
+test('swapBubbleContent: nested card survives the swap, decorate runs after reinsert, highlight rebuilt', async () => {
+  await reset();
+  const { swapBubbleContent } = await import('../lib/sidepanel/detail-thread.js');
+  const bubble = makeParagraphBubble('First paragraph here.', 60);
+  openDetailThread(bubble, 'First paragraph', bubble.querySelector('p'), { start: 0, end: 5, text: 'First' });
+  const card = bubble.querySelector('.detail-thread-card');
+  assert.ok(card, 'sanity: card nested in the bubble');
+  const h = CSS.highlights.get('detail-thread-quote');
+  assert.equal(h.ranges.length, 1, 'sanity: creation painted the quote highlight');
+
+  const order = [];
+  await swapBubbleContent(bubble, () => {
+    order.push('swap');
+    bubble.innerHTML = '<p>First paragraph here. Extended.</p>';
+  }, { decorate: () => order.push(bubble.contains(card) ? 'decorate:card-in' : 'decorate:card-out') });
+
+  assert.deepEqual(order, ['swap', 'decorate:card-in'],
+    'reinsert 必须先于注入的 decorate 回调（finishBubble 等装饰看到的就是完整气泡）');
+  assert.ok(bubble.contains(card), '嵌套卡必须活过 innerHTML 替换');
+  assert.equal(h.ranges.length, 1);
+  assert.ok(h.ranges[0].startContainer.isConnected, '高亮 Range 必须重建在新文本节点上');
+  assert.equal(h.ranges[0].toString(), 'First');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+});
+
+test('swapBubbleContent: closed card stays dead, refresh:false skips rehighlight, throwing swap still reinserts', async () => {
+  await reset();
+  const { swapBubbleContent } = await import('../lib/sidepanel/detail-thread.js');
+
+  // (a) closed-card 守卫原样复用：swap 中途关掉的卡不得复活。
+  const bubble = makeParagraphBubble('Alpha beta gamma.', 61);
+  openDetailThread(bubble, 'Alpha', bubble.querySelector('p'), { start: 0, end: 5, text: 'Alpha' });
+  const card = bubble.querySelector('.detail-thread-card');
+  await swapBubbleContent(bubble, () => {
+    card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    bubble.innerHTML = '<p>Alpha beta gamma, replaced.</p>';
+  });
+  assert.equal(bubble.querySelector('.detail-thread-card'), null,
+    '异步渲染期间关闭的卡不得被 reinsert 复活成僵尸');
+  await flushDetailThreadStore();
+
+  // (b) refresh:false（RETRY 清空点的刻意语义）：旧 Range 脱挂但不动它，
+  // DONE 会重建。
+  const bubble2 = makeParagraphBubble('Alpha beta gamma.', 62);
+  openDetailThread(bubble2, 'Alpha', bubble2.querySelector('p'), { start: 0, end: 5, text: 'Alpha' });
+  const card2 = bubble2.querySelector('.detail-thread-card');
+  const h = CSS.highlights.get('detail-thread-quote');
+  const stale = h.ranges[h.ranges.length - 1];
+  await swapBubbleContent(bubble2, () => { bubble2.innerHTML = '<p>Alpha beta gamma, longer.</p>'; }, { refresh: false });
+  assert.ok(bubble2.contains(card2), '卡照常回位');
+  // jsdom/浏览器的 Range 会随 DOM 移除活体变异：旧 Range 被折叠成空（高亮
+  // 就此消失），不一定脱挂——断言「失效」而非「脱挂」。
+  assert.ok(stale.collapsed || !stale.startContainer.isConnected, 'swap 必须已使旧 Range 失效');
+  assert.ok(h.ranges.includes(stale), 'refresh:false 不得重建高亮（旧文本已不存在，DONE 重建）');
+  card2.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await flushDetailThreadStore();
+
+  // (c) swap 抛错：finally 仍把卡放回气泡（卡不能丢进稀薄空气）。
+  const bubble3 = makeParagraphBubble('Alpha beta gamma.', 63);
+  openDetailThread(bubble3, 'Alpha', bubble3.querySelector('p'));
+  const card3 = bubble3.querySelector('.detail-thread-card');
+  await assert.rejects(swapBubbleContent(bubble3, () => {
+    bubble3.innerHTML = '<p>Alpha beta gamma.</p>';
+    throw new Error('swap boom');
+  }), /swap boom/);
+  assert.ok(bubble3.contains(card3), 'swap 抛错后嵌套卡仍须留在气泡里');
+  card3.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await flushDetailThreadStore();
 });
 

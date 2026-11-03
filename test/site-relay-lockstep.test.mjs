@@ -98,4 +98,13 @@ test('relay whitelist stays in lockstep with SITE_MESSAGE_MAP + XHS_XHR_NOTE', a
   for (const type of [...mapKeys, 'XHS_XHR_NOTE']) {
     assert.ok(relaySrc.includes(`'${type}'`), `relay whitelist missing ${type}`);
   }
+  // 反向集合相等（2026-11-03 审计补钉）：上面的 includes 只钉「不缺」，钉不住
+  // 「不多」——白名单被悄悄扩成特权 type（如 SAVE_SESSION）时转发面扩大而测试
+  // 全绿。ISOLATED 零依赖不能 import 共享常量，本用例即三份清单的单一 owner。
+  // 排序数组比较顺带抓重复项；字面量改形会因 match 失败而红，不会假绿。
+  const literal = relaySrc.match(/const RELAY_TYPES = new Set\(\[([\s\S]*?)\]\)/);
+  assert.ok(literal, 'RELAY_TYPES literal not found — update this pin if the shape changed');
+  const relayTypes = [...literal[1].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(relayTypes.sort(), [...mapKeys, 'XHS_XHR_NOTE'].sort(),
+    'RELAY_TYPES must equal SITE_MESSAGE_MAP keys + XHS_XHR_NOTE exactly — no privileged extras');
 });

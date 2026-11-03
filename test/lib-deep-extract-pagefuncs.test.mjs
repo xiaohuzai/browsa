@@ -219,19 +219,148 @@ test('clickIndexed: destructive 清除/重置/注销 verbs are vetoed even when 
   }
 });
 
-test('lockstep: clickIndexed DANGER === preExtractCleanup DANGER_WORDS; chrome selectors aligned', async () => {
-  const src = await readFile(EXTRACTOR, 'utf8');
-  const dangerWords = src.match(/const DANGER_WORDS = (\/.*\/i);/);
-  const dangerClick = src.match(/const DANGER = (\/.*\/i);/);
-  assert.ok(dangerWords && dangerClick, 'both danger regexes found');
-  assert.equal(dangerClick[1], dangerWords[1], 'clickIndexed danger list must equal preExtractCleanup (drift re-opens the labuladong hole)');
-  // 三处 closest() chrome 排除选择器逐字一致（isChromeNoise 用 tagName/role 逐判，是超集，另计）。
-  const selectors = [...src.matchAll(/closest\('(nav, header, footer[^']*)'\)/g)].map((m) => m[1]);
-  assert.ok(selectors.length >= 3, `expected >=3 chrome closest() selectors, got ${selectors.length}`);
-  for (const s of selectors) {
-    assert.equal(s, 'nav, header, footer, aside, [role="navigation"], [role="menubar"], [role="complementary"], [role="search"]',
-      'chrome exclusion must include aside/complementary/search everywhere');
+// 2026-11-03 第二批审计（content-1）：否决谓词读的标签面必须不窄于枚举面。
+// interactiveSnapshot 用 aria-label 编号 icon-only 控件，clickIndexed 若只查
+// textContent，aria-label="删除账户" 的空文字按钮就被真实点击（带用户 Cookie）。
+test('clickIndexed: icon-only destructive controls are vetoed via aria-label / title / input value', async () => {
+  const click = await loadSiblingFn('clickIndexed');
+  const fixtures = [
+    '<button aria-label="删除账户" data-browsa-ix="0"><svg></svg></button>',
+    '<button title="Delete account" data-browsa-ix="0"><svg></svg></button>',
+    '<input type="button" value="清除阅读历史" data-browsa-ix="0">',
+  ];
+  for (const html of fixtures) {
+    const { dom, ctx } = makeCtx(`<body>${html}</body>`);
+    let clickedFlag = false;
+    dom.window.document.querySelector('[data-browsa-ix]').onclick = () => { clickedFlag = true; };
+    const out = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50 }))()`, ctx);
+    assert.equal(out.vetoed, true, `must veto: ${html}`);
+    assert.equal(out.clicked, false, `must not click: ${html}`);
+    assert.equal(clickedFlag, false, `onclick must not fire: ${html}`);
+    dom.window.close();
   }
+});
+
+test('clickIndexed: benign aria-label-only expander is still clicked (veto must not over-kill)', async () => {
+  const click = await loadSiblingFn('clickIndexed');
+  const { dom, ctx } = makeCtx('<body><button aria-label="展开剩余段落" aria-expanded="false" data-browsa-ix="0"><svg></svg></button></body>');
+  let clickedFlag = false;
+  dom.window.document.querySelector('button').onclick = () => { clickedFlag = true; };
+  const out = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50 }))()`, ctx);
+  assert.equal(out.vetoed, false);
+  assert.equal(out.clicked, true);
+  assert.equal(clickedFlag, true);
+  dom.window.close();
+});
+
+test('clickIndexed: label fields are space-joined — no fake danger word across field boundaries', async () => {
+  const click = await loadSiblingFn('clickIndexed');
+  // text 尾 're' + label 头 'move' 直接拼接会拼出 remove；空格连接不会。
+  const { dom, ctx } = makeCtx('<body><button aria-label="move to next section" data-browsa-ix="0">re</button></body>');
+  const out = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50 }))()`, ctx);
+  assert.equal(out.vetoed, false, 're + move across fields must not fabricate "remove"');
+  assert.equal(out.clicked, true);
+  dom.window.close();
+});
+
+// 行为级 lockstep：同一个 aria-only 破坏性 fixture 分别喂两个注入函数——
+// clickIndexed 必须 veto，preExtractCleanup 必须不点（expandedCount 0）。
+test('lockstep(behavior): the same aria-only destructive fixture is refused by BOTH clickIndexed and preExtractCleanup', async () => {
+  const html = '<body><main><button aria-expanded="false" aria-label="清除阅读历史"><svg></svg></button></main></body>';
+  const click = await loadSiblingFn('clickIndexed');
+  const snapshot = await loadSiblingFn('interactiveSnapshot');
+  const cleanup = await loadSiblingFn('preExtractCleanup');
+
+  const { dom: dom1, ctx: ctx1 } = makeCtx(html);
+  let clicked1 = false;
+  dom1.window.document.querySelector('button').onclick = () => { clicked1 = true; };
+  const out = await vm.runInContext(`${snapshot}\n${click}\n(async () => { interactiveSnapshot(); return clickIndexed({ index: 0, settleMs: 50 }); })()`, ctx1);
+  assert.equal(out.vetoed, true);
+  assert.equal(out.clicked, false);
+  assert.equal(clicked1, false);
+  dom1.window.close();
+
+  const { dom: dom2, ctx: ctx2 } = makeCtx(html);
+  ctx2.window = { scrollY: 0, innerHeight: 800, scrollTo: () => {} };
+  let clicked2 = false;
+  dom2.window.document.querySelector('button').onclick = () => { clicked2 = true; };
+  const actions = await vm.runInContext(`${cleanup}\npreExtractCleanup()`, ctx2);
+  assert.equal(actions.expandedCount, 0, 'safeClick must veto the aria-only destructive control');
+  assert.equal(clicked2, false, 'onclick must not fire');
+  dom2.window.close();
+});
+
+// 2026-11-03 第二批审计（content-3）：策略数据的唯一 owner 是模块常量
+// CLICK_SAFETY_ARGS，经 executeScript args 下发（ADR-0009 禁共享兄弟函数，
+// 不禁传数据；RegExp 不可序列化，传 source/flags 字符串）。四个注入函数
+// 保留同值内嵌兜底（漏传 args 行为不变），本测试钉兜底 === 常量。
+test('lockstep: click-safety policy has ONE owner — embedded fallbacks === module constants', async () => {
+  const src = await readFile(EXTRACTOR, 'utf8');
+  const dangerConst = src.match(/const CLICK_DANGER_RE = (\/.*\/i);/);
+  const selectorConst = src.match(/const CHROME_EXCLUDE_SELECTOR = '([^']*)';/);
+  assert.ok(dangerConst, 'module-level CLICK_DANGER_RE must exist (the single owner)');
+  assert.ok(selectorConst, 'module-level CHROME_EXCLUDE_SELECTOR must exist');
+  assert.equal(selectorConst[1], 'nav, header, footer, aside, [role="navigation"], [role="menubar"], [role="complementary"], [role="search"]',
+    'chrome exclusion must include aside/complementary/search');
+  assert.match(src, /export const CLICK_SAFETY_ARGS = \{\s*dangerSource: CLICK_DANGER_RE\.source,\s*dangerFlags: CLICK_DANGER_RE\.flags,\s*chromeSelector: CHROME_EXCLUDE_SELECTOR,?\s*\};/,
+    'CLICK_SAFETY_ARGS must be derived from the constants, not a second hand-written copy');
+  // 危险词兜底：preExtractCleanup / clickIndexed 各一份，必须与常量逐字一致
+  //（漂移曾真实发生——labuladong 事故；兜底降级为漏传 args 时的保险）。
+  for (const fnName of ['preExtractCleanup', 'clickIndexed']) {
+    const body = await loadSiblingFn(fnName);
+    const literals = [...body.matchAll(/: (\/delete\|remove[^;]*\/i);/g)].map((m) => m[1]);
+    assert.equal(literals.length, 1, `${fnName} must keep exactly one embedded danger fallback`);
+    assert.equal(literals[0], dangerConst[1], `${fnName} fallback must equal CLICK_DANGER_RE (drift re-opens the labuladong hole)`);
+    assert.match(body, /new RegExp\(dangerSource, dangerFlags \|\| 'i'\)/, `${fnName} must rebuild the regex from args`);
+  }
+  // chrome 选择器兜底：三个消费者各一份，必须与常量逐字一致。
+  for (const fnName of ['preExtractCleanup', 'detectIncompleteness', 'interactiveSnapshot']) {
+    const body = await loadSiblingFn(fnName);
+    const sels = [...body.matchAll(/chromeSelector \|\| '([^']*)'/g)].map((m) => m[1]);
+    assert.equal(sels.length, 1, `${fnName} must keep exactly one embedded chrome-fallback`);
+    assert.equal(sels[0], selectorConst[1], `${fnName} chrome fallback must equal CHROME_EXCLUDE_SELECTOR`);
+  }
+  // 否决标签并集表达式两处逐字一致（content-1 的标签面）。
+  const unions = [...src.matchAll(/\[el\.textContent, el\.getAttribute\('aria-label'\), el\.getAttribute\('title'\), el\.value\]\s*\.map\(\(s\) => \(s \|\| ''\)\.trim\(\)\)\.filter\(Boolean\)\.join\(' '\)/g)];
+  assert.equal(unions.length, 2, 'safeClick and clickIndexed must carry the identical space-joined label union');
+});
+
+test('wiring: all 7 injection sites pass CLICK_SAFETY_ARGS', async () => {
+  const src = await readFile(EXTRACTOR, 'utf8');
+  const agentic = await readFile(join(ROOT, 'lib/agentic-extract.js'), 'utf8');
+  // page-extractor.js: preExtractCleanup（runGenericExtraction）+ detectIncompleteness（probe）
+  for (const fn of ['preExtractCleanup', 'detectIncompleteness']) {
+    const hits = [...src.matchAll(new RegExp(`func: ${fn},\\s*args: \\[CLICK_SAFETY_ARGS\\]`, 'g'))];
+    assert.equal(hits.length, 1, `page-extractor.js must inject ${fn} with args: [CLICK_SAFETY_ARGS]`);
+  }
+  // agentic-extract.js: 2 处 preExtractCleanup 直注 + 3 处 inject() 包装
+  assert.match(agentic, /import \{[\s\S]*?CLICK_SAFETY_ARGS[\s\S]*?\} from '\.\/page-extractor\.js'/);
+  const cleanupHits = [...agentic.matchAll(/func: preExtractCleanup, args: \[CLICK_SAFETY_ARGS\]/g)];
+  assert.equal(cleanupHits.length, 2, 'both preExtractCleanup injections (interactive copy + page walker) must pass the policy');
+  assert.match(agentic, /inject\(tabId, interactiveSnapshot, \{ \.\.\.CLICK_SAFETY_ARGS, maxChars:/);
+  assert.match(agentic, /inject\(tabId, clickIndexed, \{ \.\.\.CLICK_SAFETY_ARGS, index:/);
+  assert.match(agentic, /inject\(tab\.id, detectIncompleteness, \{ \.\.\.CLICK_SAFETY_ARGS \}\)/);
+});
+
+test('policy args: dangerSource/chromeSelector ride executeScript args and are honored (string→RegExp rebuild)', async () => {
+  const click = await loadSiblingFn('clickIndexed');
+  const { dom, ctx } = makeCtx('<body><button data-browsa-ix="0">banana</button></body>');
+  // 自定义词表经 args 下发必须生效（证明 new RegExp(source, flags) 重建路径活着）…
+  const vetoed = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50, dangerSource: 'banana', dangerFlags: 'i' }))()`, ctx);
+  assert.equal(vetoed.vetoed, true);
+  // …而不传 args 时兜底词表不认识 banana（正常点击）。
+  const plain = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50 }))()`, ctx);
+  assert.equal(plain.vetoed, false);
+  assert.equal(plain.clicked, true);
+  dom.window.close();
+
+  // chromeSelector 同理：把 main 划为 chrome 后，其中的展开控件不再被点。
+  const cleanup = await loadSiblingFn('preExtractCleanup');
+  const { dom: dom2, ctx: ctx2 } = makeCtx('<body><main><button aria-expanded="false">展开</button></main></body>');
+  ctx2.window = { scrollY: 0, innerHeight: 800, scrollTo: () => {} };
+  const actions = await vm.runInContext(`${cleanup}\npreExtractCleanup({ chromeSelector: 'main' })`, ctx2);
+  assert.equal(actions.expandedCount, 0, 'the args-supplied chrome selector must be honored');
+  dom2.window.close();
 });
 
 test('clickIndexed: already-open expander and unknown index are no-ops', async () => {

@@ -1,6 +1,8 @@
 // options.js — provider configuration UI
 import * as storage from './lib/storage.js';
-import { DEFAULT_SYSTEM_PROMPT } from './lib/storage.js';
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_PROVIDERS } from './lib/storage.js';
+import { mergeProviderRow } from './lib/provider-merge.js';
+import { aggregateBridgePing } from './lib/provider-ping.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingOpencode } from './lib/opencode-client.js';
 import { pingSquilla } from './lib/squilla-client.js';
@@ -649,9 +651,8 @@ async function rowPingBridge(card, row) {
   await persistProvider(name, cfg);
   updateBridgeRowDots(card, cfg);
   if (rowBtn) rowBtn.innerHTML = ICON_REFRESH;
-  const states = Object.values(cfg.endpointPing);
-  if (states.includes('reachable')) setBadge(card, 'reachable', name);
-  else if (states.length && states.every((s) => s === 'unreachable')) setBadge(card, 'unreachable', name);
+  const agg = aggregateBridgePing(cfg.endpointPing);
+  if (agg) setBadge(card, agg, name);
 }
 
 // Single owner of "forget ping state" (2026-10-17): three call sites (config
@@ -663,12 +664,20 @@ function forgetPingState(name) {
   } else {
     delete _pingState[name];
   }
-  storage.get('pingStates').then((pingStates) => {
-    const updated = { ...(pingStates || {}) };
-    if (name == null) for (const k of Object.keys(updated)) delete updated[k];
-    else delete updated[name];
-    persist({ pingStates: updated });
-  });
+  // 单点读改写（mutatePingStates 链锁）：旧 get→then→persist 与 setBadge 交错
+  // 时互相整表覆盖。返回值是权威表，回同步页内缓存；失败保留 flash。
+  storage.mutatePingStates((states) => {
+    if (name == null) return {};
+    delete states[name];
+    return states;
+  }).then(syncPingCache)
+    .catch(() => flash('err', _t('saveFailedContext', '保存失败：扩展已重载，请刷新本页后重试')));
+}
+
+// mutatePingStates 的返回值（落库后的权威表）回同步页内 _pingState 缓存。
+function syncPingCache(states) {
+  for (const k of Object.keys(_pingState)) delete _pingState[k];
+  Object.assign(_pingState, states);
 }
 
 // Show/hide the card-level API key field. Extracted from buildProviderCard
@@ -1169,7 +1178,10 @@ async function pingCard(name, card) {
           if (!urls.length) throw new Error(_t('bridgeNeedEndpointErr', '先添加至少一个桥地址再 Ping。'));
           const results = await Promise.all(urls.map((u) => pingBridge({ baseUrl: u, apiKey: resolveBridgeApiKey(cfg, u) })));
           const okUrls = results.filter((r) => r.ok);
-          if (!okUrls.length) {
+          const endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
+          // 聚合规则单点（lib/provider-ping.js）：任一端点可达即可达——与
+          // rowPingBridge 共用同一函数，勿再手写第二份。
+          if (aggregateBridgePing(endpointPing) !== 'reachable') {
             throw new Error(results[0]?.error || `no agent-bridge at ${results[0]?.url}`);
           }
           // 别名 WYSIWYG：发现名只填进「空」端点（没存别名 = 交给发现）；
@@ -1181,7 +1193,7 @@ async function pingCard(name, card) {
           ]));
           // 每端点状态（用户拍板：Bridge 多 Agent 各自维护 Ping 结果）——
           // 主页下拉按 agent 逐条显示，卡片行内状态点就地更新。
-          cfg.endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
+          cfg.endpointPing = endpointPing;
           await persistProvider(name, cfg);
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
@@ -1266,11 +1278,12 @@ function friendlyPingError(msg) {
 function setBadge(card, state, name) {
   if (name) {
     _pingState[name] = state;
-    // Persist to storage so the sidebar dropdown can reflect ping state
-    storage.get('pingStates').then((pingStates) => {
-      const updated = { ...(pingStates || {}), [name]: state };
-      persist({ pingStates: updated });
-    });
+    // Persist to storage so the sidebar dropdown can reflect ping state.
+    // 单点读改写（mutatePingStates 链锁）：旧 get→then→persist 与 forget/另一个
+    // setBadge 交错时互相整表覆盖。返回值回同步缓存；失败保留 flash。
+    storage.mutatePingStates((states) => { states[name] = state; return states; })
+      .then(syncPingCache)
+      .catch(() => flash('err', _t('saveFailedContext', '保存失败：扩展已重载，请刷新本页后重试')));
   }
   const badge = card.querySelector('.provider-badge');
   if (!badge) return;
@@ -1466,23 +1479,18 @@ function flash(cls, text) {
  * pass `undefined` to delete the row.
  */
 async function persistProvider(name, value) {
-  let latest = null;
-  try { latest = await storage.get('providers'); } catch (_) { latest = null; }
-  // Baseline is the page's table, not the stored one: the four agent providers
-  // (hermes/opencode/squilla/bridge) are shipped defaults merged in at load time
-  // and are NOT in storage until the user saves one, so writing the stored table
-  // back verbatim would delete them. For every row storage DOES hold, storage
-  // wins: the page snapshot is never newer than storage for a row it isn't
-  // actively writing, so this rescues both rows created elsewhere AND concurrent
-  // edits to existing rows (a second settings tab). The row being written is
-  // overwritten with `value` just below. (Earlier `if (!(k in next))` only rescued
-  // new keys and silently reverted a concurrently-edited existing row.)
-  const next = { ...(cachedCfg.providers || {}) };
-  if (latest && typeof latest === 'object') {
-    for (const [k, v] of Object.entries(latest)) next[k] = v;
+  let latest;
+  try { latest = await storage.get('providers'); } catch (_) {
+    // 读失败绝不落盘：合并基底完全来自 storage，把失败当空表会一次性抹掉
+    // 全部用户行。flash 错误后放弃本次写入（与 persist 的失败口径一致）。
+    flash('err', _t('saveFailedContext', '保存失败：扩展已重载，请刷新本页后重试'));
+    return false;
   }
-  if (value === undefined) delete next[name];
-  else next[name] = value;
+  // 基底 = 最新 storage 表 + 内置默认行中 storage 未持有者（策略单点在
+  // lib/provider-merge.js）：storage 持有的行 storage 赢——救并发编辑/新增；
+  // storage 已删除的行不从页面快照复活（lost-delete）。键缺席（全新安装）
+  // 是合法的 undefined，与读失败不同，回落空表只补默认行。
+  const next = mergeProviderRow(latest, DEFAULT_PROVIDERS, name, value);
   const ok = await persist({ providers: next });
   if (ok) cachedCfg.providers = next;
   return ok;

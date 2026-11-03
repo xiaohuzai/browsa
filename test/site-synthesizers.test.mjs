@@ -311,6 +311,25 @@ test('twitterFromSyndication: display_text_range trims the trailing t.co media l
     'photos upgrade to the name=large rendering');
 });
 
+// 2026-11-03 第二批审计（content-5）：syndication 照片 URL 加 pbs.twimg.com
+// 白名单（与 redditImagesFromJson 的 redd.it 白名单同型）——端点数据虽非页面
+// 可控，SW 侧下载仍只认 X 自家图床；不合者跳过，fail-open 只缺一张图。
+test('twitterFromSyndication: photo URLs are whitelisted to https://pbs.twimg.com/ before the name=large upgrade', () => {
+  const base = { __typename: 'Tweet', id_str: '1', text: '看图', display_text_range: [0, 2], user: {} };
+  const t = twitterFromSyndication({
+    ...base,
+    mediaDetails: [
+      { type: 'photo', media_url_https: 'https://pbs.twimg.com/media/OK.jpg' },
+      { type: 'photo', media_url_https: 'https://evil.example.com/track.png' },
+      { type: 'photo', media_url_https: 'https://pbs.twimg.com.evil.com/spoof.jpg' },
+      { type: 'photo', media_url_https: 'http://pbs.twimg.com/media/insecure.jpg' },
+      { type: 'photo', media_url_https: 'not a url' },
+    ],
+  });
+  assert.deepEqual(t.photos, ['https://pbs.twimg.com/media/OK.jpg?name=large'],
+    'only the genuine https pbs.twimg.com URL survives; lookalike hosts and non-https are skipped');
+});
+
 test('twitterFromSyndication: video-only media gets the un-extracted note; garbage payloads return null', () => {
   const base = { __typename: 'Tweet', id_str: '1', text: '看视频', display_text_range: [0, 3], user: {} };
   const video = twitterFromSyndication({

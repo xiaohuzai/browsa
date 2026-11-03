@@ -33,10 +33,15 @@ test('distribution ZIP includes extension files and excludes every translated RE
     await writeFile(join(dir, '.agents/local.txt'), 'Private developer fixture');
     await mkdir(join(dir, 'docs'));
     await writeFile(join(dir, 'docs/site.html'), 'Website fixture');
+    // 失败构建可能在运行根内留下刮擦残留（历史 SRC=lib/_src）：打包器按 FS
+    // 枚举 lib/，gitignore 挡不住它——残留绝不能进 zip。
+    await mkdir(join(dir, 'lib/_src'), { recursive: true });
+    await writeFile(join(dir, 'lib/_src/planted.cjs.js'), '// leftover CJS intermediate from a failed build');
     await exec(process.execPath, [join(dir, 'build/package.mjs')]);
     const { stdout } = await exec('python3', ['-c', 'import zipfile,json,sys; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps({"names":z.namelist(),"manifest":json.loads(z.read("manifest.json")),"corrupt":z.testzip()}))', join(dir, 'browsa-v0.42.0.zip')]);
     const archive = JSON.parse(stdout);
-    assert.deepEqual(archive.names.sort(), ['LICENSE', 'manifest.json', 'sidepanel.js']);
+    assert.deepEqual(archive.names.sort(), ['LICENSE', 'manifest.json', 'sidepanel.js'],
+      'build scratch leftovers (lib/_src) must never ship');
     assert.equal(archive.manifest.version, '0.42.0');
     assert.equal(archive.manifest.key, undefined);
     assert.equal(archive.corrupt, null);

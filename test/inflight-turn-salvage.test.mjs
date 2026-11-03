@@ -16,12 +16,13 @@
 //   2. salvage — salvageDurableTurns() appends the partial as an interrupted
 //      entry (收尸, same shape as the abort path) honoring origin/bg routing,
 //      and STREAM_PEEK reports `recovered` so the panel re-renders.
-//   3. zombie fix — a real error on a turn whose panel is ALREADY GONE
-//      tombstones an ERROR + clears streamState (before the fix it lingered
-//      inFlight: the reopened panel resumed a dead stream and spun forever).
-//      With a live panel the response channel still owns the error (pinned:
-//      no tombstone, streamState untouched — the panel's own STREAM_RELEASE
-//      on !res.ok clears it).
+//   3. zombie fix — a real error on an owned turn ALWAYS pushes an ERROR
+//      chunk (tombstoned) + clears streamState and its durable mirror
+//      (2026-11-03 sw-4: the old live-panel exemption depended on the panel's
+//      STREAM_RELEASE arriving — a panel destroyed in that window left a
+//      controller-less zombie whose durable record was later salvaged as a
+//      late, out-of-order interrupted entry). The {ok:false} response still
+//      rides; the panel's ERROR-chunk branch finalizes the partial text.
 //   4. squilla integration — the FULL handleChat turn through the real
 //      handle(): panel "closes" (port removed) mid-stream, PEEK sees the
 //      in-flight acc, the turn completes, PEEK says not-in-flight and history
@@ -76,10 +77,11 @@ class MockWebSocket {
 }
 globalThis.WebSocket = MockWebSocket;
 
+const alarmListeners = [];
 Object.defineProperty(globalThis, 'chrome', {
   value: {
     storage: { local: localArea, session: sessionArea, onChanged: { addListener: () => {} } },
-    alarms: { create: () => {}, clear: () => {}, onAlarm: { addListener: () => {} } },
+    alarms: { create: () => {}, clear: () => {}, onAlarm: { addListener: (fn) => alarmListeners.push(fn) } },
     runtime: { onMessage: { addListener: () => {} }, onInstalled: { addListener: () => {} }, onConnect: { addListener: () => {} }, sendMessage: () => {} },
     tabs: { onActivated: { addListener: () => {} }, onRemoved: { addListener: () => {} }, query: async () => [{ id: 1 }], get: async () => ({ id: 1 }) },
     sidePanel: { setOptions: () => {}, setPanelBehavior: async () => {} },
@@ -386,29 +388,108 @@ test('real error with the panel gone: streamState cleared + ERROR tombstone (res
   clearTerminalTombstone(31);
 });
 
-test('real error with a LIVE panel: response channel owns it (no tombstone, no double display)', async () => {
+test('real error with a LIVE panel: ERROR chunk + state/durable cleared, tombstone replayable (no RELEASE dependency)', async () => {
+  // sw-4（2026-11-03）：旧代码在端口仍在时不清态、不 tombstone，指望面板的
+  // STREAM_RELEASE 收尾。面板恰在该窗口被销毁 → RELEASE 永不来 → 无 controller
+  // 的僵尸活到 10 分钟 GC 被裸删，durable 记录残留，下次 SW 醒来被当 interrupted
+  // 条目追加进当时的 live history（迟到且乱序）。现在真实错误一律 ERROR+清态。
+  sessionArea._reset();
   await localArea.set({
     providers: { p1: { baseUrl: 'https://api.test/v1', apiKey: 'k', apiStyle: 'chat', alias: 'T' } },
     activeProvider: 'p1',
   });
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => httpError(500, 'live panel error');
+  const enc = new TextEncoder();
+  let pulls = 0;
+  // 先流出一段文本再真实错误：durable 镜像里有可收尸的 acc，断言才有分量。
+  globalThis.fetch = async () => ({
+    ok: true, status: 200, text: async () => '',
+    body: new ReadableStream({
+      pull(c) {
+        if (pulls++ === 0) c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"partial before error"}}]}\n\n'));
+        else c.error(new Error('live panel error'));
+      },
+    }),
+  });
   streamState.clear();
   streamPorts.clear();
   clearTerminalTombstone(32);
-  streamPorts.set(32, { postMessage: () => {}, disconnect: () => {} }); // panel connected
+  const received = [];
+  streamPorts.set(32, { postMessage: (m) => received.push(m), disconnect: () => {} }); // panel connected
   try {
     await assert.rejects(
       handle({ type: 'CHAT', tabId: 32, userText: 'hi', sessionId: undefined }),
-      /live panel error|500/
+      /live panel error/
     );
   } finally {
     globalThis.fetch = realFetch;
   }
-  assert.equal(takeTerminalTombstone(32), null, 'no ERROR chunk — the panel renders the response error itself');
-  assert.ok(streamState.has(32), 'unchanged behavior: a live panel releases via STREAM_RELEASE on !res.ok');
+  assert.equal(streamState.has(32), false, 'state cleared even with a live panel — no dependence on STREAM_RELEASE arriving');
+  const errs = received.filter((m) => m.type === 'ERROR');
+  assert.equal(errs.length, 1, 'the live panel receives the ERROR chunk (finalizes the partial text)');
+  assert.match(String(errs[0].error), /live panel error/);
+  const t = takeTerminalTombstone(32);
+  assert.equal(t?.type, 'ERROR', 'tombstoned too — a panel dying before reading the chunk still finalizes via resume replay');
+  await tick(20);
+  const recs = await readDurableTurns();
+  assert.ok(!recs.some((r) => r.tabId === 32), 'the durable mirror must be gone — no late salvage of a terminally-errored turn');
+  assert.equal((await sessionArea.get('browsa.inflightTurn.32'))['browsa.inflightTurn.32'], undefined, 'durable record removed');
   streamState.clear();
   streamPorts.clear();
+  clearTerminalTombstone(32);
+});
+
+test('GC reaping a zombie streamState also clears its durable record (no late interrupted entry)', async () => {
+  // sw-4 兜底层：gcStreamState 曾裸 Map.delete，绕过 clearStreamState 的
+  // durableTurnEnd——被回收僵尸的 durable 记录留在索引里，下次 SW 醒来
+  // salvage 把早已终结的残片当 interrupted 条目追加进 live history。
+  sessionArea._reset();
+  streamState.clear();
+  chatControllers.clear();
+  const st = initStreamState(51);
+  appendToStreamState(51, 'zombie partial');
+  await flushDurable();
+  assert.ok((await sessionArea.get('browsa.inflightTurn.51'))['browsa.inflightTurn.51'], 'sanity: durable record on disk');
+  // 无 controller/run 且超 TTL → GC 可回收。
+  st.startedAt = Date.now() - 11 * 60 * 1000;
+  st.lastDeltaAt = st.startedAt;
+  for (const fn of alarmListeners) fn({ name: 'browsa-stream-gc' });
+  assert.equal(streamState.has(51), false, 'GC reaped the zombie');
+  await tick(20); // durableTurnEnd 是 fire-and-forget
+  assert.equal((await sessionArea.get('browsa.inflightTurn.51'))['browsa.inflightTurn.51'], undefined,
+    'GC must go through clearStreamState — the durable record must not survive the reap');
+  const idx = (await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'] || [];
+  assert.ok(!idx.includes(51), 'the durable index must not keep the reaped tab');
+  const recs = await readDurableTurns();
+  assert.ok(!recs.some((r) => r.tabId === 51), 'nothing left to salvage');
+  streamState.clear();
+});
+
+test('durableTurnEnd from an old turn must not delete a newer turn\'s mirror (epoch compare, sw-3)', async () => {
+  // 旧回合的异步尾巴（clearStreamState/salvage 的 durableTurnEnd）落地时，
+  // 新回合可能已写入自己的镜像——读出的记录 epoch 与被清回合一致才删。
+  sessionArea._reset();
+  streamState.clear();
+  const st1 = initStreamState(61);
+  appendToStreamState(61, 'old partial');
+  await flushDurable();
+  const st2 = initStreamState(61); // 取代：新 epoch、新镜像
+  appendToStreamState(61, 'new partial');
+  await flushDurable();
+  assert.ok(st2.epoch > st1.epoch, 'sanity: epoch bumped');
+
+  await stateMod.durableTurnEnd(61, st1.epoch); // 旧回合迟到的清理
+  const rec = (await sessionArea.get('browsa.inflightTurn.61'))['browsa.inflightTurn.61'];
+  assert.ok(rec, 'the newer turn\'s durable record must survive the old turn\'s late cleanup');
+  assert.equal(rec.acc, 'new partial');
+  const idx = (await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'] || [];
+  assert.ok(idx.includes(61), 'the index entry must survive too');
+
+  await stateMod.durableTurnEnd(61, st2.epoch); // 本回合的清理正常删除
+  assert.equal((await sessionArea.get('browsa.inflightTurn.61'))['browsa.inflightTurn.61'], undefined);
+  const idx2 = (await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'] || [];
+  assert.ok(!idx2.includes(61));
+  streamState.clear();
 });
 
 // ---- 3b. THE handler call site: a tool event schedules the durable flush ----

@@ -42,7 +42,7 @@ import {
 } from './lib/sidepanel/multiselect.js';
 import {
   restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, refreshDetailHighlights,
-  captureDetailCardsIn, reinsertDetailCards, moveSiblingDetailCards
+  swapBubbleContent
 } from './lib/sidepanel/detail-thread.js'; // also wires its own mouseup/scroll listeners on import
 import { providerModelList } from './lib/handlers/provider-resolver.js';
 import { initAttachOrchestrator, onAttachPage } from './lib/sidepanel/attach-orchestrator.js';
@@ -56,6 +56,7 @@ import { shouldFollowStream, isUserScrolledUp as calcIsUserScrolledUp, edgeFadeC
 import { attachLightboxZoom } from './lib/sidepanel/lightbox-zoom.js';
 import { initImageResize } from './lib/sidepanel/image-resize.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
+import { aggregateBridgePing } from './lib/provider-ping.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
@@ -72,6 +73,10 @@ const streamRendererOpts = {
     if (isUserScrolledUp && scrollToBottomBtn) scrollToBottomBtn.classList.add('has-new');
     scrollToBottom();
   },
+  // isDone 的 innerHTML 替换经气泡替换事务（capture→swap→reinsert 单点，
+  // detail-thread.js 拥有顺序）。高亮重建留给调用方：DONE/ERROR 在 finally
+  // 里、provider 铭牌等装饰之后 refresh（与各错误/取消路径同一不变量）。
+  swapContent: (el, html) => swapBubbleContent(el, () => { el.innerHTML = html; }, { refresh: false }),
   onDone: (el, delta) => {
     // 回复里的 [图N] 引用还原为内联缩略图（图片来自其上方最近的带图附加条目）。
     // 异步读 history，fire-and-forget：失败只影响缩略图，不影响正文渲染。
@@ -1028,6 +1033,9 @@ function populateProviderSelect(cfg) {
     // 逐条显示；endpointPing 缺席（旧数据 / 从未 Ping 过）回落卡级聚合。
     const epPing = isBridgeCard ? pcfg.endpointPing : null;
     const hasEpPing = !!(epPing && Object.keys(epPing).length);
+    // 卡级回落：持久化 pingStates 优先；缺席时 bridge 卡经共享单点
+    // aggregateBridgePing 从 endpointPing 推导（与 options 同一聚合规则）。
+    const cardPing = pingStates[name] ?? (isBridgeCard ? aggregateBridgePing(epPing) : null);
     for (const model of modelList) {
       let status;
       if (hasEpPing && model) {
@@ -1035,8 +1043,8 @@ function populateProviderSelect(cfg) {
         status = es === 'reachable' ? _t('statusReachable', '● reachable')
           : es === 'unreachable' ? _t('statusUnreachable', '○ unreachable')
           : _t('statusNotPinged', 'not pinged');
-      } else if (pingStates[name] === 'reachable')   status = _t('statusReachable', '● reachable');
-      else if (pingStates[name] === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
+      } else if (cardPing === 'reachable')   status = _t('statusReachable', '● reachable');
+      else if (cardPing === 'unreachable') status = _t('statusUnreachable', '○ unreachable');
       else                           status = _t('statusNotPinged', 'not pinged');
       const suffix = providerEntrySuffix(pcfg, model);
       const opt = document.createElement('option');
@@ -1585,17 +1593,15 @@ function cancelStream({ salvage = true, detach = false } = {}) {
     // C3 单一收尾（2026-11-03 审计，与 detail-thread stopTurn 同形）：destroy 只停
     // pacer/移除 live-think，不做最终装饰——被取消的部分回复此前缺代码复制按钮、
     // [mm:ss] 不链化、已存图片尺寸不重放（finishBubble 是 applyStoredImageSizes 唯一
-    // 挂点）。有文本则 renderSafe + finishBubble 定稿；追问卡先 capture 后 reinsert。
+    // 挂点）。有文本则经气泡替换事务定稿（capture→swap→reinsert→finish→refresh
+    // 单点；取消路径曾漏 refresh，Esc 后引文高亮静默消失）。
     // fire-and-forget：cancelStream 的调用方（Esc/切会话）是同步口，装饰异步落地即可。
     const cancelledPartial = String(cancelledState?.acc || '');
     if (cancelledPartial.trim()) {
-      const nested = captureDetailCardsIn(cancelledEl);
-      renderSafe(cancelledPartial).then((html) => {
-        cancelledEl.innerHTML = html;
+      swapBubbleContent(cancelledEl, async () => {
+        cancelledEl.innerHTML = await renderSafe(cancelledPartial);
         cancelledEl.dataset.raw = cancelledPartial;
-        reinsertDetailCards(cancelledEl, nested);
-        finishBubble(cancelledEl);
-      }).catch(() => {});
+      }, { decorate: () => finishBubble(cancelledEl) }).catch(() => {});
     }
   }
   activeController = null;
@@ -1972,50 +1978,63 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       // linkifyTimestamps 靠 data-video-src 门控（无盖章不链，2026-09-26）——
       // 倒置 = 视频笔记回复的时间戳静默失效（resume-streaming 回归测试锁这一点）。
       if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
-      // isDone replaces the bubble's innerHTML — keep any open 追问 card nested
-      // in this reply (anchored to a paragraph) alive across the final render.
-      const nestedDetailCards = captureDetailCardsIn(el);
-      await r(finalText, true);
-      reinsertDetailCards(el, nestedDetailCards);
-      // finishBubble（decorate/linkify/thinkCopy/richRender）已在 renderStream
-      // 的 isDone 路径里跑完（C3）；provider 铭牌等站点差异在渲染后补。
-      if (m.providerLabel) addProviderChip(el, m.providerLabel);
-      // innerHTML was replaced — rebuild any 追问 quote highlight in this bubble.
-      refreshDetailHighlights(el);
-      if (m.providerKey) lastReplyKey = m.providerKey;
-      // Provider-reported token/cache numbers; the decode rate is derived only
-      // for turn-scoped usage over the first-token → DONE window (session-
-      // scoped channels get no rate — see lib/usage.js).
-      if (m.usage) {
-        const durationMs = state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0;
-        turnChrome.showTokenUsage(el, m.usage, m.usageScope, durationMs);
-        state.startedAt = 0;
+      // isDone replaces the bubble's innerHTML — nested 追问 cards survive via
+      // the swapContent transaction inside renderStream (streamRendererOpts):
+      // its own finally reinserts them even when the swap/decoration throws.
+      // 终态清理 finally 化（2026-11-03 审计，与 detail-thread finalize 的 B6
+      // 同形）：此前清理排在 await 终渲之后，finishBubble 装饰链/onDone 钩子
+      // 一抛错就跳过全部清理——activeController 泄漏、端口不断、followups 永不
+      // drain。渲染/装饰失败只记日志，收尾无条件执行。
+      try {
+        await r(finalText, true);
+        // finishBubble（decorate/linkify/thinkCopy/richRender）已在 renderStream
+        // 的 isDone 路径里跑完（C3）；provider 铭牌等站点差异在渲染后补。
+        if (m.providerLabel) addProviderChip(el, m.providerLabel);
+        if (m.providerKey) lastReplyKey = m.providerKey;
+        // Provider-reported token/cache numbers; the decode rate is derived only
+        // for turn-scoped usage over the first-token → DONE window (session-
+        // scoped channels get no rate — see lib/usage.js).
+        if (m.usage) {
+          const durationMs = state.startedAt ? Math.max(0, Date.now() - state.startedAt) : 0;
+          turnChrome.showTokenUsage(el, m.usage, m.usageScope, durationMs);
+          state.startedAt = 0;
+        }
+        // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
+        // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
+        if (m.outputTruncated) {
+          // 背景端已自动续写一次；走到这里说明续写后仍被上限截断。
+          showToast(_t('outputTruncatedToast', '回复仍被模型输出上限截断，可点「继续生成」或回复「继续」'), 'info');
+          appendMsgAction(el, _t('continueGenerate', '→ 继续生成'), () => { inputEl.value = '继续'; onSend(); });
+        }
+        if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
+        // Detect max-turns: agent hit the tool-call ceiling and is asking
+        // the user to continue. Show a one-click Continue button.
+        if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
+          appendMsgAction(el, _t('continueMaxTurns', '→ 继续'), () => { inputEl.value = '继续'; onSend(); });
+        }
+      } catch (e) {
+        console.error('[chat] DONE finalize failed', e);
+        el.classList.add('done');
+      } finally {
+        // innerHTML was replaced — rebuild any 追问 quote highlight in this bubble
+        // (cards themselves are reinserted by the swapContent transaction).
+        refreshDetailHighlights(el);
+        stopKeepAlive();
+        try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+        try { port.disconnect(); } catch (_) {}
+        // port.disconnect() does NOT fire this side's own onDisconnect listener
+        // (only the other end's), so activeController must be cleared here —
+        // otherwise it stays set until the async round trip settles, and a
+        // Send click in that window is misrouted to cancelStream() instead.
+        activeController = null;
+        // epoch 前置接线（第五批 sw-3 的 SW 门）：DONE 若带回合 epoch 就随
+        // RELEASE 附上；当前 SW 忽略未知字段，无行为变化。
+        sendMessage({ type: 'STREAM_RELEASE', tabId, ...(m.epoch != null ? { epoch: m.epoch } : {}) }).catch(() => {});
+        reconcileHistoryIdx(typeof m.historyLen === 'number' ? m.historyLen : undefined); // no-drift fast path skips the full-history read (批C)
+        maybeDrainFollowups();
+        // caller 钩子最末且单独包住：钩子抛错不得再吃掉任何清理。
+        try { afterDone?.(el); } catch (e) { console.error('[chat] afterDone hook failed', e); }
       }
-      // 输出被模型长度上限截断（finish_reason=length）——明示，别让用户以为是
-      // browsa 吞了内容（真实用户反馈 2026-08-24：回复分几截，只能喊“继续”）。
-      if (m.outputTruncated) {
-        // 背景端已自动续写一次；走到这里说明续写后仍被上限截断。
-        showToast(_t('outputTruncatedToast', '回复仍被模型输出上限截断，可点「继续生成」或回复「继续」'), 'info');
-        appendMsgAction(el, _t('continueGenerate', '→ 继续生成'), () => { inputEl.value = '继续'; onSend(); });
-      }
-      if (m.choiceRequest) renderChoiceRequest(el, m.choiceRequest);
-      // Detect max-turns: agent hit the tool-call ceiling and is asking
-      // the user to continue. Show a one-click Continue button.
-      if (/reached.*max.*turns|maximum.*turns|max_turns|已达上限|工具调用.*上限|继续.*完成/i.test(finalText)) {
-        appendMsgAction(el, _t('continueMaxTurns', '→ 继续'), () => { inputEl.value = '继续'; onSend(); });
-      }
-      stopKeepAlive();
-      try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
-      try { port.disconnect(); } catch (_) {}
-      // port.disconnect() does NOT fire this side's own onDisconnect listener
-      // (only the other end's), so activeController must be cleared here —
-      // otherwise it stays set until the async round trip settles, and a
-      // Send click in that window is misrouted to cancelStream() instead.
-      activeController = null;
-      sendMessage({ type: 'STREAM_RELEASE', tabId }).catch(() => {});
-      reconcileHistoryIdx(typeof m.historyLen === 'number' ? m.historyLen : undefined); // no-drift fast path skips the full-history read (批C)
-      maybeDrainFollowups();
-      afterDone?.(el);
 
     } else if (m.type === 'ERROR') {
       // ABORTED: clean cancel. Other ERROR chunks (2026-10-13) come from the
@@ -2025,46 +2044,45 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
       // keeps the partial text, the wait indicator stops.
       turnChrome.stopWait();
       stopKeepAlive();
-      target.getEl().classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
-      if (m.code === 'ABORTED') {
-        const r = target.getRenderer();
-        const el = target.getEl();
-        // isDone re-renders via innerHTML; a 追问 card nested in this bubble
-        // (anchored to a paragraph/li) must survive the swap like it does on
-        // DONE and the send-failure paths. Without capture/reinsert it
-        // vanished while activeCards still held its highlight.
-        const nested = captureDetailCardsIn(el);
-        await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
-        reinsertDetailCards(el, nested);
+      const el = target.getEl();
+      el.classList.add('done'); // 流结束（错误/中止）→ content-visibility 恢复生效
+      // 与 DONE 同形的 finally 化（2026-11-03 审计）：终渲抛错不得跳过清理。
+      // 嵌套追问卡由 isDone 内的 swapContent 事务保活（同 DONE）。
+      try {
+        if (m.code === 'ABORTED') {
+          const r = target.getRenderer();
+          await r(state.acc ? state.acc + '\n\n_(cancelled)_' : '_(cancelled)_', true);
+          // 后台发起的中止（空闲超时/网络断——端口仍连着才走到这里）已把部分
+          // 文本作为 interrupted 条目收尸入库：这个气泡就是那条条目的可见化身，
+          // 盖 hidx 保持镜像同步（用户主动 Esc 走 cancelStream 本地盖章，收不
+          // 到这条 ERROR）。与 cancelStream 的收尸记账同一不变量。
+          if (m.salvaged) hidxAssign(el);
+        } else {
+          // SW-death tombstone replay：先定稿部分文本气泡——isDone 重渲会 destroy
+          // renderer（移除 live-think「思考中…」块）并跑 finishBubble 装饰/图片尺寸
+          // 重放，再追加错误提示。2026-11-03 审计前此分支只 appendError，renderer 不
+          // destroy→live-think 永久挂在死气泡上方直到下次 renderHistory（与 ABORTED
+          // 分支同一收尾不变量）。
+          const r = target.getRenderer();
+          await r(state.acc || '', true);
+          appendError(tSub('streamDied', '⚠️ 回复流中断：$1', m.error || '未知错误'));
+        }
+      } catch (e) {
+        console.error('[chat] ERROR finalize failed', e);
+      } finally {
+        // 卡已由 swapContent 事务放回气泡；这里重建引文高亮。
         refreshDetailHighlights(el);
-        // 后台发起的中止（空闲超时/网络断——端口仍连着才走到这里）已把部分
-        // 文本作为 interrupted 条目收尸入库：这个气泡就是那条条目的可见化身，
-        // 盖 hidx 保持镜像同步（用户主动 Esc 走 cancelStream 本地盖章，收不
-        // 到这条 ERROR）。与 cancelStream 的收尸记账同一不变量。
-        if (m.salvaged) hidxAssign(el);
-      } else {
-        // SW-death tombstone replay：先定稿部分文本气泡——isDone 重渲会 destroy
-        // renderer（移除 live-think「思考中…」块）并跑 finishBubble 装饰/图片尺寸
-        // 重放，再追加错误提示。2026-11-03 审计前此分支只 appendError，renderer 不
-        // destroy→live-think 永久挂在死气泡上方直到下次 renderHistory（与 ABORTED
-        // 分支同一收尾不变量）。
-        const r = target.getRenderer();
-        const el = target.getEl();
-        const nested = captureDetailCardsIn(el);
-        await r(state.acc || '', true);
-        reinsertDetailCards(el, nested);
-        refreshDetailHighlights(el);
-        appendError(tSub('streamDied', '⚠️ 回复流中断：$1', m.error || '未知错误'));
+        // The background never disconnects the port after pushing ERROR —
+        // without this cleanup activeController leaks, and every later send
+        // gets silently routed into the followups queue (which never drains
+        // because DONE can never run again). Port self-disconnect() does NOT
+        // fire our own onDisconnect, so do the full cleanup here.
+        activeController = null;
+        setStreamingUI(false);
+        try { port.disconnect(); } catch (_) {}
+        // caller 钩子最末且单独包住：钩子抛错不得再吃掉任何清理。
+        try { onAborted?.(); } catch (e2) { console.error('[chat] onAborted hook failed', e2); }
       }
-      // The background never disconnects the port after pushing ERROR —
-      // without this cleanup activeController leaks, and every later send
-      // gets silently routed into the followups queue (which never drains
-      // because DONE can never run again). Port self-disconnect() does NOT
-      // fire our own onDisconnect, so do the full cleanup here.
-      activeController = null;
-      setStreamingUI(false);
-      try { port.disconnect(); } catch (_) {}
-      onAborted?.();
     }
   });
 }
@@ -2212,11 +2230,10 @@ async function onSend() {
           const prevSib = assistantEl.previousElementSibling;
           if (prevSib?.classList.contains('live-think')) prevSib.remove();
           // innerHTML='' also destroys any 追问 card nested in this bubble —
-          // capture first and put it back after the wipe (it stays anchored by
-          // its saved text; the next DONE re-captures it anyway).
-          const nested = captureDetailCardsIn(assistantEl);
-          assistantEl.innerHTML = '';
-          reinsertDetailCards(assistantEl, nested);
+          // the transaction puts it back (anchored by its saved text; the next
+          // DONE re-captures it anyway). refresh 刻意跳过：旧文本已不存在，
+          // DONE 会重建高亮。
+          swapBubbleContent(assistantEl, () => { assistantEl.innerHTML = ''; }, { refresh: false });
           renderStream.destroy?.(); // stop the abandoned attempt's paced reveal
           renderStream = makeStreamRenderer(assistantEl, streamRendererOpts);
           if (activeController) activeController.renderStream = renderStream;
@@ -2272,15 +2289,15 @@ async function onSend() {
       // errored (same loss family as the closed-panel case).
       sendMessage({ type: 'STREAM_RELEASE', tabId: turnTabId }).catch(() => {});
       // Preserve any partial streaming content; append the error inline.
+      // 气泡替换事务保活嵌套追问卡并重建引文高亮（textContent 分支同样换 DOM）。
       const errMsg = res.error || 'Unknown error';
-      const nestedDetailCards = captureDetailCardsIn(assistantEl);
-      if (state.acc) {
-        await renderStream(state.acc + `\n\n---\n❌ **${errMsg}**`, true);
-      } else {
-        assistantEl.textContent = `❌ ${errMsg}`;
-      }
-      reinsertDetailCards(assistantEl, nestedDetailCards);
-      refreshDetailHighlights(assistantEl);
+      await swapBubbleContent(assistantEl, async () => {
+        if (state.acc) {
+          await renderStream(state.acc + `\n\n---\n❌ **${errMsg}**`, true);
+        } else {
+          assistantEl.textContent = `❌ ${errMsg}`;
+        }
+      });
       // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
       // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
       // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
@@ -2295,14 +2312,13 @@ async function onSend() {
     clearInterval(_swPingInterval);
     activeController = null;
     try { port.disconnect(); } catch (_) {}
-    const nestedDetailCards = captureDetailCardsIn(assistantEl);
-    if (state.acc) {
-      await renderStream(state.acc + `\n\n---\n❌ **${e.message}**`, true);
-    } else {
-      assistantEl.textContent = `❌ ${e.message}`;
-    }
-    reinsertDetailCards(assistantEl, nestedDetailCards);
-    refreshDetailHighlights(assistantEl);
+    await swapBubbleContent(assistantEl, async () => {
+      if (state.acc) {
+        await renderStream(state.acc + `\n\n---\n❌ **${e.message}**`, true);
+      } else {
+        assistantEl.textContent = `❌ ${e.message}`;
+      }
+    });
     // 错误重试走 regenerateReply（原位截断重放）：chat-handler 在派发 LLM 前已把
     // 用户轮（含图）入库，截断重放图才不丢、已入库的轮次也不会在上下文里存两遍；
     // CHAT 没入库的极端情况由 regenerateReply 的气泡 DOM 兜底接住。
@@ -3752,32 +3768,22 @@ async function renderHistory() {
     // IntersectionObserver → eager fallback keeps tests and old behavior.
     const runUpgrade = async ({ el, rawContent, figs, providerLabel }) => {
       const html = await renderSafe(rawContent);
-      // A 追问 card can be nested inside this bubble (anchored to a paragraph/
-      // list item), and innerHTML replaces that subtree wholesale. Capture
-      // every nested card with its anchor path, then re-attach it to the
-      // freshly rendered DOM. Cards anchored to the bubble itself are siblings
-      // and survive on their own (querySelectorAll only finds nested ones).
-      const nestedCards = captureDetailCardsIn(el);
-      el.innerHTML = html;
-      reinsertDetailCards(el, nestedCards);
-      // A restored card whose anchor block was missing from the SYNC render
-      // (renderStreamingSafe leaves some block structure unresolved) was placed
-      // right after the bubble. Now that the full render exists, move it back
-      // to the real paragraph/list item its record points at.
-      moveSiblingDetailCards(el);
-      finishBubble(el); // innerHTML 重建后全部装饰重跑（C3 单一收尾）
-      decorateFigureRefs(el, figs);
-      // el.innerHTML above wipes out the .msg-actions row appended during the
-      // sync pass (it's a child of el, not a sibling) — re-add it here.
-      // addMsgActions is idempotent (no-ops if .msg-actions already present),
-      // but since innerHTML just destroyed the old one, this always re-creates it.
-      addMsgActions(el, () => rawContent);
-      addProviderChip(el, providerLabel);
-      // The upgraded innerHTML replaced the text nodes — rebuild the stored
-      // quote range against the final render (and re-anchor sibling cards
-      // that the sync render could not place because its block structure was
-      // still unresolved).
-      refreshDetailHighlights(el);
+      // 气泡替换事务（单点）：嵌套卡 capture→reinsert；同步渲染缺块时暂落
+      // 气泡后的卡 moveSiblings 移回真实锚点；decorate 重跑全部装饰（C3 单一
+      // 收尾 + .msg-actions 重建 + 铭牌）；最后对最终渲染重建引文高亮。
+      await swapBubbleContent(el, () => { el.innerHTML = html; }, {
+        moveSiblings: true,
+        decorate: () => {
+          finishBubble(el); // innerHTML 重建后全部装饰重跑（C3 单一收尾）
+          decorateFigureRefs(el, figs);
+          // el.innerHTML above wipes out the .msg-actions row appended during the
+          // sync pass (it's a child of el, not a sibling) — re-add it here.
+          // addMsgActions is idempotent (no-ops if .msg-actions already present),
+          // but since innerHTML just destroyed the old one, this always re-creates it.
+          addMsgActions(el, () => rawContent);
+          addProviderChip(el, providerLabel);
+        },
+      });
     };
     if (typeof IntersectionObserver !== 'function') {
       showHistoryUpgradeIndicator();

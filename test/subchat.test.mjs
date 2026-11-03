@@ -15,6 +15,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { makeStorageArea } from './helpers/chrome-mock.mjs';
 
 // Captured so tests can simulate a real port connecting, to exercise the
 // actual browsa-subchat onConnect handler (not just its static source) —
@@ -56,6 +57,10 @@ const chromeMock = {
     executeScript: async () => [{ result: { text: '# Mock page\n\nMock.', articleTitle: 'Mock', wasCapped: false, rawTextLength: 20 } }],
   },
   storage: {
+    // 行为级测试（stop→resend 竞态）要跑真 handleSubchat → storage.getAll/
+    // takeTurnUsage，需要可用的 local/session 区（唯一 storage 桩实现）。
+    local: makeStorageArea(),
+    session: makeStorageArea(),
     onChanged: { addListener: () => {} },
   },
   alarms: {
@@ -76,6 +81,7 @@ Object.defineProperty(globalThis, 'chrome', {
 
 const bg = await import('../background.js');
 const { handle, subChatControllers, subChatPorts } = bg;
+const { handleSubchat, handleSubchatAbort } = await import('../lib/handlers/subchat-handler.js');
 
 async function readBackgroundSrc() {
   const fs = await import('fs/promises');
@@ -388,4 +394,185 @@ test('subChatControllers is keyed by subId, not tabId, and is exported for testa
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/state.js', import.meta.url), 'utf8');
   assert.match(src, /export const subChatControllers = new Map\(\);/);
+});
+
+// --------------- 回合身份门：stop→resend 竞态（2026-11-03 审计 sw-1） ---------
+//
+// 面板侧同一线程重发复用 subId（detail-thread.js），新端口挂同一个 subId。
+// 旧流结束后的 takeTurnUsage 是真实存储读（宽窗口）：停止后立刻重发，旧流从
+// usage await 恢复时若无条件 pushSubChatChunk(DONE, full=旧全文)，会把旧回复
+// 定稿进新回合的气泡。身份判定必须按本回合 controller（subChatPorts.has 不是
+// 身份——端口存在但属于新回合）。
+
+const tick = (n = 5) => new Promise((r) => setTimeout(r, n));
+async function waitFor(cond, what, ms = 3000) {
+  for (let i = 0; i < ms / 5 && !cond(); i++) await tick();
+  assert.ok(cond(), `timed out waiting for: ${what}`);
+}
+
+function seedHermesProvider() {
+  chromeMock.storage.local._set({
+    providers: { hermes: { type: 'agent', isHermes: true, baseUrl: 'http://hermes.test', apiKey: 'k', alias: 'Hermes' } },
+    activeProvider: 'hermes',
+    history: [],
+  });
+}
+
+//  scripted /v1/runs：POST 创建 run，GET events 回一轮 message.delta +
+//  run.completed。第一轮带 session-cumulative usage（cache keys 在场），
+//  逼出 subchat 的 takeTurnUsage 存储读；第二轮不带 usage。
+function stubRunsFetch({ parkEvents = false } = {}) {
+  const enc = new TextEncoder();
+  let runSeq = 0;
+  const state = { eventsRequested: 0 };
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.endsWith('/v1/runs')) {
+      runSeq += 1;
+      return { ok: true, status: 200, json: async () => ({ run_id: `run-${runSeq}` }) };
+    }
+    const n = /\/runs\/run-(\d+)\/events/.exec(u)?.[1];
+    state.eventsRequested += 1;
+    if (parkEvents) {
+      // 永不完成的 SSE：回合停在 read loop 里，测试控制何时被 abort。
+      return { ok: true, status: 200, body: new ReadableStream({ start() {}, cancel() {} }), text: async () => '' };
+    }
+    const first = n === '1';
+    const text = first ? 'old reply' : 'new reply';
+    const completed = { output: text, ...(first ? { usage: { input_tokens: 5, output_tokens: 3, cache_read_tokens: 0, cache_write_tokens: 0 } } : {}) };
+    const sse =
+      `event: message.delta\ndata: ${JSON.stringify({ delta: text })}\n\n` +
+      `event: run.completed\ndata: ${JSON.stringify(completed)}\n\n`;
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(enc.encode(sse)); c.close(); } }),
+      text: async () => '',
+    };
+  };
+  return state;
+}
+
+test('stop→resend: an old turn parked in takeTurnUsage must not push its DONE into the new turn\'s port', async () => {
+  seedHermesProvider();
+  const realFetch = globalThis.fetch;
+  const areaGet = chromeMock.storage.local.get;
+  let usageAskedResolve, usageRelease;
+  const usageAsked = new Promise((r) => { usageAskedResolve = r; });
+  const usageGate = new Promise((r) => { usageRelease = r; });
+  // takeTurnUsage → storage.get('usageSnapshots')（字符串键）：卡住它，模拟
+  // 旧流停在 usage await 的宽窗口；getAll 的键表读取不受影响。
+  chromeMock.storage.local.get = async (keys) => {
+    if (keys === 'usageSnapshots') { usageAskedResolve(); await usageGate; }
+    return areaGet(keys);
+  };
+  const subId = 'sub-race';
+  const got1 = [], got2 = [];
+  try {
+    stubRunsFetch();
+    subChatPorts.set(subId, { postMessage: (m) => got1.push(m) });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q1' }] }, '');
+    await waitFor(() => got1.some((m) => m.type === 'SUBCHAT_CHUNK'), 'old turn deltas on port 1');
+    // 旧流已读完 SSE，停在 takeTurnUsage 的存储读上。
+    await Promise.race([usageAsked, tick(3000).then(() => { throw new Error('old turn never reached takeTurnUsage'); })]);
+
+    // 用户 Stop（面板语义）→ 立刻同 subId 重发：新 controller、新端口。
+    handleSubchatAbort({ subId });
+    subChatPorts.set(subId, { postMessage: (m) => got2.push(m) });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q2' }] }, '');
+    await waitFor(() => got2.some((m) => m.type === 'SUBCHAT_DONE'), 'new turn DONE on port 2');
+
+    // 放行旧流的 usage 读：旧代码此刻会把旧全文 DONE 打进新端口。
+    usageRelease();
+    await tick(30);
+
+    const dones = got2.filter((m) => m.type === 'SUBCHAT_DONE');
+    assert.equal(dones.length, 1, 'the new port must receive exactly one DONE (its own)');
+    assert.equal(dones[0].full, 'new reply', 'the new bubble must be finalized with the NEW reply, never the old full text');
+    assert.equal(got2.filter((m) => m.type === 'SUBCHAT_ERROR').length, 0, 'the superseded turn must not push ERROR into the new port');
+    assert.equal(got1.filter((m) => m.type === 'SUBCHAT_DONE').length, 0, 'the old turn was superseded before its DONE — it must not finalize anywhere');
+  } finally {
+    usageRelease();
+    chromeMock.storage.local.get = areaGet;
+    globalThis.fetch = realFetch;
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+  }
+});
+
+test('a direct resend on the same subId aborts the previous controller (non-panel sender fallback)', async () => {
+  seedHermesProvider();
+  const realFetch = globalThis.fetch;
+  const subId = 'sub-resend';
+  try {
+    const fstate = stubRunsFetch({ parkEvents: true });
+    subChatPorts.set(subId, { postMessage: () => {} });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q1' }] }, '');
+    await waitFor(() => fstate.eventsRequested >= 1 && subChatControllers.has(subId), 'turn 1 parked in its SSE loop');
+    const ctrl1 = subChatControllers.get(subId);
+
+    // 无 SUBCHAT_ABORT 的直发重发（面板纪律之外的兜底）：旧流必须被 abort，
+    // 否则旧 fetch/reader 继续烧 token 且往同一 subId 推 delta。
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q2' }] }, '');
+    assert.equal(ctrl1.signal.aborted, true, 'the superseded controller must be aborted on resend');
+    assert.notEqual(subChatControllers.get(subId), ctrl1, 'the new turn owns the controller slot');
+  } finally {
+    handleSubchatAbort({ subId });
+    await tick(20);
+    globalThis.fetch = realFetch;
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+  }
+});
+
+test('bare-string rejection after an abort classifies as cancel — no SUBCHAT_ERROR (adapter-gap floor)', async () => {
+  // sw-2 地板：正确性不得依赖每个 adapter 各自把字符串 reason 规整成
+  // AbortError。opencode 的 session 创建不带 signal（apiFetch 无法归一），
+  // mock fetch 在 controller.abort('user-cancel') 后以裸字符串 reject——
+  // 模拟任一 adapter 的规整缺口。handler 必须凭 signal.aborted 判为取消。
+  chromeMock.storage.local._set({
+    providers: { oc: { type: 'agent', isOpencode: true, baseUrl: 'http://oc.test', apiKey: '' } },
+    activeProvider: 'oc',
+    history: [],
+  });
+  const realFetch = globalThis.fetch;
+  const subId = 'sub-bare-abort';
+  let rejectFetch, fetchCalled;
+  const gate = new Promise((_, rej) => { rejectFetch = rej; });
+  const called = new Promise((r) => { fetchCalled = r; });
+  globalThis.fetch = () => { fetchCalled(); return gate; };
+  const got = [];
+  try {
+    subChatPorts.set(subId, { postMessage: (m) => got.push(m) });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q' }] }, '');
+    await Promise.race([called, tick(3000).then(() => { throw new Error('session create never started'); })]);
+    // 内部 abort（controller 留在 map 里，owned 门放行）：分类是唯一决定者。
+    subChatControllers.get(subId).abort('user-cancel');
+    rejectFetch('user-cancel');
+    await tick(30);
+    assert.equal(got.filter((m) => m.type === 'SUBCHAT_ERROR').length, 0,
+      'a bare string reason on an aborted signal must be a clean cancel, never an error card');
+    assert.equal(subChatControllers.has(subId), false, 'the turn still cleans up its controller');
+  } finally {
+    globalThis.fetch = realFetch;
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+  }
+});
+
+test('all SUBCHAT pushes and pending-map writes are gated by this turn\'s controller identity (shape pin)', async () => {
+  // 行为面由上面两例兜住；此 pin 保证收口不被拆散：所有 pushSubChatChunk 调用
+  // 实际落到 owned() 门控的本地包装（raw 导入只在包装内使用一次），五个
+  // pending-map 创建点（opencode appr+clar、bridge appr、hermes appr+clar）
+  // 先过同一 owned 门——被取代的旧流迟到审批事件不得重新塞入 pending。
+  const subchatSrc = await readSubchatHandlerSrc();
+  assert.match(subchatSrc, /pushSubChatChunk as rawPushSubChatChunk/, 'the raw pusher must be imported under a private name');
+  assert.match(subchatSrc, /const owned = \(\) => subChatControllers\.get\(subId\) === controller;/, 'ownership is controller identity, never subChatPorts.has');
+  assert.match(subchatSrc, /const pushSubChatChunk = \(id, payload\) => \{ if \(owned\(\)\) rawPushSubChatChunk\(id, payload\); \};/,
+    'every push goes through the owned-gated local wrapper');
+  assert.equal((subchatSrc.match(/rawPushSubChatChunk\(/g) || []).length, 1, 'the raw pusher is called exactly once — inside the wrapper');
+  assert.equal((subchatSrc.match(/if \(!owned\(\)\) return;/g) || []).length, 5,
+    'all five approval/clarify creation sites must gate the pending-map write on owned()');
 });

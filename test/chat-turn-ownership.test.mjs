@@ -279,6 +279,45 @@ test('streamEpoch bumps per turn, including after the prior turn cleared its sta
   clearStreamState(tabId);
 });
 
+test('a bridge error mentioning "aborted" on a LIVE signal rides the ERROR path, not user-cancel (proto-1)', async () => {
+  // 真实 bridgeStream 收到 {type:'error'} 事件后 throw Error(message)——消息含
+  // "aborted" 字样但 signal 未 aborted。旧的 /aborted/i 文案兜底会把它误判为
+  // 用户取消：错误卡消失、partial 以 interrupted 落库、返回 ok。
+  const savedProviders = local.providers;
+  const savedActive = local.activeProvider;
+  local.providers = { br: { type: 'agent', isBridge: true, alias: 'codex', baseUrl: 'http://127.0.0.1:3948', apiKey: '', model: '' } };
+  local.activeProvider = 'br';
+  local.history = [];
+  const tabId = 13;
+  const events = posted(tabId);
+  const enc = new TextEncoder();
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    start(c) {
+      c.enqueue(enc.encode('data: {"type":"error","message":"tool execution aborted by upstream provider"}\n\n'));
+      c.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+  try {
+    await assert.rejects(
+      handleChat({ type: 'CHAT', userText: 'go', tabId, sessionId: '' }, '', ''),
+      /aborted by upstream provider/,
+      'the real error must be re-thrown, not swallowed as a clean cancel'
+    );
+    const errs = events.filter((e) => e.type === 'ERROR');
+    assert.equal(errs.length, 1, 'the panel must receive an ERROR chunk');
+    assert.notEqual(errs[0].code, 'ABORTED', 'it must NOT be the cancelled path');
+    assert.match(String(errs[0].error), /aborted by upstream provider/);
+    assert.equal(local.history.filter((m) => m.role === 'assistant').length, 0,
+      'a real error must not persist an interrupted salvage entry');
+  } finally {
+    local.providers = savedProviders;
+    local.activeProvider = savedActive;
+    clearStreamState(tabId);
+    streamPorts.delete(tabId);
+    chatControllers.delete(tabId);
+  }
+});
+
 test('the owning turn does finalize normally (DONE + state cleared)', async () => {
   stubFetch();
   local.history = [];
@@ -288,6 +327,9 @@ test('the owning turn does finalize normally (DONE + state cleared)', async () =
   await handleChat({ type: 'CHAT', userText: 'solo', tabId, sessionId: '' }, '', '');
 
   assert.equal(events.filter((e) => e.type === 'DONE').length, 1, 'the owning turn emits exactly one DONE');
+  // sw-3 接线：DONE 携带本回合 epoch，面板 DONE 路径随 STREAM_RELEASE 回传。
+  assert.equal(events.find((e) => e.type === 'DONE').epoch, streamEpoch(tabId),
+    'DONE must carry this turn\'s epoch for the SW-side RELEASE identity gate');
   assert.equal(streamState.get(tabId), undefined, 'the owning turn clears its own stream state');
   assert.equal(chatControllers.get(tabId), undefined, 'the owning turn clears its own controller');
   assert.equal(local.history.filter((m) => m.role === 'assistant').length, 1);

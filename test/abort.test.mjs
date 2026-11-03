@@ -268,22 +268,40 @@ test('CHAT handler catches AbortError, salvages the partial as interrupted, and 
     'the success-path assistant persist must appear AFTER the abort-return');
 });
 
-test('CHAT handler isAbortError: signal.aborted is authoritative; bare string reason classifies as cancel', async () => {
-  // 2026-11-03 审计回归：取消分类必须以本回合 signal.aborted 为权威判据。
-  // controller.abort('user-cancel') 让 fetch/throwIfAborted 抛裸字符串，旧式
-  // e?.name/.message 判别两者都不命中→当成真实错误。抽出 helper 真实执行。
-  const fs = await import('fs/promises');
-  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
-  const m = src.match(/const isAbortError = (\(e\) => [^\n]+);/);
-  assert.ok(m, 'isAbortError helper must exist');
-  const make = (signal) => new Function('signal', `return ${m[1]};`)(signal);
-  const aborted = make({ aborted: true });
-  const live = make({ aborted: false });
+test('abort classification is a single shared owner: signal.aborted authoritative, NO message-text fallback', async () => {
+  // 2026-11-03 审计回归（sw-2 + proto-1）：取消分类单点 lib/abort-error.js。
+  // ① controller.abort('user-cancel') 让 fetch/throwIfAborted 抛裸字符串，旧式
+  //    e?.name/.message 判别两者都不命中→当成真实错误；signal.aborted 说了算。
+  // ② /aborted/i 文案兜底会把含 "aborted" 字样的真实 provider/agent 错误误判为
+  //    用户取消（错误卡消失、partial 以 interrupted 落库）——必须已删除。
+  // ③ name==='AbortError' 条款保留：嵌套 controller 超时（AbortSignal.timeout）
+  //    在本回合 signal 未 aborted 时仍靠它。
+  const { isAbortError } = await import('../lib/abort-error.js');
+  const aborted = (e) => isAbortError({ aborted: true }, e);
+  const live = (e) => isAbortError({ aborted: false }, e);
   assert.equal(aborted('user-cancel'), true, 'bare string reason + aborted signal → cancel');
   assert.equal(aborted(new Error('anything')), true, 'aborted signal is authoritative regardless of error');
-  assert.equal(live({ name: 'AbortError' }), true, 'named AbortError still cancels');
+  assert.equal(live({ name: 'AbortError' }), true, 'named AbortError still cancels (nested controller timeout)');
   assert.equal(live(new Error('network dead')), false, 'real error on live signal is not a cancel');
   assert.equal(live('user-cancel'), false, 'string reason without an aborted signal is not silently swallowed');
+  assert.equal(live(new Error('tool execution aborted by upstream provider')), false,
+    'a real provider error whose message mentions "aborted" must NOT classify as user-cancel (proto-1)');
+  assert.equal(isAbortError(undefined, { name: 'AbortError' }), true, 'missing signal tolerated');
+  assert.equal(isAbortError(undefined, 'user-cancel'), false, 'missing signal + bare string is not a cancel');
+
+  // 接线 pin：chat-handler 与 subchat-handler 都消费同一单点，不再各持判据。
+  const fs = await import('fs/promises');
+  const chatSrc = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  assert.match(chatSrc, /import \{ isAbortError as classifyAbortError \} from '\.\.\/abort-error\.js';/,
+    'chat-handler must import the shared classifier');
+  assert.match(chatSrc, /const isAbortError = \(e\) => classifyAbortError\(signal, e\);/,
+    'chat-handler binds the shared classifier to THIS turn’s signal');
+  assert.doesNotMatch(chatSrc, /aborted\/i/, 'the message-text fallback must be gone from chat-handler');
+  const subSrc = await fs.readFile(new URL('../lib/handlers/subchat-handler.js', import.meta.url), 'utf8');
+  assert.match(subSrc, /import \{ isAbortError \} from '\.\.\/abort-error\.js';/,
+    'subchat-handler must import the shared classifier');
+  assert.match(subSrc, /if \(!isAbortError\(controller\.signal, e\)\)/,
+    'subchat catch must classify with this turn’s signal, not e?.name alone');
 });
 
 test('CHAT handler prepare-path abort returns a clean cancel (no streamState yet)', async () => {

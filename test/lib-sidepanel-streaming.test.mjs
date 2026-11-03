@@ -320,6 +320,61 @@ test('cancel aborts the stream\'s OWN tab: STREAM_ABORT carries the same tabId a
   }
 });
 
+// ─── Esc 取消后的引文高亮（2026-11-03 审计 panel-1 最小修）─────────────────────
+// cancelStream 的定稿渲染换了 innerHTML，旧 Range 脱挂；8 处气泡替换事务里
+// 唯独这里漏了 refreshDetailHighlights——取消后追问卡引文高亮静默消失。
+
+test('cancelStream: the finalize render rebuilds the detail-card quote highlight (Esc path)', async () => {
+  // jsdom 没有 CSS Custom Highlight API——桩掉注册面，观察重建后的 Range。
+  const registry = new Map();
+  globalThis.CSS = { highlights: { set: (n, h) => registry.set(n, h), get: (n) => registry.get(n) } };
+  globalThis.Highlight = class {
+    constructor() { this.ranges = new Set(); }
+    add(r) { this.ranges.add(r); }
+    delete(r) { this.ranges.delete(r); }
+  };
+  let card = null;
+  try {
+    const { openDetailThread } = await import('../lib/sidepanel/detail-thread.js');
+    inputEl.value = 'cancel while a quote card is open';
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 50));
+    lastChatPort.emit({ type: 'CHUNK', delta: 'highlighted passage inside the reply' });
+    const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+    // paced reveal 逐字画——轮询等全文落 DOM（jsdom 的 rAF 桩节奏不保证时延）。
+    for (let i = 0; i < 100 && !el.textContent.includes('highlighted passage'); i++) {
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    assert.match(el.textContent, /highlighted passage/, 'sanity: streamed text is painted');
+    openDetailThread(el, 'highlighted passage', el, { start: 0, end: 11, text: 'highlighted' });
+    card = el.nextElementSibling;
+    assert.ok(card?.classList.contains('detail-thread-card'), 'sanity: card opened on the streaming bubble');
+    const h = registry.get('detail-thread-quote');
+    assert.ok(h && h.ranges.size === 1, 'sanity: creation painted one highlight range');
+
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // Stop / Esc
+    await new Promise((r) => setTimeout(r, 50)); // cancelStream 的定稿渲染是 fire-and-forget
+
+    assert.ok(el.classList.contains('done'));
+    const ranges = [...registry.get('detail-thread-quote').ranges];
+    assert.equal(ranges.length, 1, '取消定稿后必须仍有一条引文高亮');
+    assert.ok(ranges[0].startContainer.isConnected && ranges[0].endContainer.isConnected,
+      'innerHTML 替换后高亮 Range 必须重建在新文本节点上（旧 Range 已脱挂）');
+    assert.equal(ranges[0].toString(), 'highlighted');
+  } finally {
+    // 拆回合 + 拆卡：泄漏的 SW_PING interval 会挂死 node --test（test/AGENTS.md）。
+    if (card?.isConnected) {
+      card.querySelector('.detail-thread-close')?.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    }
+    if (sendBtn.classList.contains('is-stopping')) {
+      sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    delete globalThis.CSS;
+    delete globalThis.Highlight;
+  }
+});
+
 test('source pin: stream-addressing sites use the stream\'s tabId, never bare currentTabId', async () => {
   const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
   assert.match(src, /const streamTabId = activeController\.tabId \?\? currentTabId;/,

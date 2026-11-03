@@ -35,7 +35,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const LIB = join(ROOT, 'lib');
 const VENDOR = join(LIB, 'vendor');
-const SRC = join(LIB, '_src'); // scratch dir for the CJS→IIFE intermediate
+// Scratch dir for the CJS→IIFE intermediate — MUST stay outside lib/: the
+// packager enumerates lib/ from the filesystem (gitignore can't help), so a
+// failed build's leftover *.cjs.js under lib/ would ship in the next zip.
+const SRC = join(__dirname, '_src');
 const ALLOW_MISSING = process.argv.includes('--allow-missing');
 
 await fs.mkdir(VENDOR, { recursive: true });

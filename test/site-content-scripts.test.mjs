@@ -639,6 +639,103 @@ function loadContentScript(name) {
     }
   });
 
+  // 2026-11-03 第二批审计（content-2）：SPA 导航后 ytInitialPlayerResponse 的
+  // videoDetails 又是 stale 的，但曾经过 globalsAreFresh 只丢 richMeta/chapters，
+  // title/author/lengthSeconds/shortDescription 直接混入新视频结果——正确性
+  // 全靠 Stage 3 POST 成功覆盖。修复：videoDetails 过独立 videoId 门（勿并入
+  // globalsAreFresh——ytInitialData 与 playerResponse 的新鲜度互相独立）。
+  test('youtube: stale videoDetails (videoId mismatch) is discarded even when Stage 3 fails', async () => {
+    const prevWindow = globalThis.window;
+    const prevPerf = globalThis.performance;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      // 两种情形：ytInitialData 新（playerResponse 单独 stale）/ 两者都旧。
+      for (const idDataVideoId of ['NEW123', 'OLD456']) {
+        globalThis.window = {
+          location: { search: '?v=NEW123', pathname: '/watch' },
+          ytInitialPlayerResponse: {
+            videoDetails: { videoId: 'OLD456', title: 'OLD VIDEO TITLE', author: 'Old Author', lengthSeconds: '999', shortDescription: 'previous video description' },
+          },
+          ytInitialData: { currentVideoEndpoint: { watchEndpoint: { videoId: idDataVideoId } } },
+          ytcfg: { get: () => undefined },
+        };
+        globalThis.document = { getElementById: () => null };
+        globalThis.performance = { getEntriesByType: () => [] };
+        globalThis.fetch = async () => { throw new Error('network down'); };
+        const result = await activeYouTubeFetch();
+        assert.ok(result, 'must still return metadata shell when everything fails');
+        assert.equal(result.videoId, 'NEW123', 'videoId always comes from the URL');
+        assert.equal(result.title, '', `stale title must not ride (ytInitialData=${idDataVideoId})`);
+        assert.equal(result.author, '', 'stale author must not ride');
+        assert.equal(result.lengthSeconds, 0, 'stale duration must not ride');
+        assert.equal(result.shortDescription, '', 'stale description must not ride');
+      }
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+    }
+  });
+
+  test('youtube: videoDetails without a videoId is discarded (宁缺勿错)', async () => {
+    const prevWindow = globalThis.window;
+    const prevPerf = globalThis.performance;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      globalThis.window = {
+        location: { search: '?v=NEW123', pathname: '/watch' },
+        ytInitialPlayerResponse: { videoDetails: { title: 'UNVERIFIABLE', author: 'X', lengthSeconds: '5', shortDescription: 'd' } },
+        ytInitialData: {},
+        ytcfg: { get: () => undefined },
+      };
+      globalThis.document = { getElementById: () => null };
+      globalThis.performance = { getEntriesByType: () => [] };
+      globalThis.fetch = async () => { throw new Error('network down'); };
+      const result = await activeYouTubeFetch();
+      assert.equal(result.title, '', 'details lacking videoId cannot be verified fresh — discard');
+      assert.equal(result.lengthSeconds, 0);
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+    }
+  });
+
+  test('youtube: fresh videoDetails (videoId matches URL) is still adopted on first load', async () => {
+    const prevWindow = globalThis.window;
+    const prevPerf = globalThis.performance;
+    const prevFetch = globalThis.fetch;
+    const prevDocument = globalThis.document;
+    try {
+      globalThis.window = {
+        location: { search: '?v=NEW123', pathname: '/watch' },
+        ytInitialPlayerResponse: {
+          videoDetails: { videoId: 'NEW123', title: ' Fresh Title ', author: 'Fresh Author', lengthSeconds: '120', shortDescription: 'fresh desc' },
+        },
+        ytInitialData: {},
+        ytcfg: { get: () => undefined },
+      };
+      globalThis.document = { getElementById: () => null };
+      globalThis.performance = { getEntriesByType: () => [] };
+      globalThis.fetch = async () => { throw new Error('network down'); };
+      const result = await activeYouTubeFetch();
+      assert.equal(result.videoId, 'NEW123');
+      assert.equal(result.title, 'Fresh Title', 'the freshness gate must not kill the normal first-load path');
+      assert.equal(result.author, 'Fresh Author');
+      assert.equal(result.lengthSeconds, 120);
+      assert.equal(result.shortDescription, 'fresh desc');
+    } finally {
+      if (prevWindow === undefined) delete globalThis.window; else globalThis.window = prevWindow;
+      if (prevPerf === undefined) delete globalThis.performance; else globalThis.performance = prevPerf;
+      if (prevFetch === undefined) delete globalThis.fetch; else globalThis.fetch = prevFetch;
+      if (prevDocument === undefined) delete globalThis.document; else globalThis.document = prevDocument;
+    }
+  });
+
   test('youtube: activeYouTubeFetch returns null when videoId is not in the URL and player has no video', async () => {
     const prevWindow = globalThis.window;
     const prevDocument = globalThis.document;
