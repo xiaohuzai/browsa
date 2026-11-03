@@ -101,6 +101,12 @@ test('YouTube active fallback: injects content script (MAIN) then calls activeYo
     fileInjections.some((c) => c.files.some((f) => f.includes('youtube-content-script.js'))),
     'must inject youtube-content-script.js'
   );
+  // 2026-11-03 审计：site-common.js 必须先于站点脚本同批注入——否则 manifest 没
+  // 跑过的 tab 上站点脚本走 require 桥（MAIN world 无 require）整体失效。
+  const siteInjection = fileInjections.find((c) => c.files.some((f) => f.includes('youtube-content-script.js')));
+  const commonIdx = siteInjection.files.findIndex((f) => f.includes('site-common.js'));
+  const siteIdx = siteInjection.files.findIndex((f) => f.includes('youtube-content-script.js'));
+  assert.ok(commonIdx !== -1 && commonIdx < siteIdx, 'site-common.js must precede the site script in the same injection');
 });
 
 // Bilibili variant — re-use same chrome mock with a bilibili URL

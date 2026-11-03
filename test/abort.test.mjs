@@ -203,7 +203,7 @@ test('CHAT handler idle-timeout abort path also stops the server-side Hermes run
   // abort catch must stop the registered run itself — otherwise the agent keeps
   // executing tools server-side with nobody listening.
   const src = await (await import('fs/promises')).readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
-  const catchIdx = src.indexOf("if (e?.name === 'AbortError' || /aborted/i.test(String(e?.message))) {", src.indexOf('} catch (e)'));
+  const catchIdx = src.indexOf('if (isAbortError(e)) {', src.indexOf('} catch (e)'));
   assert.ok(catchIdx > 0, 'abort catch block must exist');
   const block = src.slice(catchIdx, src.indexOf('throw e;', catchIdx));
   // Must stop the run registered by THIS turn. Prefer the record captured in
@@ -253,7 +253,7 @@ test('CHAT handler catches AbortError, salvages the partial as interrupted, and 
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
-  const abortMatch = src.match(/e\?\.name === 'AbortError'[\s\S]{0,2000}?return \{ ok: true, cancelled: true \}/);
+  const abortMatch = src.match(/if \(isAbortError\(e\)\) \{[\s\S]{0,2000}?return \{ ok: true, cancelled: true \}/);
   assert.ok(abortMatch, 'CHAT handler must have a catch block for AbortError that returns cancelled');
   const block = abortMatch[0];
   assert.match(block, /clearStreamState\(tabId\)/, 'catch must clear streamState');
@@ -266,6 +266,34 @@ test('CHAT handler catches AbortError, salvages the partial as interrupted, and 
   const appendIdx = src.indexOf("await persistTurnEntry(tabId, { role: 'assistant'", catchReturnIdx);
   assert.ok(appendIdx > catchReturnIdx,
     'the success-path assistant persist must appear AFTER the abort-return');
+});
+
+test('CHAT handler isAbortError: signal.aborted is authoritative; bare string reason classifies as cancel', async () => {
+  // 2026-11-03 审计回归：取消分类必须以本回合 signal.aborted 为权威判据。
+  // controller.abort('user-cancel') 让 fetch/throwIfAborted 抛裸字符串，旧式
+  // e?.name/.message 判别两者都不命中→当成真实错误。抽出 helper 真实执行。
+  const fs = await import('fs/promises');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  const m = src.match(/const isAbortError = (\(e\) => [^\n]+);/);
+  assert.ok(m, 'isAbortError helper must exist');
+  const make = (signal) => new Function('signal', `return ${m[1]};`)(signal);
+  const aborted = make({ aborted: true });
+  const live = make({ aborted: false });
+  assert.equal(aborted('user-cancel'), true, 'bare string reason + aborted signal → cancel');
+  assert.equal(aborted(new Error('anything')), true, 'aborted signal is authoritative regardless of error');
+  assert.equal(live({ name: 'AbortError' }), true, 'named AbortError still cancels');
+  assert.equal(live(new Error('network dead')), false, 'real error on live signal is not a cancel');
+  assert.equal(live('user-cancel'), false, 'string reason without an aborted signal is not silently swallowed');
+});
+
+test('CHAT handler prepare-path abort returns a clean cancel (no streamState yet)', async () => {
+  const fs = await import('fs/promises');
+  const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
+  // prepare 的 catch 必须在 signal.aborted 时干净返回，而非把字符串 reason 抛出。
+  const prep = src.match(/await turn\.prepare\(\);[\s\S]*?catch \(error\) \{[\s\S]*?return \{ ok: true, cancelled: true \}/);
+  assert.ok(prep, 'prepare try/catch with a clean-cancel return found');
+  assert.match(prep[0], /if \(signal\.aborted\)/, 'prepare catch must branch on signal.aborted');
+  assert.match(prep[0], /code: 'ABORTED'/, 'prepare abort must push ABORTED');
 });
 
 // --------------- llm-client reader cancellation ----------------------------

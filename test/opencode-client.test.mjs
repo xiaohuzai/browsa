@@ -51,6 +51,39 @@ function installFetch(routes) {
   };
 }
 
+// 2026-11-03 审计：opencode 的 apiFetch 曾把裸字符串 abort reason 原样抛出，
+// chat-handler 的取消分类（signal.aborted / AbortError）两者都不命中→当成真实
+// 错误。归一后任何 abort 都必须以 AbortError 落地（与 llm-client 同形）。
+test('createOpencodeSession: pre-aborted signal rejects with AbortError, not a string reason', async () => {
+  const f = installFetch({
+    // 模拟真实 fetch：信号已 abort 时以 reason reject（installFetch 默认不认信号）。
+    '/api/session': (u, opts) => opts.signal?.aborted
+      ? Promise.reject(opts.signal.reason ?? 'aborted')
+      : jsonResponse({ id: SES }),
+  });
+  try {
+    const ac = new AbortController();
+    ac.abort('user-cancel');
+    await assert.rejects(
+      createOpencodeSession({ baseUrl: 'http://127.0.0.1:4096', signal: ac.signal }),
+      (e) => e?.name === 'AbortError',
+    );
+  } finally { f.restore(); }
+});
+
+test('createOpencodeSession: fetch rejecting with a bare string reason on abort is normalized to AbortError', async () => {
+  const ac = new AbortController();
+  const f = installFetch({
+    '/api/session': () => { ac.abort('user-cancel'); return Promise.reject('user-cancel'); },
+  });
+  try {
+    await assert.rejects(
+      createOpencodeSession({ baseUrl: 'http://127.0.0.1:4096', signal: ac.signal }),
+      (e) => e?.name === 'AbortError',
+    );
+  } finally { f.restore(); }
+});
+
 test('normalizeOpencodeUrl', () => {
   assert.equal(normalizeOpencodeUrl(''), 'http://127.0.0.1:4096');
   assert.equal(normalizeOpencodeUrl(null), 'http://127.0.0.1:4096');

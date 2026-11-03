@@ -185,6 +185,55 @@ test('clickIndexed: danger-word control is vetoed without clicking', async () =>
   assert.equal(clickedFlag, false);
 });
 
+// 2026-11-03 安全审计：labuladong「清除阅读历史」侧栏按钮事故的回归属于此。
+// interactiveSnapshot 必须把 aside/complementary/search 里的控件排除（不编号喂
+// brain）；clickIndexed 的破坏性词表必须与 preExtractCleanup 同步（清除/清空/重置
+// 等），即使控件被直接编号也 veto。
+test('interactiveSnapshot: aside/complementary/search controls are excluded from the brain feed', async () => {
+  const fn = await loadSiblingFn('interactiveSnapshot');
+  const { dom, ctx } = makeCtx(`<body>
+    <aside><button aria-expanded="false">清除阅读历史</button></aside>
+    <div role="complementary"><button>重置偏好</button></div>
+    <div role="search"><button>退出登录</button></div>
+    <button aria-expanded="false">加载更多评论</button></body>`);
+  const out = await vm.runInContext(`${fn}\ninteractiveSnapshot({ maxChars: 5000 })`, ctx);
+  assert.equal(out.count, 1, 'only the article load-more is listed; chrome-region controls excluded');
+  assert.ok(out.items.some((l) => l.includes('加载更多评论')));
+  assert.ok(!out.text.includes('清除阅读历史'));
+  assert.ok(!out.text.includes('重置偏好'));
+  assert.ok(!out.text.includes('退出登录'));
+  dom.window.close();
+});
+
+test('clickIndexed: destructive 清除/重置/注销 verbs are vetoed even when directly indexed', async () => {
+  const click = await loadSiblingFn('clickIndexed');
+  for (const label of ['清除阅读历史', '清空缓存', '重置设置', '注销账户', '退出登录', 'clear history', 'reset preferences', 'log out']) {
+    const { dom, ctx } = makeCtx(`<body><button data-browsa-ix="0">${label}</button></body>`);
+    let clickedFlag = false;
+    dom.window.document.querySelector('button').onclick = () => { clickedFlag = true; };
+    const out = await vm.runInContext(`${click}\n(async () => clickIndexed({ index: 0, settleMs: 50 }))()`, ctx);
+    assert.equal(out.vetoed, true, `must veto: ${label}`);
+    assert.equal(out.clicked, false, `must not click: ${label}`);
+    assert.equal(clickedFlag, false, `onclick must not fire: ${label}`);
+    dom.window.close();
+  }
+});
+
+test('lockstep: clickIndexed DANGER === preExtractCleanup DANGER_WORDS; chrome selectors aligned', async () => {
+  const src = await readFile(EXTRACTOR, 'utf8');
+  const dangerWords = src.match(/const DANGER_WORDS = (\/.*\/i);/);
+  const dangerClick = src.match(/const DANGER = (\/.*\/i);/);
+  assert.ok(dangerWords && dangerClick, 'both danger regexes found');
+  assert.equal(dangerClick[1], dangerWords[1], 'clickIndexed danger list must equal preExtractCleanup (drift re-opens the labuladong hole)');
+  // 三处 closest() chrome 排除选择器逐字一致（isChromeNoise 用 tagName/role 逐判，是超集，另计）。
+  const selectors = [...src.matchAll(/closest\('(nav, header, footer[^']*)'\)/g)].map((m) => m[1]);
+  assert.ok(selectors.length >= 3, `expected >=3 chrome closest() selectors, got ${selectors.length}`);
+  for (const s of selectors) {
+    assert.equal(s, 'nav, header, footer, aside, [role="navigation"], [role="menubar"], [role="complementary"], [role="search"]',
+      'chrome exclusion must include aside/complementary/search everywhere');
+  }
+});
+
 test('clickIndexed: already-open expander and unknown index are no-ops', async () => {
   const snapshot = await loadSiblingFn('interactiveSnapshot');
   const click = await loadSiblingFn('clickIndexed');

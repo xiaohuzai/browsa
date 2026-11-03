@@ -112,6 +112,22 @@ test('SUBCHAT never calls storage.appendToHistory', async () => {
   assert.doesNotMatch(subchatSrc, /appendToHistory\(/, 'SUBCHAT must never write to the main history');
 });
 
+test('SUBCHAT finally cleanup is identity-gated (a late old-turn finally must not delete a new turn)', async () => {
+  // 2026-11-03 审计：停止后立刻重发，旧流的 abort rejection 异步落地（卡在无
+  // signal 的 session 创建时可迟数秒），旧 finally 曾无条件 delete(subId)→删掉
+  // 新回合的 controller/runId/pending（新回合 Stop 变 no-op）。须与主聊天
+  // ownsController 同形，按本回合 controller 身份门控。
+  const subchatSrc = await readSubchatHandlerSrc();
+  const finallyIdx = subchatSrc.lastIndexOf('} finally {');
+  assert.ok(finallyIdx > 0, 'subchat stream has a finally cleanup');
+  const block = subchatSrc.slice(finallyIdx, finallyIdx + 600);
+  assert.match(block, /if \(subChatControllers\.get\(subId\) === controller\)/,
+    'finally must gate on this turn’s controller identity before deleting controller/runId/pending');
+  const deleteIdx = block.indexOf('subChatControllers.delete(subId)');
+  const gateIdx = block.indexOf('subChatControllers.get(subId) === controller');
+  assert.ok(gateIdx !== -1 && gateIdx < deleteIdx, 'the identity gate must precede the delete');
+});
+
 // --------------- SUBCHAT: runs for Hermes (dedicated session), dispatcher for LLM styles
 
 test('SUBCHAT: LLM styles via the shared dispatcher; Hermes gets its own runs branch on a DEDICATED per-subId session', async () => {

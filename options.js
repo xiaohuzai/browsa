@@ -1471,11 +1471,15 @@ async function persistProvider(name, value) {
   // Baseline is the page's table, not the stored one: the four agent providers
   // (hermes/opencode/squilla/bridge) are shipped defaults merged in at load time
   // and are NOT in storage until the user saves one, so writing the stored table
-  // back verbatim would delete them. Keys that storage gained since load (another
-  // tab, an import) are the ones to rescue.
+  // back verbatim would delete them. For every row storage DOES hold, storage
+  // wins: the page snapshot is never newer than storage for a row it isn't
+  // actively writing, so this rescues both rows created elsewhere AND concurrent
+  // edits to existing rows (a second settings tab). The row being written is
+  // overwritten with `value` just below. (Earlier `if (!(k in next))` only rescued
+  // new keys and silently reverted a concurrently-edited existing row.)
   const next = { ...(cachedCfg.providers || {}) };
   if (latest && typeof latest === 'object') {
-    for (const [k, v] of Object.entries(latest)) if (!(k in next)) next[k] = v;
+    for (const [k, v] of Object.entries(latest)) next[k] = v;
   }
   if (value === undefined) delete next[name];
   else next[name] = value;

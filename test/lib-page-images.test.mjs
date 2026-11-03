@@ -272,6 +272,14 @@ test('isBlockedPageImageUrl: 私网/loopback/metadata/单标签/IPv6 内部段�
     'http://[fe80::1]/x.png',                          // 链路本地
     'http://[::ffff:10.0.0.1]/x.png',                  // IPv4-mapped（点分写法）
     'http://[::ffff:a00:1]/x.png',                     // IPv4-mapped（十六进制写法）
+    'http://[::127.0.0.1]/x.png',                      // IPv4-compatible（归一成 ::7f00:1，2026-11-03 审计）
+    'http://[::7f00:1]/x.png',                         // 同上十六进制裸写法
+    'http://[::a00:1]/x.png',                          // IPv4-compatible ::10.0.0.1
+    'http://metadata.google.internal./x.png',          // 尾点 FQDN 绕过（2026-11-03 审计）
+    'http://localhost./x.png',                         // 尾点 loopback
+    'https://nas.internal./x.jpg',                     // 尾点内网后缀
+    'https://printer.local./x.png',                    // 尾点 .local
+    'https://intranet./x.jpg',                         // 尾点单标签
     'https://user:pass@example.com/x.png',             // URL 内嵌凭据
     'ftp://example.com/x.png',
     'javascript:void(0)',
@@ -287,6 +295,8 @@ test('isBlockedPageImageUrl: 私网/loopback/metadata/单标签/IPv6 内部段�
     'https://93.184.216.34/img.png',                   // 公网 IP 字面量
     'https://pic1.zhimg.com/v2-abc_r.jpg',
     'http://[2606:4700::6810:85e5]/x.png',             // 公网 IPv6
+    'https://cdn.example.com./a.jpg',                  // 公网域名尾点（合法根锚）仍放行
+    'http://[2001:db8::1]/x.png',                      // 公网 IPv6（文档段，非内部）仍放行
   ];
   for (const url of allowed) {
     assert.equal(isBlockedPageImageUrl(url), false, `must allow: ${url}`);

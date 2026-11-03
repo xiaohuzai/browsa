@@ -89,7 +89,7 @@ Object.defineProperty(globalThis, 'chrome', {
 // Dynamic import so the mock is in place before background.js evaluates.
 const bg = await import('../background.js');
 const { handle, streamState, streamPorts, initStreamState, appendToStreamState, clearStreamState } = bg;
-const { pushChunk } = await import('../lib/state.js'); // same module instance bg uses (not re-exported)
+const { pushChunk, peekTerminalTombstone, takeTerminalTombstone } = await import('../lib/state.js'); // same module instance bg uses (not re-exported)
 
 // --------------- tests -------------------------------------------------------
 
@@ -358,4 +358,23 @@ test('REASSIGN_STREAM_SESSION for an unknown tab reports reassigned:false', asyn
   streamState.clear();
   const r = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 9999, sessionId: 's1' });
   assert.equal(r.reassigned, false);
+});
+
+test('a backgrounded stream still tombstones its DONE/ERROR (bg gate must not skip the record)', async () => {
+  // 2026-11-03 审计：pushChunk 的 bg 门曾在 tombstone 记录之前 early-return，后台
+  // 流（切会话转后台）完成时 DONE 不留墓碑→切回时 PEEK→HELLO 竞态接不住回复→
+  // 永久 spinner。记录必须先于 bg 门；replay 侧 resume 门 + origin 校验保证不泄漏。
+  streamState.clear();
+  streamPorts.clear();
+  initStreamState(7, { bg: true, originSessionId: 's1' });
+  assert.equal(streamState.get(7).bg, true);
+
+  // bg CHUNK 仍被抑制（无 port 注册，这里只验证 DONE 墓碑不被 bg 门吞掉）。
+  pushChunk(7, { type: 'DONE', full: 'backgrounded reply', providerLabel: 'test' });
+  assert.equal(peekTerminalTombstone(7), true, 'bg DONE must leave a tombstone for the switch-back resume');
+  const terminal = takeTerminalTombstone(7);
+  assert.equal(terminal?.type, 'DONE');
+  assert.equal(terminal?.full, 'backgrounded reply');
+  assert.equal(peekTerminalTombstone(7), false, 'read-once');
+  clearStreamState(7);
 });

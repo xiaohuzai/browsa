@@ -129,6 +129,23 @@ test('buildAgentTurn — images: msg.images first, then trailing page-context ru
   assert.deepEqual(t.images, [IMG_D, IMG_C, IMG_A, IMG_B]);
 });
 
+test('buildAgentTurn — legacy flat image_url part still rides (imagePartUrl single source, 2026-11-03 audit)', () => {
+  // 旧存储条目的扁平部件 {type:'image_url', image_url:'data:…'}（image_url 是字符串
+  // 而非 {url}）。旧手写 `typeof p.image_url?.url === 'string'` 漏掉它→agent 腿丢图
+  // 只留锚点。imagePartUrl 收录全部形状，与 LLM 腿同源。
+  const FLAT = 'data:image/png;base64,FLAT';
+  const NESTED = 'data:image/png;base64,NESTED';
+  const history = [
+    { role: 'user', content: [
+      { type: 'text', text: `${PCP}\nURL: https://a.com\n---\n\npage a` },
+      { type: 'image_url', image_url: FLAT },               // legacy flat
+      { type: 'image_url', image_url: { url: NESTED } },    // OpenAI nested
+    ] },
+  ];
+  const t = buildAgentTurn({ userText: '看图' }, history);
+  assert.deepEqual(t.images, [FLAT, NESTED], 'both flat and nested image parts ride, in order');
+});
+
 test('buildAgentTurn — no page context, no images: empty images array', () => {
   const t = buildAgentTurn({ userText: 'hi' }, [{ role: 'user', content: 'old' }]);
   assert.equal(t.text, 'hi');

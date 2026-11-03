@@ -1582,6 +1582,21 @@ function cancelStream({ salvage = true, detach = false } = {}) {
     turnChrome.clearToolProgress(cancelledEl);
     turnChrome.stopWait();
     cancelledRenderStream?.destroy?.();
+    // C3 单一收尾（2026-11-03 审计，与 detail-thread stopTurn 同形）：destroy 只停
+    // pacer/移除 live-think，不做最终装饰——被取消的部分回复此前缺代码复制按钮、
+    // [mm:ss] 不链化、已存图片尺寸不重放（finishBubble 是 applyStoredImageSizes 唯一
+    // 挂点）。有文本则 renderSafe + finishBubble 定稿；追问卡先 capture 后 reinsert。
+    // fire-and-forget：cancelStream 的调用方（Esc/切会话）是同步口，装饰异步落地即可。
+    const cancelledPartial = String(cancelledState?.acc || '');
+    if (cancelledPartial.trim()) {
+      const nested = captureDetailCardsIn(cancelledEl);
+      renderSafe(cancelledPartial).then((html) => {
+        cancelledEl.innerHTML = html;
+        cancelledEl.dataset.raw = cancelledPartial;
+        reinsertDetailCards(cancelledEl, nested);
+        finishBubble(cancelledEl);
+      }).catch(() => {});
+    }
   }
   activeController = null;
   setStreamingUI(false);
@@ -1844,15 +1859,18 @@ function createDriftingStreamTarget({ initialEl, resolveEl, makeRenderer, onElem
 // pick up the previous turn's DONE.
 function waitForStreamHelloAck(port, tabId, { onAck, resume = false } = {}) {
   return new Promise((resolve) => {
-    const ackTimeout = setTimeout(resolve, 500);
-    port.onMessage.addListener(function once(m) {
+    function once(m) {
       if (m.type === 'STREAM_HELLO_ACK') {
         clearTimeout(ackTimeout);
         port.onMessage.removeListener(once);
         onAck?.();
         resolve();
       }
-    });
+    }
+    // 超时也移除 once（2026-11-03 审计）：否则迟到的 ACK 会在 await 已返回后才
+    // 触发 onAck，时序倒置。调用方对 onAck 的接线须幂等并在 await 后兜底补挂。
+    const ackTimeout = setTimeout(() => { port.onMessage.removeListener(once); resolve(); }, 500);
+    port.onMessage.addListener(once);
     port.postMessage({ type: 'STREAM_HELLO', tabId, ...(resume ? { resume: true } : {}) });
   });
 }
@@ -2025,6 +2043,17 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
         // 到这条 ERROR）。与 cancelStream 的收尸记账同一不变量。
         if (m.salvaged) hidxAssign(el);
       } else {
+        // SW-death tombstone replay：先定稿部分文本气泡——isDone 重渲会 destroy
+        // renderer（移除 live-think「思考中…」块）并跑 finishBubble 装饰/图片尺寸
+        // 重放，再追加错误提示。2026-11-03 审计前此分支只 appendError，renderer 不
+        // destroy→live-think 永久挂在死气泡上方直到下次 renderHistory（与 ABORTED
+        // 分支同一收尾不变量）。
+        const r = target.getRenderer();
+        const el = target.getEl();
+        const nested = captureDetailCardsIn(el);
+        await r(state.acc || '', true);
+        reinsertDetailCards(el, nested);
+        refreshDetailHighlights(el);
         appendError(tSub('streamDied', '⚠️ 回复流中断：$1', m.error || '未知错误'));
       }
       // The background never disconnects the port after pushing ERROR —
@@ -2155,9 +2184,17 @@ async function onSend() {
   // handler emits a delta, it looks up the port via this tabId.
   // We wait for an ACK before sending the CHAT message, to avoid a race
   // where the first chunk fires before the background has registered us.
+  let chunkListenerAttached = false;
   await waitForStreamHelloAck(port, turnTabId, { onAck: attachChunkListener });
+  // 超时兜底（2026-11-03 审计）：ACK 迟于 500ms（SW 冷启动完全可能）时 onAck
+  // 不触发，旧实现此后永不挂监听→CHAT 照发但 CHUNK/DONE 无人接，整轮回复在 UI
+  // 消失。这里无条件补挂；幂等守卫保证 ACK 正常到达（onAck 已挂）时不重复接线，
+  // 与 detail-thread「await 后无条件挂监听」的正确形状对齐。
+  attachChunkListener();
 
   function attachChunkListener() {
+    if (chunkListenerAttached) return;
+    chunkListenerAttached = true;
     wireChatStreamPort({
       port,
       tabId: turnTabId,

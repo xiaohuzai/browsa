@@ -153,6 +153,29 @@ test('durable mirror: initStreamState writes a record, deltas flush debounced, c
   assert.deepEqual((await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'], [], 'index entry removed');
 });
 
+test('readDurableTurns never deletes a LIVE turn’s empty-acc record (SW-wake race guard)', async () => {
+  // 2026-11-03 审计：SW 醒来即发的新回合刚 durableTurnBegin 写入 acc='' 记录，
+  // 收尸扫描曾把空 acc 记录就地 durableTurnEnd 删掉（活回合守卫在下游来得太晚）；
+  // scheduleDurableTurnFlush 只重写记录键不重写索引→索引条目一旦被删，该回合
+  // 的 SW-death 收尸永久失效。readDurableTurns 必须跳过 streamState 里的活回合。
+  sessionArea._reset();
+  streamState.clear();
+  initStreamState(41, { providerLabel: 'bridge', providerKey: { name: 'bridge' } });
+  await tick();
+  let rec = (await sessionArea.get('browsa.inflightTurn.41'))['browsa.inflightTurn.41'];
+  assert.ok(rec, 'sanity: live turn seeded an empty-acc record');
+  assert.equal(rec.acc, '');
+
+  const salvaged = await readDurableTurns();
+  assert.deepEqual(salvaged, [], 'a live turn is not salvaged');
+  rec = (await sessionArea.get('browsa.inflightTurn.41'))['browsa.inflightTurn.41'];
+  assert.ok(rec, 'live turn record must survive the sweep');
+  const idx = (await sessionArea.get('browsa.inflightTurns'))['browsa.inflightTurns'];
+  assert.deepEqual(idx, [41], 'live turn index entry must survive');
+  clearStreamState(41);
+  await tick();
+});
+
 // Turn step ledger ↔ durable mirror (2026-10-23). The chat-handler's
 // onToolProgress schedules a durable flush when a step lands, because a long
 // tool call can run for minutes with no text delta — a SW death in that window

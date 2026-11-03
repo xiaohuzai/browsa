@@ -1241,6 +1241,47 @@ function loadContentScript(name) {
     }
   });
 
+  test('twitter: activeXFetch excludes the main tweet from replies after adopting longer DOM text (identity regression)', async () => {
+    // 2026-11-03 审计：采纳 DOM 长文本会用 Object.assign 把 main 换成新对象，原对象
+    // 仍在 tweets 里；按 `t !== main` 过滤会把主推文当成自己的第一条回复。必须按
+    // tweets 内的原始引用排除。
+    const prev = globalThis.window;
+    const domMainEl = {
+      querySelector: (sel) => {
+        if (sel === '[data-testid="tweetText"]') return { textContent: 'the main tweet expanded long note_tweet body' };
+        if (sel === '[data-testid="User-Name"]') return { textContent: 'Alice\n@alice' };
+        if (sel === 'time') return { closest: () => ({ getAttribute: () => '/jayair/status/111' }), getAttribute: () => '' };
+        return null;
+      },
+      querySelectorAll: () => [],
+    };
+    globalThis.window = {
+      location: { pathname: '/jayair/status/111' },
+      __INITIAL_STATE__: {
+        entities: {
+          tweets: {
+            '222': { id_str: '222', full_text: 'a reply', user_id_str: 'u2' },
+            '111': { id_str: '111', full_text: 'main short', user_id_str: 'u1' },
+          },
+          users: {
+            u1: { id_str: 'u1', name: 'Alice', screen_name: 'alice' },
+            u2: { id_str: 'u2', name: 'Bob', screen_name: 'bob' },
+          },
+        },
+      },
+      document: { querySelectorAll: (sel) => (sel === '[data-testid="tweet"]' ? [domMainEl] : []) },
+    };
+    try {
+      const result = await activeXFetch();
+      assert.equal(result.tweetId, '111');
+      assert.equal(result.text, 'the main tweet expanded long note_tweet body', 'adopts the longer DOM text');
+      assert.equal(result.replies.length, 1, 'main tweet must not appear as its own reply');
+      assert.equal(result.replies[0].text, 'a reply');
+    } finally {
+      if (prev === undefined) delete globalThis.window; else globalThis.window = prev;
+    }
+  });
+
   test('twitter: activeXFetch returns null (no throw) when nothing extractable', async () => {
     const prev = globalThis.window;
     globalThis.window = { location: { pathname: '/explore' }, __INITIAL_STATE__: undefined };
