@@ -359,6 +359,33 @@ function connectNavPort() {
 }
 
 /**
+ * Panel-wide keyboard shortcuts. Extracted from init() (2026-11-03): the Esc chain
+ * encodes a real ordering decision (overlays and native dialogs own Esc first, then
+ * search, multiselect, drawers — only then does Esc cancel the stream) and it used
+ * to sit 500 lines into a function, invisible next to unrelated wiring.
+ */
+function wireGlobalShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // 顶层浮层占用短路（2026-10-01 审计）：确认框（.confirm-overlay，含上下文/
+      // 提示词检查器）与 native <dialog>（灯箱、截图裁剪）各有自己的 Esc 处理，
+      // 与这条 document 链并行注册——此前一次 Esc 既关浮层又穿透到链上（流式中
+      // 弹「清空」确认框，按 Esc 想反悔却把回复一起 cancel）。有浮层时链不接管。
+      if (document.querySelector('.confirm-overlay, dialog[open]')) return;
+      if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
+      if (isInMultiSelectMode()) { exitMultiSelect(); return; }
+      if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
+      if (isOpenTranscriptDrawer()) { closeTranscriptDrawer(); return; }
+      if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== inputEl) {
+      e.preventDefault();
+      openMsgSearch();
+    }
+  });
+}
+
+/**
  * Tab-switch plumbing for the panel. Extracted from init() (2026-11-03) because
  * these two listeners are "register only" wiring: they repaint the page-meta bar,
  * retarget currentTabId and follow the new tab with the nav port. The comments
@@ -598,25 +625,7 @@ async function init() {
     }
   });
 
-  // Global shortcuts (Esc = cancel stream or close drawer/search, Ctrl+F = search)
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      // 顶层浮层占用短路（2026-10-01 审计）：确认框（.confirm-overlay，含上下文/
-      // 提示词检查器）与 native <dialog>（灯箱、截图裁剪）各有自己的 Esc 处理，
-      // 与这条 document 链并行注册——此前一次 Esc 既关浮层又穿透到链上（流式中
-      // 弹「清空」确认框，按 Esc 想反悔却把回复一起 cancel）。有浮层时链不接管。
-      if (document.querySelector('.confirm-overlay, dialog[open]')) return;
-      if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
-      if (isInMultiSelectMode()) { exitMultiSelect(); return; }
-      if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
-      if (isOpenTranscriptDrawer()) { closeTranscriptDrawer(); return; }
-      if (activeController && !activeController.cancelled) { e.preventDefault(); cancelStream(); }
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && document.activeElement !== inputEl) {
-      e.preventDefault();
-      openMsgSearch();
-    }
-  });
+  wireGlobalShortcuts();
 
   // Show current page meta
   if (tab) setPageMeta(tab.title, tab.url);
