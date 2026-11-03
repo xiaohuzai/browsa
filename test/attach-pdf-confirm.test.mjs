@@ -11,6 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseChatContent } from './helpers/sse-fixtures.mjs';
 
 const localArea = makeStorageArea({
   activeProvider: 'compatible',
@@ -210,11 +211,7 @@ test('ATTACH_PDF_CONFIRM: missing text is a no-op error, not a crash', async () 
 // attachId stamp, no shouldSummarize check), unlike same-sized page
 // attachments via ATTACH_PAGE.
 
-function sseFor(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
-  return new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } });
-}
+const sseFor = (text) => sseChatContent(text);
 
 async function flush() {
   await new Promise((r) => setTimeout(r, 20));

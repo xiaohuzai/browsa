@@ -8,6 +8,7 @@
 
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { sseHttpResponse } from './helpers/sse-fixtures.mjs';
 import {
   normalizeOpencodeUrl,
   buildOpencodeTurn,
@@ -23,17 +24,7 @@ const now = Date.now();
 const PCP = '[Page context attached by browsa]';
 const ev = (type, data) => `data: ${JSON.stringify({ id: 'evt_x', type, data: { timestamp: now, sessionID: SES, ...data } })}\n\n`;
 
-function sseResponse(lines, { holdOpen = true } = {}) {
-  const enc = new TextEncoder();
-  const body = new ReadableStream({
-    start(c) {
-      for (const l of lines) c.enqueue(enc.encode(l));
-      if (!holdOpen) c.close();
-    },
-    cancel() {},
-  });
-  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
-}
+const sseResponse = (lines, opts) => sseHttpResponse(lines, { holdOpen: opts?.holdOpen ?? true });
 
 function jsonResponse(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });

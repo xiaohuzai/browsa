@@ -5,20 +5,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { sseHttpResponse } from './helpers/sse-fixtures.mjs';
 
 const { bridgeStream, pingBridge, respondBridgeApproval, renameBridgeSession, normalizeBridgeUrl } = await import('../lib/bridge-client.js');
 
-function sseResponse(chunks, { status = 200 } = {}) {
-  const encoder = new TextEncoder();
-  let i = 0;
-  const body = new ReadableStream({
-    pull(controller) {
-      if (i < chunks.length) controller.enqueue(encoder.encode(chunks[i++]));
-      else controller.close();
-    },
-  });
-  return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } });
-}
+const sseResponse = (chunks, opts) => sseHttpResponse(chunks, { status: opts?.status ?? 200 });
 
 function captureFetch(handler) {
   const calls = [];

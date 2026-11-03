@@ -12,32 +12,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-
-function buildSseStream(blocks) {
-  const encoder = new TextEncoder();
-  let text = '';
-  for (const b of blocks) {
-    // Chat blocks are the raw wire object; responses blocks are {event, data}
-    // wrappers (their SSE event name rides in `event`, per llm-client-responses).
-    if (b.event) text += `event: ${b.event}\n`;
-    text += `data: ${JSON.stringify(b.data ?? b)}\n\n`;
-  }
-  text += 'data: [DONE]\n\n';
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(encoder.encode(text));
-      controller.close();
-    }
-  });
-}
-
-function mockFetchWithStream(blocks, capture) {
-  globalThis.fetch = async (url, opts) => {
-    capture.url = String(url);
-    if (opts?.body) capture.body = JSON.parse(opts.body);
-    return { ok: true, status: 200, body: buildSseStream(blocks), text: async () => '' };
-  };
-}
+import { sseFetch, sseStreamRaw } from './helpers/sse-fixtures.mjs';
+// Chat-completions blocks are the RAW wire object (no `event:` line) and the stream
+// ends with the OpenAI `data: [DONE]` sentinel — the one place the shared fixtures
+// have to be asked for that variant explicitly.
+const buildSseStream = (blocks) => sseStreamRaw(blocks, { appendDone: true });
+const mockFetchWithStream = (blocks, capture) => {
+  globalThis.fetch = sseFetch(blocks, { capture, body: buildSseStream(blocks) });
+};
 
 const REASONING_STREAM = [
   { choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] },

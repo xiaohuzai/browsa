@@ -20,6 +20,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { sseResponseLike } from './helpers/sse-fixtures.mjs';
 
 const realFetch = globalThis.fetch;
 
@@ -34,16 +35,7 @@ function hangingFetch() {
   });
 }
 
-function sseResponse(frames) {
-  const encoder = new TextEncoder();
-  const body = new ReadableStream({
-    start(controller) {
-      for (const f of frames) controller.enqueue(encoder.encode(f));
-      controller.close();
-    },
-  });
-  return { ok: true, status: 200, body, text: async () => '' };
-}
+const sseResponse = (frames) => sseResponseLike(frames, { text: async () => '' });
 
 async function expectAbortError(promise, label) {
   let err = null;

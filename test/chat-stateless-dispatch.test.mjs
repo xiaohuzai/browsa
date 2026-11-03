@@ -15,6 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseResponseLike } from './helpers/sse-fixtures.mjs';
 
 // ---- in-memory chrome.storage areas (same pattern as test/storage.test.mjs)
 
@@ -33,16 +34,7 @@ Object.defineProperty(globalThis, 'chrome', {
 
 const { handleChat } = await import('../lib/handlers/chat-handler.js');
 
-function sseResponse(events) {
-  const encoder = new TextEncoder();
-  const body = new ReadableStream({
-    start(controller) {
-      for (const e of events) controller.enqueue(encoder.encode(e));
-      controller.close();
-    },
-  });
-  return { ok: true, status: 200, body, headers: { get: () => 'text/event-stream' } };
-}
+const sseResponse = (events) => sseResponseLike(events, { headers: { get: () => 'text/event-stream' } });
 
 async function seedChatProvider() {
   localArea._reset();

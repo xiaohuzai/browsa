@@ -7,30 +7,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { sseStream } from './helpers/sse-fixtures.mjs';
+import { sseFetch } from './helpers/sse-fixtures.mjs';
 
-function buildSseStream(blocks) {
-  const encoder = new TextEncoder();
-  let text = '';
-  for (const b of blocks) {
-    if (b.event) text += `event: ${b.event}\n`;
-    text += `data: ${JSON.stringify(b.data)}\n\n`;
-  }
-  const bytes = encoder.encode(text);
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    }
-  });
-}
 
-function mockFetchWithStream(blocks, capture) {
-  globalThis.fetch = async (url, opts) => {
-    capture.url = String(url);
-    capture.body = JSON.parse(opts.body);
-    return { ok: true, status: 200, body: buildSseStream(blocks), text: async () => '' };
-  };
-}
+const mockFetchWithStream = (blocks, capture) => { globalThis.fetch = sseFetch(blocks, { capture }); };
 
 test('anthropicStream: POSTs to /v1/messages with system + max_tokens and streams text_delta', async () => {
   const { anthropicStream } = await import('../lib/llm-client.js');

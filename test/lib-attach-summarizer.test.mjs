@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseChatContent } from './helpers/sse-fixtures.mjs';
 
 const localArea = makeStorageArea();
 const sessionArea = makeStorageArea();
@@ -26,22 +27,8 @@ const {
 
 function reset() { localArea._reset(); sessionArea._reset(); }
 
-function buildSseStream(blocks) {
-  const encoder = new TextEncoder();
-  let text = '';
-  for (const b of blocks) {
-    if (b.event) text += `event: ${b.event}\n`;
-    text += `data: ${JSON.stringify(b.data)}\n\n`;
-  }
-  const bytes = encoder.encode(text);
-  return new ReadableStream({
-    start(controller) { controller.enqueue(bytes); controller.close(); }
-  });
-}
 
-function sseFor(text) {
-  return buildSseStream([{ data: { choices: [{ delta: { content: text } }] } }]);
-}
+const sseFor = (text) => sseChatContent(text);
 
 const PROVIDER = { baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' };
 
