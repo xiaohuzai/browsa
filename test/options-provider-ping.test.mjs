@@ -370,6 +370,36 @@ test('options.js: init() renders the agent squad (bridge + opencode + squilla + 
   assert.equal(document.querySelector('.provider-tab-add') != null, true, 'the ＋ add-provider tab is always present — even with the reserved slot');
 });
 
+test('options.js: Ping on a half-filled card reports the missing field WITHOUT persisting it', async () => {
+  // A2 (2026-11-03): pingCard used to call saveCard() first - which persists
+  // unconditionally - and only then preflight the required fields. A user who
+  // left Model ID empty and clicked Ping got "Please fill in: Model ID" while a
+  // provider with NO model was already in storage; the sidebar's isConfigured
+  // only checks baseUrl, so the dropdown then offered a provider that could never
+  // work, with a badge claiming "unreachable" for a ping that never ran.
+  const baseUrl = 'http://preflight-' + Math.random().toString(36).slice(2);
+  const card = document.querySelector('.provider.reserved');
+  assert.ok(card, 'fresh install shows the reserved LLM slot');
+  card.querySelector('[data-k="baseUrl"]').value = baseUrl;
+  // Model ID deliberately left empty.
+  let pinged = false;
+  globalThis.fetch = async () => { pinged = true; throw new Error('must not be reached'); };
+
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 25));
+
+  assert.match(card.querySelector('.card-status').textContent, /Model ID/, 'the preflight must name the missing field');
+  const providers = storedData.providers || {};
+  assert.equal(
+    Object.values(providers).find((p) => (p.baseUrl || '') === baseUrl),
+    undefined,
+    'a card that failed preflight must not reach storage (the sidebar would list an unusable provider)',
+  );
+  assert.doesNotMatch(card.querySelector('.provider-badge')?.textContent || '', /unreachable/,
+    'a ping that never ran must not claim the provider is unreachable');
+  assert.equal(pinged, false, 'no network probe may run for a card that cannot be valid');
+});
+
 test('options.js: settings header carries the guide link matching the UI locale', () => {
   const a = document.getElementById('guideLink');
   assert.ok(a, 'guide link present in the settings page header');

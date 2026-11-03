@@ -973,6 +973,22 @@ function buildProviderCard(name, cfg, opts = {}) {
   return card;
 }
 
+// Which fields a card cannot be pinged (or considered configured) without.
+// The card template marks them with reqMark() and Ping's preflight names them, so
+// both surfaces read this one list instead of three hand-written copies (the
+// 2026-11-03 audit found the requirement stated in the template ×3 and again as
+// two inline ifs in pingCard).
+function missingFieldsFor({ baseUrl, model, type, isBridge }) {
+  // Bridge cards keep their addresses in the per-endpoint rows, not in the
+  // baseUrl/model inputs, and the bridge ping branch already fails fast with an
+  // instructional error when the list is empty ("先添加至少一个桥地址再 Ping").
+  if (isBridge) return [];
+  const missing = [];
+  if (!String(baseUrl || '').trim()) missing.push(_t('baseUrlLabel', 'Base URL'));
+  if ((type || 'llm') === 'llm' && !String(model || '').trim()) missing.push(_t('modelIdLabel', 'Model ID'));
+  return missing;
+}
+
 function readCard(card) {
   const out = {};
   card.querySelectorAll('[data-k]').forEach((el) => {
@@ -1111,6 +1127,24 @@ async function pingCard(name, card) {
   // clears it.
   const wasReachable = _pingState[name] === 'reachable';
 
+  // Preflight FIRST — before saveCard(), which persists unconditionally. The old
+  // order saved the card and only then complained about a missing field: a card
+  // with an empty Model ID reached storage anyway, the sidebar (isConfigured
+  // checks baseUrl only) listed it as selectable, and the badge claimed
+  // "unreachable" for a ping that never ran. Validating the DRAFT keeps the
+  // "failed validation wrote nothing" rule structural.
+  const draft = readCard(card);
+  const missing = missingFieldsFor({
+    baseUrl: draft.baseUrl,
+    model: draft.model,
+    type: cachedCfg.providers[name]?.type,
+    isBridge: !!cachedCfg.providers[name]?.isBridge,
+  });
+  if (missing.length) {
+    flashCard(card, 'err', `❌ ${tSub('pingMissingFields', 'Please fill in: $1', missing.join(', '))}`);
+    return;
+  }
+
   await saveCard(name, card);
   // saveCard() re-renders when a reserved slot is committed — re-query so
   // the DOM ref below stays attached to a live card.
@@ -1119,20 +1153,6 @@ async function pingCard(name, card) {
   // saveCard() rejects a blank reserved slot by deleting it (error already
   // flashed) — there is nothing to ping.
   if (!cfg) return;
-
-  // Preflight gate: name EVERY missing required field in one message instead
-  // of letting each provider layer reject with a bare technical string
-  // (llm-client: "baseUrl is required"). Agent cards only require a Base
-  // URL; LLM cards additionally require a Model ID. Labels resolve through
-  // _t so the message names the fields exactly as the card labels them.
-  const missing = [];
-  if (!(cfg.baseUrl || '').trim()) missing.push(_t('baseUrlLabel', 'Base URL'));
-  if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) missing.push(_t('modelIdLabel', 'Model ID'));
-  if (missing.length) {
-    flashCard(card, 'err', `❌ ${tSub('pingMissingFields', 'Please fill in: $1', missing.join(', '))}`);
-    setBadge(card, 'unreachable', name);
-    return;
-  }
 
   flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
