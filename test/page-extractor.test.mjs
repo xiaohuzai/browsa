@@ -2331,3 +2331,123 @@ test('extractInPageWorld: PMC citation_author meta fills the byline Readability 
     'citation_author metas joined with commas; institutions deliberately not appended');
   assert.equal(result.articleTitle, 'Real Article');
 });
+
+// --- MathJax-rendered formula preservation (2026-11-02 audit) --------------
+// MathJax 3 CHTML containers carry class "CtxtMenu_Attached_0"; Readability's
+// unlikelyCandidates regex matches "menu" and deleted the whole container
+// (assistive MathML included), so every formula vanished from reader output.
+// lilianweng.github.io/posts/2017-06-21-overview lost 7/7 formulas this way.
+
+// Exact MathJax 3 CHTML shape: visible glyphs are CSS pseudo-elements (empty
+// DOM text), the assistive copy lives inside a container Readability would
+// delete on the "menu" class match.
+function mjxContainer(mathHtml, { display = false } = {}) {
+  return `<mjx-container class="MathJax CtxtMenu_Attached_0" jax="CHTML"${display ? ' display="true"' : ''} tabindex="0"><mjx-math aria-hidden="true"></mjx-math><mjx-assistive-mml unselectable="on"><math>${mathHtml}</math></mjx-assistive-mml></mjx-container>`;
+}
+
+test('extractInPageWorld: MathJax 3 CHTML formulas become $…$ / $$…$$ instead of vanishing', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>MathJax Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>The model state ${mjxContainer('<mi>placeholder-inline-1</mi>')} is followed by ${mjxContainer('<mi>placeholder-inline-2</mi>')} in the sequence, and this sentence is long enough to stay put.</p>
+      <p>Pythagoras ${mjxContainer('<mi>placeholder-display</mi>', { display: true })} is a display formula.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const TEX = [
+    { math: 's\\_{t-1}', display: false, inputJax: { name: 'TeX' } },
+    { math: 't+1', display: false, inputJax: { name: 'TeX' } },
+    // No .display on the item: the container's display="true" attribute must
+    // keep the formula in $$…$$ (MathJax-major fallback).
+    { math: 'a^2 + b^2 = c^2', inputJax: { name: 'TeX' } },
+  ];
+  let i = 0;
+  // MathJax 3/4 runtime lookup, as verified on the live lilianweng page.
+  dom.window.MathJax = {
+    startup: { document: { getMathItemsWithin: () => [TEX[i++]] } }
+  };
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(result.text.includes('$s\\_{t-1}$'),
+    `inline TeX must survive verbatim with $ delimiters, got: ${result.text.slice(0, 400)}`);
+  assert.ok(result.text.includes('$t+1$'), 'second inline formula must survive');
+  assert.ok(result.text.includes('$$a^2 + b^2 = c^2$$'), 'display formula must use $$ delimiters');
+  assert.ok(!result.text.includes('placeholder-inline-1'),
+    'assistive MathML placeholder must not leak once the TeX was harvested');
+  assert.ok(!result.text.includes('\\\\_'), 'the browsaMath rule must emit LaTeX unescaped');
+});
+
+test('extractInPageWorld: MathJax container without runtime API keeps assistive MathML text (no empty gap)', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Static MathJax Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>The unrolling version illustrates what happens in time: ${mjxContainer('<mi>s</mi><mi mathvariant="normal">_</mi><mi>t</mi>')} and then continues with more prose that keeps the paragraph substantial.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  // No window.MathJax at all -- the API harvest cannot run.
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(result.text.includes('in time: s\\_t and'),
+    `assistive MathML text must survive (markdown-escaped, as plain prose), got: ${result.text.slice(0, 400)}`);
+});
+
+test('extractInPageWorld: MathML-input MathJax items are not wrapped in $…$ (raw XML never reaches the model)', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>MathML Input Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p>Value: ${mjxContainer('<mi>x</mi><mo>+</mo><mn>1</mn>')} and then more prose keeps this paragraph substantial enough.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  // Source format is MathML, not TeX -- item.math is markup, so the harvest
+  // must fall back to the assistive text rather than emit $<mi>x</mi>…$.
+  dom.window.MathJax = {
+    startup: { document: { getMathItemsWithin: () => [{ math: '<mi>x</mi><mo>+</mo><mn>1</mn>', display: false, inputJax: { name: 'MathML' } }] } }
+  };
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(!result.text.includes('<mi>'), 'raw MathML markup must not be wrapped in $…$');
+  assert.ok(result.text.includes('Value: x+1 and'),
+    `assistive text must be used for non-TeX input, got: ${result.text.slice(0, 400)}`);
+});
+
+test('extractInPageWorld: a container added mid-harvest keeps assistive text and never steals another MathJax formula', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Late MathJax Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p id="mathline">First ${mjxContainer('<mi>placeholder-a</mi>')} then ${mjxContainer('<mi>placeholder-b</mi>')} and more prose keeps this line substantial.</p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const TEX = [
+    { math: 'a_1', display: false, inputJax: { name: 'TeX' } },
+    { math: 'b_2', display: false, inputJax: { name: 'TeX' } },
+  ];
+  let calls = 0;
+  dom.window.MathJax = {
+    startup: { document: { getMathItemsWithin: () => {
+      const item = TEX[calls];
+      calls += 1;
+      if (calls === 2) {
+        // A container appears after the harvest's static NodeList was taken:
+        // it carries no payload, while the two original containers still do.
+        dom.window.document.getElementById('mathline')
+          .insertAdjacentHTML('beforeend', mjxContainer('<mi>placeholder-late</mi>'));
+      }
+      return [item];
+    } } }
+  };
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.ok(result.text.includes('First $a_1$ then $b_2$'),
+    'each original container keeps its own TeX (payload travels with the node)');
+  assert.ok(!result.text.includes('placeholder-a') && !result.text.includes('placeholder-b'),
+    'harvested containers must not fall back to their assistive placeholders');
+  assert.ok(result.text.includes('placeholder-late'),
+    'the mid-harvest container has no payload and degrades to its assistive text');
+});
