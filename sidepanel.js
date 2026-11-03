@@ -359,6 +359,98 @@ function connectNavPort() {
 }
 
 /**
+ * Scroll following: the jump-to-bottom affordance plus the three signals that keep
+ * the view pinned — scroll geometry, DOM growth (MutationObserver) and REAL user
+ * input (the cooldown counts wheel/touch/keyboard only, never our own scrollTop
+ * writes). One policy spread over ~70 lines, so it lives in its own function
+ * instead of mid-init (2026-11-03). Returns the updater the scroll listener uses.
+ */
+function wireScrollFollowing() {
+  // Scroll-to-bottom button: show when user scrolls up, hide at bottom
+  scrollToBottomBtn = document.createElement('button');
+  scrollToBottomBtn.className = 'scroll-to-bottom-btn';
+  scrollToBottomBtn.hidden = true;
+  scrollToBottomBtn.title = _t('jumpToBottom', '跳到最新');
+  scrollToBottomBtn.textContent = '↓';
+  scrollToBottomBtn.addEventListener('click', () => {
+    isUserScrolledUp = false;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottomBtn.hidden = true;
+    scrollToBottomBtn.classList.remove('has-new');
+  });
+  document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
+
+  // Anchor the fixed-position button to the composer stack's REAL height —
+  // the CSS bottom:134px is only the no-JS fallback, calibrated for a one-line
+  // composer. A grown textarea (multi-line draft, image previews) pushes the
+  // quickbar up past a static offset and the button lands on top of it.
+  const repositionScrollBtn = () => {
+    const stackH = (document.querySelector('.quickbar')?.offsetHeight || 0)
+      + (document.querySelector('.composer')?.offsetHeight || 0);
+    scrollToBottomBtn.style.bottom = `${stackH + 10}px`;
+  };
+  repositionScrollBtn();
+  if (typeof ResizeObserver !== 'undefined') {
+    const stbObserver = new ResizeObserver(repositionScrollBtn);
+    for (const el of [document.querySelector('.quickbar'), document.querySelector('.composer')]) {
+      if (el) stbObserver.observe(el);
+    }
+  }
+
+  const updateScrollState = () => {
+    const geom = {
+      scrollHeight: messagesEl.scrollHeight,
+      scrollTop: messagesEl.scrollTop,
+      clientHeight: messagesEl.clientHeight,
+    };
+    isUserScrolledUp = calcIsUserScrolledUp(geom);
+    // Intent vs geometry: an upward scroll means the user let go (wheel,
+    // touch, scrollbar drag, keyboard); being at the bottom means they came
+    // back. Programmatic re-anchors only move downward, so they never clear
+    // the intent by accident.
+    stickToBottom = stickIntent({
+      scrollTop: messagesEl.scrollTop,
+      lastScrollTop,
+      isUserScrolledUp,
+      stickToBottom,
+    });
+    lastScrollTop = messagesEl.scrollTop;
+    scrollToBottomBtn.hidden = !isUserScrolledUp;
+    // Scroll-edge feather (sidepanel.css .fade-t/.fade-b): recompute per scroll.
+    const { fadeT, fadeB } = edgeFadeClasses(geom);
+    messagesEl.classList.toggle('fade-t', fadeT);
+    messagesEl.classList.toggle('fade-b', fadeB);
+  };
+  messagesEl.addEventListener('scroll', updateScrollState, { passive: true });
+  updateScrollState();
+  // Re-anchor when content grows under us. Mermaid/KaTeX/RDKit/Mol* resolve
+  // AFTER the initial scroll, pushing the newest message out of view. A
+  // MutationObserver (not ResizeObserver) is the right signal: the scroll
+  // container's own box never changes — only its scrollHeight does — so
+  // observing the container never fires. Gated on the intent, so a user who
+  // scrolled up to read is never yanked back.
+  if (typeof MutationObserver !== 'undefined') {
+    const stickObserver = new MutationObserver(() => {
+      // `_suppressAutoScroll` covers renderHistory's batched paint (it scrolls
+      // once at the end); the cooldown covers an active wheel/touch gesture,
+      // so a mutation mid-flick cannot yank the viewport back.
+      if (_suppressAutoScroll || !stickToBottom) return;
+      if (performance.now() - lastUserScrollInputAt < SCROLL_FOLLOW_COOLDOWN_MS) return;
+      const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+      if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+    stickObserver.observe(messagesEl, { childList: true, subtree: true, characterData: true });
+  }
+  // The follower cooldown timestamps REAL input, not the (also programmatic)
+  // scroll event — see lastUserScrollInputAt above.
+  const markScrollInput = () => { lastUserScrollInputAt = performance.now(); };
+  messagesEl.addEventListener('wheel', markScrollInput, { passive: true });
+  messagesEl.addEventListener('touchstart', markScrollInput, { passive: true });
+  messagesEl.addEventListener('keydown', markScrollInput);
+  return updateScrollState;
+}
+
+/**
  * Panel-wide keyboard shortcuts. Extracted from init() (2026-11-03): the Esc chain
  * encodes a real ordering decision (overlays and native dialogs own Esc first, then
  * search, multiselect, drawers — only then does Esc cancel the stream) and it used
@@ -727,87 +819,7 @@ async function init() {
     }
   } catch (_) {}
 
-  // Scroll-to-bottom button: show when user scrolls up, hide at bottom
-  scrollToBottomBtn = document.createElement('button');
-  scrollToBottomBtn.className = 'scroll-to-bottom-btn';
-  scrollToBottomBtn.hidden = true;
-  scrollToBottomBtn.title = _t('jumpToBottom', '跳到最新');
-  scrollToBottomBtn.textContent = '↓';
-  scrollToBottomBtn.addEventListener('click', () => {
-    isUserScrolledUp = false;
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    scrollToBottomBtn.hidden = true;
-    scrollToBottomBtn.classList.remove('has-new');
-  });
-  document.querySelector('.composer').insertAdjacentElement('beforebegin', scrollToBottomBtn);
-
-  // Anchor the fixed-position button to the composer stack's REAL height —
-  // the CSS bottom:134px is only the no-JS fallback, calibrated for a one-line
-  // composer. A grown textarea (multi-line draft, image previews) pushes the
-  // quickbar up past a static offset and the button lands on top of it.
-  const repositionScrollBtn = () => {
-    const stackH = (document.querySelector('.quickbar')?.offsetHeight || 0)
-      + (document.querySelector('.composer')?.offsetHeight || 0);
-    scrollToBottomBtn.style.bottom = `${stackH + 10}px`;
-  };
-  repositionScrollBtn();
-  if (typeof ResizeObserver !== 'undefined') {
-    const stbObserver = new ResizeObserver(repositionScrollBtn);
-    for (const el of [document.querySelector('.quickbar'), document.querySelector('.composer')]) {
-      if (el) stbObserver.observe(el);
-    }
-  }
-
-  const updateScrollState = () => {
-    const geom = {
-      scrollHeight: messagesEl.scrollHeight,
-      scrollTop: messagesEl.scrollTop,
-      clientHeight: messagesEl.clientHeight,
-    };
-    isUserScrolledUp = calcIsUserScrolledUp(geom);
-    // Intent vs geometry: an upward scroll means the user let go (wheel,
-    // touch, scrollbar drag, keyboard); being at the bottom means they came
-    // back. Programmatic re-anchors only move downward, so they never clear
-    // the intent by accident.
-    stickToBottom = stickIntent({
-      scrollTop: messagesEl.scrollTop,
-      lastScrollTop,
-      isUserScrolledUp,
-      stickToBottom,
-    });
-    lastScrollTop = messagesEl.scrollTop;
-    scrollToBottomBtn.hidden = !isUserScrolledUp;
-    // Scroll-edge feather (sidepanel.css .fade-t/.fade-b): recompute per scroll.
-    const { fadeT, fadeB } = edgeFadeClasses(geom);
-    messagesEl.classList.toggle('fade-t', fadeT);
-    messagesEl.classList.toggle('fade-b', fadeB);
-  };
-  messagesEl.addEventListener('scroll', updateScrollState, { passive: true });
-  updateScrollState();
-  // Re-anchor when content grows under us. Mermaid/KaTeX/RDKit/Mol* resolve
-  // AFTER the initial scroll, pushing the newest message out of view. A
-  // MutationObserver (not ResizeObserver) is the right signal: the scroll
-  // container's own box never changes — only its scrollHeight does — so
-  // observing the container never fires. Gated on the intent, so a user who
-  // scrolled up to read is never yanked back.
-  if (typeof MutationObserver !== 'undefined') {
-    const stickObserver = new MutationObserver(() => {
-      // `_suppressAutoScroll` covers renderHistory's batched paint (it scrolls
-      // once at the end); the cooldown covers an active wheel/touch gesture,
-      // so a mutation mid-flick cannot yank the viewport back.
-      if (_suppressAutoScroll || !stickToBottom) return;
-      if (performance.now() - lastUserScrollInputAt < SCROLL_FOLLOW_COOLDOWN_MS) return;
-      const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
-      if (away > 0) messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
-    stickObserver.observe(messagesEl, { childList: true, subtree: true, characterData: true });
-  }
-  // The follower cooldown timestamps REAL input, not the (also programmatic)
-  // scroll event — see lastUserScrollInputAt above.
-  const markScrollInput = () => { lastUserScrollInputAt = performance.now(); };
-  messagesEl.addEventListener('wheel', markScrollInput, { passive: true });
-  messagesEl.addEventListener('touchstart', markScrollInput, { passive: true });
-  messagesEl.addEventListener('keydown', markScrollInput);
+  const updateScrollState = wireScrollFollowing();
 
   // Image lightbox — delegate click on all img inside messages. 用户贴图
   // （.msg-images 缩略条）同样可放大（2026-10-01 拍板）：b37fea0 起的显式
