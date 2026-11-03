@@ -72,8 +72,6 @@ const chromeMock = {
   },
 };
 
-const keepAlive = () => {};
-
 Object.defineProperty(globalThis, 'chrome', {
   value: chromeMock,
   writable: true,
@@ -86,38 +84,30 @@ const bg = await import('../background.js');
 const { handle } = bg;
 
 // --------------- tests -------------------------------------------------------
-test('handle returns config on GET_CONFIG', async () => {
-  // TODO: mock storage.getAll() to return a known config.
-  // For now, verify the function doesn't throw on a valid message type.
-  assert.equal(typeof handle, 'function');
-  assert.equal(handle.length, 2, 'handle(msg, sender) should take 2 parameters');
+test('handle returns the stored config on GET_CONFIG', async () => {
+  // Real dispatch, real storage read: the old version only asserted that
+  // `handle` was a function (its own TODO admitted it), so deleting the
+  // GET_CONFIG branch kept it green.
+  const res = await handle({ type: 'GET_CONFIG' }, {});
+  assert.equal(res.activeProvider, 'hermes', 'GET_CONFIG must return the stored active provider');
+  assert.equal(res.providers.hermes.baseUrl, 'http://localhost:8642', 'the provider table must ride along');
+  assert.equal(res.contextMode, 'reader', 'other settings survive the round-trip');
 });
 
-test('handle does not reference undeclared variables', () => {
-  // Parse the source and verify handle() only references:
-  //   - its own parameters (msg, sender)
-  //   - declared local variables
-  //   - globals (console, Error, etc.)
-  //   - imported functions
-  //
-  // This catches bugs like the v0.19.0 "sender is not defined" which
-  // happened because the parameter was renamed to `_sender` but the
-  // body still referenced `sender`.
-  const src = handle.toString();
-  // The function body starts at the first `{` after the parameter list.
-  // We extract parameter names from the signature.
-  const sigMatch = src.match(/^async function handle\s*\(([^)]*)\)/);
-  assert.ok(sigMatch, 'handle() should have a recognizable signature');
-  const params = sigMatch[1].split(',').map(s => s.trim()).filter(Boolean);
-  assert.ok(params.includes('msg'), 'handle() must accept msg');
-  assert.ok(params.includes('sender'), 'handle() must accept sender');
+test('handle tolerates a missing sender on the sender-reading cases (v0.19.0 regression)', async () => {
+  // History: v0.19.0 shipped a "sender is not defined" crash because the
+  // parameter was renamed while the body still referenced it. The old version of
+  // this test claimed to guard that, but it only grepped case labels and parameter
+  // names, so an undeclared `sender` still passed. Driving the real cases with
+  // sender === undefined fails with ReferenceError if the bug ever comes back.
+  const selectionAction = await handle({ type: 'SELECTION_ACTION', action: 'chat', text: 'x' }, undefined);
+  assert.deepEqual(selectionAction, { ok: false }, 'no sender tab → benign refusal, not a crash');
 
-  // Quick sanity: the function should contain known case labels.
-  assert.match(src, /GET_CONFIG/, 'should handle GET_CONFIG');
-  assert.match(src, /GET_PAGE_CONTEXT/, 'should handle GET_PAGE_CONTEXT');
-  assert.match(src, /XHS_XHR_NOTE/, 'should handle XHS_XHR_NOTE');
-  assert.match(src, /CHAT/, 'should handle CHAT');
-  assert.match(src, /default:/, 'should have a default case');
+  const selectionCache = await handle({ type: 'SELECTION_CACHE', text: 'hello' }, undefined);
+  assert.deepEqual(selectionCache, { ok: true }, 'a sender-less selection cache write is a no-op, not a crash');
+
+  const xhs = await handle({ type: 'XHS_XHR_NOTE', note: { title: 'n' } }, undefined);
+  assert.deepEqual(xhs, { ok: true }, 'sender-less site pushes are dropped politely');
 });
 
 // --------------- XHS_XHR_NOTE tabId regression --------------------------------
