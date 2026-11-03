@@ -279,15 +279,23 @@ globalThis.chrome = {
       get: async (keys, cb) => {
         // real chrome.storage.local.get supports BOTH promise and callback
         // styles; options.js's setBadge() uses the callback form.
+        // Deep-copy on the way out, like the real API: without it the page and
+        // the "stored" table share one object, so a write that persists a stale
+        // snapshot looks identical to a correct one (that aliasing was hiding a
+        // cross-tab data-loss bug).
+        const clone = (v) => (v === undefined ? undefined : structuredClone(v));
         const result = (() => {
-          if (keys == null) return { ...storedData };
-          if (typeof keys === 'string') return { [keys]: storedData[keys] };
-          return { ...storedData };
+          if (typeof keys === 'string') return { [keys]: clone(storedData[keys]) };
+          return clone(storedData);
         })();
         if (typeof cb === 'function') cb(result);
         return result;
       },
-      set: async (obj) => { setCalls.push(obj); Object.assign(storedData, obj); },
+      // Deep-copy on the way IN as well: the real API serializes, and an aliased
+      // write lets the page keep mutating "stored" state by reference — which is
+      // exactly what made a stale-snapshot write indistinguishable from a correct
+      // one in this harness.
+      set: async (obj) => { setCalls.push(obj); Object.assign(storedData, structuredClone(obj)); },
     },
   },
 };
@@ -1225,3 +1233,23 @@ test('options.js: Bridge — ping, then change URL + key, then Save resets ALL p
   assert.ok(!dots[0].classList.contains('reachable') && !dots[0].classList.contains('unreachable'),
     '行内状态点回到未测灰色');
 });
+test('options.js: saving one card does not erase providers added after the page loaded', async () => {
+  // A4 (2026-11-03): every provider write used the whole cachedCfg.providers
+  // snapshot taken at page load, so a provider created after this page opened (a
+  // second settings tab, an import, the sidebar) was silently erased by the next
+  // save - with the UI showing nothing wrong. This case runs LAST on purpose: it
+  // writes a row behind the page's back, which earlier DOM assertions would see.
+  const card = findProviderCard('Hermes Agent');
+  assert.ok(card, 'the Hermes Agent card is always rendered');
+  storedData.providers = storedData.providers || {};
+  storedData.providers['added-elsewhere'] = { baseUrl: 'http://elsewhere', model: 'x' };
+  card.querySelector('[data-k="baseUrl"]').value = 'http://hermes-local';
+  const writesBefore = setCalls.length;
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  assert.ok(setCalls.length > writesBefore, 'the save must actually reach storage (guards this case from passing vacuously)');
+  assert.equal(storedData.providers?.hermes?.baseUrl, 'http://hermes-local', 'the edited row itself must be persisted');
+  assert.deepEqual(storedData.providers['added-elsewhere'], { baseUrl: 'http://elsewhere', model: 'x' },
+    'a provider written after page load must survive another card save');
+});
+

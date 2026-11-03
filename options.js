@@ -1092,7 +1092,7 @@ async function saveCard(name, card) {
     // 必须在 storage.set 之前删——否则存储里残留旧 endpointPing，与内存分叉。
     delete cachedCfg.providers[name].endpointPing;
   }
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   if (configChanged) {
     forgetPingState(name);
     // 卡面同步回未测态——否则卡片还挂着旧「● reachable」，主页下拉已是
@@ -1456,6 +1456,34 @@ function flash(cls, text) {
 // 旧设置页操作，set 以 "Extension context invalidated" 拒绝——此前各点位无
 // try/catch，点击毫无反馈，且各 saveCard 都是 cachedCfg 先改后写，内存持半新
 // 值，下一张卡的保存会把半新对象整体写回。统一走这里：失败 flash + 从盘重读。
+/**
+ * Write ONE provider row against the LATEST stored table.
+ *
+ * Provider writes here used to persist the whole `cachedCfg.providers` snapshot
+ * captured at page load, so a provider created after this page opened (a second
+ * settings tab, an import, the sidebar) was silently erased by the next save —
+ * with the UI showing nothing wrong. Read-merge-write keeps each edit surgical;
+ * pass `undefined` to delete the row.
+ */
+async function persistProvider(name, value) {
+  let latest = null;
+  try { latest = await storage.get('providers'); } catch (_) { latest = null; }
+  // Baseline is the page's table, not the stored one: the four agent providers
+  // (hermes/opencode/squilla/bridge) are shipped defaults merged in at load time
+  // and are NOT in storage until the user saves one, so writing the stored table
+  // back verbatim would delete them. Keys that storage gained since load (another
+  // tab, an import) are the ones to rescue.
+  const next = { ...(cachedCfg.providers || {}) };
+  if (latest && typeof latest === 'object') {
+    for (const [k, v] of Object.entries(latest)) if (!(k in next)) next[k] = v;
+  }
+  if (value === undefined) delete next[name];
+  else next[name] = value;
+  const ok = await persist({ providers: next });
+  if (ok) cachedCfg.providers = next;
+  return ok;
+}
+
 async function persist(patch) {
   try {
     await storage.set(patch);
