@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 // never touch chrome.
 globalThis.chrome = { runtime: {}, storage: { local: { get: async () => ({}), set: async () => {} } } };
 
-const { compactEntryImageParts, parseFigureLabels, imagePartsBytes, boundUnseenImageBytes, markImagesSeenInHistory } = await import('../lib/handlers/history-compactor.js');
+const { compactEntryImageParts, parseFigureLabels, imagePartsBytes, boundUnseenImageBytes, stampImagesSeenInArray } = await import('../lib/handlers/history-compactor.js');
 const { prepareHistoryForModel, IMAGE_SEEN_FLAG, buildMessages, buildAnthropicMessages, buildRunsConversationHistory } = await import('../lib/message-builder.js');
 
 // --------------- parseFigureLabels ------------------------------------------
@@ -287,26 +287,26 @@ test('boundUnseenImageBytes: idempotent — a second run writes nothing', async 
   assert.equal(sets.length, writesAfterFirst, 'no additional write on the second run');
 });
 
-// --------------- markImagesSeenInHistory ------------------------------------
+// --------------- stampImagesSeenInArray (persistTurnEntry's folded stamp) ----
 
-test('markImagesSeenInHistory: stamps image-bearing entries once, pixels untouched', async () => {
-  const { read } = statefulStorage([
+test('stampImagesSeenInArray: stamps image-bearing entries once, pixels untouched', () => {
+  const history = [
     attachEntry('a', 'data:image/png;base64,AAA'),
     { role: 'assistant', content: 'reply' },
     { role: 'user', content: 'plain text' },
     attachEntry('b', 'data:image/png;base64,BBB'),
-  ]);
-  const n = await markImagesSeenInHistory();
+  ];
+  const n = stampImagesSeenInArray(history);
   assert.equal(n, 2, 'both image-bearing entries stamped');
-  const history = read();
   assert.equal(history[0][IMAGE_SEEN_FLAG], true);
   assert.equal(history[0].content[1].type, 'image_url', 'pixels untouched');
   assert.equal(history[0].content[1].image_url.url, 'data:image/png;base64,AAA');
   assert.equal(history[1][IMAGE_SEEN_FLAG], undefined, 'assistant turn untouched');
   assert.equal(history[2][IMAGE_SEEN_FLAG], undefined, 'text-only turn untouched');
   assert.equal(history[3][IMAGE_SEEN_FLAG], true);
-  const n2 = await markImagesSeenInHistory();
-  assert.equal(n2, 0, 'idempotent');
+  assert.equal(stampImagesSeenInArray(history), 0, 'idempotent');
+  // The flag is what persistence rides on: same array, no image part mutation.
+  assert.equal(history[0].content.length, 2, 'no part added or removed');
 });
 
 // --------------- prepareHistoryForModel (request-side compaction) ------------
