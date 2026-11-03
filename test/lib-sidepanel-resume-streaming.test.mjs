@@ -162,3 +162,166 @@ test('resumeInFlightStream()\'s ERROR/ABORTED handler renders through the markdo
   assert.ok(assistantEl.querySelector('strong'), 'markdown (**partial**) must be rendered as real HTML, not shown as literal syntax');
   assert.match(assistantEl.textContent, /cancelled/);
 });
+
+// ─── 终态清理 finally 化（2026-11-03 审计 panel-3）─────────────────────────────
+// wireChatStreamPort 的 DONE/ERROR 清理此前排在 await 终渲之后且不在 finally
+// 里：finishBubble 装饰链一抛错，activeController 泄漏（后续 Send 被误路由）、
+// 端口不断、STREAM_RELEASE 不发、followups 永不 drain、嵌套追问卡丢进稀薄
+// 空气。detail-thread 的 finalize/stopTurn 早已 try/finally（B6），主聊天同形。
+// 抛错注入：finishBubble 第一步 decorateLinks 的 el.querySelectorAll('a[href]')
+// ——恰好落在 innerHTML 已替换、装饰未完成的位置。
+
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const clickSend = () => sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+
+async function startTurnWithNestedCard(text) {
+  const { openDetailThread } = await import('../lib/sidepanel/detail-thread.js');
+  inputEl.value = text;
+  clickSend();
+  await new Promise((r) => setTimeout(r, 50));
+  const port = lastChatPort;
+  port.emit({ type: 'CHUNK', delta: 'quoted passage lives here.' });
+  const el = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
+  for (let i = 0; i < 100 && !el.textContent.includes('quoted passage lives here'); i++) {
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  assert.match(el.textContent, /quoted passage lives here/, 'sanity: streamed text painted');
+  const anchor = el.querySelector('p') || el;
+  openDetailThread(el, 'quoted passage', anchor);
+  const card = el.querySelector('.detail-thread-card');
+  assert.ok(card && el.contains(card), 'sanity: card is NESTED in the bubble');
+  return { port, el, card };
+}
+
+function armFinalizeThrow(el) {
+  const orig = el.querySelectorAll.bind(el);
+  el.querySelectorAll = (sel) => {
+    if (sel === 'a[href]') { el.querySelectorAll = orig; throw new Error('finalize decoration boom'); }
+    return orig(sel);
+  };
+}
+
+function trackPortDisconnect(port) {
+  const state = { count: 0 };
+  const orig = port.disconnect;
+  port.disconnect = () => { state.count++; return orig(); };
+  state.restore = () => { port.disconnect = orig; };
+  return state;
+}
+
+async function teardownTurn({ card }) {
+  const { clearFollowups } = await import('../lib/sidepanel/followups.js');
+  // 先清队列再终态：DONE 会 drain，清晚了可以在拆完后再开一个野回合。
+  // 本文件 mock 是 trackDisconnect:false——onSend 路径 DONE 后 is-stopping
+  // 不复位（真浏览器由后台断端口触发 onDisconnect 复位），不能拿它判活。
+  clearFollowups();
+  inputEl.value = '';
+  lastChatPort.emit({ type: 'DONE', full: 'teardown reply' });
+  await new Promise((r) => setTimeout(r, 100));
+  if (card?.isConnected) {
+    card.querySelector('.detail-thread-close')?.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  }
+}
+
+test('DONE: a throw in the finalize decoration still runs ALL terminal cleanup and keeps the nested card alive', async () => {
+  const rejections = [];
+  const onRej = (e) => rejections.push(e);
+  process.on('unhandledRejection', onRej);
+  const sent = [];
+  const origSend = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = (msg, cb) => { sent.push(msg); return origSend(msg, cb); };
+  const ctx = await startTurnWithNestedCard('turn whose finalize throws');
+  const disc = trackPortDisconnect(ctx.port);
+  try {
+    // 流中排队一条 followup：DONE 的 finally 必须 drain 它（activeController
+    // 复位 + maybeDrainFollowups 都跑到的行为证据）。流中 send 键是 ■ 停止，
+    // 排队走输入框 Enter（onSend 的 mid-stream 分支），不能点按钮。
+    inputEl.value = 'queued followup after crash';
+    inputEl.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 10));
+
+    armFinalizeThrow(ctx.el);
+    ctx.port.emit({ type: 'DONE', full: 'quoted passage lives here. Final.' });
+    // drain 是 DONE 后 50ms 的异步链（终渲 → finally → drain → onSend → CHAT）。
+    for (let i = 0; i < 60 && !sent.some((m) => m.type === 'CHAT' && m.userText === 'queued followup after crash'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    assert.ok(ctx.el.contains(ctx.card), '嵌套追问卡必须在终渲抛错后仍活在气泡里（swapContent 事务保活）');
+    assert.ok(disc.count >= 1, 'port.disconnect 必须无条件执行');
+    assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && m.tabId === 7), 'STREAM_RELEASE 必须无条件发出');
+    assert.ok(sent.some((m) => m.type === 'CHAT' && m.userText === 'queued followup after crash'),
+      'activeController 复位 + followups drain：排队的追问必须自动发出');
+    assert.deepEqual(rejections, [], '终渲抛错必须被 catch 记录，不得成为 unhandled rejection');
+
+    // epoch 前置接线（第五批 sw-3 的 SW 门）：DONE 带 epoch 就随 RELEASE 附上，
+    // 不带则不附字段（上面第一次 DONE 无 epoch 的 RELEASE 已发出）。
+    ctx.port.emit({ type: 'DONE', full: 'quoted passage lives here. Final.', epoch: 42 });
+    await new Promise((r) => setTimeout(r, 80));
+    assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && m.tabId === 7 && m.epoch === 42),
+      'DONE 携带的 epoch 必须随 STREAM_RELEASE 附上');
+    assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && !('epoch' in m)),
+      '无 epoch 的 DONE 不得给 RELEASE 附字段');
+  } finally {
+    disc.restore();
+    chrome.runtime.sendMessage = origSend;
+    process.removeListener('unhandledRejection', onRej);
+    await teardownTurn(ctx);
+  }
+});
+
+test('ERROR ABORTED: a throw in the finalize render still resets the controller, disconnects and keeps the nested card', async () => {
+  const rejections = [];
+  const onRej = (e) => rejections.push(e);
+  process.on('unhandledRejection', onRej);
+  const ctx = await startTurnWithNestedCard('aborted turn whose finalize throws');
+  const disc = trackPortDisconnect(ctx.port);
+  try {
+    armFinalizeThrow(ctx.el);
+    ctx.port.emit({ type: 'ERROR', code: 'ABORTED' });
+    await new Promise((r) => setTimeout(r, 80));
+
+    assert.ok(ctx.el.contains(ctx.card), 'ABORTED 终渲抛错后嵌套卡必须仍在气泡里');
+    assert.ok(disc.count >= 1, 'ERROR 清理的 disconnect 必须无条件执行');
+    assert.ok(!sendBtn.classList.contains('is-stopping'), 'setStreamingUI(false) 必须无条件执行');
+    // activeController 复位的行为证据：新 Send 开新端口，而不是被误入队列。
+    const portBefore = lastChatPort;
+    inputEl.value = 'send after aborted crash';
+    clickSend();
+    await new Promise((r) => setTimeout(r, 50));
+    assert.notEqual(lastChatPort, portBefore, '终态后的 Send 必须开新回合，不得被泄漏的 activeController 误路由进队列');
+    assert.deepEqual(rejections, [], '终渲抛错必须被 catch，不得成为 unhandled rejection');
+  } finally {
+    disc.restore();
+    process.removeListener('unhandledRejection', onRej);
+    await teardownTurn(ctx);
+  }
+});
+
+test('ERROR tombstone (SW-death replay): a throw in the finalize render still runs the full cleanup and keeps the nested card', async () => {
+  const rejections = [];
+  const onRej = (e) => rejections.push(e);
+  process.on('unhandledRejection', onRej);
+  const ctx = await startTurnWithNestedCard('tombstoned turn whose finalize throws');
+  const disc = trackPortDisconnect(ctx.port);
+  try {
+    armFinalizeThrow(ctx.el);
+    ctx.port.emit({ type: 'ERROR', error: 'sw died mid-turn' });
+    await new Promise((r) => setTimeout(r, 80));
+
+    assert.ok(ctx.el.contains(ctx.card), '墓碑重放终渲抛错后嵌套卡必须仍在气泡里');
+    assert.ok(disc.count >= 1, '墓碑路径的 disconnect 必须无条件执行');
+    assert.ok(!sendBtn.classList.contains('is-stopping'), '墓碑路径的 setStreamingUI(false) 必须无条件执行');
+    const portBefore = lastChatPort;
+    inputEl.value = 'send after tombstone crash';
+    clickSend();
+    await new Promise((r) => setTimeout(r, 50));
+    assert.notEqual(lastChatPort, portBefore, '墓碑终态后的 Send 必须开新回合');
+    assert.deepEqual(rejections, [], '终渲抛错必须被 catch，不得成为 unhandled rejection');
+  } finally {
+    disc.restore();
+    process.removeListener('unhandledRejection', onRej);
+    await teardownTurn(ctx);
+  }
+});

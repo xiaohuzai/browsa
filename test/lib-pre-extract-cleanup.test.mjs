@@ -449,6 +449,52 @@ test('preExtractCleanup: destructive labels (清除/clear/reset family) are veto
   assert.equal(result.expandedCount, 0);
 });
 
+// 2026-11-03 第二批审计（content-1）：Step 2 按 aria-expanded 属性选控件，
+// 但 safeClick 曾只按 textContent 否决——aria-label-only 的「清除阅读历史」
+// 空文字按钮被真实点击（expandedCount:1、onclick 触发，vm+jsdom 复现）。
+// 否决标签面 = [textContent, aria-label, title, value] 空格连接并集。
+test('preExtractCleanup: aria-label/title/value-only destructive controls are vetoed (label union)', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <button aria-expanded="false" aria-label="清除阅读历史" id="aria-only"><svg></svg></button>
+      <button aria-expanded="false" title="Clear reading history" id="title-only"><svg></svg></button>
+      <input type="button" aria-expanded="false" value="重置设置" id="value-only">
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  let clicked = 0;
+  for (const id of ['aria-only', 'title-only', 'value-only']) {
+    dom.window.document.getElementById(id).addEventListener('click', () => { clicked++; });
+  }
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(clicked, 0, 'icon-only destructive controls must never be clicked, whichever field carries the label');
+  assert.equal(result.expandedCount, 0);
+});
+
+test('preExtractCleanup: a benign aria-label-only expander is still clicked (no over-kill)', async () => {
+  const html = `<!doctype html><html><body>
+    <main><button aria-expanded="false" aria-label="展开剩余段落" id="benign"><svg></svg></button></main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/blog/post' });
+  let clicked = false;
+  dom.window.document.getElementById('benign').addEventListener('click', () => { clicked = true; });
+  const fnBody = await loadSiblingFn('preExtractCleanup');
+  const ctx = vm.createContext({
+    document: dom.window.document,
+    window: { scrollY: 0, scrollTo: () => {} },
+    setTimeout,
+  });
+  const result = await vm.runInContext(`${fnBody}\npreExtractCleanup()`, ctx);
+  assert.equal(clicked, true, 'a safe icon-only expander must stay eligible');
+  assert.equal(result.expandedCount, 1);
+});
+
 test('preExtractCleanup: a click that pops a dialog is rolled back, the dialog dismissed, and the pass stops', async () => {
   const html = `<!doctype html><html><body>
     <main>

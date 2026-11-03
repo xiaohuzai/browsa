@@ -11,6 +11,8 @@ import {
   inlinePageImages,
   refererGateForImageUrls,
   isBlockedPageImageUrl,
+  codeSpanRanges,
+  fetchImageAsDataURL,
 } from '../lib/page-images.js';
 
 const BASE = 'https://example.com/post/a';
@@ -192,6 +194,81 @@ test('inlinePageImages: 同一 URL 多次出现只锚定首次；上限 8 张封
   }
 });
 
+// ── 代码区间豁免（2026-11-03 第二批审计 content-4）─────────────────────────
+// Markdown 教程页的代码块/行内代码里的示例 ![logo](url) 不是文章配图：
+// 不收集、不下载、不改写。判定单点 codeSpanRanges，收集与改写消费同一份。
+
+test('codeSpanRanges: fenced ```/~~~、未闭合围栏、行内 backtick 等长配对', () => {
+  const md = 'a\n```js\ncode\n```\nb\n~~~\nmore\n~~~\nc\n`inline ` code\n``two ` ticks``\nd\n````\nunclosed';
+  const ranges = codeSpanRanges(md);
+  const covered = (s) => {
+    const i = md.indexOf(s);
+    assert.ok(i >= 0, `fixture must contain ${s}`);
+    return ranges.some(([a, b]) => i >= a && i < b);
+  };
+  assert.ok(covered('code'), '``` fenced content is code');
+  assert.ok(covered('more'), '~~~ fenced content is code');
+  assert.ok(covered('inline '), 'equal-length backtick run pairs into a code span');
+  assert.ok(covered('two ` ticks'), 'double-backtick span may contain single backticks');
+  assert.ok(covered('unclosed'), 'an unclosed fence extends to end of text');
+  assert.ok(!covered('b\n'), 'text between fences is not code');
+  assert.ok(!covered('d\n'), 'text after a closed span is not code');
+  //  closing fence must be >= opening length: ```` opened, ``` does not close it
+  const tricky = '````\n```\nstill code\n````\nout';
+  const r2 = codeSpanRanges(tricky);
+  const at = (s) => r2.some(([a, b]) => tricky.indexOf(s) >= a && tricky.indexOf(s) < b);
+  assert.ok(at('still code'), 'a shorter fence line does not close a longer opening fence');
+  assert.ok(!at('out'), 'text after the real closing fence is not code');
+});
+
+test('collectMarkdownImages: 围栏与行内代码里的示例图语法不收集', () => {
+  const md = [
+    '正文真图',
+    '![real](https://cdn.example.com/real.png)',
+    '```markdown',
+    '![logo](https://example.com/logo.png)',
+    '```',
+    '~~~',
+    '![tilde](https://example.com/tilde.png)',
+    '~~~',
+    '行内示例 `![inline](https://example.com/inline.png)` 结束',
+  ].join('\n');
+  const out = collectMarkdownImages(md, BASE);
+  assert.deepEqual(out.map((c) => c.url), ['https://cdn.example.com/real.png'],
+    'code examples must not become image candidates');
+});
+
+test('inlinePageImages: 代码块示例不下载不改写；同 URL 围栏示例与正文真图只锚正文那次', async () => {
+  const restore = installDecodeStub();
+  try {
+    const fetched = [];
+    const inner = imgFetch({ 'https://cdn.example.com/same.png': { w: 800 } });
+    const fetchImpl = async (url, opts) => { fetched.push(url); return inner(url, opts); };
+    const md = [
+      '教程示例：',
+      '```markdown',
+      '![logo](https://cdn.example.com/same.png)',
+      '```',
+      '行内示例 `![x](https://cdn.example.com/inline-only.png)` 保留',
+      '正文真图：',
+      '![真图](https://cdn.example.com/same.png)',
+    ].join('\n');
+    const res = await inlinePageImages(md, { baseUrl: BASE, fetchImpl });
+    assert.deepEqual(fetched, ['https://cdn.example.com/same.png'],
+      'the fenced example must not trigger a second download; the inline-only URL must not be fetched at all');
+    assert.equal(res.figures.length, 1);
+    // 围栏内那次必须原样保留（consumed 抢锚回归：改写循环若无围栏感知，
+    // 会把文档序第一次出现——围栏里的示例——抢锚成 [图1]）。
+    const fenceBlock = res.text.slice(res.text.indexOf('```markdown'), res.text.indexOf('```\n行内'));
+    assert.match(fenceBlock, /!\[logo\]\(https:\/\/cdn\.example\.com\/same\.png\)/, 'fenced example stays verbatim');
+    assert.match(res.text, /行内示例 `!\[x\]\(https:\/\/cdn\.example\.com\/inline-only\.png\)` 保留/, 'inline code stays verbatim');
+    assert.match(res.text, /\[图1\] 真图/, 'the real body occurrence is the one anchored');
+    assert.equal(res.text.split('[图1]').length - 1, 1, 'exactly one anchor');
+  } finally {
+    restore();
+  }
+});
+
 test('inlinePageImages: 无解码环境（非 SW）fail-open 返回原文', async () => {
   const restore = installDecodeStub();
   restore(); // 先恢复即删除 stub → 模拟无 createImageBitmap
@@ -218,6 +295,40 @@ test('blobToJpegDataURL: 拒绝损坏/不支持格式（SVG），成功时输出
     };
     await blobToJpegDataURL({ _w: 2000, _h: 1000 });
     assert.equal(sawW, 768);
+  } finally {
+    restore();
+  }
+});
+
+// ── fetchImageAsDataURL 导出入口（2026-11-03 第二批审计 content-5）─────────
+// 「SW 侧下载一张图」的安全包络单点化：site-fallbacks 的 syndication 照片
+// 循环复用同一入口（SSRF 门 + redirect:'error' + credentials:'omit' +
+// content-type 前置 + 流式量上限），不再手写裸 fetch。
+test('fetchImageAsDataURL: 导出入口保持任何失败返回 null 契约，成功输出 JPEG dataURL', async () => {
+  const restore = installDecodeStub();
+  try {
+    const calls = [];
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, opts });
+      return imgFetch({ 'https://cdn.example.com/ok.png': { w: 800 } })(url, opts);
+    };
+    // SSRF 门：内网目标连请求都不发。
+    assert.equal(await fetchImageAsDataURL('http://169.254.169.254/latest/meta-data', { fetchImpl }), null);
+    assert.equal(calls.length, 0, 'blocked URLs must never reach fetch');
+    // 成功路径 + 请求包络。
+    const out = await fetchImageAsDataURL('https://cdn.example.com/ok.png', { fetchImpl, timeoutMs: 10000 });
+    assert.match(out, /^data:image\/jpeg;base64,/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].opts.redirect, 'error');
+    assert.equal(calls[0].opts.credentials, 'omit');
+    // 非图片 content-type / 404 / fetch 抛错 → null，绝不抛出。
+    assert.equal(await fetchImageAsDataURL('https://cdn.example.com/html', {
+      fetchImpl: async () => ({ ok: true, headers: { get: () => 'text/html' } }),
+    }), null);
+    assert.equal(await fetchImageAsDataURL('https://cdn.example.com/missing.png', { fetchImpl }), null);
+    assert.equal(await fetchImageAsDataURL('https://cdn.example.com/ok.png', {
+      fetchImpl: async () => { throw new Error('redirect refused'); },
+    }), null);
   } finally {
     restore();
   }
@@ -272,6 +383,14 @@ test('isBlockedPageImageUrl: 私网/loopback/metadata/单标签/IPv6 内部段�
     'http://[fe80::1]/x.png',                          // 链路本地
     'http://[::ffff:10.0.0.1]/x.png',                  // IPv4-mapped（点分写法）
     'http://[::ffff:a00:1]/x.png',                     // IPv4-mapped（十六进制写法）
+    'http://[::127.0.0.1]/x.png',                      // IPv4-compatible（归一成 ::7f00:1，2026-11-03 审计）
+    'http://[::7f00:1]/x.png',                         // 同上十六进制裸写法
+    'http://[::a00:1]/x.png',                          // IPv4-compatible ::10.0.0.1
+    'http://metadata.google.internal./x.png',          // 尾点 FQDN 绕过（2026-11-03 审计）
+    'http://localhost./x.png',                         // 尾点 loopback
+    'https://nas.internal./x.jpg',                     // 尾点内网后缀
+    'https://printer.local./x.png',                    // 尾点 .local
+    'https://intranet./x.jpg',                         // 尾点单标签
     'https://user:pass@example.com/x.png',             // URL 内嵌凭据
     'ftp://example.com/x.png',
     'javascript:void(0)',
@@ -287,6 +406,8 @@ test('isBlockedPageImageUrl: 私网/loopback/metadata/单标签/IPv6 内部段�
     'https://93.184.216.34/img.png',                   // 公网 IP 字面量
     'https://pic1.zhimg.com/v2-abc_r.jpg',
     'http://[2606:4700::6810:85e5]/x.png',             // 公网 IPv6
+    'https://cdn.example.com./a.jpg',                  // 公网域名尾点（合法根锚）仍放行
+    'http://[2001:db8::1]/x.png',                      // 公网 IPv6（文档段，非内部）仍放行
   ];
   for (const url of allowed) {
     assert.equal(isBlockedPageImageUrl(url), false, `must allow: ${url}`);

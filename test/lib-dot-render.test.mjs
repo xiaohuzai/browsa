@@ -75,6 +75,51 @@ test('invalid DOT keeps the code block and inserts an error note before it', asy
   assert.match(err.textContent, /DOT/, 'the note must name the fence type');
 });
 
+// ─── DOT repair: statement-level commas (2026-11-03 RNN-cluster user report) ──
+// 模型把 subgraph/graph 属性当成属性列表用逗号分隔：`label="X", color=Y`。语句层
+// DOT 用分号分隔属性，逗号是 syntax error near ','。逗号在 [...] 属性列表内和引号
+// 内合法，必须保留。
+test('repairDotSource: statement-level attribute commas become semicolons', () => {
+  const src = 'digraph G {\n  subgraph cluster_t { label="展开", color=lightgrey; fontsize=10;\n    a -> b;\n  }\n}';
+  const out = repairDotSource(src);
+  assert.match(out, /label="展开"; color=lightgrey/, 'the comma between statement-level attrs becomes a semicolon');
+  assert.ok(!/label="展开", color/.test(out), 'no statement-level comma remains');
+});
+
+test('repairDotSource: commas inside [...] attr lists and quoted strings are preserved', () => {
+  const src = 'digraph G { node [shape=box, style="rounded,filled"]; a [label="a,b,c"]; a -> b; }';
+  const out = repairDotSource(src);
+  assert.match(out, /shape=box, style="rounded,filled"/, 'attr-list comma stays');
+  assert.match(out, /label="a,b,c"/, 'quoted comma stays');
+});
+
+test('repairDotSource: multiple statement-level commas each become a semicolon', () => {
+  const src = 'digraph G { label="T", color=lightgrey, fontsize=10; a -> b; }';
+  const out = repairDotSource(src);
+  assert.match(out, /label="T"; color=lightgrey; fontsize=10/);
+});
+
+test('renderDot repairs the RNN cluster DOT (statement-level comma) and renders a real SVG', async () => {
+  const src = `digraph RNN {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#dbeafe", color="#3b6ea5", fontsize=10];
+  subgraph cluster_t { label="按时间展开：每个 s_t 都是同一个单元、同一组参数 W", color=lightgrey; fontsize=10;
+    x0 [label="x₀"]; s0 [label="s₀"]; o0 [label="o₀", fillcolor="#fde68a"];
+    x1 [label="x₁"]; s1 [label="s₁"]; o1 [label="o₁", fillcolor="#fde68a"];
+    x0 -> s0; x1 -> s1;
+    s0 -> s1;
+    s0 -> o0; s1 -> o1;
+  }
+}`;
+  const el = makeDotEl(src);
+  await renderDot(el);
+  assert.equal(el.querySelector('.dot-error'), null, 'the repaired DOT must not surface an error note');
+  const svg = el.querySelector('.dot-diagram svg');
+  assert.ok(svg, 'a real <svg> must be rendered after repair');
+  assert.ok(svg.querySelector('path'), 'the graph must contain drawn geometry');
+  assert.equal(el.querySelector('pre'), null, 'the raw code block must be swapped out');
+});
+
 test('renderDot with no dot blocks is a no-op (does not load the vendor)', async () => {
   const el = document.createElement('div');
   el.innerHTML = '<pre><code class="language-js">const x = 1;</code></pre>';

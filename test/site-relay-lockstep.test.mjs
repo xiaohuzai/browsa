@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
 
 const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
 const relaySrc = await readFile(new URL('../lib/content-scripts/site-relay.js', import.meta.url), 'utf8');
@@ -56,4 +57,54 @@ test('background receivers are alive: SITE_MESSAGE_MAP 9 keys + XHS_XHR_NOTE cas
   const bg = await readFile(new URL('../background.js', import.meta.url), 'utf8');
   assert.match(bg, /case 'XHS_XHR_NOTE'/);
   assert.match(bg, /recordSiteMessage\(msg, sender\?\.tab\?\.id\)/, 'receiver must key the cache by the sending tab');
+});
+
+// 2026-11-03 安全审计：relay 与页面共享 JS 世界，页面可伪造任意 postMessage。
+// 后台 handle() 对 sender 无类型门控（CLEAR_HISTORY 等特权 case 直达），故 relay
+// 必须只转发站点数据键。此用例在 VM 沙箱里真实执行 relay，断言特权 type 被丢弃。
+test('relay forwards only whitelisted site-data types, never privileged router cases', () => {
+  const sent = [];
+  let handler = null;
+  const win = {
+    __browsaSiteRelayInstalled: false,
+    location: { origin: 'https://example.com' },
+    addEventListener: (type, fn) => { if (type === 'message') handler = fn; },
+  };
+  const sandbox = {
+    window: win,
+    chrome: { runtime: { sendMessage: (m) => { sent.push(m); return Promise.resolve(); } } },
+    Set,
+    console: { warn() {}, error() {}, log() {} },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(relaySrc, sandbox);
+  assert.equal(typeof handler, 'function', 'relay registered a message listener');
+  const fire = (msg) => handler({ source: win, data: { __browsaRelay: true, message: msg } });
+  fire({ type: 'YOUTUBE_DATA', video: {} });
+  fire({ type: 'XHS_XHR_NOTE', note: {} });
+  fire({ type: 'CLEAR_HISTORY' });
+  fire({ type: 'CLEAR_ALL_SESSIONS' });
+  fire({ type: 'DELETE_SESSION', id: 'x' });
+  fire({ type: 'APPROVAL_RESPOND' });
+  fire({ type: 'SET_ACTIVE_PROVIDER', name: 'x' });
+  assert.deepEqual(sent.map((m) => m.type), ['YOUTUBE_DATA', 'XHS_XHR_NOTE'],
+    'only site-data types reach the background; privileged cases are dropped at the relay');
+});
+
+test('relay whitelist stays in lockstep with SITE_MESSAGE_MAP + XHS_XHR_NOTE', async () => {
+  const store = await readFile(new URL('../lib/handlers/site-cache-store.js', import.meta.url), 'utf8');
+  const mapKeys = [...store.matchAll(/^\s*([A-Z_]+):\s*\{\s*site:/gm)].map((m) => m[1]);
+  assert.equal(mapKeys.length, 9, 'nine SITE_MESSAGE_MAP keys');
+  for (const type of [...mapKeys, 'XHS_XHR_NOTE']) {
+    assert.ok(relaySrc.includes(`'${type}'`), `relay whitelist missing ${type}`);
+  }
+  // 反向集合相等（2026-11-03 审计补钉）：上面的 includes 只钉「不缺」，钉不住
+  // 「不多」——白名单被悄悄扩成特权 type（如 SAVE_SESSION）时转发面扩大而测试
+  // 全绿。ISOLATED 零依赖不能 import 共享常量，本用例即三份清单的单一 owner。
+  // 排序数组比较顺带抓重复项；字面量改形会因 match 失败而红，不会假绿。
+  const literal = relaySrc.match(/const RELAY_TYPES = new Set\(\[([\s\S]*?)\]\)/);
+  assert.ok(literal, 'RELAY_TYPES literal not found — update this pin if the shape changed');
+  const relayTypes = [...literal[1].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(relayTypes.sort(), [...mapKeys, 'XHS_XHR_NOTE'].sort(),
+    'RELAY_TYPES must equal SITE_MESSAGE_MAP keys + XHS_XHR_NOTE exactly — no privileged extras');
 });

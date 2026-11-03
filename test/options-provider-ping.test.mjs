@@ -22,6 +22,17 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
 import { BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
+import { aggregateBridgePing } from '../lib/provider-ping.js';
+
+// --------------- aggregateBridgePing: 聚合规则纯函数单点 ----------------------
+
+test('aggregateBridgePing: 任一可达即可达；已测全不通才 unreachable；未测 null', () => {
+  assert.equal(aggregateBridgePing({ a: 'reachable', b: 'unreachable' }), 'reachable');
+  assert.equal(aggregateBridgePing({ a: 'unreachable', b: 'unreachable' }), 'unreachable');
+  assert.equal(aggregateBridgePing({}), null);
+  assert.equal(aggregateBridgePing(undefined), null);
+  assert.equal(aggregateBridgePing({ a: 'stale-unknown' }), null, '非标准状态不算已测不通');
+});
 
 // --------------- direct tests of lib/llm-client.js's ping()/getCapabilities() ---
 
@@ -272,6 +283,9 @@ globalThis.location = dom.window.location;
 
 const storedData = {}; // in-memory chrome.storage.local backing store
 const setCalls = [];
+// 交错用例：给 pingStates 的读加延迟，把「两个读改写同时在飞」的窗口拉开
+// （旧 fire-and-forget get→then→persist 在窗口内互相整表覆盖）。
+let pingReadDelayMs = 0;
 
 globalThis.chrome = {
   storage: {
@@ -288,6 +302,11 @@ globalThis.chrome = {
           if (typeof keys === 'string') return { [keys]: clone(storedData[keys]) };
           return clone(storedData);
         })();
+        // 快照在调用时取（真实 API 语义），延迟只推迟应答——这才是「读在飞、
+        // 写落地、旧快照才到」的 lost-update 窗口；延迟快照本身会把读串行化。
+        if (pingReadDelayMs && (keys === 'pingStates' || (Array.isArray(keys) && keys.includes('pingStates')))) {
+          await new Promise((r) => setTimeout(r, pingReadDelayMs));
+        }
         if (typeof cb === 'function') cb(result);
         return result;
       },
@@ -1251,5 +1270,50 @@ test('options.js: saving one card does not erase providers added after the page 
   assert.equal(storedData.providers?.hermes?.baseUrl, 'http://hermes-local', 'the edited row itself must be persisted');
   assert.deepEqual(storedData.providers['added-elsewhere'], { baseUrl: 'http://elsewhere', model: 'x' },
     'a provider written after page load must survive another card save');
+});
+
+// ─── pingStates 读改写交错（lost-update 回归）────────────────────────────────
+
+test('options.js: 两个 setBadge 同时在飞，两个状态都必须落库（不得互相整表覆盖）', async () => {
+  const c1 = await addLlmCard();
+  const c2 = await addLlmCard();
+  for (const c of [c1, c2]) {
+    c.querySelector('[data-k="baseUrl"]').value = 'http://ping-race-' + c.dataset.name;
+    c.querySelector('[data-k="model"]').value = 'm';
+  }
+  globalThis.fetch = async () => { throw new Error('ECONNREFUSED'); };
+  pingReadDelayMs = 30;
+  try {
+    c1.querySelector('button[data-act="ping"]').dispatchEvent(click());
+    c2.querySelector('button[data-act="ping"]').dispatchEvent(click());
+    await sleepMs(300);
+  } finally {
+    pingReadDelayMs = 0;
+  }
+  assert.equal(storedData.pingStates?.[c1.dataset.name], 'unreachable', '第一个 setBadge 的效果必须在');
+  assert.equal(storedData.pingStates?.[c2.dataset.name], 'unreachable', '第二个 setBadge 不得用过期快照抹掉第一个');
+});
+
+test('options.js: setBadge 与 forgetPingState 同时在飞，两个效果都必须落库', async () => {
+  const cPing = await addLlmCard();
+  const cDel = await addLlmCard();
+  cPing.querySelector('[data-k="baseUrl"]').value = 'http://ping-forget-race';
+  cPing.querySelector('[data-k="model"]').value = 'm';
+  // 被删卡先有一个已持久化的 reachable 状态。
+  storedData.pingStates = { ...(storedData.pingStates || {}), [cDel.dataset.name]: 'reachable' };
+  const delName = cDel.dataset.name;
+  globalThis.fetch = async () => { throw new Error('ECONNREFUSED'); };
+  pingReadDelayMs = 30;
+  try {
+    cPing.querySelector('button[data-act="ping"]').dispatchEvent(click());
+    cDel.querySelector('[data-act="delete"]').dispatchEvent(click());
+    await sleepMs(300);
+  } finally {
+    pingReadDelayMs = 0;
+  }
+  assert.equal(storedData.pingStates?.[cPing.dataset.name], 'unreachable',
+    'forget 不得用过期快照抹掉在飞的 setBadge');
+  assert.equal(delName in (storedData.pingStates || {}), false,
+    'setBadge 不得用过期快照复活已 forget 的状态');
 });
 

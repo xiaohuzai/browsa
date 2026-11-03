@@ -201,6 +201,40 @@ test('bridgeStream: outer abort rejects with AbortError (no hang on a never-endi
   try { controller.close(); } catch (_) {}
 });
 
+// 2026-11-03 proto-3：bridge 的 abort 二跳不变量——外层 signal.abort('user-cancel')
+// （字符串 reason）经 onOuterAbort 转成 controller.abort()（刻意不带 reason），
+// postTurn 的裸 await 因此 reject 的是真 AbortError 而非裸字符串。给
+// controller.abort 加上 reason 转发会让这两条测试红：postTurn 处没有归一
+// catch，字符串会原样漏给 handler 的取消分类。
+test('bridgeStream: string-reason outer abort DURING the POST still rejects AbortError (reason-less second hop)', async () => {
+  // Chrome-faithful fetch: rejects with signal.reason on abort.
+  globalThis.fetch = (url, opts) => new Promise((resolve, reject) => {
+    const sig = opts?.signal;
+    if (sig?.aborted) { reject(sig.reason); return; }
+    sig?.addEventListener('abort', () => reject(sig.reason), { once: true });
+  });
+  const ctrl = new AbortController();
+  const p = bridgeStream({ baseUrl: '', text: 'x', signal: ctrl.signal });
+  const t = setTimeout(() => ctrl.abort('user-cancel'), 10);
+  await assert.rejects(() => p, (e) => e?.name === 'AbortError');
+  clearTimeout(t);
+});
+
+test('bridgeStream: string-reason outer abort MID-STREAM rejects AbortError (no hang, no raw string)', async () => {
+  const encoder = new TextEncoder();
+  let controller;
+  const body = new ReadableStream({
+    start(c) { controller = c; controller.enqueue(encoder.encode('data: {"type":"delta","text":"a"}\n\n')); },
+  });
+  globalThis.fetch = async () => new Response(body, { status: 200 });
+  const ctrl = new AbortController();
+  const p = bridgeStream({ baseUrl: '', text: 'x', signal: ctrl.signal });
+  const t = setTimeout(() => ctrl.abort('user-cancel'), 30);
+  await assert.rejects(() => p, (e) => e?.name === 'AbortError');
+  clearTimeout(t);
+  try { controller.close(); } catch (_) {}
+});
+
 test('pingBridge: /health ok:true is reachable; anything else is not', async () => {
   captureFetch((url) => {
     if (String(url).endsWith('/health')) {

@@ -516,7 +516,10 @@ function gcStreamState() {
     const live = chatControllers.has(tabId) || activeRunIds.has(tabId);
     const lastTouch = Math.max(st.startedAt || 0, st.lastDeltaAt || 0);
     if (!live && now - lastTouch > STREAM_STATE_TTL_MS) {
-      streamState.delete(tabId);
+      // 完整清理出口（2026-11-03 sw-4）：裸 Map.delete 会留下 durable 镜像，
+      // 下次 SW 醒来 salvage 把早已终结的残片当 interrupted 条目追加进
+      // 当时的 live history。clearStreamState 连带 durableTurnEnd。
+      clearStreamState(tabId);
       console.log('browsa[bg]: GC stale streamState for tab', tabId);
     }
   }
@@ -913,8 +916,21 @@ async function handle(msg, sender) {
       // when no state exists. The CHAT handler also calls
       // clearStreamState on its own, so this is mostly a fast-path for
       // the cancel button.
+      // 回合身份门（2026-11-03 sw-3）：RELEASE 不得绕过 ownership——迟到的
+      // 旧回合 RELEASE（多窗口面板 / tombstone 重放后立刻重发）会删掉新回合
+      // 的 streamState 并连带抹掉其 durable 收尸镜像。DONE 路径回传 epoch，
+      // 不匹配即 no-op；epoch 缺席（错误路径拿不到）时仅清无活回合的 tab
+      //（CHAT throw 后 finally 已删 controller/run，兜底成立）。
       const t = msg.tabId;
-      if (t != null) clearStreamState(t);
+      if (t != null) {
+        const st = streamState.get(t);
+        if (msg.epoch != null) {
+          if (st && st.epoch !== msg.epoch) return { released: false };
+        } else if (chatControllers.has(t) || activeRunIds.has(t)) {
+          return { released: false };
+        }
+        clearStreamState(t);
+      }
       return { released: true };
     }
 

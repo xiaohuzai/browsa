@@ -72,6 +72,9 @@ globalThis.chrome = {
       }
       if (msg.type === 'LOAD_SESSION') {
         // 真实 envelope：外层 ok 恒 true，判据在内层 data.ok（B5 修复后的唯一读法）。
+        // 真实 storage.loadSession 命中时在锁内落归属指针（面板不再补写）；
+        // 未命中（-1）不动指针。
+        if (loadSessionOk) localStore.activeSessionId = msg.id;
         return cb({ ok: true, data: { ok: loadSessionOk, len: loadSessionOk ? 2 : -1 } });
       }
       cb({ ok: true, data: { ok: true } });
@@ -526,6 +529,14 @@ test('loadSession does not SAVE_SESSION when there is no existing conversation t
 });
 
 // ─── 会话归属：切走已归属的对话必须原地写回，而不是 fork 新条目 ────────────────
+
+test('归属指针唯一写者是 storage.loadSession——面板不得补写（乱序复活口）', async () => {
+  // 连点两个会话时，面板侧在 LOAD_SESSION 响应后补写指针会乱序覆盖：click1
+  // 的补写晚于 click2 落锁，指针被写回旧会话。锁内落指针后面板补写必须删除。
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../lib/sidepanel/sessions-ui.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /setActiveSessionId/, 'sessions-ui 不得再写归属指针（storage.loadSession 锁内落）');
+});
 
 test('loadSession writes back into the session the conversation belongs to and re-points the identity at the loaded one', async () => {
   // 模拟“s1 之前被加载过、之后没改过内容”的状态——这是 bug 的最纯复现：

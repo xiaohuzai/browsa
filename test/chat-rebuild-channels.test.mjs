@@ -432,6 +432,29 @@ test('continuation keeps the v1 turn images (2026-10-01 audit: the old text-only
   assert.ok(!String(v1h.content).includes('iVBOR'), 'runs history must never carry base64');
 });
 
+test('continuation after overflow rescue uses the trimmed history, not the original sendHistory (2026-11-03 audit)', async () => {
+  // 溢出自救 rebuildFrom(stubbed) 只改了 wire payload；continueWith 曾从原始
+  // sendHistory 闭包重建 contHistory，把刚裁掉的大附件原样重发→续写必然再溢出
+  // 并被 runSilentLeg 静默吞掉。activeHistory 必须随 rebuildFrom 同步。
+  const { stubOversizedAttachments } = await import('../lib/message-builder.js');
+  const bigAttach = { role: 'user', attachId: 'att-big', content: `${PAGE_CONTEXT_PREFIX}\nURL: https://x.example/a\nTitle: Big\n${'x'.repeat(9000)}` };
+  const sendHistory = [bigAttach, { role: 'assistant', content: 'prior reply' }];
+  const { history: stubbed } = stubOversizedAttachments(sendHistory);
+  for (const provider of [CHAT_PROVIDER, RESPONSES_PROVIDER, ANTHROPIC_PROVIDER]) {
+    const turn = createTurnRequest({
+      provider, activeProvider: 'p1',
+      all: { activeProvider: 'p1', providers: { p1: provider } },
+      msg: { userText: 'Q' }, sendHistory, effectiveSystemPrompt: 'SYS',
+    });
+    await turn.prepare();
+    turn.rebuildFrom(stubbed);        // overflow self-rescue
+    turn.continueWith('CONT', 'V1');  // auto-continuation on output-cap truncation
+    const wire = JSON.stringify(turn.messages ?? turn.responsesInput ?? turn.anthropicMessages);
+    assert.ok(!wire.includes('x'.repeat(9000)), `${provider.apiStyle}: continuation must not re-send the trimmed big attachment`);
+    assert.ok(wire.includes('too large'), `${provider.apiStyle}: continuation rides the stubbed history`);
+  }
+});
+
 test('buildAnthropicMessages normalizes a headless history to user-first (Anthropic 400s assistant-first requests on every turn)', async () => {
   const { buildAnthropicMessages } = await import('../lib/message-builder.js');
   const out = buildAnthropicMessages({ userText: 'next' }, [
@@ -643,10 +666,17 @@ test('overflow rescue (chat): the retried request carries the stub and drops att
     assert.equal(result.full, 'STUBBED-ANSWER');
 
     // Storage is rewritten ONLY after the retry succeeded (attachId-keyed).
+    // ADR-0013（2026-11-03 审计修正）：请求侧丢图让重试塞进窗口，但存储侧只 stub
+    // 文本、保留原 image_url 像素——气泡与后续快照仍显示原图。旧实现把无图字符串
+    // 写回 storage 永久销毁像素（下面的断言曾错误地钉住那个 bug）。
     const { history } = await localArea.get('history');
     const stored = history.find((m) => m.attachId === 'att-big');
-    assert.ok(!JSON.stringify(stored).includes(BIG_MARKER), 'the stub is persisted to history on success');
-    assert.match(stored.content, STUB_MARKER);
+    assert.ok(!JSON.stringify(stored).includes(BIG_MARKER), 'the big attachment text is stubbed in storage on success');
+    assert.ok(Array.isArray(stored.content), 'storage keeps the part array (pixels preserved)');
+    const storedText = stored.content.find((p) => p.type === 'text')?.text || '';
+    assert.match(storedText, STUB_MARKER);
+    assert.ok(stored.content.some((p) => p.type === 'image_url' && p.image_url.url.includes('IMGPIX')),
+      'ADR-0013: the original pixel survives in storage even though the request dropped it');
   } finally {
     cap.release();
     restore();

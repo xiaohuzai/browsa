@@ -7,6 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { PAGE_CONTEXT_PREFIX } from '../lib/constants.js';
 import { BRIDGE_CARD_LABEL } from '../lib/provider-display.js';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
@@ -90,6 +91,45 @@ test('getAll() normalizes an ASR config saved for an uninstalled provider back t
   localArea.set({ asr: { enabled: true, provider: 'ark', apiKey: 'ark-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-1-lite-260915', videoModel: '', language: 'zh', timeoutMs: 150000, subtitleSource: 'original' } });
   const untouched = await storage.getAll();
   assert.equal(untouched.asr.apiKey, 'ark-key', '合法配置原样透传');
+});
+
+test('getAll() delivers every options-page chat preference (GET_ALL_KEYS lockstep)', async () => {
+  // 回归：approvalChime 曾是 options 写、cfg 读、却不在 GET_ALL_KEYS 的断线键
+  // ——用户关掉提示音后重开设置页，getAll 送不到 false，界面恒谎报「开」。
+  reset();
+  const prefs = { fontSize: 15, fontFamily: 'serif', sendShortcut: 'ctrl-enter', thoughtAutoCollapse: false, approvalChime: false };
+  await localArea.set(prefs);
+  const all = await storage.getAll();
+  for (const [k, v] of Object.entries(prefs)) {
+    assert.equal(all[k], v, `getAll() must deliver the stored ${k}`);
+  }
+  // Lockstep：options.js 每个 saveChatPref({ key: … }) 单键写入都必须被
+  // getAll 送达——未来新增开关自动进这张契约网，不再靠人肉记得改键表。
+  const ojs = await readFile(new URL('../options.js', import.meta.url), 'utf8');
+  const keys = [...ojs.matchAll(/saveChatPref\(\{ (\w+):/g)].map((m) => m[1]);
+  assert.ok(keys.length >= 5, `expected the five known chat prefs in options.js, found ${keys.length}`);
+  for (const k of keys) {
+    reset();
+    await localArea.set({ [k]: 'lockstep-probe' });
+    assert.equal((await storage.getAll())[k], 'lockstep-probe', `saveChatPref key "${k}" must ride getAll()`);
+  }
+});
+
+test('mutatePingStates 串行化并发读改写（两个 mutator 的效果都在）', async () => {
+  reset();
+  await localArea.set({ pingStates: { base: 'reachable' } });
+  await Promise.all([
+    storage.mutatePingStates((s) => { s.a = 'reachable'; return s; }),
+    storage.mutatePingStates((s) => { delete s.base; s.b = 'unreachable'; return s; }),
+  ]);
+  assert.deepEqual(await storage.get('pingStates'), { a: 'reachable', b: 'unreachable' },
+    '链锁下后写者基于先写者的结果，不得用过期快照整表覆盖');
+  // mutator 返回 null = 不写；错误向上抛且链不断。
+  const unchanged = await storage.mutatePingStates(() => null);
+  assert.deepEqual(unchanged, { a: 'reachable', b: 'unreachable' });
+  await assert.rejects(storage.mutatePingStates(() => { throw new Error('boom'); }), /boom/);
+  const after = await storage.mutatePingStates((s) => { s.c = 'reachable'; return s; });
+  assert.equal(after.c, 'reachable', '前一个 mutator 抛错不得卡死链');
 });
 
 test('getAll() does not resurrect a deleted LLM provider (empty LLM group stays empty)', async () => {
@@ -448,6 +488,58 @@ test('loadSession returns -1 for an unknown session id and does not touch histor
 });
 
 // --------------- 会话归属（activeSessionId）-----------------------------------
+
+test('loadSession 返回时归属指针已指向新会话（与 history 同批落锁）', async () => {
+  // 回归：指针曾由面板在 LOAD_SESSION 响应之后补写——窗口内 history 已是 B
+  // 的、指针还指着 A，SAVE_SESSION(A) 会把 B 的 history 灌进 A 的快照。
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'A' }]);
+  const a = await storage.saveCurrentSession('A');
+  await storage.clearHistory();
+  await storage.setHistory([{ role: 'user', content: 'B' }]);
+  const b = await storage.saveCurrentSession('B');
+  await storage.setActiveSessionId(a.id);
+  const len = await storage.loadSession(b.id);
+  assert.equal(len, 1);
+  assert.equal(await storage.getActiveSessionId(), b.id, 'loadSession 落锁即落指针，不等面板补写');
+});
+
+test('loadSession 未命中（-1）不动归属指针', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'x' }]);
+  await storage.setActiveSessionId('s-current');
+  assert.equal(await storage.loadSession('does-not-exist'), -1);
+  assert.equal(await storage.getActiveSessionId(), 's-current');
+});
+
+test('saveCurrentSession 归档即落归属指针（后续写回原地，不 fork）', async () => {
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'x' }]);
+  const s = await storage.saveCurrentSession('archived');
+  assert.equal(await storage.getActiveSessionId(), s.id,
+    '归档后活对话即归属该会话——SAVE_SESSION 的原地写回校验以此为准');
+});
+
+test('updateSessionHistory 拒写非当前归属的 id（在途 SAVE_SESSION 不得跨会话覆盖）', async () => {
+  // click2 读到 A 后 click1 的 LOAD_SESSION(B) 才落锁：click2 的
+  // SAVE_SESSION(A) 携带过时 id——锁内校验归属，不匹配返回 null（handler
+  // 回落 saveCurrentSession），绝不把 B 的 history/agent 身份灌进 A。
+  reset();
+  await storage.setHistory([{ role: 'user', content: 'A saved' }]);
+  const a = await storage.saveCurrentSession('A');
+  await storage.clearHistory();
+  await storage.setHistory([{ role: 'user', content: 'B live' }]);
+  const b = await storage.saveCurrentSession('B');
+  await storage.loadSession(b.id); // 指针与 history 都已是 B
+  assert.equal(await storage.updateSessionHistory(a.id), null, '过时 id 必须被拒');
+  const fullA = await storage.getSessionFull(a.id);
+  assert.deepEqual(fullA.history.map(m => m.content), ['A saved'], 'A 的快照原样不动');
+  // 当前归属的 id 正常原地写回。
+  await storage.setHistory([{ role: 'user', content: 'B live' }, { role: 'assistant', content: 'B2' }]);
+  const updated = await storage.updateSessionHistory(b.id);
+  assert.ok(updated, '当前归属 id 正常写回');
+  assert.deepEqual((await storage.getSessionFull(b.id)).history.map(m => m.content), ['B live', 'B2']);
+});
 
 test('activeSessionId defaults to empty and round-trips through set/get', async () => {
   reset();

@@ -1405,6 +1405,33 @@ test('extractInPageWorld: trivial shadow content below the 40-char threshold is 
   assert.equal(host.getAttribute('data-browsa-embed'), null, 'live host element must not retain a leftover marker attribute');
 });
 
+test('extractInPageWorld: a throwing cloneNode still un-marks the live document (no leaked data-browsa-*)', async () => {
+  // 2026-11-03 审计：cloneNode 曾在 try 外，抛错（超大 DOM 内存压力）即跳过清理，
+  // 把 data-browsa-hidden 留在活页面——下次附加的克隆继承它并被 NOISE_SELECTORS
+  // 当隐藏内容剥掉（即使元素此时已可见）。修复后克隆失败也需要清掉活页面标记。
+  const html = `<!doctype html><html><body><main><h1>Real Article</h1><p>${'A long paragraph. '.repeat(60)}</p><p style="display:none">secret hidden</p></main></body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const doc = dom.window.document;
+  const win = dom.window;
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 100 });
+  Object.defineProperty(win.HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 20 });
+  doc.cloneNode = () => { throw new Error('simulated clone OOM'); };
+  const fnBody = await loadSiblingFn('extractInPageWorld');
+  const rSrc = await readFile(join(ROOT, 'lib/vendor/Readability.iife.js'), 'utf8');
+  const tSrc = await readFile(join(ROOT, 'lib/vendor/Turndown.iife.js'), 'utf8');
+  const ctx = vm.createContext({ document: doc, window: win, Node: win.Node, NodeFilter: win.NodeFilter, DOMParser: win.DOMParser, console });
+  vm.runInContext(rSrc, ctx);
+  vm.runInContext(tSrc, ctx);
+  assert.throws(
+    () => vm.runInContext(`${fnBody}\nextractInPageWorld({ mode: 'reader', htmlCap: 100000 });`, ctx),
+    /simulated clone OOM/,
+  );
+  assert.equal(doc.querySelector('[data-browsa-hidden]'), null, 'no leaked HIDDEN_MARK on the live doc');
+  assert.equal(doc.querySelector('[data-browsa-embed]'), null, 'no leaked EMBED_MARK');
+  assert.equal(doc.querySelector('[data-browsa-math-src]'), null, 'no leaked MATH_MARK');
+  dom.window.close();
+});
+
 // --- Repeated-structure detection (list item boundary markers) -------------
 // extractDomTreeInPageWorld now detects when a container has >=3 structurally
 // similar children (e.g. .product-card, .comment-row) and wraps each item in

@@ -956,6 +956,97 @@ test('引用图里的非图片协议（blob:/相对路径）被丢弃，不会�
   card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
 });
 
+// ─── 宿主门（2026-11-03 审计 panel-2）：宿主气泡必须是主聊天顶层回复 ─────────
+// 卡内回复同为 .msg.assistant、同在 #messages 子树；嵌套卡的引用块不在任何
+// .msg 内，closest('.msg.assistant') 会解析到外层宿主。卡中卡一旦创建，
+// findHostBubble/anchorCandidates 都只认顶层气泡，重开面板后必然孤儿化。
+
+function stubRangeRect() {
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    left: 10, top: 10, width: 60, height: 20, right: 70, bottom: 30,
+  });
+}
+
+function selectInside(el) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = dom.window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+async function mouseupSelection() {
+  document.getElementById('messages').dispatchEvent(new dom.window.Event('mouseup', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 10));
+}
+
+test('卡内回复的选区不出追问按钮（宿主必须是顶层主聊天回复）', async () => {
+  sentMessages.length = 0;
+  hideSelectionAskBtn();
+  stubRangeRect();
+  const bubble = makeAssistantBubble('Host reply about GPUs.');
+  openDetailThread(bubble, 'GPUs', bubble);
+  const card = bubble.nextElementSibling;
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'expand this';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'Card reply text.' });
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await new Promise((r) => setTimeout(r, 20));
+
+  const liveAi = card.querySelector('.detail-thread-messages .msg.assistant');
+  assert.ok(liveAi, '卡内必须已有一条完成的回复');
+  selectInside(liveAi);
+  await mouseupSelection();
+  assert.equal(document.querySelector('.selection-ask-btn'), null,
+    '卡内回复的选区绝不能给出追问入口（卡中卡重开面板必然孤儿化）');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('嵌套卡的引用块选区不出追问按钮（closest 会绕过 .msg.assistant 门）', async () => {
+  sentMessages.length = 0;
+  hideSelectionAskBtn();
+  stubRangeRect();
+  // 锚到段落 → 卡片嵌套在宿主气泡内部，引用块的 closest('.msg.assistant')
+  // 解析到外层宿主气泡——只查 bubbleEl 的门会漏掉这种情形。
+  const bubble = document.createElement('div');
+  bubble.className = 'msg assistant';
+  bubble.dataset.raw = 'Host paragraph text.';
+  bubble.innerHTML = '<p>Host paragraph text.</p>';
+  document.getElementById('messages').appendChild(bubble);
+  openDetailThread(bubble, 'Host paragraph', bubble.querySelector('p'));
+  const card = bubble.querySelector('.detail-thread-card');
+  assert.ok(card, '卡片应嵌套在宿主气泡里');
+  assert.ok(bubble.contains(card));
+
+  selectInside(card.querySelector('.detail-thread-quote'));
+  await mouseupSelection();
+  assert.equal(document.querySelector('.selection-ask-btn'), null,
+    '引用块选区不得借外层宿主气泡绕过宿主门');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
+test('openDetailThread 入口防御门：卡内元素作宿主时拒绝建卡', async () => {
+  sentMessages.length = 0;
+  const bubble = makeAssistantBubble('Host reply.');
+  openDetailThread(bubble, 'Host', bubble);
+  const card = bubble.nextElementSibling;
+  const inner = document.createElement('div');
+  inner.className = 'msg assistant';
+  inner.textContent = 'inner reply';
+  card.querySelector('.detail-thread-messages').appendChild(inner);
+
+  const before = document.querySelectorAll('.detail-thread-card').length;
+  openDetailThread(inner, 'inner reply', inner);
+  assert.equal(document.querySelectorAll('.detail-thread-card').length, before,
+    '未来调用方直接传卡内元素也必须被拒绝');
+
+  card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+});
+
 test('纯图片选区：折叠后引用缩略条仍可见（否则折叠成空卡片）', async () => {
   const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   const bubble = makeFigureBubble(`<img class="inline-fig" src="${IMG}">`, '[图1]');

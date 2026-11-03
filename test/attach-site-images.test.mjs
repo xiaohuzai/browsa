@@ -607,13 +607,15 @@ const SYND_PAYLOAD = (() => {
 function stubXFetch({ syndStatus = 200, jinaText = null } = {}) {
   const prev = { fetch: globalThis.fetch };
   const fetched = [];
-  globalThis.fetch = async (url) => {
+  const photoOpts = [];
+  globalThis.fetch = async (url, opts) => {
     fetched.push(String(url));
     if (String(url) === SYND_URL) {
       if (syndStatus !== 200) return { ok: false, status: syndStatus };
       return { ok: true, status: 200, json: async () => SYND_PAYLOAD };
     }
     if (/pbs\.twimg\.com\/media/.test(String(url))) {
+      photoOpts.push(opts);
       return { ok: true, status: 200, blob: async () => new Blob([new Uint8Array(8)], { type: 'image/jpeg' }) };
     }
     if (/r\.jina\.ai/.test(String(url))) {
@@ -622,7 +624,7 @@ function stubXFetch({ syndStatus = 200, jinaText = null } = {}) {
     }
     throw new Error('unexpected fetch: ' + url);
   };
-  return { fetched, restore: () => { globalThis.fetch = prev.fetch; } };
+  return { fetched, photoOpts, restore: () => { globalThis.fetch = prev.fetch; } };
 }
 
 test('X syndication fallback: dead page state still yields the clean tweet (auto/dom cascade)', async () => {
@@ -641,6 +643,12 @@ test('X syndication fallback: dead page state still yields the clean tweet (auto
       'photo rides as an [图N] URL line when bytes fail open (Node has no canvas)');
     assert.ok(!text.includes('t.co/3acKIMMgsK'), 'the trailing t.co link must be trimmed');
     assert.ok(stub.fetched.includes(SYND_URL), 'the syndication URL (incl. pinned token) must be requested');
+    // 2026-11-03 第二批审计（content-5）：照片下载必须走共享安全包络
+    // fetchImageAsDataURL（redirect:'error' + credentials:'omit'），不再是
+    // 跟随重定向、带 Cookie、无量上限的裸 fetch。
+    assert.ok(stub.photoOpts.length >= 1, 'the syndication photo must be fetched');
+    assert.equal(stub.photoOpts[0]?.redirect, 'error', 'syndication photos ride the shared fetchImageAsDataURL envelope');
+    assert.equal(stub.photoOpts[0]?.credentials, 'omit', 'the embed endpoint is cookie-free — photo downloads must be too');
   } finally { stub.restore(); }
 });
 

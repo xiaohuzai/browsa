@@ -45,6 +45,34 @@ async function expectAbortError(promise, label) {
     `${label}: string-reason abort must classify as AbortError, got ${err?.constructor?.name}: ${err?.message}`);
 }
 
+// 2026-11-03 proto-3：abort 归一的单点 owner。此前同形三行拷贝散在
+// renegotiateOutputCap / openSseStream / runsApiStream POST / opencode apiFetch /
+// squillaStream catch 五处，每个新 fetch 点都要靠调用者自觉重抄。helper 契约
+// 刻意窄：只做 abort 判定与归一，非 abort 错误落空返回——包装留在各调用点
+// （networkErrLabel 措辞字节稳定，error-classifier 按串匹配；opencode 的非
+// abort 分支是裸 rethrow，统一包装会改错误面）。
+test('classifyFetchAbort: single-owner normalization, narrow contract', async () => {
+  const { classifyFetchAbort } = await import('../lib/llm-client.js');
+  assert.equal(typeof classifyFetchAbort, 'function');
+
+  // leg 1: signal.aborted 权威——裸字符串 reason（无 .name/.message）归一为 AbortError。
+  const ac = new AbortController();
+  ac.abort('user-cancel');
+  assert.throws(() => classifyFetchAbort('user-cancel', ac.signal), (e) => e?.name === 'AbortError');
+  // signal 已 aborted 时即使 e 长得像真实错误也判取消（signal 是权威判据）。
+  assert.throws(() => classifyFetchAbort(new Error('socket hang up'), ac.signal), (e) => e?.name === 'AbortError');
+
+  // leg 2: 本回合 signal 未 aborted，但 e 是 AbortError（嵌套 timeout controller）→ 原样 rethrow。
+  const nested = new DOMException('The operation timed out', 'AbortError');
+  assert.throws(() => classifyFetchAbort(nested, new AbortController().signal), (e) => e === nested);
+  assert.throws(() => classifyFetchAbort(nested, null), (e) => e === nested);
+
+  // leg 3: 非 abort → 落空返回，包装/重抛留在调用点。
+  assert.equal(classifyFetchAbort(new Error('net down'), new AbortController().signal), undefined);
+  assert.equal(classifyFetchAbort('weird rejection', undefined), undefined);
+  assert.equal(classifyFetchAbort(undefined, null), undefined);
+});
+
 test('fetch-phase string-reason aborts are AbortError on chat/responses/anthropic styles', async () => {
   const { chatStream, responsesStream, anthropicStream } = await import('../lib/llm-client.js');
 

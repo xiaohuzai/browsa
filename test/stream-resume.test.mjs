@@ -88,8 +88,8 @@ Object.defineProperty(globalThis, 'chrome', {
 // --------------- import ------------------------------------------------------
 // Dynamic import so the mock is in place before background.js evaluates.
 const bg = await import('../background.js');
-const { handle, streamState, streamPorts, initStreamState, appendToStreamState, clearStreamState } = bg;
-const { pushChunk } = await import('../lib/state.js'); // same module instance bg uses (not re-exported)
+const { handle, streamState, streamPorts, chatControllers, activeRunIds, initStreamState, appendToStreamState, clearStreamState } = bg;
+const { pushChunk, peekTerminalTombstone, takeTerminalTombstone } = await import('../lib/state.js'); // same module instance bg uses (not re-exported)
 
 // --------------- tests -------------------------------------------------------
 
@@ -134,6 +134,47 @@ test('STREAM_RELEASE is idempotent (safe to call when no state exists)', async (
   streamState.clear();
   const r = await handle({ type: 'STREAM_RELEASE', tabId: 9999 });
   assert.equal(r.released, true);
+});
+
+// ─── STREAM_RELEASE 回合身份门（2026-11-03 sw-3）─────────────────────────────
+// RELEASE 曾是绕过 ownership 的无条件 clearStreamState：迟到的旧回合 RELEASE
+// （多窗口面板 / tombstone 重放后立刻重发）会删掉新回合的 streamState 并连带
+// 抹掉其 SW-death 收尸镜像。epoch 随 DONE 下发、面板回传；缺席时只清无主 tab。
+
+test('STREAM_RELEASE with a stale epoch is a no-op against a newer turn', async () => {
+  streamState.clear();
+  const old = initStreamState(7);
+  const newer = initStreamState(7); // 同 tab 新回合：epoch 递增并取代旧态
+  const r = await handle({ type: 'STREAM_RELEASE', tabId: 7, epoch: old.epoch });
+  assert.equal(r.released, false, 'a stale-epoch RELEASE must report it did nothing');
+  assert.equal(streamState.get(7), newer, 'the newer turn\'s state must survive the old RELEASE');
+
+  const r2 = await handle({ type: 'STREAM_RELEASE', tabId: 7, epoch: newer.epoch });
+  assert.equal(r2.released, true, 'the matching epoch releases normally');
+  assert.equal(streamState.has(7), false);
+});
+
+test('STREAM_RELEASE without epoch refuses while a live controller/run owns the tab', async () => {
+  streamState.clear();
+  chatControllers.clear();
+  activeRunIds.clear();
+  initStreamState(7);
+  chatControllers.set(7, new AbortController());
+  const r = await handle({ type: 'STREAM_RELEASE', tabId: 7 });
+  assert.equal(r.released, false, 'epoch-less RELEASE (error path) must not clear a live turn');
+  assert.ok(streamState.has(7));
+  chatControllers.delete(7);
+
+  activeRunIds.set(7, { runId: 'r', baseUrl: 'http://x', apiKey: 'k' });
+  const r2 = await handle({ type: 'STREAM_RELEASE', tabId: 7 });
+  assert.equal(r2.released, false, 'a live server-side run also blocks the epoch-less release');
+  assert.ok(streamState.has(7));
+  activeRunIds.delete(7);
+
+  // CHAT throw 后 finally 已删 controller/run —— 兜底清除成立（面板错误路径）。
+  const r3 = await handle({ type: 'STREAM_RELEASE', tabId: 7 });
+  assert.equal(r3.released, true);
+  assert.equal(streamState.has(7), false);
 });
 
 test('streamState survives the streaming port disconnecting (the actual bug)', async () => {
@@ -358,4 +399,23 @@ test('REASSIGN_STREAM_SESSION for an unknown tab reports reassigned:false', asyn
   streamState.clear();
   const r = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 9999, sessionId: 's1' });
   assert.equal(r.reassigned, false);
+});
+
+test('a backgrounded stream still tombstones its DONE/ERROR (bg gate must not skip the record)', async () => {
+  // 2026-11-03 审计：pushChunk 的 bg 门曾在 tombstone 记录之前 early-return，后台
+  // 流（切会话转后台）完成时 DONE 不留墓碑→切回时 PEEK→HELLO 竞态接不住回复→
+  // 永久 spinner。记录必须先于 bg 门；replay 侧 resume 门 + origin 校验保证不泄漏。
+  streamState.clear();
+  streamPorts.clear();
+  initStreamState(7, { bg: true, originSessionId: 's1' });
+  assert.equal(streamState.get(7).bg, true);
+
+  // bg CHUNK 仍被抑制（无 port 注册，这里只验证 DONE 墓碑不被 bg 门吞掉）。
+  pushChunk(7, { type: 'DONE', full: 'backgrounded reply', providerLabel: 'test' });
+  assert.equal(peekTerminalTombstone(7), true, 'bg DONE must leave a tombstone for the switch-back resume');
+  const terminal = takeTerminalTombstone(7);
+  assert.equal(terminal?.type, 'DONE');
+  assert.equal(terminal?.full, 'backgrounded reply');
+  assert.equal(peekTerminalTombstone(7), false, 'read-once');
+  clearStreamState(7);
 });

@@ -120,6 +120,25 @@ test('worker error event flips the sticky flag but leaves queued state consisten
   }
 });
 
+test('worker error clears the worker so the fuse is reachable immediately (no dead-worker post, no timeout wait)', async () => {
+  // 2026-11-03 审计：error 事件曾只置 workerFailed 而不清空 worker，ensure 的
+  // `if (worker) return` 排在 workerFailed 前→熔断永不可达，后续每次 call 都
+  // postMessage 到死 worker 并等满 timeout（pdf 90s）。修复后 ensure 立即返回 null。
+  const instances = installFakeWorker();
+  const rpc = await freshRpc({ timeoutMs: 5000 }); // 长 timeout：若仍空等会显著拖慢用例
+  rpc.ensure();
+  const wk = instances[0];
+  wk.postMessage = () => {};
+  for (const fn of wk._listeners.error) fn(new Error('wasm oom'));
+  assert.equal(wk.terminated, true, 'dead worker is terminated');
+  assert.equal(rpc.ensure(), null, 'fuse reachable: ensure returns null right after the error');
+  const postedBefore = wk.posted.length;
+  const t0 = Date.now();
+  assert.equal(await rpc.call({ n: 1 }), null, 'new call fails open immediately');
+  assert.ok(Date.now() - t0 < 1000, 'must not wait out the 5s timeout against a dead worker');
+  assert.equal(wk.posted.length, postedBefore, 'no message posted to the dead worker');
+});
+
 test('transfer option moves the byte buffer; default posts without a transfer list', async () => {
   const instances = installFakeWorker();
   const rpc = await freshRpc();

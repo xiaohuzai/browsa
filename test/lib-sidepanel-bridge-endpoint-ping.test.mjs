@@ -127,3 +127,36 @@ test('endpointPing present but one endpoint untested: that entry reads not pinge
     'Hermes Agent — ○ unreachable',
   ]);
 });
+
+// ─── 卡级回落聚合对齐共享单点（2026-11-03 第四批，store-4 收尾）────────────────
+// bridge 卡的卡级 Ping 回落必须经 lib/provider-ping.js 的 aggregateBridgePing
+// 从 endpointPing 推导（pingStates 缺席时），不再只认持久化卡级状态。
+// 无端点可展开时（models 空）下拉落到卡级条目，正好钉住回落分支。
+
+test('bridge card-level fallback derives from endpointPing via the shared aggregate when pingStates is absent', async () => {
+  // models/model 都清空 → 无端点可展开，下拉落到卡级条目（回落分支）。
+  // 排序只看持久化 pingStates：两卡都非 reachable → 保持原相对顺序。
+  fakeCfg.providers.bridge.models = [];
+  fakeCfg.providers.bridge.model = '';
+  fakeCfg.providers.bridge.endpointPing = { [URL_A]: 'reachable', [URL_B]: 'unreachable' };
+  fakeCfg.pingStates = { hermes: 'unreachable' }; // bridge 卡级状态缺席
+  await storageListener({ providers: { newValue: {} } }, 'local');
+  assert.deepEqual(optionTexts(), [
+    'Hermes Agent — ○ unreachable',
+    'Agent Bridge — ● reachable', // 任一端点可达即可达
+  ]);
+
+  fakeCfg.providers.bridge.endpointPing = { [URL_A]: 'unreachable', [URL_B]: 'unreachable' };
+  await storageListener({ providers: { newValue: {} } }, 'local');
+  assert.deepEqual(optionTexts(), [
+    'Hermes Agent — ○ unreachable',
+    'Agent Bridge — ○ unreachable', // 已测端点全不通才 unreachable
+  ]);
+
+  delete fakeCfg.providers.bridge.endpointPing;
+  await storageListener({ providers: { newValue: {} } }, 'local');
+  assert.deepEqual(optionTexts(), [
+    'Hermes Agent — ○ unreachable',
+    'Agent Bridge — not pinged', // 从未测过
+  ]);
+});

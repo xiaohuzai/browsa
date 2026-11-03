@@ -72,7 +72,9 @@ def collect(rel):
     if not os.path.isdir(full):
         return
     for dirpath, dirnames, filenames in os.walk(full):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        # "_src" is build scratch, never runtime — skip legacy lib/_src leftovers
+        # from failed builds (scratch now lives at build/_src, outside the roots).
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "_src"]
         for fn in filenames:
             if fn.startswith("."):
                 continue
@@ -133,7 +135,7 @@ import json, sys, zipfile
 z = zipfile.ZipFile(sys.argv[1])
 names = z.namelist()
 bad = [n for n in names if n.endswith(('.md', '.test.mjs', '.log')) or
-       n.startswith(('test/', 'docs/', 'dev-preview/', 'store-assets/', 'node_modules/', 'build/'))]
+       n.startswith(('test/', 'docs/', 'dev-preview/', 'store-assets/', 'node_modules/', 'build/', 'lib/_src/'))]
 if bad:
     print('FAIL: dev-only files leaked into the package:', bad[:10])
     sys.exit(1)
