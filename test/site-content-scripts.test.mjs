@@ -32,6 +32,19 @@ function loadContentScript(name) {
     assert.equal(isBilibiliViewUrl('not a url'), false);
   });
 
+  test('bilibili: the video object has exactly ONE mapping (active fetch reuses extractBilibiliVideo)', async () => {
+    // 2026-11-03: the active-fetch path carried an inline copy of the whole 16-field
+    // mapping; it had already drifted once on `pages[0].cid`, which is how a P1 page
+    // ended up with P2's subtitles (lib/content-scripts/AGENTS.md). Pin the single
+    // homepage of the mapping: one rawAt stamp, one bvid/id fallback entry point.
+    const fs = await import('node:fs/promises');
+    const src = await fs.readFile(new URL('../lib/content-scripts/bilibili-content-script.js', import.meta.url), 'utf8');
+    assert.equal((src.match(/rawAt: Date\.now\(\)/g) || []).length, 1,
+      'exactly one video-object literal — a second copy drifts silently');
+    assert.match(src, /fallbackBvid: bvid/,
+      'the active fetch passes its URL-derived id into the shared mapping instead of rebuilding the object');
+  });
+
   test('bilibili: isBilibiliPlayerUrl matches both the WBI and legacy player paths', () => {
     assert.equal(isBilibiliPlayerUrl('https://api.bilibili.com/x/player/wbi/v2?bvid=x'), true);
     assert.equal(isBilibiliPlayerUrl('https://api.bilibili.com/x/player/v2?bvid=x'), true);
