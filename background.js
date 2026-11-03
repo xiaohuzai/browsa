@@ -32,7 +32,7 @@ import { ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
 import { buildAsrPendingCtx } from './lib/handlers/attach-asr-pending.js';
 import { handleAttachConfirm, ATTACH_CONFIRM_TYPES } from './lib/handlers/attach-confirm-handler.js';
 import { storeAttachment } from './lib/handlers/attach-store.js';
-import { relayApproval, relayClarify } from './lib/handlers/approval-relay.js';
+import { relayApproval, relayClarify, respondPending } from './lib/handlers/approval-relay.js';
 import { modeCaps, DEFERRED_HANDOFFS } from './lib/attach-modes.js';
 import { videoUrlMatches } from './lib/video-url.js';
 // Re-exported for tests: `const bg = await import('../background.js'); const { streamPorts, ... } = bg;`
@@ -963,16 +963,13 @@ async function handle(msg, sender) {
       // reply via the opencode endpoints; card choices (once/always/deny) map
       // onto opencode's reply enum (deny → reject) — see showApprovalCard's
       // btnLabels.
-      const pending = pendingApprovals.get(msg.reqKey);
-      if (!pending) return { ok: false, error: 'no pending approval' };
-      try {
-        const res = await relayApproval(pending, msg.choice);
-        // 答成即删：条目不再参与 STREAM_PEEK 的未决卡补挂；失败保留供重试。
-        if (res?.ok) pendingApprovals.delete(msg.reqKey);
-        return res;
-      } catch (e) {
-        return { ok: false, error: e?.message };
-      }
+      return respondPending({
+        map: pendingApprovals,
+        relay: relayApproval,
+        reqKey: msg.reqKey,
+        payload: msg.choice,
+        missing: 'no pending approval',
+      });
     }
 
     case 'CLARIFY_RESPOND': {
@@ -981,15 +978,13 @@ async function handle(msg, sender) {
       // clarify card is free-text, so the response rides as the single
       // selected label (opencode's QuestionInfo has a `custom` answer path).
       // reqKey routing mirrors APPROVAL_RESPOND (see above).
-      const pending = pendingClarifications.get(msg.reqKey);
-      if (!pending) return { ok: false, error: 'no pending clarification' };
-      try {
-        const res = await relayClarify(pending, msg.response);
-        if (res?.ok) pendingClarifications.delete(msg.reqKey);
-        return res;
-      } catch (e) {
-        return { ok: false, error: e?.message };
-      }
+      return respondPending({
+        map: pendingClarifications,
+        relay: relayClarify,
+        reqKey: msg.reqKey,
+        payload: msg.response,
+        missing: 'no pending clarification',
+      });
     }
 
     case 'SUBCHAT':

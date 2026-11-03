@@ -304,10 +304,21 @@ test('SUBCHAT pushes tool progress + approval/clarify chunks and relays replies 
   assert.match(subchatSrc, /pushSubChatChunk\(subId, \{ type: 'SUBCHAT_CLARIFY', subId, data, reqKey \}\)/);
   assert.equal((subchatSrc.match(/const reqKey = agentPendingKey\(subId\);/g) || []).length, 5,
     'all five creation sites (opencode appr+clar, bridge appr, hermes appr+clar) key by agentPendingKey');
-  assert.match(subchatSrc, /subchatPendingApprovals\.get\(msg\.reqKey\)/,
-    'approval relay must route by reqKey, not the old subId single slot');
-  assert.match(subchatSrc, /subchatPendingClarifications\.get\(msg\.reqKey\)/,
-    'clarification relay must route by reqKey');
+  // 2026-11-03: the four "answer a pending card" paths collapsed into
+  // respondPending(map, relay, reqKey, payload, missing) in approval-relay.js, so
+  // the pin moved to the call sites: each twin must still route by reqKey
+  // against its OWN subId-scoped map (not the old subId single slot) and pass the
+  // matching relay + payload field.
+  assert.match(
+    subchatSrc,
+    /respondPending\(\{\s*map: subchatPendingApprovals,\s*relay: relayApproval,\s*reqKey: msg\.reqKey,\s*payload: msg\.choice,/,
+    'approval relay must route by reqKey, not the old subId single slot',
+  );
+  assert.match(
+    subchatSrc,
+    /respondPending\(\{\s*map: subchatPendingClarifications,\s*relay: relayClarify,\s*reqKey: msg\.reqKey,\s*payload: msg\.response,/,
+    'clarification relay must route by reqKey',
+  );
   // Runs + opencode + bridge branches all wire onApproval: two `onApproval:`
   // option keys (opencode/bridge) plus the runs branch's local const passed
   // as shorthand (`onApproval,` at the runsApiStream call).
