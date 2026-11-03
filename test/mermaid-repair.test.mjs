@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { extractMermaidFence, repairMermaid } from '../lib/handlers/mermaid-repair.js';
 import { formatMermaidParseError } from '../lib/sidepanel/mermaid-utils.js';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseChatContent } from './helpers/sse-fixtures.mjs';
 
 // ── 纯函数 ───────────────────────────────────────────────────────────────────
 
@@ -101,11 +102,7 @@ globalThis.chrome = chromeMock;
 const bg = await import('../background.js');
 const { handle } = bg;
 
-function sseFor(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
-  return new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } });
-}
+const sseFor = (text) => sseChatContent(text);
 
 // responses / anthropic 的 SSE 事件形状与 chat completions 不同，按各自协议给
 function sseForResponses(text) {

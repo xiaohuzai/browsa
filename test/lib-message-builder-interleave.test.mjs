@@ -3,7 +3,22 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interleaveImageParts } from '../lib/message-builder.js';
+import { interleaveImageParts, imagePartUrl } from '../lib/message-builder.js';
+
+test('imagePartUrl: every image shape this codebase passes around', () => {
+  // The accepted shapes ARE the contract: history entries carry OpenAI parts, older
+  // stored entries carry the flat legacy string, figureImages carry {url}, and the
+  // builders pass bare data URLs. Four consumers used to unpack this by hand.
+  assert.equal(imagePartUrl('data:image/png;base64,AA'), 'data:image/png;base64,AA', 'bare URL string');
+  assert.equal(imagePartUrl({ url: 'https://x/y.png' }), 'https://x/y.png', 'figureImages {url}');
+  assert.equal(imagePartUrl({ type: 'image_url', image_url: { url: 'data:a' } }), 'data:a', 'OpenAI part');
+  assert.equal(imagePartUrl({ type: 'image_url', image_url: 'data:b' }), 'data:b', 'legacy flat part');
+  assert.equal(imagePartUrl({ type: 'image_url' }), '', 'part with no URL');
+  assert.equal(imagePartUrl({ image_url: { url: 42 } }), '', 'non-string url is not a URL');
+  assert.equal(imagePartUrl(null), '', 'null');
+  assert.equal(imagePartUrl(undefined), '', 'undefined');
+  assert.equal(imagePartUrl(7), '', 'number');
+});
 
 test('interleaveImageParts: anchors split text and place images at their positions', () => {
   const text = '前文\n[00:05] [图1] 图表一\n中段\n[03:00] [图2] 代码\n后文';

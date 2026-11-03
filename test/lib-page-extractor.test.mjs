@@ -49,3 +49,51 @@ test('attach flow wires the predicate with a body.innerText probe (source-shape 
   assert.match(src, /mode === 'auto' && !ctx\.siteSynthesized/,
     'site-synthesized results must skip the probe entirely');
 });
+
+// --------------- extractActiveTab: the ordered site ladder -------------------
+
+test('extractActiveTab runs its attempts in the pinned order', async () => {
+  // The ladder IS the behaviour: a page can satisfy several gates, and whichever
+  // attempt runs first wins. Nothing pinned that order, so a "harmless" reshuffle
+  // silently changed which extractor produced a page's text (the arXiv/YouTube
+  // ordering is the load-bearing example: abs->/html/ must win before YouTube-style
+  // active fetch paths are even tried, and site-cache synthesis must precede the
+  // URL fallbacks). Steps added or reordered must update this list deliberately.
+  const fs = await import('node:fs/promises');
+  const src = await fs.readFile(new URL('../lib/page-extractor.js', import.meta.url), 'utf8');
+  const start = src.indexOf('export async function extractActiveTab');
+  const end = src.indexOf('return await runGenericExtraction', start);
+  assert.ok(start > 0 && end > start, 'extractActiveTab body must be findable');
+  const body = src.slice(start, end);
+  const ORDERED = [
+    'tryPdfExtraction',
+    'tryOfficeExtraction',
+    "mode === 'screenshot'",
+    'synthesizeSiteCache',
+    'isXiaoyuzhouEpisodeUrl',
+    'arxivAbsIdFromUrl',
+    'tryArxivHtmlFallback',
+    'tryYoutubeActiveFallback',
+    'tryBilibiliActiveFallback',
+    'tryXActiveFallback',
+    'tryRedditActiveFallback',
+    'tryZhihuActiveFallback',
+    'tryXhsExtraction',
+    'tryFeishuExtraction',
+    'tryGithubRepoExtraction',
+    'tryGithubExtraction',
+  ];
+  let cursor = 0;
+  for (const marker of ORDERED) {
+    const at = body.indexOf(marker, cursor);
+    assert.ok(at >= 0, `${marker} must appear after the previous step (ladder order changed?)`);
+    cursor = at + marker.length;
+  }
+  // The generic cascade is the terminal step: nothing after it in the ladder, and the
+  // slice above stops right before it.
+  assert.equal((body.match(/runGenericExtraction\(/g) || []).length, 0,
+    'no extraction attempt may run after the generic cascade');
+  assert.ok(src.slice(end).startsWith('return await runGenericExtraction('),
+    'the function must end with the generic cascade');
+});
+

@@ -11,7 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { JSDOM } from 'jsdom';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -816,6 +817,47 @@ async function loadDedupeFn() {
 // We have to find the OPENING `{` of the function BODY, not the
 // parameter list. The body always follows the closing `)` of the
 // parameter list, possibly with whitespace and arrow markers.
+// Blank out comments, string/template literals and regex bodies (same length,
+// newlines kept) so structural scanning can never be fooled by a brace that lives
+// inside a literal. 2026-11-03: without this, a '}' in a string ended an extracted
+// function body early — the vm then ran HALF a function while the test stayed
+// green, and production had been spelling its own regex braces as \x7B/\x7D to
+// appease the naive counter.
+function maskLiterals(src) {
+  const a = src.split('');
+  const n = src.length;
+  const blank = (x, y) => { for (let k = x; k < y; k++) if (a[k] !== '\n') a[k] = ' '; };
+  let i = 0;
+  while (i < n) {
+    const two = src.slice(i, i + 2);
+    if (two === '//') { const j = src.indexOf('\n', i); const end = j < 0 ? n : j; blank(i, end); i = end; continue; }
+    if (two === '/*') { const j = src.indexOf('*/', i + 2); const end = j < 0 ? n : j + 2; blank(i, end); i = end; continue; }
+    const c = src[i];
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < n) { if (src[j] === '\\') { j += 2; continue; } if (src[j] === c) { j++; break; } j++; }
+      blank(i + 1, j - 1); i = j; continue;
+    }
+    // Regex literal: a '/' that cannot be division (previous significant char is a
+    // word char, ')' or ']' means division).
+    if (c === '/' && !/[\w$)\]]/.test(src[i - 1] || '')) {
+      let j = i + 1; let inClass = false; let ok = false;
+      while (j < n) {
+        const ch = src[j];
+        if (ch === '\\') { j += 2; continue; }
+        if (ch === '[') inClass = true;
+        else if (ch === ']') inClass = false;
+        else if (ch === '/' && !inClass) { ok = true; j++; break; }
+        else if (ch === '\n') break;
+        j++;
+      }
+      if (ok) { blank(i + 1, j - 1); i = j; continue; }
+    }
+    i++;
+  }
+  return a.join('');
+}
+
 async function loadSiblingFn(name, file = join(ROOT, 'lib/page-extractor.js')) {
   const src = await readFile(file, 'utf8');
   // Match the function name and the position of the closing paren
@@ -831,14 +873,40 @@ async function loadSiblingFn(name, file = join(ROOT, 'lib/page-extractor.js')) {
   while (i < src.length && /\s/.test(src[i])) i++;
   if (src[i] !== '{') throw new Error(`${name}: expected { at offset ${i}, got ${src[i]}`);
   const start = m.index; // include the full "function name(...) {" header
+  const masked = maskLiterals(src);
   let depth = 0;
   for (; i < src.length; i++) {
-    if (src[i] === '{') depth++;
-    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+    if (masked[i] === '{') depth++;
+    else if (masked[i] === '}') { depth--; if (depth === 0) break; }
   }
   if (depth !== 0) throw new Error(`${name}: unbalanced braces`);
   return src.slice(start, i + 1);
 }
+
+test('loadSiblingFn survives unbalanced braces inside strings and regexes (harness regression)', async () => {
+  // The extractor used to count braces character by character with no awareness of
+  // literals: a '}' inside a string (or a regex like /^\}$/) closed the body early,
+  // so the vm ran HALF a function and the test could still pass - a silent false
+  // green. Production even spelled its own regex braces as \x7B/\x7D to appease
+  // this counter. The fixture below is exactly that shape.
+  const dir = await mkdtemp(join(tmpdir(), 'browsa-harness-'));
+  const file = join(dir, 'fixture.js');
+  await writeFile(file, [
+    'function probe() {',
+    "  const note = 'closing } inside a string';",
+    '  const re = /^\}$/;',
+    '  return note + String(re);',
+    '}',
+    '',
+  ].join('\n'));
+  try {
+    const body = await loadSiblingFn('probe', file);
+    assert.match(body, /closing \} inside a string/, 'the body must include the string literal');
+    assert.match(body, /String\(re\)/, 'a naive counter stops at the brace in the string and cuts this line');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 async function runDedupe(lastNavMap, navPortsMap, tabId, url) {
   // Build a side map: tabId → array of portId. The function we're testing
@@ -1803,10 +1871,26 @@ test('extractInPageWorld: "Skip to Content" accessibility anchors are stripped',
   assert.doesNotMatch(result.text, /Skip to Content/i, 'skip-to-content anchor text must be stripped');
 });
 
-test('postProcessMarkdown regex: multi-line link text gets its inner newline escaped', () => {
-  const md = '[line one\nline two](https://example.com)';
-  const out = md.replace(/\[([^\]]*\n[^\]]*)\]\(([^)]+)\)/g, (m, text, url) => `[${text.replace(/\n/g, '\\\n')}](${url})`);
-  assert.equal(out, '[line one\\\nline two](https://example.com)');
+test('extractInPageWorld: multi-line link text keeps the link intact (inner newline escaped)', async () => {
+  // 2026-11-03: the previous version of this test re-typed the postProcessMarkdown
+  // regex and applied it to a hand-made string - it asserted that its own copy
+  // matched itself, and deleting the real rule in lib/page-extractor.js kept it
+  // green. Drive the actual extraction pipeline instead.
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Real Article</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <p><a href="https://example.com/x">line one<br>line two</a></p>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  const tail = result.text.slice(-400);
+  // The link must stay ONE markdown link: an unescaped newline inside the text
+  // splits it and the URL degrades into literal prose.
+  assert.match(result.text, /\[\s*line one[\s\S]{0,40}?\\\n\s*line two\s*\]\(https:\/\/example\.com\/x\)/,
+    `multi-line link text must be escaped with a backslash-newline, got tail: ${tail}`);
 });
 
 // --- postProcessMarkdown(): SPA-embedded JSON state/config blob stripping --
@@ -2051,11 +2135,11 @@ test('extractInPageWorld: standalone data:/blob: image lines collapse to <image-
 });
 
 // --- PDF client-side text extraction (Feature A from firecrawl research) ---
-// _fetchPdfBytesInPageWorld runs IN-TAB (MAIN world) so the browser attaches
+// _fetchBytesInPageWorld (PDF args) runs IN-TAB (MAIN world) so the browser attaches
 // cookies -- tested here via a mocked fetch/Blob/btoa in the vm sandbox.
 
-test('_fetchPdfBytesInPageWorld: success path returns base64 + byteLength', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): success path returns base64 + byteLength', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
   const ctx = vm.createContext({
@@ -2069,51 +2153,51 @@ test('_fetchPdfBytesInPageWorld: success path returns base64 + byteLength', asyn
       })
     })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(!result.error, `expected success, got error: ${result.error}`);
   assert.equal(result.byteLength, 5);
   assert.equal(Buffer.from(result.base64, 'base64').toString('binary'), Buffer.from(fakeBytes).toString('binary'));
 });
 
-test('_fetchPdfBytesInPageWorld: oversized PDF is rejected with an error, not silently truncated', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): oversized PDF is rejected with an error, not silently truncated', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => ({ ok: true, blob: async () => ({ size: 999_999_999 }) })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'oversized PDF must return an error field');
   assert.ok(!result.base64, 'must not return partial/truncated base64');
 });
 
-test('_fetchPdfBytesInPageWorld: non-ok fetch response returns an error', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): non-ok fetch response returns an error', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => ({ ok: false, status: 403 })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'a 403 response must surface as an error, not throw uncaught');
 });
 
-test('_fetchPdfBytesInPageWorld: a thrown fetch error is caught and returned as {error}, never rejects', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): a thrown fetch error is caught and returned as {error}, never rejects', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => { throw new Error('network down'); }
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.equal(result.error, 'network down');
 });
 
-test('_fetchPdfBytesInPageWorld: github.com /blob/ URL is rewritten to raw.githubusercontent.com with credentials:omit', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): github.com /blob/ URL is rewritten to raw.githubusercontent.com with credentials:omit', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://github.com/alxndrTL/little-book-rl/blob/main/book.pdf' });
   let fetchedUrl = null, fetchedCreds = null;
   const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
@@ -2127,15 +2211,15 @@ test('_fetchPdfBytesInPageWorld: github.com /blob/ URL is rewritten to raw.githu
       return { ok: true, headers: { get: () => 'application/octet-stream' }, blob: async () => ({ size: fakeBytes.length, arrayBuffer: async () => fakeBytes.buffer }) };
     }
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.equal(fetchedUrl, 'https://raw.githubusercontent.com/alxndrTL/little-book-rl/main/book.pdf', 'github /blob/ URL must be rewritten to the raw host');
   assert.equal(fetchedCreds, 'omit', 'cross-origin raw fetch must use credentials:omit (raw host sends no Allow-Credentials)');
   assert.ok(result.base64, 'should return base64 for the rewritten raw URL');
   assert.equal(result.byteLength, 5);
 });
 
-test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) returns an error, not base64-encoded HTML', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): an HTML viewer page (content-type text/html) returns an error, not base64-encoded HTML', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   let blobCalled = false;
   const ctx = vm.createContext({
@@ -2148,7 +2232,7 @@ test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) re
       blob: async () => { blobCalled = true; return { size: 5000, arrayBuffer: async () => new Uint8Array(5000).buffer }; }
     })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'an HTML viewer page must surface as an error');
   assert.ok(!result.base64, 'must not base64-encode HTML as if it were a PDF');
   assert.equal(blobCalled, false, 'should not consume the blob body once content-type says HTML');

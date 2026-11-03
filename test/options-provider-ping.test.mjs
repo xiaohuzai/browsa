@@ -279,15 +279,23 @@ globalThis.chrome = {
       get: async (keys, cb) => {
         // real chrome.storage.local.get supports BOTH promise and callback
         // styles; options.js's setBadge() uses the callback form.
+        // Deep-copy on the way out, like the real API: without it the page and
+        // the "stored" table share one object, so a write that persists a stale
+        // snapshot looks identical to a correct one (that aliasing was hiding a
+        // cross-tab data-loss bug).
+        const clone = (v) => (v === undefined ? undefined : structuredClone(v));
         const result = (() => {
-          if (keys == null) return { ...storedData };
-          if (typeof keys === 'string') return { [keys]: storedData[keys] };
-          return { ...storedData };
+          if (typeof keys === 'string') return { [keys]: clone(storedData[keys]) };
+          return clone(storedData);
         })();
         if (typeof cb === 'function') cb(result);
         return result;
       },
-      set: async (obj) => { setCalls.push(obj); Object.assign(storedData, obj); },
+      // Deep-copy on the way IN as well: the real API serializes, and an aliased
+      // write lets the page keep mutating "stored" state by reference — which is
+      // exactly what made a stale-snapshot write indistinguishable from a correct
+      // one in this harness.
+      set: async (obj) => { setCalls.push(obj); Object.assign(storedData, structuredClone(obj)); },
     },
   },
 };
@@ -368,6 +376,36 @@ test('options.js: init() renders the agent squad (bridge + opencode + squilla + 
   assert.equal(findProviderCard('LLM 1'), reserved, 'the reserved slot renders as the LLM 1 card');
   assert.equal(reserved.querySelector('[data-act="delete"]'), null, 'the reserved slot has no delete button (nothing persisted yet)');
   assert.equal(document.querySelector('.provider-tab-add') != null, true, 'the ＋ add-provider tab is always present — even with the reserved slot');
+});
+
+test('options.js: Ping on a half-filled card reports the missing field WITHOUT persisting it', async () => {
+  // A2 (2026-11-03): pingCard used to call saveCard() first - which persists
+  // unconditionally - and only then preflight the required fields. A user who
+  // left Model ID empty and clicked Ping got "Please fill in: Model ID" while a
+  // provider with NO model was already in storage; the sidebar's isConfigured
+  // only checks baseUrl, so the dropdown then offered a provider that could never
+  // work, with a badge claiming "unreachable" for a ping that never ran.
+  const baseUrl = 'http://preflight-' + Math.random().toString(36).slice(2);
+  const card = document.querySelector('.provider.reserved');
+  assert.ok(card, 'fresh install shows the reserved LLM slot');
+  card.querySelector('[data-k="baseUrl"]').value = baseUrl;
+  // Model ID deliberately left empty.
+  let pinged = false;
+  globalThis.fetch = async () => { pinged = true; throw new Error('must not be reached'); };
+
+  card.querySelector('button[data-act="ping"]').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 25));
+
+  assert.match(card.querySelector('.card-status').textContent, /Model ID/, 'the preflight must name the missing field');
+  const providers = storedData.providers || {};
+  assert.equal(
+    Object.values(providers).find((p) => (p.baseUrl || '') === baseUrl),
+    undefined,
+    'a card that failed preflight must not reach storage (the sidebar would list an unusable provider)',
+  );
+  assert.doesNotMatch(card.querySelector('.provider-badge')?.textContent || '', /unreachable/,
+    'a ping that never ran must not claim the provider is unreachable');
+  assert.equal(pinged, false, 'no network probe may run for a card that cannot be valid');
 });
 
 test('options.js: settings header carries the guide link matching the UI locale', () => {
@@ -1195,3 +1233,23 @@ test('options.js: Bridge — ping, then change URL + key, then Save resets ALL p
   assert.ok(!dots[0].classList.contains('reachable') && !dots[0].classList.contains('unreachable'),
     '行内状态点回到未测灰色');
 });
+test('options.js: saving one card does not erase providers added after the page loaded', async () => {
+  // A4 (2026-11-03): every provider write used the whole cachedCfg.providers
+  // snapshot taken at page load, so a provider created after this page opened (a
+  // second settings tab, an import, the sidebar) was silently erased by the next
+  // save - with the UI showing nothing wrong. This case runs LAST on purpose: it
+  // writes a row behind the page's back, which earlier DOM assertions would see.
+  const card = findProviderCard('Hermes Agent');
+  assert.ok(card, 'the Hermes Agent card is always rendered');
+  storedData.providers = storedData.providers || {};
+  storedData.providers['added-elsewhere'] = { baseUrl: 'http://elsewhere', model: 'x' };
+  card.querySelector('[data-k="baseUrl"]').value = 'http://hermes-local';
+  const writesBefore = setCalls.length;
+  card.querySelector('button[data-act="save"]').dispatchEvent(click());
+  await sleepMs(40);
+  assert.ok(setCalls.length > writesBefore, 'the save must actually reach storage (guards this case from passing vacuously)');
+  assert.equal(storedData.providers?.hermes?.baseUrl, 'http://hermes-local', 'the edited row itself must be persisted');
+  assert.deepEqual(storedData.providers['added-elsewhere'], { baseUrl: 'http://elsewhere', model: 'x' },
+    'a provider written after page load must survive another card save');
+});
+

@@ -16,23 +16,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { sseStream } from './helpers/sse-fixtures.mjs';
 
 // Builds a fake SSE ReadableStream body from a list of {event, data} pairs,
 // in the "event: X\ndata: {...}\n\n" shape runsApiStream() parses.
-function buildSseStream(events) {
-  const encoder = new TextEncoder();
-  let text = '';
-  for (const { event, data } of events) {
-    text += `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  }
-  const bytes = encoder.encode(text);
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    }
-  });
-}
 
 // runsApiStream makes two fetches: POST /v1/runs (returns run_id as JSON),
 // then GET /v1/runs/{id}/events (returns the SSE stream).
@@ -43,7 +30,7 @@ function mockFetchWithEvents(events) {
     if (call === 1) {
       return { ok: true, status: 200, json: async () => ({ run_id: 'run_1' }) };
     }
-    return { ok: true, status: 200, body: buildSseStream(events), text: async () => '' };
+    return { ok: true, status: 200, body: sseStream(events), text: async () => '' };
   };
 }
 

@@ -27,7 +27,7 @@ globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
 const {
-  fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe,
+  fixBoldSpans, fixCjkEmphasisSpacing, renderStreamingSafe, renderSafe, renderFallbackText,
   decorateLinks, addThinkCopyButtons, addCodeCopyButtons, highlightDiffBlocks, extractCodeText,
   makeStreamRenderer, renderMermaid, sanitizeEchartsText, setThoughtAutoCollapse,
   stripThinkSegments, linkifyTimestamps, decorateFigureRefs, figuresBeforeEntry,
@@ -477,11 +477,18 @@ test('renderSafe: a echoed math/think placeholder does not downgrade the whole m
   assert.match(html2, /answer/, 'bogus think placeholder must not crash the render');
 });
 
-test('renderSafe falls back to escaped plain text on unexpected internal errors', async () => {
-  // Can't easily force marked/katex to throw from the outside, but the
-  // catch-all fallback branch must at minimum escape unsafe characters.
-  const html = await renderSafe('plain & <b>text</b>');
-  assert.ok(html.length > 0);
+test('renderFallbackText escapes markup (the renderSafe catch path)', async () => {
+  // renderSafe's catch returns this, and from the outside there is no honest way
+  // to force marked/KaTeX to throw - so the previous version of this test could
+  // only assert "non-empty", which passes for unescaped markup too. Pin the
+  // actual escaping contract instead.
+  const html = renderFallbackText('plain & <b>"x"</b> \'q\'');
+  assert.match(html, /&lt;b&gt;/, 'tags must be escaped, not rendered');
+  assert.match(html, /&amp;/, 'ampersand escaped');
+  assert.ok(!/<b>/.test(html), 'no raw tag survives');
+  assert.match(html, /&quot;/, 'quotes escaped');
+  assert.match(html, /&#39;/, 'single quotes escaped');
+  assert.equal(renderFallbackText(''), '', 'empty input stays empty');
 });
 
 test('renderSafe: a message with enough formulas to cross the KaTeX worker threshold still renders every formula correctly', async () => {

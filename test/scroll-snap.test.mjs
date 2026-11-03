@@ -86,10 +86,15 @@ test('sidepanel.js onActivated preserves tab url/title in pagemeta (regression c
     else if (rest[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
   }
   const body = rest.slice(0, end);
-  assert.ok(/pagemetaEl\.textContent\s*=\s*t\.title/.test(body),
-    'pagemeta must read t.title (not the unbound `tab`)');
+  // 2026-11-03: the three-field page-meta write was collapsed into setPageMeta(),
+  // so the pin moved to the call: the values must still come from the RESOLVED
+  // tab (`t`), which is the whole point of the regression this test froze.
+  assert.ok(/setPageMeta\(t\.title,\s*t\.url\)/.test(body),
+    'pagemeta must be painted from the resolved tab (t.title/t.url), never the unbound `tab`');
   assert.ok(!/\btab\.url\b/.test(body),
     'onActivated must not reference `tab.url` — `tab` is not in scope, only `t` from chrome.tabs.get()');
+  assert.ok(!/pagemetaEl\.(textContent|href|title)\s*=/.test(body),
+    'the page-meta bar has ONE writer (setPageMeta); onActivated must not paint it directly again');
 });
 
 test('scrollToBottom sets scrollTop to scrollHeight (correct implementation)', async () => {

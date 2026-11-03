@@ -646,7 +646,7 @@ async function rowPingBridge(card, row) {
     const aliasInput = row.querySelector('[data-bridge-alias]');
     if (aliasInput && !aliasInput.value.trim()) aliasInput.value = r.agent;
   }
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cfg);
   updateBridgeRowDots(card, cfg);
   if (rowBtn) rowBtn.innerHTML = ICON_REFRESH;
   const states = Object.values(cfg.endpointPing);
@@ -973,6 +973,22 @@ function buildProviderCard(name, cfg, opts = {}) {
   return card;
 }
 
+// Which fields a card cannot be pinged (or considered configured) without.
+// The card template marks them with reqMark() and Ping's preflight names them, so
+// both surfaces read this one list instead of three hand-written copies (the
+// 2026-11-03 audit found the requirement stated in the template ×3 and again as
+// two inline ifs in pingCard).
+function missingFieldsFor({ baseUrl, model, type, isBridge }) {
+  // Bridge cards keep their addresses in the per-endpoint rows, not in the
+  // baseUrl/model inputs, and the bridge ping branch already fails fast with an
+  // instructional error when the list is empty ("先添加至少一个桥地址再 Ping").
+  if (isBridge) return [];
+  const missing = [];
+  if (!String(baseUrl || '').trim()) missing.push(_t('baseUrlLabel', 'Base URL'));
+  if ((type || 'llm') === 'llm' && !String(model || '').trim()) missing.push(_t('modelIdLabel', 'Model ID'));
+  return missing;
+}
+
 function readCard(card) {
   const out = {};
   card.querySelectorAll('[data-k]').forEach((el) => {
@@ -1076,7 +1092,7 @@ async function saveCard(name, card) {
     // 必须在 storage.set 之前删——否则存储里残留旧 endpointPing，与内存分叉。
     delete cachedCfg.providers[name].endpointPing;
   }
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   if (configChanged) {
     forgetPingState(name);
     // 卡面同步回未测态——否则卡片还挂着旧「● reachable」，主页下拉已是
@@ -1111,6 +1127,24 @@ async function pingCard(name, card) {
   // clears it.
   const wasReachable = _pingState[name] === 'reachable';
 
+  // Preflight FIRST — before saveCard(), which persists unconditionally. The old
+  // order saved the card and only then complained about a missing field: a card
+  // with an empty Model ID reached storage anyway, the sidebar (isConfigured
+  // checks baseUrl only) listed it as selectable, and the badge claimed
+  // "unreachable" for a ping that never ran. Validating the DRAFT keeps the
+  // "failed validation wrote nothing" rule structural.
+  const draft = readCard(card);
+  const missing = missingFieldsFor({
+    baseUrl: draft.baseUrl,
+    model: draft.model,
+    type: cachedCfg.providers[name]?.type,
+    isBridge: !!cachedCfg.providers[name]?.isBridge,
+  });
+  if (missing.length) {
+    flashCard(card, 'err', `❌ ${tSub('pingMissingFields', 'Please fill in: $1', missing.join(', '))}`);
+    return;
+  }
+
   await saveCard(name, card);
   // saveCard() re-renders when a reserved slot is committed — re-query so
   // the DOM ref below stays attached to a live card.
@@ -1119,20 +1153,6 @@ async function pingCard(name, card) {
   // saveCard() rejects a blank reserved slot by deleting it (error already
   // flashed) — there is nothing to ping.
   if (!cfg) return;
-
-  // Preflight gate: name EVERY missing required field in one message instead
-  // of letting each provider layer reject with a bare technical string
-  // (llm-client: "baseUrl is required"). Agent cards only require a Base
-  // URL; LLM cards additionally require a Model ID. Labels resolve through
-  // _t so the message names the fields exactly as the card labels them.
-  const missing = [];
-  if (!(cfg.baseUrl || '').trim()) missing.push(_t('baseUrlLabel', 'Base URL'));
-  if ((cfg.type || 'llm') === 'llm' && !cfg.model?.trim()) missing.push(_t('modelIdLabel', 'Model ID'));
-  if (missing.length) {
-    flashCard(card, 'err', `❌ ${tSub('pingMissingFields', 'Please fill in: $1', missing.join(', '))}`);
-    setBadge(card, 'unreachable', name);
-    return;
-  }
 
   flashCard(card, '', _t('pingingFlash', 'Pinging…'));
   try {
@@ -1162,7 +1182,7 @@ async function pingCard(name, card) {
           // 每端点状态（用户拍板：Bridge 多 Agent 各自维护 Ping 结果）——
           // 主页下拉按 agent 逐条显示，卡片行内状态点就地更新。
           cfg.endpointPing = Object.fromEntries(results.map((r) => [r.url, r.ok ? 'reachable' : 'unreachable']));
-          await persist({ providers: cachedCfg.providers });
+          await persistProvider(name, cfg);
           // 发现的别名顺手写回页面上还空着的输入框——所见即所存，下次 Save
           // 即按手填处理；输入框按规整后的 URL 对上行匹配（raw 输入可能没写 scheme）。
           for (const row of card.querySelectorAll('.bridge-row')) {
@@ -1216,7 +1236,7 @@ async function pingCard(name, card) {
       const hasRuns = !!(caps.features.run_submission && caps.features.run_events_sse);
       if (cachedCfg.providers[name].isHermes !== hasRuns) {
         cachedCfg.providers[name].isHermes = hasRuns;
-        await persist({ providers: cachedCfg.providers });
+        await persistProvider(name, cachedCfg.providers[name]);
       }
       flashCard(card, 'ok', `✅ ${reply.slice(0, 60)} [runs:${hasRuns ? '✓' : '✗'}]${activeNote}`);
     } else {
@@ -1273,7 +1293,7 @@ async function resetCard(name, card) {
   // blank template — a user-added card's "stored default" is just its own
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
   forgetPingState(name);
@@ -1292,7 +1312,7 @@ async function addProvider() {
   while (cachedCfg.providers[`llm-${n}`]) n++;
   const name = `llm-${n}`;
   cachedCfg.providers[name] = { ...BLANK_LLM };
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, cachedCfg.providers[name]);
   // 新服务商即刻成为选中标签（它就是标签栏里横着出现的那一个）。
   llmEditorTab = name;
   renderProviders({ keepDirty: true });
@@ -1316,7 +1336,7 @@ async function removeProvider(name) {
   if (!cfg || (cfg.type || 'llm') === 'agent') return;
   if (!window.confirm(tSub('confirmRemoveProvider', '删除 provider「$1」及其配置？此操作不可撤销。', cfg.alias || name))) return;
   delete cachedCfg.providers[name];
-  await persist({ providers: cachedCfg.providers });
+  await persistProvider(name, undefined);
   forgetPingState(name);
   if (cachedCfg.activeProvider === name) {
     cachedCfg.activeProvider = 'hermes';
@@ -1436,6 +1456,34 @@ function flash(cls, text) {
 // 旧设置页操作，set 以 "Extension context invalidated" 拒绝——此前各点位无
 // try/catch，点击毫无反馈，且各 saveCard 都是 cachedCfg 先改后写，内存持半新
 // 值，下一张卡的保存会把半新对象整体写回。统一走这里：失败 flash + 从盘重读。
+/**
+ * Write ONE provider row against the LATEST stored table.
+ *
+ * Provider writes here used to persist the whole `cachedCfg.providers` snapshot
+ * captured at page load, so a provider created after this page opened (a second
+ * settings tab, an import, the sidebar) was silently erased by the next save —
+ * with the UI showing nothing wrong. Read-merge-write keeps each edit surgical;
+ * pass `undefined` to delete the row.
+ */
+async function persistProvider(name, value) {
+  let latest = null;
+  try { latest = await storage.get('providers'); } catch (_) { latest = null; }
+  // Baseline is the page's table, not the stored one: the four agent providers
+  // (hermes/opencode/squilla/bridge) are shipped defaults merged in at load time
+  // and are NOT in storage until the user saves one, so writing the stored table
+  // back verbatim would delete them. Keys that storage gained since load (another
+  // tab, an import) are the ones to rescue.
+  const next = { ...(cachedCfg.providers || {}) };
+  if (latest && typeof latest === 'object') {
+    for (const [k, v] of Object.entries(latest)) if (!(k in next)) next[k] = v;
+  }
+  if (value === undefined) delete next[name];
+  else next[name] = value;
+  const ok = await persist({ providers: next });
+  if (ok) cachedCfg.providers = next;
+  return ok;
+}
+
 async function persist(patch) {
   try {
     await storage.set(patch);

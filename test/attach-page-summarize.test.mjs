@@ -13,6 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseChatContent } from './helpers/sse-fixtures.mjs';
 
 const localArea = makeStorageArea({
   activeProvider: 'compatible',
@@ -76,11 +77,7 @@ const { handle } = bg;
 
 let nextTabId = 200;
 
-function sseFor(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
-  return new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } });
-}
+const sseFor = (text) => sseChatContent(text);
 
 async function flush() {
   // Let the fire-and-forget summarization's already-resolved-instantly

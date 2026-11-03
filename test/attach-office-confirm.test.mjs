@@ -59,13 +59,16 @@ const localArea = makeStorageArea({
 });
 const sessionArea = makeStorageArea();
 
-// Mutable per-test; keyed by the injected function's name so the
-// isPdfDocument probe (anonymous func) answers false while
-// _fetchOfficeBytesInPageWorld answers with the configured result.
+// Mutable per-test; the isPdfDocument probe (anonymous func) answers false while the
+// byte fetch answers with the configured result. The PDF and Office byte fetches are
+// ONE injected function now (_fetchBytesInPageWorld — they differed only in their two
+// error strings), so the Office call is identified by its args, not by a second name.
 let officeFetchResult = { error: 'not configured for this test' };
 let throwOnFetch = false;
 const executeScriptImpl = async (injection) => {
-  if (injection?.func?.name === '_fetchOfficeBytesInPageWorld') {
+  const isOfficeFetch = String(injection?.func?.name || '').startsWith('_fetch')
+    && String(injection?.args?.[1] || '').includes('office');
+  if (isOfficeFetch) {
     if (throwOnFetch) throw new Error('scripting API unavailable');
     return [{ result: officeFetchResult }];
   }

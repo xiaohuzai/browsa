@@ -37,6 +37,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseResponseLike } from './helpers/sse-fixtures.mjs';
 
 // ---- in-memory chrome.storage areas (same pattern as chat-stateless-dispatch)
 // get/set structuredClone like the real chrome.storage (de)serialization: a
@@ -65,16 +66,7 @@ const { PAGE_CONTEXT_PREFIX } = await import('../lib/constants.js');
 const HINTS = 'CAP-HINTS-MARKER';
 
 // ---- wire stubs ------------------------------------------------------------
-function sseResponse(events) {
-  const encoder = new TextEncoder();
-  const body = new ReadableStream({
-    start(controller) {
-      for (const e of events) controller.enqueue(encoder.encode(e));
-      controller.close();
-    },
-  });
-  return { ok: true, status: 200, body, headers: { get: () => 'text/event-stream' } };
-}
+const sseResponse = (events) => sseResponseLike(events, { headers: { get: () => 'text/event-stream' } });
 
 function httpError(status, text) {
   return { ok: false, status, body: null, text: async () => text, headers: { get: () => '' } };

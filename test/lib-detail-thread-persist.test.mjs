@@ -78,7 +78,7 @@ globalThis.chrome = {
 
 const {
   openDetailThread, restoreDetailThreads, clearDetailThreads, closeDetailThreadsIn, hideSelectionAskBtn,
-  captureDetailCardsIn, reinsertDetailCards, moveSiblingDetailCards,
+  captureDetailCardsIn, reinsertDetailCards, moveSiblingDetailCards, toPersistedMessage,
 } = await import('../lib/sidepanel/detail-thread.js');
 const { flushDetailThreadStore, loadDetailThreads, saveDetailThread, deleteDetailThread } = await import('../lib/sidepanel/detail-thread-store.js');
 
@@ -817,3 +817,29 @@ test('恢复后的卡片：首轮仍然随附引用图（重开后追问不丢�
   restored.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await flushDetailThreadStore();
 });
+
+// --------------- persisted message shape (one builder for write + snapshot) ----
+
+test('toPersistedMessage: the field set restoreDetailThreads reads back', () => {
+  // The write side (finalize/fail) and the snapshot side both build records; before
+  // the builder existed a field added to only one of them vanished on reload with
+  // nothing failing. Pin the contract as data, not as "the two copies agree".
+  assert.deepEqual(toPersistedMessage({ role: 'user', content: 'q' }), { role: 'user', content: 'q' },
+    'a plain message keeps only role+content (no empty optional keys)');
+  assert.deepEqual(
+    toPersistedMessage({
+      role: 'assistant', content: 'a', providerLabel: 'P', usage: { input_tokens: 1 },
+      usageScope: 'turn', durationMs: 42,
+    }),
+    { role: 'assistant', content: 'a', providerLabel: 'P', usage: { input_tokens: 1 }, usageScope: 'turn', durationMs: 42 },
+    'every optional field the restore path reads must survive the builder',
+  );
+  assert.deepEqual(toPersistedMessage({ role: 'assistant', content: 'boom', error: true }),
+    { role: 'assistant', content: 'boom', error: true }, 'the failure flag is part of the contract');
+  assert.deepEqual(
+    toPersistedMessage({ role: 'assistant', content: 'a', providerLabel: '', usage: null, usageScope: '', durationMs: 0 }),
+    { role: 'assistant', content: 'a' },
+    'falsy optional values are omitted (no empty chips after reload)',
+  );
+});
+
