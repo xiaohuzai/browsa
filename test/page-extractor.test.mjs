@@ -2135,11 +2135,11 @@ test('extractInPageWorld: standalone data:/blob: image lines collapse to <image-
 });
 
 // --- PDF client-side text extraction (Feature A from firecrawl research) ---
-// _fetchPdfBytesInPageWorld runs IN-TAB (MAIN world) so the browser attaches
+// _fetchBytesInPageWorld (PDF args) runs IN-TAB (MAIN world) so the browser attaches
 // cookies -- tested here via a mocked fetch/Blob/btoa in the vm sandbox.
 
-test('_fetchPdfBytesInPageWorld: success path returns base64 + byteLength', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): success path returns base64 + byteLength', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
   const ctx = vm.createContext({
@@ -2153,51 +2153,51 @@ test('_fetchPdfBytesInPageWorld: success path returns base64 + byteLength', asyn
       })
     })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(!result.error, `expected success, got error: ${result.error}`);
   assert.equal(result.byteLength, 5);
   assert.equal(Buffer.from(result.base64, 'base64').toString('binary'), Buffer.from(fakeBytes).toString('binary'));
 });
 
-test('_fetchPdfBytesInPageWorld: oversized PDF is rejected with an error, not silently truncated', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): oversized PDF is rejected with an error, not silently truncated', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => ({ ok: true, blob: async () => ({ size: 999_999_999 }) })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'oversized PDF must return an error field');
   assert.ok(!result.base64, 'must not return partial/truncated base64');
 });
 
-test('_fetchPdfBytesInPageWorld: non-ok fetch response returns an error', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): non-ok fetch response returns an error', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => ({ ok: false, status: 403 })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'a 403 response must surface as an error, not throw uncaught');
 });
 
-test('_fetchPdfBytesInPageWorld: a thrown fetch error is caught and returned as {error}, never rejects', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): a thrown fetch error is caught and returned as {error}, never rejects', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   const ctx = vm.createContext({
     location: dom.window.location,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     fetch: async () => { throw new Error('network down'); }
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.equal(result.error, 'network down');
 });
 
-test('_fetchPdfBytesInPageWorld: github.com /blob/ URL is rewritten to raw.githubusercontent.com with credentials:omit', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): github.com /blob/ URL is rewritten to raw.githubusercontent.com with credentials:omit', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://github.com/alxndrTL/little-book-rl/blob/main/book.pdf' });
   let fetchedUrl = null, fetchedCreds = null;
   const fakeBytes = new Uint8Array([37, 80, 68, 70, 45]); // "%PDF-" magic bytes
@@ -2211,15 +2211,15 @@ test('_fetchPdfBytesInPageWorld: github.com /blob/ URL is rewritten to raw.githu
       return { ok: true, headers: { get: () => 'application/octet-stream' }, blob: async () => ({ size: fakeBytes.length, arrayBuffer: async () => fakeBytes.buffer }) };
     }
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.equal(fetchedUrl, 'https://raw.githubusercontent.com/alxndrTL/little-book-rl/main/book.pdf', 'github /blob/ URL must be rewritten to the raw host');
   assert.equal(fetchedCreds, 'omit', 'cross-origin raw fetch must use credentials:omit (raw host sends no Allow-Credentials)');
   assert.ok(result.base64, 'should return base64 for the rewritten raw URL');
   assert.equal(result.byteLength, 5);
 });
 
-test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) returns an error, not base64-encoded HTML', async () => {
-  const fnBody = await loadSiblingFn('_fetchPdfBytesInPageWorld');
+test('_fetchBytesInPageWorld (PDF args): an HTML viewer page (content-type text/html) returns an error, not base64-encoded HTML', async () => {
+  const fnBody = await loadSiblingFn('_fetchBytesInPageWorld');
   const dom = new JSDOM('', { url: 'https://example.com/doc.pdf' });
   let blobCalled = false;
   const ctx = vm.createContext({
@@ -2232,7 +2232,7 @@ test('_fetchPdfBytesInPageWorld: an HTML viewer page (content-type text/html) re
       blob: async () => { blobCalled = true; return { size: 5000, arrayBuffer: async () => new Uint8Array(5000).buffer }; }
     })
   });
-  const result = await vm.runInContext(`${fnBody}\n_fetchPdfBytesInPageWorld(1000)`, ctx);
+  const result = await vm.runInContext(`${fnBody}\n_fetchBytesInPageWorld(1000, 'not a pdf (html viewer page): ', 'pdf too large: ')`, ctx);
   assert.ok(result.error, 'an HTML viewer page must surface as an error');
   assert.ok(!result.base64, 'must not base64-encode HTML as if it were a PDF');
   assert.equal(blobCalled, false, 'should not consume the blob body once content-type says HTML');
