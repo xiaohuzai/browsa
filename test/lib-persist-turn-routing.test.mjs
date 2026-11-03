@@ -108,3 +108,25 @@ test('interrupted-turn salvage shape persists via the same writer (interrupted f
   await persistTurnEntry('t5', { role: 'assistant', content: 'half a thought', interrupted: true });
   assert.equal(stored['session_s1'][0].interrupted, true);
 });
+
+test('persistTurnEntry: a bg turn no route can write is DROPPED, never appended to live history', async () => {
+  reset('t6', { originSessionId: 's1' });
+  streamState.get('t6').bg = true;
+  stored.savedSessions = [{ id: 's1', name: 'A', createdAt: 1, pinned: false, textDigest: 'q' }];
+  stored['session_s1'] = [{ role: 'user', content: 'q' }];
+  stored.history = [{ role: 'user', content: 'the OTHER conversation' }];
+  // Both routes need a real entry to write: appendToSessionHistory returns null
+  // for a deleted origin and rescueOrphanedTurn returns null without an entry.
+  // The routing must therefore END here. Falling through to appendToHistory
+  // writes into whatever conversation is on screen — the cross-session leak this
+  // file exists to prevent (today it is only unreachable by accident of the
+  // callee's null contract, not by structure).
+  const res = await persistTurnEntry('t6', undefined);
+  assert.deepEqual(
+    stored.history.map((m) => m && m.content),
+    ['the OTHER conversation'],
+    'live history must not receive a turn that belongs to another conversation',
+  );
+  assert.equal(res && res.dropped, true, 'the drop must be reported, not silent');
+});
+
