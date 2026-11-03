@@ -19,20 +19,26 @@ test('capability rows only declare known capabilities', () => {
   }
 });
 
-test('deferred rows: DEFERRED_HANDOFFS and ATTACH_MODE_CAPS agree on (mode, field, confirm)', () => {
+test('deferred handoffs are DERIVED from the capability table, in dispatch order', () => {
+  // Before 2026-11-03 the same (mode, field, confirm) triples were written twice,
+  // and this test existed only to keep the two copies equal — a guard that hides
+  // the duplicate instead of removing it. The list is now derived from
+  // ATTACH_MODE_CAPS, so what remains to pin is coverage (no deferred row is
+  // missed by the derivation), dispatch order (screenshot first, matching the
+  // original if-chain both consumers rely on) and a well-formed confirm type.
+  const deferredModes = Object.entries(ATTACH_MODE_CAPS)
+    .filter(([, caps]) => caps.deferred)
+    .map(([mode]) => mode);
+  assert.deepEqual(
+    DEFERRED_HANDOFFS.map((h) => h.mode),
+    deferredModes,
+    'every deferred capability row must reach the handoff list, in table order',
+  );
+  assert.equal(DEFERRED_HANDOFFS[0].mode, 'screenshot');
   for (const h of DEFERRED_HANDOFFS) {
-    const caps = ATTACH_MODE_CAPS[h.mode];
-    assert.ok(caps, `${h.mode} appears in DEFERRED_HANDOFFS without a capability row`);
-    assert.ok(caps.deferred, `${h.mode} handoff row lacks a deferred descriptor`);
-    assert.equal(caps.deferred.field, h.field, `${h.mode}: field mismatch between table and handoff list`);
-    assert.equal(caps.deferred.confirm, h.confirm, `${h.mode}: confirm mismatch between table and handoff list`);
+    assert.ok(h.field && h.confirm, `${h.mode} handoff needs field + confirm`);
     assert.ok(h.confirm.startsWith('ATTACH_') && h.confirm.endsWith('_CONFIRM'), `${h.confirm} is not a confirm message type`);
   }
-  // The handoff list is the dispatch order — screenshot first (mirrors the
-  // original if-chain), no duplicate modes.
-  assert.equal(DEFERRED_HANDOFFS[0].mode, 'screenshot');
-  const modes = DEFERRED_HANDOFFS.map((h) => h.mode);
-  assert.equal(new Set(modes).size, modes.length, 'no duplicate deferred modes');
 });
 
 test('generic modes keep their historical capability sets (regression pins for the five old inline lists)', () => {
