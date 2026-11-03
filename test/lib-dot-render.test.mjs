@@ -263,6 +263,24 @@ test('repairDotSource is quote-aware (] and -> inside labels)', () => {
   assert.ok(fixed.includes('A -> B['), 'the real edge survives with its legal trailing attrs');
 });
 
+test('repairDotSource: escaped quotes inside a label do not end the string', () => {
+  // DOT allows \" inside a quoted id. The repair scanner is a hand-written char
+  // scanner shared by three passes (<br/> rewrite, structural pass, quote-aware
+  // `]` matcher); if any stops skipping the escaped char, the inner quote reads as
+  // the end of the string and the shorthand conversion is skipped altogether — the
+  // line then reaches Graphviz unchecked and the repair silently does nothing.
+  assert.equal(
+    repairDotSource('digraph { A["a\\"b"]; }'),
+    'digraph { A[label="a\\"b"]; }',
+    'shorthand conversion must survive an escaped quote inside the label',
+  );
+  assert.equal(
+    repairDotSource('digraph { A[label="say \\"hi\\""]; A -> B[label="y"]; }'),
+    'digraph { A[label="say \\"hi\\""]; A -> B[label="y"]; }',
+    'valid DOT with escaped quotes comes back byte-identical',
+  );
+});
+
 test('renderDot repairs and renders the reported PMC-style DOT (real WASM render)', async () => {
   // exact shape from the user report: bare-string labels on both ends of
   // every edge, <br/> line breaks, Unicode superscripts, CJK text
