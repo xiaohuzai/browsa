@@ -74,7 +74,7 @@ test('the composer enforces the gate at attach time (paste / drop / picker all f
   assert.match(fn, /ingestImageFiles\(fileList, images/, 'handleDroppedFiles must funnel through the shared ingest pipeline');
   assert.match(fn, /appendError\(text, \{ compact: true \}\)/, 'and tell the user, visibly, when it refuses');
   const mod = await readFile(new URL('../lib/sidepanel/image-drop.js', import.meta.url), 'utf8');
-  assert.match(mod, /imageRejectReason\(store\.map/, 'the shared pipeline must consult the image-budget gate');
+  assert.match(mod, /imageRejectReason\(\[\.\.\.alreadyCommitted, \.\.\.store\.map/, 'the shared pipeline must consult the image-budget gate (incl. already-committed quote images)');
   // Both refusal wordings must be used by the pipeline and have a dict entry
   // in both locales.
   for (const key of ['imageBudgetExceeded', 'imageCountExceeded']) {
@@ -114,4 +114,35 @@ test('capFetchedImages — count cap 18 (XHS platform maximum), junk dropped', (
   const { images: cleaned, dropped: junk } = capFetchedImages([null, undefined, 'ok', 42]);
   assert.deepEqual(cleaned, ['ok']);
   assert.equal(junk, 3);
+});
+
+test('ingestImageFiles counts alreadyCommitted images against the gate (detail-thread quotes)', async () => {
+  // The card's quoted images ride EVERY turn outside cardImages. Without
+  // counting them, a paste passed the attach gate and pickTurnImages
+  // silently dropped it at send — the exact "paste did nothing" failure
+  // this pipeline exists to prevent (2026-11-05).
+  const { ingestImageFiles } = await import('../lib/sidepanel/image-drop.js');
+  // FileReader shim: deterministic data URL per file name.
+  const prevFileReader = globalThis.FileReader;
+  globalThis.FileReader = class {
+    readAsDataURL(file) { this.result = 'data:image/png;base64,' + file.name; setTimeout(() => this.onload(), 0); }
+  };
+  try {
+    const committed = Array.from({ length: AGENT_TURN_MAX_IMAGES }, (_, i) => `data:image/png;base64,q${i}`);
+    const store = [];
+    const notices = [];
+    const added = await ingestImageFiles(
+      [{ type: 'image/png', size: 100, name: 'paste' }],
+      store, (t) => notices.push(t), { alreadyCommitted: committed },
+    );
+    assert.equal(added, 0, 'count cap already reached by the quotes — the paste must be refused');
+    assert.equal(store.length, 0);
+    assert.equal(notices.length, 1, 'the refusal is visible, not silent');
+    assert.match(notices[0], /18/);
+    // Without the option (main composer) behavior is unchanged.
+    const added2 = await ingestImageFiles([{ type: 'image/png', size: 100, name: 'ok' }], store, () => {});
+    assert.equal(added2, 1);
+  } finally {
+    globalThis.FileReader = prevFileReader;
+  }
 });

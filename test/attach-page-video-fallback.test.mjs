@@ -307,3 +307,35 @@ test('X fallback is host-gated: /status/<digits> on another host is not a tweet'
   assert.doesNotMatch(JSON.stringify(res.ctx || {}), /Okay let me tell you/,
     'must not attach a tweet fetched via syndication');
 });
+
+test('YouTube/Bilibili fallbacks are host-gated: lookalike PATHS on another host do not inject', async () => {
+  // The gates matched /youtube\.com\/watch\?/ etc. against the FULL URL —
+  // https://evil.com/youtube.com/watch?v=x passed and injected the site
+  // script into the attacker page (X's gate got its host anchor 2026-10-21;
+  // these two were the same-shape residue, 2026-11-05 audit).
+  for (const url of [
+    'https://evil.com/youtube.com/watch?v=abc123',
+    'https://evil.com/bilibili.com/video/BV1xx411c7mD',
+    'https://youtube.com.evil.com/watch?v=abc123',
+    'https://bilibili.com.evil.com/video/BV1xx411c7mD',
+  ]) {
+    chromeMock.tabs.query = async () => [{ id: 7, url, title: 'Lookalike' }];
+    chromeMock.tabs.get = async (id) => ({ id, url, title: 'Lookalike', favIconUrl: '' });
+    chromeMock.scripting.executeScript = async (opts) => {
+      executeScriptCalls.push(opts);
+      if (opts.files) return [{ result: undefined }];
+      const body = opts.func?.toString() || '';
+      if (body.includes('contentType') || body.includes('Readability') || body.includes('Turndown')) return [{ result: false }];
+      if (opts.func?.name === 'preExtractCleanup') return [{ result: {} }];
+      return [{ result: { text: 'generic mock content long enough to avoid the jina floor threshold checks entirely', rawTextLength: 90, wasCapped: false } }];
+    };
+    executeScriptCalls = [];
+    const res = await handle({ type: 'ATTACH_PAGE', tabId: 7, mode: 'reader' }, { tab: { id: 7 } });
+    assert.equal(res.ok, true);
+    const fileInjections = executeScriptCalls.filter((c) => Array.isArray(c.files));
+    assert.ok(
+      !fileInjections.some((c) => c.files.some((f) => /youtube-content-script|bilibili-content-script/.test(f))),
+      `must not inject site scripts on ${url}`
+    );
+  }
+});

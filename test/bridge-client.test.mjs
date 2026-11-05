@@ -139,7 +139,7 @@ test('bridgeStream: first turn (no sessionId) captures it from the start event',
 test('bridgeStream: approval event maps to the card payload', async () => {
   captureFetch(() => sseResponse([
     'data: {"type":"approval","requestId":"900","tool":"command","command":"rm -rf /x","cwd":"/w"}\n\n',
-    'data: {"type":"aborted"}\n\n',
+    'data: {"type":"done","full":"ok"}\n\n',
   ]));
   const approvals = [];
   await bridgeStream({
@@ -147,6 +147,24 @@ test('bridgeStream: approval event maps to the card payload', async () => {
     onApproval: (a) => approvals.push(a),
   });
   assert.deepEqual(approvals, [{ requestId: '900', tool: 'command', command: 'rm -rf /x', choices: ['once', 'always', 'deny'] }]);
+});
+
+test('bridgeStream: a server-side aborted terminal (outer signal live) throws AbortError, not a fake success', async () => {
+  // The daemon emits `aborted` when the turn was cancelled server-side
+  // (stop endpoint / adapter cancel). With the client's own signal NOT
+  // aborted, the old code returned {full: partial} as a normal completion —
+  // chat-handler persisted it as DONE with no interrupted stamp. The runs
+  // dialect already throws AbortError for run.cancelled; bridge must match.
+  captureFetch(() => sseResponse([
+    'data: {"type":"start","sessionId":"s1","turnId":"t1"}\n\n',
+    'data: {"type":"delta","text":"half an answer"}\n\n',
+    'data: {"type":"aborted"}\n\n',
+  ]));
+  await assert.rejects(
+    bridgeStream({ baseUrl: '', text: 'x' }),
+    (e) => e?.name === 'AbortError',
+    'server-side abort must ride the cancel/salvage path, not DONE',
+  );
 });
 
 test('bridgeStream: error event throws with the agent message', async () => {

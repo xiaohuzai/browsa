@@ -42,8 +42,11 @@ test('github blob URL: rewrites to raw.githubusercontent.com and returns source'
   assert.deepEqual(out.articleTitle, META.title);
   assert.equal(mock.calls.length, 1);
   assert.equal(mock.calls[0].url, 'https://raw.githubusercontent.com/volcengine/OpenViking/main/bot/README.md');
-  // credentials must be 'omit' (raw sends no Access-Control-Allow-Credentials)
-  assert.deepEqual(mock.calls[0].opts, { credentials: 'omit' });
+  // credentials must be 'omit' (raw sends no Access-Control-Allow-Credentials);
+  // a timeout signal rides along (2026-11-05: a hung raw socket must not
+  // stall ATTACH_PAGE).
+  assert.equal(mock.calls[0].opts.credentials, 'omit');
+  assert.ok(mock.calls[0].opts.signal instanceof AbortSignal, 'fetch carries a deadline');
   assert.deepEqual(out.truncated, { rawTextLength: 41, textLength: 41, wasCapped: false, textCap: 1_000_000 });
 });
 

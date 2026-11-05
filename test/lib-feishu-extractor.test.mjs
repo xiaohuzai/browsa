@@ -175,3 +175,31 @@ test('extractFeishuInPageWorld handles the classic .docx-* renderer (nested list
   assert.ok(t.includes('| --- | --- |'), 'separator');
   assert.ok(t.includes('| a1 | b1 |'), 'data row');
 });
+
+test('tryFeishuExtraction stamps siteSynthesized — auto jina fallback must not replace a short doc', async () => {
+  // The SW coordinator mutates the shared result shell. Without the stamp a
+  // 30-199 char doc hit autoJinaFallbackWarranted's absolute floor and jina's
+  // login-wall text (longer) replaced the authoritative extraction.
+  const prevChrome = globalThis.chrome;
+  globalThis.chrome = {
+    scripting: {
+      executeScript: async () => [{ result: {
+        text: '短文档：这是一段超过三十五十个字符但不足两百字符的小记录，内容权威且完整，不需要任何外部救援服务来补充它。', // ≥30, <200
+        articleTitle: 'Doc', rawTextLength: 55, wasCapped: false, feishuVia: 'direct', feishuBlocks: 2,
+      } }],
+    },
+  };
+  try {
+    const { tryFeishuExtraction } = await import('../lib/feishu-extractor.js');
+    const result = { mode: 'auto' };
+    const out = await tryFeishuExtraction(
+      { id: 1, url: 'https://xxx.feishu.cn/docx/ABC123' },
+      { title: 'Doc' }, 100000, result,
+    );
+    assert.ok(out, 'extraction succeeds');
+    assert.equal(out.siteSynthesized, true, 'the auto jina veto must be stamped');
+    assert.equal(out.feishuSource, true);
+  } finally {
+    globalThis.chrome = prevChrome;
+  }
+});

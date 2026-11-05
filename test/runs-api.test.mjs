@@ -266,3 +266,39 @@ test('runsApiStream: SHORT reasoning.available echoes (per-step narration) are a
   assert.ok(!result.full.includes('<thinking>'), 'no stray <thinking> blocks for the echoed short bursts');
 });
 
+test('runsApiStream: a SHORTER divergent run.completed output is still authoritative (no length gate)', async () => {
+  // 2026-11-05 audit: message.delta streamed 27 chars of narration, then the
+  // daemon's consolidated output was an 18-char rewrite. The old
+  // `output.length > messageTextLen` gate dropped the real answer entirely —
+  // full kept only the narration. On divergence the output is the truth;
+  // the panel's DONE re-render replaces the streamed text wholesale.
+  const { runsApiStream } = await import('../lib/llm-client.js');
+  const narration = '我先看一下这个文件的内容，然后再给你答复。';
+  const answer = '文件一共 42 行。';
+  assert.ok(answer.length < narration.length, 'fixture must exercise the shorter-output case');
+  mockFetchWithEvents([
+    { event: 'message.delta', data: { delta: narration } },
+    { event: 'run.completed', data: { output: answer } },
+  ]);
+
+  const deltas = [];
+  const result = await runsApiStream({
+    baseUrl: 'http://test', apiKey: 'k', input: 'hi',
+    onDelta: (d) => deltas.push(d),
+  });
+
+  assert.ok(deltas.some((d) => d.includes(answer)), 'the authoritative answer must be emitted even when shorter');
+  assert.ok(result.full.includes(answer), 'full must contain the real answer, not just the narration');
+  assert.equal(result.full, answer, 'the persisted/DONE text is the authoritative output alone — no stale narration');
+});
+
+test('runsApiStream: an identical run.completed output does not duplicate the streamed text', async () => {
+  const { runsApiStream } = await import('../lib/llm-client.js');
+  mockFetchWithEvents([
+    { event: 'message.delta', data: { delta: 'exact same text' } },
+    { event: 'run.completed', data: { output: 'exact same text' } },
+  ]);
+  const result = await runsApiStream({ baseUrl: 'http://test', apiKey: 'k', input: 'hi' });
+  assert.equal(result.full, 'exact same text', 'prefix-match path stays a no-op remainder');
+});
+

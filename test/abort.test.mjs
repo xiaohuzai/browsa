@@ -206,11 +206,14 @@ test('CHAT handler idle-timeout abort path also stops the server-side Hermes run
   const catchIdx = src.indexOf('if (isAbortError(e)) {', src.indexOf('} catch (e)'));
   assert.ok(catchIdx > 0, 'abort catch block must exist');
   const block = src.slice(catchIdx, src.indexOf('throw e;', catchIdx));
-  // Must stop the run registered by THIS turn. Prefer the record captured in
-  // this turn's onRunId over the per-tab slot: a concurrent turn on the same
-  // tabId may own that slot (ownership gate, 2026-10-17).
-  assert.match(block, /stopHermesRun\(ownRunRecord \|\| activeRunIds\.get\(tabId\)\)/,
-    'the abort catch must call stopHermesRun with the still-registered run (own record preferred)');
+  // Must stop the run registered by THIS turn — and ONLY this turn's record
+  // (2026-11-05): the per-tab slot fallback could stop a concurrent NEWER
+  // turn's run when this turn never got a runId. The comment above the call
+  // always said "not the per-tab slot"; the code now matches it.
+  assert.match(block, /stopHermesRun\(ownRunRecord\)/,
+    'the abort catch must call stopHermesRun with THIS turn\'s record only');
+  assert.doesNotMatch(block, /activeRunIds\.get\(tabId\)/,
+    'the per-tab slot may belong to a newer turn — never read it here');
 });
 
 test('CHAT handler stores AbortController in chatControllers before stream', async () => {
@@ -253,7 +256,7 @@ test('CHAT handler catches AbortError, salvages the partial as interrupted, and 
   const fs = await import('fs/promises');
   const src = await fs.readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
 
-  const abortMatch = src.match(/if \(isAbortError\(e\)\) \{[\s\S]{0,2000}?return \{ ok: true, cancelled: true \}/);
+  const abortMatch = src.match(/if \(isAbortError\(e\)\) \{[\s\S]{0,2600}?return \{ ok: true, cancelled: true \}/);
   assert.ok(abortMatch, 'CHAT handler must have a catch block for AbortError that returns cancelled');
   const block = abortMatch[0];
   assert.match(block, /clearStreamState\(tabId\)/, 'catch must clear streamState');

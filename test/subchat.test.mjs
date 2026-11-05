@@ -576,3 +576,84 @@ test('all SUBCHAT pushes and pending-map writes are gated by this turn\'s contro
   assert.equal((subchatSrc.match(/if \(!owned\(\)\) return;/g) || []).length, 5,
     'all five approval/clarify creation sites must gate the pending-map write on owned()');
 });
+
+test('stop→resend: a late session-create resolution must not clobber the new turn\'s session map', async () => {
+  // The old turn parks in createOpencodeSession (no signal on that POST).
+  // After abort+resend, its late resolution used to setBounded over the
+  // NEW turn's session id — the next follow-up would continue the aborted
+  // server thread (context cross-wiring).
+  chromeMock.storage.local._set({
+    providers: { oc: { type: 'agent', isOpencode: true, baseUrl: 'http://oc.test', apiKey: '', alias: 'OC' } },
+    activeProvider: 'oc',
+    history: [],
+  });
+  const realFetch = globalThis.fetch;
+  const subId = 'sub-sess-race';
+  let sessionCalls = 0;
+  let releaseOldSession;
+  const oldSessionGate = new Promise((r) => { releaseOldSession = r; });
+  const enc = new TextEncoder();
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.endsWith('/api/session') && opts.method === 'POST') {
+      sessionCalls += 1;
+      if (sessionCalls === 1) {
+        await oldSessionGate; // old turn parks HERE, before setBounded
+        return { ok: true, status: 200, text: async () => JSON.stringify({ data: { id: 'sess-old' } }) };
+      }
+      return { ok: true, status: 200, text: async () => JSON.stringify({ data: { id: 'sess-new' } }) };
+    }
+    if (u.endsWith('/prompt')) {
+      return { ok: true, status: 200, text: async () => '{}' };
+    }
+    if (u.endsWith('/api/event')) {
+      // Immediate idle → done lifecycle for the new turn's session.
+      const sid = 'sess-new';
+      const sse = `data: ${JSON.stringify({ type: 'session.idle', data: { sessionID: sid, timestamp: Date.now() } })}\n\n`;
+      return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.enqueue(enc.encode(sse)); c.close(); } }), text: async () => '' };
+    }
+    if (u.includes('/api/session/active')) {
+      return { ok: true, status: 200, text: async () => '[]' };
+    }
+    if (u.endsWith('/interrupt')) {
+      return { ok: true, status: 200, text: async () => '{}' };
+    }
+    return { ok: true, status: 200, text: async () => '{}', json: async () => ({}) };
+  };
+  try {
+    subChatPorts.set(subId, { postMessage: () => {} });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q1' }] }, '');
+    await waitFor(() => sessionCalls === 1, 'old turn parked in session create');
+
+    handleSubchatAbort({ subId });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q2' }] }, '');
+    await waitFor(() => sessionCalls === 2, 'new turn created its session');
+    await tick(30);
+
+    // Old turn's create finally resolves — must NOT overwrite sess-new.
+    releaseOldSession();
+    await tick(30);
+
+    // Third send: which session does it reuse? Must be the NEW one.
+    let promptSession = null;
+    const midFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts = {}) => {
+      const m = /\/api\/session\/([^/]+)\/prompt/.exec(String(url));
+      if (m) promptSession = decodeURIComponent(m[1]);
+      return midFetch(url, opts);
+    };
+    handleSubchatAbort({ subId });
+    await handleSubchat({ subId, messages: [{ role: 'user', content: 'q3' }] }, '');
+    await waitFor(() => promptSession !== null, 'third turn issued its prompt');
+    assert.equal(promptSession, 'sess-new',
+      'the late old-turn session id must not clobber the new turn\'s map entry');
+  } finally {
+    releaseOldSession();
+    globalThis.fetch = realFetch;
+    handleSubchatAbort({ subId });
+    await tick(20);
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+  }
+});

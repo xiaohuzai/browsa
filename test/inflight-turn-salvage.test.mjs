@@ -306,6 +306,93 @@ test('salvage: a backgrounded turn routes to its origin session snapshot, not li
   assert.equal(entry.interrupted, true);
 });
 
+// ─── 2026-11-05 audit: REASSIGN/PEEK routing changes must reach the mirror ────
+// The durable record only flushed on delta/tool-step. A turn backgrounded
+// during a QUIET window (waiting on approval / long tool) kept bg:false,
+// origin:'' in storage.session — SW death then salvaged the partial into
+// LIVE history, the exact cross-conversation leak REASSIGN exists to prevent.
+
+test('REASSIGN mid-turn flushes bg/origin into the durable record (silent window)', async () => {
+  sessionArea._reset();
+  localArea._reset();
+  streamState.clear();
+  await localArea.set({
+    savedSessions: [{ id: 's9', name: 'origin', createdAt: Date.now(), pinned: false, textDigest: '' }],
+    session_s9: [{ role: 'user', content: 'earlier' }],
+  });
+  initStreamState(26, { providerLabel: 'X', originSessionId: '' });
+  appendToStreamState(26, '部分输出');
+  await flushDurable();
+
+  // Session switch with NO further deltas: only the routing flags change.
+  const r = await handle({ type: 'REASSIGN_STREAM_SESSION', tabId: 26, sessionId: 's9' });
+  assert.equal(r.reassigned, true);
+  await flushDurable();
+
+  const rec = (await sessionArea.get('browsa.inflightTurn.26'))['browsa.inflightTurn.26'];
+  assert.equal(rec.bg, true, 'the durable mirror must carry the backgrounded flag');
+  assert.equal(rec.originSessionId, 's9', 'the durable mirror must carry the origin session');
+
+  // SW death: salvage routes by the MIRRORED flags, not the dead Maps.
+  streamState.clear();
+  const salvaged = await salvageDurableTurns();
+  assert.ok(salvaged.has(26));
+  assert.ok(!(await history()).some((m) => m.content === '部分输出'), 'must not leak into live history');
+  const body = (await localArea.get('session_s9'))['session_s9'];
+  assert.equal(body[body.length - 1].content, '部分输出');
+  clearStreamState(26);
+  await tick();
+});
+
+test('PEEK un-backgrounding flushes bg:false into the durable record', async () => {
+  sessionArea._reset();
+  localArea._reset();
+  streamState.clear();
+  initStreamState(27, { providerLabel: 'X', originSessionId: 's9' });
+  streamState.get(27).bg = true;
+  appendToStreamState(27, 'x');
+  await flushDurable();
+
+  await handle({ type: 'STREAM_PEEK', tabId: 27, sessionId: 's9' });
+  await flushDurable();
+  const rec = (await sessionArea.get('browsa.inflightTurn.27'))['browsa.inflightTurn.27'];
+  assert.equal(rec.bg, false, 'switching back must reach the mirror too');
+  clearStreamState(27);
+  await tick();
+});
+
+test('salvage: a failed persist keeps the durable record for the next wake (no evidence destroyed)', async () => {
+  sessionArea._reset();
+  localArea._reset();
+  streamState.clear();
+  initStreamState(28, { providerLabel: 'X', originSessionId: '' });
+  appendToStreamState(28, '不能丢的残片');
+  await flushDurable();
+  streamState.clear(); // SW death
+
+  // Quota/lock failure on the salvage write: storage.local.set rejects once.
+  const realSet = localArea.set.bind(localArea);
+  let failed = false;
+  localArea.set = async (obj) => {
+    if (!failed && obj && 'history' in obj) { failed = true; throw new Error('quota exceeded'); }
+    return realSet(obj);
+  };
+  try {
+    const first = await salvageDurableTurns();
+    assert.equal(first.size, 0, 'the failed write is not reported as salvaged');
+    assert.ok((await sessionArea.get('browsa.inflightTurn.28'))['browsa.inflightTurn.28'],
+      'the only copy of the partial must survive a failed persist');
+  } finally {
+    localArea.set = realSet;
+  }
+
+  // Next wake retries and succeeds.
+  const second = await salvageDurableTurns();
+  assert.ok(second.has(28), 'the retry salvages the turn');
+  assert.equal((await history()).pop().content, '不能丢的残片');
+  assert.deepEqual(await readDurableTurns(), [], 'consumed only after a successful write');
+});
+
 test('salvage: a turn alive in this SW is never salvaged under, and its record is kept', async () => {
   sessionArea._reset();
   localArea._reset();

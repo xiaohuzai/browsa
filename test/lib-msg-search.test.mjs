@@ -48,6 +48,20 @@ test('openMsgSearch un-hides the bar and focuses the input', () => {
   assert.equal(document.getElementById('msg-search-bar').hidden, false);
 });
 
+test('search never wraps matches inside SVG or KaTeX (diagram labels must not vanish)', async () => {
+  document.querySelector('.msg').innerHTML = `
+    <p>fox in prose</p>
+    <svg><text>fox in diagram</text></svg>
+    <span class="katex"><span class="katex-html">fox in math</span></span>`;
+  await fireInput('fox');
+  assert.equal(document.querySelectorAll('p mark').length, 1, 'prose matches still highlighted');
+  assert.equal(document.querySelectorAll('svg mark, svg .search-highlight').length, 0,
+    'an HTML <mark> inside SVG renders nothing — the label would disappear');
+  assert.equal(document.querySelector('svg text').textContent, 'fox in diagram', 'SVG text untouched');
+  assert.equal(document.querySelectorAll('.katex mark').length, 0, 'KaTeX structure must not be split');
+  assert.equal(document.getElementById('msg-search-count').textContent, '1 / 1');
+});
+
 test('typing a query wraps every match in <mark class="search-highlight"> and updates the count', async () => {
   openMsgSearch();
   await fireInput('fox');

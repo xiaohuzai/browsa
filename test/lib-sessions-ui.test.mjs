@@ -178,6 +178,20 @@ test('direct rename action edits without loading and can be used again after can
   assert.equal(document.querySelector('.session-rename-input')?.value, 'First session');
 });
 
+test('rename Escape stops propagation — the global shortcut must not also close the drawer', async () => {
+  await renderSessionsList();
+  document.querySelector('.session-item .session-rename-btn').click();
+  const input = document.querySelector('.session-rename-input');
+  let bubbledToDocument = false;
+  document.addEventListener('keydown', function onEsc(e) {
+    if (e.key === 'Escape') bubbledToDocument = true;
+    document.removeEventListener('keydown', onEsc);
+  });
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  assert.equal(bubbledToDocument, false,
+    'cancelling the rename must not reach the drawer-closing global shortcut');
+});
+
 for (const succeeds of [true, false]) {
   test(`pending rename cannot reopen an editable done input and unlocks after ${succeeds ? 'success' : 'failure'}`, async () => {
     await renderSessionsList();

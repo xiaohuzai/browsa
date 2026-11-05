@@ -746,6 +746,8 @@ test('synth-from-xhr: real note produces a non-degraded, xhr-intercepted result'
   });
   assert.equal(out.xhsSource, true);
   assert.equal(out.xhsSubSource, 'xhr-intercepted');
+  assert.equal(out.siteSynthesized, true,
+    'authoritative site product must carry the jina-fallback veto (auto <200 chars otherwise overwrites image-heavy notes with login-wall garbage)');
   assert.equal(out.xhsDegraded, false);
   assert.equal(out.xhsNoteId, '6a141d03000000003502b14f');
   assert.equal(out.articleTitle, '创业早期最大的幻觉之一');

@@ -151,6 +151,24 @@ test('REPAIR_MERMAID：模型回复无围栏 → 返回整段修剪文本，仍�
   assert.equal(res.source, 'sequenceDiagram\n    A->>B: hi');
 });
 
+test('repairMermaid passes a timeout signal — a hung provider cannot pin the button forever', async () => {
+  // The panel disables the repair button until the response arrives; without
+  // a deadline a server that accepts the connection but never answers hangs
+  // sendMessage until the SW is killed (approval-relay solved the same class
+  // with RELAY_TIMEOUT_MS; 2026-11-05 audit).
+  let seenSignal = null;
+  globalThis.fetch = async (url, opts) => {
+    seenSignal = opts?.signal;
+    return { ok: true, status: 200, body: sseFor('```mermaid\ngraph TD\nA-->B\n```'), text: async () => '' };
+  };
+  const out = await repairMermaid({
+    provider: { baseUrl: 'http://test', apiKey: 'k', apiStyle: 'chat', maxTokens: 0 },
+    all: {}, model: 'm', source: 'graph TD\nA-->', errorText: 'parse error',
+  });
+  assert.equal(out, 'graph TD\nA-->B');
+  assert.ok(seenSignal instanceof AbortSignal, 'the repair fetch must carry an AbortSignal deadline');
+});
+
 test('REPAIR_MERMAID：无可用 provider（baseUrl 为空）→ 诚实 ok:false', async () => {
   const saved = localArea._set({ activeProvider: 'hermes', providers: { hermes: { type: 'agent', alias: '', baseUrl: '', apiKey: '', model: '', stream: true, isHermes: true, apiStyle: 'chat', temperature: null, maxTokens: 0 } } });
   let fetchCalled = false;

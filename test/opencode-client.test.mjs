@@ -354,6 +354,47 @@ test('opencodeStream — outer abort fires server interrupt and rejects AbortErr
   } finally { ff.restore(); }
 });
 
+test('opencodeStream — abort DURING the prompt POST still interrupts the admitted server turn', async () => {
+  // The prompt POST is async-admitted server-side. The old code registered
+  // the abort listener only AFTER the POST resolved: an abort landing while
+  // the POST was in flight (server already accepted) never fired interrupt —
+  // the agent kept running headless. Reproduce by aborting inside the POST.
+  const ac = new AbortController();
+  let interrupted = false;
+  let releasePrompt;
+  const promptGate = new Promise((r) => { releasePrompt = r; });
+  const ff = installFetch({
+    '/prompt': async () => {
+      // Server admits the turn, THEN the user cancels while the response is
+      // still in flight: the real fetch rejects with AbortError (signal),
+      // so opencodeStream throws BEFORE ever registering its abort listener.
+      releasePrompt();
+      await new Promise((r) => setTimeout(r, 40));
+      if (ac.signal.aborted) throw new DOMException('The operation was aborted', 'AbortError');
+      return jsonResponse({ data: {} });
+    },
+    '/api/event': () => sseResponse([]),
+    '/api/session/active': () => jsonResponse({ data: {} }),
+    '/interrupt': () => { interrupted = true; return jsonResponse({}); },
+  });
+  try {
+    const p = assert.rejects(
+      opencodeStream({
+        baseUrl: 'http://127.0.0.1:4096', sessionId: SES, text: 'q',
+        signal: ac.signal,
+        _pollIntervalMs: 10,
+      }),
+      (e) => e?.name === 'AbortError',
+    );
+    await promptGate;
+    ac.abort('user-cancel');
+    await p;
+    // interruptSession is fire-and-forget — give it a tick to land.
+    await new Promise((r) => setTimeout(r, 30));
+    assert.ok(interrupted, 'the admitted server turn must be interrupted even when abort landed mid-POST');
+  } finally { ff.restore(); }
+});
+
 test('respond helpers hit the reply endpoints with the right bodies', async () => {
   const ff = installFetch({
     '/permission/per_9/reply': (u, o) => { assert.equal(o.method, 'POST'); assert.match(o.body, /"reply":"once"/); return jsonResponse({}); },

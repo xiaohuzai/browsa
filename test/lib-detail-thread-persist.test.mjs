@@ -378,6 +378,80 @@ test('deleting the host bubble closes its card and deletes the record', async ()
     'a card whose host reply was deleted must not resurrect');
 });
 
+test('deleting the host bubble closes cards even when DONE chrome sits between (usage chip / actions)', async () => {
+  // A card opened MID-STREAM anchors right after the bubble; DONE then
+  // inserts the token-usage chip / action row via afterend — between the
+  // bubble and the card. closeDetailThreadsIn's contiguous-sibling walk
+  // stopped at the chip and left the card + record alive (2026-11-05).
+  await reset();
+  const bubble = makeAssistantBubble('Reply with usage.', 7);
+  openDetailThread(bubble, 'excerpt', bubble);
+  await flushDetailThreadStore();
+  // DONE-path chrome inserted between bubble and card:
+  const chip = document.createElement('div');
+  chip.className = 'token-usage';
+  bubble.after(chip);
+  const actions = document.createElement('div');
+  actions.className = 'msg-action-row';
+  chip.after(actions);
+  assert.ok(messagesEl().querySelector('.detail-thread-card'), 'card exists before delete');
+
+  closeDetailThreadsIn(bubble);
+  assert.equal(messagesEl().querySelectorAll('.detail-thread-card').length, 0,
+    'the card behind the chrome siblings must be closed too');
+  await flushDetailThreadStore();
+
+  teardownPanel();
+  makeAssistantBubble('Reply with usage.', 7);
+  await restoreDetailThreads();
+  assert.equal(messagesEl().querySelectorAll('.detail-thread-card').length, 0,
+    'the record must be gone — no floating card at the conversation end');
+});
+
+test('stop mid-turn then a late ERROR keeps the user/assistant alternation intact', async () => {
+  // stopTurn nulls liveAiEl then awaits renderSafe(partial). An ERROR landing
+  // in that window used to run fail(): liveAiEl null → no error shown, but the
+  // trailing user turn was popped — stopTurn then pushed its assistant partial
+  // with no user predecessor, and the NEXT send shipped assistant-first wire
+  // (most APIs reject). fail() must no-op once stopTurn claimed the outcome.
+  await reset();
+  const bubble = makeAssistantBubble('Host reply.', 8);
+  openDetailThread(bubble, 'excerpt', bubble);
+  await flushDetailThreadStore();
+  const card = messagesEl().querySelector('.detail-thread-card');
+  const input = card.querySelector('.detail-thread-input');
+  input.value = 'question one';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await tick();
+  lastPort.emit({ type: 'SUBCHAT_CHUNK', delta: 'partial answer' });
+  await tick();
+
+  // ■ stop, and DURING its async final render the port delivers ERROR.
+  const stopBtn = card.querySelector('.detail-thread-send');
+  stopBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  lastPort.emit({ type: 'SUBCHAT_ERROR', message: 'late failure' });
+  await tick(60);
+  await flushDetailThreadStore();
+
+  // Follow up: the wire messages must still alternate user/assistant.
+  sentMessages.length = 0;
+  input.value = 'question two';
+  card.querySelector('.detail-thread-send').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await tick();
+  const sub = sentMessages.find((m) => m.type === 'SUBCHAT');
+  assert.ok(sub, 'follow-up sent');
+  const roles = sub.messages.map((m) => m.role);
+  for (let i = 1; i < roles.length; i++) {
+    assert.notEqual(roles[i], roles[i - 1], `wire must alternate, got ${roles.join(',')}`);
+  }
+  assert.equal(roles[roles.length - 1], 'user', 'the new question is the tail');
+  assert.equal(roles.filter((r) => r === 'user').length, 2,
+    'the stopped turn keeps its user+partial pair; the late ERROR must not pop it');
+  // Teardown the in-flight follow-up so no SW_PING interval leaks.
+  lastPort.emit({ type: 'SUBCHAT_DONE' });
+  await tick(40);
+});
+
 test('the first streamed chunk is persisted immediately, not after a debounce window', async () => {
   // Chrome may tear the side panel down without firing pagehide; if the first
   // chunk only landed on a 1s debounce, closing right after sending lost the

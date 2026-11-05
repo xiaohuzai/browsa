@@ -1154,6 +1154,9 @@ test('videoAssetId: xiaoyuzhou derives xy-<eid> from the episode path; other pla
   assert.equal(videoAssetId('xiaoyuzhou', 'https://www.xiaoyuzhoufm.com/episode/66f5ac71e4185dc4d3d43a27?s=xyz'), 'xy-66f5ac71e4185dc4d3d43a27');
   assert.equal(videoAssetId('xiaoyuzhou', 'https://www.xiaoyuzhoufm.com/podcast/abc'), '', 'non-episode pages have no asset id');
   assert.equal(videoAssetId('youtube', 'https://www.youtube.com/watch?v=abc123'), 'yt-abc123');
+  assert.equal(videoAssetId('youtube', 'https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'yt-dQw4w9WgXcQ', 'Shorts path form gets a cache key too');
+  assert.equal(videoAssetId('youtube', 'https://www.youtube.com/live/abc_123-x'), 'yt-abc_123-x');
+  assert.equal(videoAssetId('youtube', 'https://www.youtube.com/embed/videoseries'), '', 'playlist embeds are not a video');
   assert.equal(videoAssetId('bilibili', 'https://www.bilibili.com/video/BV1xx411c7mD?p=3'), 'bili-BV1xx411c7mD-p3');
 });
 

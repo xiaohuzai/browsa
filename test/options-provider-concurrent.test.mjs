@@ -142,3 +142,18 @@ test('storage 读失败必须放弃本次写入（绝不带残缺基底落盘）
   assert.equal(JSON.stringify(storedData.providers), before, '存储表原样不动');
   assert.match(document.getElementById('status').className, /err/, '读失败必须有可见的错误 flash');
 });
+
+test('同页两张卡并发保存都被串行化——后写不覆盖前行（read-merge-write 锁）', async () => {
+  // Without the storage-level chain lock both saves snapshot the SAME
+  // pre-state inside their get→merge→set windows; the later write clobbers
+  // the earlier row. Fire both clicks in the same tick.
+  const c1 = document.querySelector('.provider[data-name="llm-1"]');
+  const c2 = document.querySelector('.provider[data-name="llm-2"]');
+  c1.querySelector('[data-k="apiKey"]').value = 'sk-A-edit';
+  c2.querySelector('[data-k="apiKey"]').value = 'sk-B-edit';
+  c1.querySelector('button[data-act="save"]').click();
+  c2.querySelector('button[data-act="save"]').click();
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(storedData.providers['llm-1'].apiKey, 'sk-A-edit', 'first save survives the second');
+  assert.equal(storedData.providers['llm-2'].apiKey, 'sk-B-edit', 'second save lands too');
+});

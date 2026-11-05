@@ -730,6 +730,29 @@ test('buildTimestampRewriteHistory: falls back to full history when no videoSrc 
   assert.deepEqual(out[3], { role: 'assistant', content: 'a' });
 });
 
+test('buildTimestampRewriteHistory: matches the video ATTACH entry by value, not object identity (2026-11-05)', async () => {
+  // Real second-turn shape: history round-trips through storage, so the
+  // scanned videoSrc (newest-first hit = the PREVIOUS assistant's stamp) is
+  // a DIFFERENT object from the attach entry's. `===` matched the assistant
+  // entry → the rewrite prompt carried the old reply instead of the
+  // transcript, and the model could only invent timestamps.
+  const attachSrc = { platform: 'youtube', url: 'https://www.youtube.com/watch?v=abc', tabId: 7 };
+  const videoAttach = { role: 'user', content: '[transcript]\n[00:12] hello\n[01:40] world', videoSrc: attachSrc };
+  const stampedAssistant = {
+    role: 'assistant', content: 'v0 notes',
+    videoSrc: { platform: 'youtube', url: 'https://www.youtube.com/watch?v=abc', tabId: 99 }, // same video, different object/tab
+  };
+  const history = [videoAttach, stampedAssistant];
+  // chat-handler scans newest-first → hands us the ASSISTANT's stamp object.
+  const scanned = stampedAssistant.videoSrc;
+  const out = await buildTimestampRewriteHistory(history, scanned, '总结视频', 'v1 notes');
+  assert.deepEqual(out, [
+    videoAttach,
+    { role: 'user', content: '总结视频' },
+    { role: 'assistant', content: 'v1 notes' },
+  ], 'the rewrite must carry the transcript (user attach entry), never the old assistant reply');
+});
+
 // 2026-09-23 (C2): the "every apiStyle rebuilt" source pins (cont/rewrite in
 // chat-handler + contFn/rwFn per-kind branches in turn-request.js) were
 // retired — the exact regression they guarded (continuation rebuilding ONLY

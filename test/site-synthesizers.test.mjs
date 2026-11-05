@@ -344,3 +344,17 @@ test('twitterFromSyndication: video-only media gets the un-extracted note; garba
   assert.equal(twitterFromSyndication({ __typename: 'Tweet', id_str: '1', text: '' }), null, 'empty text → null');
   assert.equal(twitterFromSyndication({ __typename: 'Block', id_str: '1', text: 'x' }), null, 'wrong typename → null');
 });
+
+test('synthesizeSiteCache xiaoyuzhou: stale eid after SPA episode switch is rejected', () => {
+  // The cache is keyed by tabId only. SPA A→B without a fresh API call
+  // (bfcache / local cache) left A's mediaUrl behind — attach B would
+  // download A's audio and poison B's 30-day Ark cache key (2026-11-05).
+  const cache = { source: 'xiaoyuzhou', data: { eid: 'aaaaaaaaaaaaaaaaaaaaaaaa', title: 'Ep A', mediaUrl: 'https://media.xyzcdn.net/a.m4a' } };
+  const stale = synthesizeSiteCache(cache, fakeMeta('https://www.xiaoyuzhoufm.com/episode/bbbbbbbbbbbbbbbbbbbbbbbb'));
+  assert.equal(stale, null, 'previous episode cache must be rejected');
+  const fresh = synthesizeSiteCache(cache, fakeMeta('https://www.xiaoyuzhoufm.com/episode/aaaaaaaaaaaaaaaaaaaaaaaa'));
+  assert.ok(fresh, 'same eid synthesizes');
+  const legacy = { source: 'xiaoyuzhou', data: { title: 'old format, no eid' } };
+  assert.ok(synthesizeSiteCache(legacy, fakeMeta('https://www.xiaoyuzhoufm.com/episode/bbbbbbbbbbbbbbbbbbbbbbbb')),
+    'old cache without eid keeps the accept-on-missing behavior');
+});

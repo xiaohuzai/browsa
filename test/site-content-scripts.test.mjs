@@ -2222,3 +2222,20 @@ test('every site script warns when site-common.js did not load', async () => {
   }
   assert.ok(checked >= 9, `expected every relaying site interceptor, checked ${checked}`);
 });
+
+// ─── re-injection var invariant (SITES.md; 2026-11-05 audit) ─────────────────
+// runActiveFallback re-injects via files: on EVERY attach. A module-level
+// const/let binding throws "already declared" on the second injection, killing
+// the whole script (Bilibili's WBI table paid for this rule). Four scripts
+// bound siteCommon with const — same trap.
+test('module-level bindings in re-injected site scripts use var, never const/let', async () => {
+  const { readFile, readdir } = await import('node:fs/promises');
+  const dir = new URL('../lib/content-scripts/', import.meta.url);
+  for (const f of await readdir(dir)) {
+    if (!/-content-script\.js$/.test(f)) continue;
+    const src = await readFile(new URL(f, dir), 'utf8');
+    // Top-level = column 0. Inside functions/IIFEs the lines are indented.
+    const bad = src.split('\n').filter((l) => /^(const|let)\s/.test(l));
+    assert.deepEqual(bad, [], `${f}: top-level const/let breaks files: re-injection — use var`);
+  }
+});

@@ -23,6 +23,16 @@ test('splits lines across chunk boundaries and strips a trailing CR', async () =
   assert.deepEqual(lines, ['data: {"a":1}', 'data: {"b":2}']);
 });
 
+test('lone-CR line endings split lines too (SSE spec allows CR/LF/CRLF)', async () => {
+  const lines = [];
+  await (await import('../lib/sse-reader.js')).readSseLines(
+    readerOf(['data: {"a":1}\rdata: {"b":2}\r', '\rdata: {"c":3}\r']),
+    { onLine: (l) => lines.push(l) }
+  );
+  assert.deepEqual(lines, ['data: {"a":1}', 'data: {"b":2}', '', 'data: {"c":3}'],
+    'CR is a line terminator; a CR at a chunk boundary must not swallow the next line');
+});
+
 test('a multi-byte character split across chunks decodes correctly', async () => {
   const bytes = enc.encode('data: 中文\n');
   const mid = 8; // inside the multi-byte run

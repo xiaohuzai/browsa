@@ -1,5 +1,7 @@
 # lib/sidepanel/AGENTS.md — 面板层：渲染管线与 32 个 UI 模块
 
+> 2026-11-05 复审：叙事见 wiki Architecture。
+
 > 作用域：`sidepanel.js`、`sidepanel.html/css`、`lib/sidepanel/*`（含三个 `*.worker.js`）、`options.*`。
 > 根级全局约束与 P0 不变量索引见仓库根 `AGENTS.md`；机制叙事见 GitHub wiki（Rendering-Pipeline / Architecture 页）。
 

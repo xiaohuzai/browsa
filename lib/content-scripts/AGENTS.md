@@ -1,6 +1,6 @@
 # lib/content-scripts/AGENTS.md — MAIN world 站点脚本与站点快路径
 
-> 作用域：`lib/content-scripts/*`（站点拦截器 + 划词条 + site-relay + SITES.md）及 `lib/site-fallbacks.js`、`lib/site-synthesizers.js` 的站点规则面。
+> 作用域：`lib/content-scripts/*`（站点拦截器+划词条+site-relay+SITES.md）及 `lib/site-fallbacks.js`、`lib/site-synthesizers.js` 规则面。11-05批见wiki
 > 根级全局约束见仓库根 `AGENTS.md`；每站运维知识见 `SITES.md`（同目录）。
 
 ### Content scripts

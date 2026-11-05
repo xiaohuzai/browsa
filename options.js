@@ -226,7 +226,9 @@ function applyAsr(cfg) {
   const provSel = document.getElementById('asrProvider');
   if (provSel) {
     syncAsrProviderUI(); // 先填充选项
-    provSel.value = known ? (a.provider || 'qwen') : 'ark'; // 空值 = 新默认百炼；未知供应商（storage 已归一）兜底回 ark
+    // 未知供应商 storage.getAll 已归一为注册表默认（qwen）——这里的兜底
+    // 必须同源，否则直连存储的旧配置显示 ark 下拉配 qwen 字段（2026-11-05）。
+    provSel.value = known ? (a.provider || Object.keys(ASR_PROVIDERS)[0]) : Object.keys(ASR_PROVIDERS)[0];
     // Re-sync AFTER selecting the stored provider: the first call ran while
     // the select still showed its default (qwen), so an Ark config displayed
     // DashScope placeholders/tips/doc link until the user touched the select.
@@ -1479,21 +1481,24 @@ function flash(cls, text) {
  * pass `undefined` to delete the row.
  */
 async function persistProvider(name, value) {
-  let latest;
-  try { latest = await storage.get('providers'); } catch (_) {
+  // 读-合并-写整体进 storage 单点锁（2026-11-05）：两个设置页签/同页快速
+  // 连存交错时，后写者曾整表覆盖前写者的行。锁内读失败照旧绝不落盘。
+  let next;
+  try {
+    next = await storage.mutateProviders((latest) =>
+      // 基底 = 最新 storage 表 + 内置默认行中 storage 未持有者（策略单点在
+      // lib/provider-merge.js）：storage 持有的行 storage 赢——救并发编辑/新增；
+      // storage 已删除的行不从页面快照复活（lost-delete）。键缺席（全新安装）
+      // 是合法的 undefined，与读失败不同，回落空表只补默认行。
+      mergeProviderRow(latest, DEFAULT_PROVIDERS, name, value));
+  } catch (_) {
     // 读失败绝不落盘：合并基底完全来自 storage，把失败当空表会一次性抹掉
     // 全部用户行。flash 错误后放弃本次写入（与 persist 的失败口径一致）。
     flash('err', _t('saveFailedContext', '保存失败：扩展已重载，请刷新本页后重试'));
     return false;
   }
-  // 基底 = 最新 storage 表 + 内置默认行中 storage 未持有者（策略单点在
-  // lib/provider-merge.js）：storage 持有的行 storage 赢——救并发编辑/新增；
-  // storage 已删除的行不从页面快照复活（lost-delete）。键缺席（全新安装）
-  // 是合法的 undefined，与读失败不同，回落空表只补默认行。
-  const next = mergeProviderRow(latest, DEFAULT_PROVIDERS, name, value);
-  const ok = await persist({ providers: next });
-  if (ok) cachedCfg.providers = next;
-  return ok;
+  cachedCfg.providers = next;
+  return true;
 }
 
 async function persist(patch) {

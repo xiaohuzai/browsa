@@ -60,7 +60,7 @@ installChrome();
 const { handleChat } = await import('../lib/handlers/chat-handler.js');
 const {
   streamState, chatControllers, idleTimerResetters, streamPorts,
-  initStreamState, clearStreamState, streamEpoch,
+  initStreamState, clearStreamState, streamEpoch, pendingApprovals, pendingClarifications,
 } = await import('../lib/state.js');
 
 // A controllable SSE body: the test decides when each turn's stream ends.
@@ -335,4 +335,115 @@ test('the owning turn does finalize normally (DONE + state cleared)', async () =
   assert.equal(local.history.filter((m) => m.role === 'assistant').length, 1);
 
   streamPorts.delete(tabId);
+});
+
+// ─── 2026-11-05 audit: approval/clarify + RETRY carry the SAME identity gate ──
+// subchat-handler got `if (!owned()) return` on its pending writes; the main
+// chat's five closures and the RETRY push were missed. A superseded turn's
+// approval card must not land in the newer turn's port/PEEK, and its RETRY
+// must not wipe the newer turn's bubble (panel onRetry re-renders).
+
+test('a superseded turn\'s APPROVAL/CLARIFY events neither register pending entries nor push cards', async () => {
+  let releaseStream;
+  const enc = new TextEncoder();
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({
+      start(c) {
+        releaseStream = () => {
+          // Hermes chat/completions dialect approval + clarify events, then a
+          // normal completion. The turn is superseded BEFORE these arrive.
+          c.enqueue(enc.encode(
+            'event: hermes.approval.request\ndata: {"approval_id":"ap_old","run_id":"r_old","tool":"execute_code"}\n\n' +
+            'event: hermes.clarification.request\ndata: {"clarify_id":"cl_old","run_id":"r_old","question":"old?"}\n\n' +
+            'data: {"choices":[{"delta":{"content":"done"},"finish_reason":"stop"}]}\n\n'
+          ));
+          c.close();
+        };
+      },
+    }),
+    text: async () => '',
+  });
+  local.history = [];
+  pendingApprovals.clear();
+  pendingClarifications.clear();
+  const tabId = 14;
+  const events = posted(tabId);
+
+  const turnA = handleChat({ type: 'CHAT', userText: 'from A', tabId, sessionId: '' }, '', '');
+  for (let i = 0; i < 200 && !releaseStream; i++) await new Promise((r) => setTimeout(r, 2));
+  assert.ok(releaseStream, 'turn A parked inside its stream');
+
+  const stateB = initStreamState(tabId, { providerLabel: 'Test', originSessionId: '' });
+  chatControllers.set(tabId, new AbortController());
+
+  releaseStream();
+  await turnA;
+
+  assert.equal(events.filter((e) => e.type === 'APPROVAL').length, 0,
+    'a superseded turn must not push an approval card into the newer turn\'s port');
+  assert.equal(events.filter((e) => e.type === 'CLARIFY').length, 0,
+    'a superseded turn must not push a clarify card into the newer turn\'s port');
+  assert.equal([...pendingApprovals.keys()].filter((k) => k.startsWith(`${tabId}::`)).length, 0,
+    'a superseded turn must not register pending approvals (PEEK would re-hang the dead card)');
+  assert.equal([...pendingClarifications.keys()].filter((k) => k.startsWith(`${tabId}::`)).length, 0,
+    'a superseded turn must not register pending clarifications');
+
+  clearStreamState(tabId);
+  streamPorts.delete(tabId);
+  chatControllers.delete(tabId);
+  idleTimerResetters.delete(tabId);
+});
+
+test('a superseded turn\'s transient-retry does not push RETRY into the newer turn\'s port', async () => {
+  let call = 0;
+  let failFirst;
+  let releaseSecond;
+  const enc = new TextEncoder();
+  globalThis.fetch = async () => {
+    call++;
+    if (call === 1) {
+      // First attempt parks until the test supersedes the turn, THEN fails
+      // as a transient network error → the retry ladder (and its RETRY
+      // push) runs while turn A no longer owns the slots.
+      await new Promise((_, reject) => { failFirst = () => reject(new TypeError('fetch failed')); });
+    }
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({
+        start(c) {
+          releaseSecond = () => {
+            c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n'));
+            c.close();
+          };
+        },
+      }),
+      text: async () => '',
+    };
+  };
+  local.history = [];
+  const tabId = 15;
+  const events = posted(tabId);
+
+  const turnA = handleChat({ type: 'CHAT', userText: 'from A', tabId, sessionId: '' }, '', '');
+  for (let i = 0; i < 200 && !failFirst; i++) await new Promise((r) => setTimeout(r, 2));
+  assert.ok(failFirst, 'turn A parked inside attempt 1');
+
+  // Supersede BEFORE the failure: the RETRY push now runs unowned.
+  const stateB = initStreamState(tabId, { providerLabel: 'Test', originSessionId: '' });
+  chatControllers.set(tabId, new AbortController());
+  failFirst();
+  for (let i = 0; i < 400 && !releaseSecond; i++) await new Promise((r) => setTimeout(r, 5));
+  assert.ok(releaseSecond, 'attempt 2 must have started');
+  releaseSecond();
+  await turnA;
+
+  assert.equal(events.filter((e) => e.type === 'RETRY').length, 0,
+    'RETRY from a superseded turn wipes the NEWER turn\'s bubble via panel onRetry — must be gated');
+  assert.equal(streamState.get(tabId), stateB);
+
+  clearStreamState(tabId);
+  streamPorts.delete(tabId);
+  chatControllers.delete(tabId);
+  idleTimerResetters.delete(tabId);
 });

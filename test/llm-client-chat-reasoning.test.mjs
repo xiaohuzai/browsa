@@ -192,3 +192,109 @@ test('responsesStream: multi-data-line event joins per spec too', async () => {
   assert.equal(full, 'joined!');
   delete globalThis.fetch;
 });
+
+// ─── 2026-11-05 audit: raw-event hooks must match the event: LINE, not prose ──
+// makeChatEventHooks used event.includes('event: hermes.tool.progress') /
+// a whole-block regex — a model answer QUOTING those strings (a developer
+// discussing the Hermes protocol) had the entire delta consumed by the hook.
+
+test('chatStream: content quoting Hermes event names is NOT consumed by the raw hooks', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
+  const prose = 'Hermes emits `event: hermes.tool.progress` and `event: approval.request` frames.';
+  mockFetchWithStream([
+    { choices: [{ index: 0, delta: { content: prose }, finish_reason: null }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+  ]);
+
+  const progress = [];
+  const approvals = [];
+  const result = await chatStream({
+    baseUrl: 'http://test', apiKey: 'sk-x', model: 'm',
+    messages: [{ role: 'user', content: 'explain hermes' }],
+    onToolProgress: (t) => progress.push(t),
+    onApproval: (a) => approvals.push(a),
+  });
+
+  assert.equal(result.full, prose, 'the answer text must survive verbatim');
+  assert.equal(progress.length, 0, 'prose is not a tool-progress event');
+  assert.equal(approvals.length, 0, 'prose is not an approval request');
+  delete globalThis.fetch;
+});
+
+test('chatStream: REAL named Hermes events still route to the hooks', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
+  const encoder = new TextEncoder();
+  const text =
+    'event: hermes.tool.progress\ndata: {"tool":"terminal","description":"ls"}\n\n' +
+    'event: hermes.approval.request\ndata: {"approval_id":"ap1","run_id":"r1"}\n\n' +
+    'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n' +
+    'data: [DONE]\n\n';
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({ start(c) { c.enqueue(encoder.encode(text)); c.close(); } }),
+    text: async () => '',
+  });
+
+  const progress = [];
+  const approvals = [];
+  const result = await chatStream({
+    baseUrl: 'http://test', apiKey: 'sk-x', model: 'm',
+    messages: [{ role: 'user', content: 'go' }],
+    onToolProgress: (t) => progress.push(t),
+    onApproval: (a) => approvals.push(a),
+  });
+  assert.equal(progress.length, 1);
+  assert.match(progress[0], /terminal: ls/);
+  assert.equal(approvals.length, 1);
+  assert.equal(approvals[0].approval_id, 'ap1');
+  assert.equal(result.full, 'ok');
+  delete globalThis.fetch;
+});
+
+// ─── 2026-11-05 audit: lone-CR line endings are legal SSE ─────────────────────
+// The spec allows CR, LF, or CRLF. The skeleton only normalized CRLF — a
+// CR-separated stream never hit a '\n\n' boundary and resolved full=''.
+
+test('chatStream: a lone-CR separated stream parses (spec-legal line endings)', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
+  const encoder = new TextEncoder();
+  const text =
+    'data: {"choices":[{"delta":{"content":"hello "},"finish_reason":null}]}\r\r' +
+    'data: {"choices":[{"delta":{"content":"world"},"finish_reason":"stop"}]}\r\r' +
+    'data: [DONE]\r\r';
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({ start(c) { c.enqueue(encoder.encode(text)); c.close(); } }),
+    text: async () => '',
+  });
+
+  const result = await chatStream({
+    baseUrl: 'http://test', apiKey: 'sk-x', model: 'm',
+    messages: [{ role: 'user', content: 'q' }],
+  });
+  assert.equal(result.full, 'hello world', 'CR-separated events must not silently vanish');
+  delete globalThis.fetch;
+});
+
+test('chatStream: CRLF split across chunk boundaries still normalizes (pendingCR preserved)', async () => {
+  const { chatStream } = await import('../lib/llm-client.js');
+  const encoder = new TextEncoder();
+  const chunks = [
+    'data: {"choices":[{"delta":{"content":"a"},"finish_reason":null}]}\r',
+    '\n\r\n',
+    'data: {"choices":[{"delta":{"content":"b"},"finish_reason":"stop"}]}\r\n\r\n',
+  ];
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: new ReadableStream({
+      start(c) { for (const ch of chunks) c.enqueue(encoder.encode(ch)); c.close(); },
+    }),
+    text: async () => '',
+  });
+  const result = await chatStream({
+    baseUrl: 'http://test', apiKey: 'sk-x', model: 'm',
+    messages: [{ role: 'user', content: 'q' }],
+  });
+  assert.equal(result.full, 'ab');
+  delete globalThis.fetch;
+});

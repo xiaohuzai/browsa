@@ -16,7 +16,7 @@ import {
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState,
   recordTerminalTombstone, takeTerminalTombstone, peekTerminalTombstone, clearTerminalTombstone,
-  STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm
+  STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm, scheduleDurableTurnFlush
 } from './lib/state.js';
 import { handleChat, fetchLlmsTxt, ensureDurableSalvage } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
@@ -865,7 +865,13 @@ async function handle(msg, sender) {
           : justFinished ? { inFlight: false, justFinished: true }
           : { inFlight: false };
       }
-      if (msg.sessionId != null && st.originSessionId === msg.sessionId) st.bg = false;
+      if (msg.sessionId != null && st.originSessionId === msg.sessionId && st.bg) {
+        st.bg = false;
+        // Routing flags ride the durable mirror (2026-11-05 audit): a silent
+        // window (approval wait / long tool) has no delta to trigger the
+        // flush — without this a SW death salvages by the STALE flags.
+        scheduleDurableTurnFlush(t);
+      }
       // 并发审批堆叠（2026-10-15）：把该 tab 名下仍未决的审批/澄清卡随 PEEK
       // 带回——面板重开时流正停在等审批，没有卡用户就无法应答（只能干等到
       // idle-stop）。已答的条目在 RESPOND 成功时已删，不会重复补挂。
@@ -906,6 +912,10 @@ async function handle(msg, sender) {
       if (st && msg.sessionId) {
         st.originSessionId = msg.sessionId;
         st.bg = true;
+        // Same mirror invariant as PEEK: bg/origin must reach storage.session
+        // even when no further delta arrives, or SW-death salvage routes the
+        // partial into live history — the exact leak REASSIGN prevents.
+        scheduleDurableTurnFlush(msg.tabId);
       }
       return { reassigned: !!(st && msg.sessionId) };
     }

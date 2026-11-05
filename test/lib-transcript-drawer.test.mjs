@@ -270,6 +270,40 @@ test('search marks matches, counts them, and cycles with wraparound', async () =
   assert.equal(T.__TRANSCRIPT_TESTING__.state().matchCount, 0);
 });
 
+test('refresh with an active search re-indexes matches — "next" never indexes past the new rows', async () => {
+  // refreshTranscriptSource rebuilt _rows but kept _searchMatches pointing
+  // into the OLD row array: with fewer rows in the new transcript, clicking
+  // "next" read _rows[oldIndex] === undefined and threw (2026-11-05).
+  const vs = mountDom();
+  init(vs);
+  T.__TRANSCRIPT_TESTING__.setSource(RAW, vs);
+  T.openTranscriptDrawer();
+  const input = document.getElementById('transcript-search');
+  input.value = '一';
+  input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 140));
+  assert.equal(T.__TRANSCRIPT_TESTING__.state().matchCount, 2);
+
+  // A NEW, shorter transcript arrives while the drawer + search stay open.
+  // refreshTranscriptSource re-reads via the getSource dep — re-init with
+  // the shorter transcript (what a new attach/renderHistory delivers).
+  T.initTranscriptDrawer({
+    sendMessage: async () => ({ ok: true, data: { ok: false } }),
+    onSeek: () => {}, onNote: () => {},
+    getSource: async () => ({ raw: '[00:01] 唯一的一行', videoSrc: vs }),
+  });
+  await T.refreshTranscriptSource();
+  const st = T.__TRANSCRIPT_TESTING__.state();
+  assert.equal(st.rowCount, 1);
+  assert.equal(st.matchCount, 1, 'matches re-computed against the new rows');
+
+  // The crash path: cycling must stay in bounds.
+  document.getElementById('transcript-search-next')
+    .dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(T.__TRANSCRIPT_TESTING__.state().searchIdx, 0);
+  assert.ok(document.querySelector('.ts-row').classList.contains('search-current'));
+});
+
 test('no tabId: rows stay clickable but polling never starts', async () => {
   const vs = mountDom({ withTabId: false });
   init(vs);

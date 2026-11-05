@@ -114,10 +114,34 @@ test('YouTube ASR injected funcs surface a clear error when window.location has 
   }
 });
 
+test('YouTube ASR injected funcs accept PATH-form videoIds (shorts/live/embed — no ?v=)', async () => {
+  // 2026-10-20 widened the extraction gate + youtubeVideoIdFromLocation, but
+  // the two ASR injection funcs kept reading only ?v= — a Shorts page has no
+  // such param, so ASR silently degraded to plain attach (2026-11-05 audit).
+  const funcs = await extractYouTubeInjectFuncs();
+  for (const { body } of funcs) {
+    const fakeWindow = {
+      location: { search: '', pathname: '/shorts/dQw4w9WgXcQ' },
+      __browsaFetchFreshYouTubeStreams: async (videoId) => {
+        assert.equal(videoId, 'dQw4w9WgXcQ', 'the path-form id must reach the fresh fetcher');
+        return {
+          streams: [{ type: 'audio', url: 'https://rr.googlevideo.com/videoplayback?pot=aa', bandwidth: 128000, codecs: 'mp4a.40.2' }],
+          videoDurationSec: 300,
+        };
+      },
+    };
+    const fn = runInFreshVm(body, fakeWindow);
+    const res = await fn();
+    const streams = res?.streams || res?.data?.streams;
+    assert.ok(Array.isArray(streams) && streams.length === 1,
+      `Shorts location must yield streams (got ${JSON.stringify(res)})`);
+  }
+});
+
 test('the injected funcs must NOT reference a closure variable videoId (the countImages trap)', async () => {
   const funcs = await extractYouTubeInjectFuncs();
   for (const { body } of funcs) {
-    assert.match(body, /window\.location\.search/, 'func must parse videoId from window.location');
+    assert.match(body, /window\.location/, 'func must parse videoId from window.location');
     assert.match(body, /const vid =/, 'func must bind the parsed id to a local (not a closure var)');
     assert.doesNotMatch(body, /fn\(videoId\)|!videoId\b/, 'func must not reference a closure videoId');
   }
@@ -136,6 +160,7 @@ test('YouTube ASR injected func prefers captured pot audio streams over the ANDR
         { type: 'audio', url: 'https://rr.googlevideo.com/videoplayback?pot=CAPTURED', bandwidth: 128000, hasPot: true, codecs: 'mp4a.40.2', id: 140 },
         { type: 'audio', url: 'https://rr.googlevideo.com/videoplayback?pot=CAPTURED2', bandwidth: 70000, hasPot: true, codecs: 'opus', id: 251 },
       ],
+      __browsaPlayerDurationCache: { abc123XYZ: 300 },
       __browsaFetchFreshYouTubeStreams: async () => {
         freshCalled = true; // must NOT be called when pot capture exists
         return { streams: [{ type: 'audio', url: 'https://rr.googlevideo.com/videoplayback?c=ANDROID&sig=x' }], videoDurationSec: 300 };
@@ -148,6 +173,12 @@ test('YouTube ASR injected func prefers captured pot audio streams over the ANDR
     assert.ok(Array.isArray(streams), 'must return streams');
     assert.ok(streams.length > 0, 'must get the captured pot streams');
     assert.equal(streams[0].url, 'https://rr.googlevideo.com/videoplayback?pot=CAPTURED', 'must prefer the captured pot stream');
+    // The pot path must NOT hardcode duration 0 — that disables the 90%
+    // truncation guards downstream (2026-11-05 audit). The page caches the
+    // real player's lengthSeconds alongside the streams.
+    if ('videoDurationSec' in (res || {})) {
+      assert.equal(res.videoDurationSec, 300, 'pot path carries the cached video duration');
+    }
     assert.equal(freshCalled, false, 'must NOT fall back to the pot-less ANDROID fetch when pot capture exists');
   }
 });
