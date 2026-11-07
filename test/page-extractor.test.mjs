@@ -2147,6 +2147,120 @@ test('extractInPageWorld: lazy data-src placeholder (WeChat pattern) swaps in th
   assert.doesNotMatch(result.text, /data:image\/svg\+xml/, '占位 data: 行不得残留');
 });
 
+test('extractInPageWorld: media-class image wrapper survives Readability cleanup', async () => {
+  // Google Research wraps article figures in .dynamic_media/.media__image.
+  // Readability treats "media" as a negative class, so its div cleanup used to
+  // delete the entire wrapper before counting the <img> -- taking the figure
+  // and any caption inside the same wrapper with it.
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Wearable hypertension study</h1>
+      <p>${'A long paragraph. '.repeat(60)}</p>
+      <div class="dynamic_media">
+        <div class="dynamic_media__item">
+          <picture class="media__image">
+            <img src="https://example.com/figure-overview.png" alt="Diagram of the wearable workflow">
+          </picture>
+        </div>
+        <div class="caption"><p>The figure caption explains how PPG and ACC embeddings are aggregated.</p></div>
+      </div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/research' });
+  const liveWrapper = dom.window.document.querySelector('.dynamic_media');
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /!\[Diagram of the wearable workflow\]\(https:\/\/example\.com\/figure-overview\.png\)/,
+    'the image Markdown must survive the media-class wrapper');
+  assert.match(result.text, /The figure caption explains how PPG and ACC embeddings are aggregated/,
+    'the caption inside the same wrapper must survive');
+  assert.equal(result.imageCount, 1, 'imageCount must count images that are not inside <figure>');
+  assert.equal(liveWrapper.className, 'dynamic_media', 'the rescue must only mutate the extraction clone');
+});
+
+test('extractInPageWorld: media rescue preserves other negative class tokens', async () => {
+  // Only the "media" token causes the false-positive cleanup we are repairing.
+  // Dropping the WHOLE class list would also erase "promo" and let a
+  // promoted-story card ride into the article body.
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Main article</h1>
+      <p>${'Long article paragraph. '.repeat(60)}</p>
+      <div class="media promo">
+        <img src="https://example.com/promo.png" alt="Promoted story image">
+        <p>Promoted story teaser text that must not enter the article body.</p>
+      </div>
+      <div class="media-promo">
+        <img src="https://example.com/promo-compound.png" alt="Compound promoted story image">
+        <p>Compound promoted teaser text that must not enter the article body.</p>
+      </div>
+      <div class="author-media">
+        <img src="https://example.com/author.png" alt="Author portrait image">
+        <p>Author card text that must not enter the article body.</p>
+      </div>
+      <div class="meta">
+        <img src="https://example.com/meta.png" alt="Metadata card image">
+        <p>Metadata card text that must not enter the article body.</p>
+      </div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/research' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.doesNotMatch(result.text, /Promoted story teaser text/,
+    'non-media negative class tokens must still let Readability remove the card');
+  assert.doesNotMatch(result.text, /Compound promoted teaser text/,
+    'compound media-promo tokens must not erase the promo signal');
+  assert.doesNotMatch(result.text, /Author card text/,
+    'author/media wrappers are metadata, not article figures');
+  assert.doesNotMatch(result.text, /Metadata card text/,
+    'meta-only wrappers must stay outside the rescue surface');
+});
+
+test('extractInPageWorld: short localized alt survives when its wrapper has a caption', async () => {
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>图文文章</h1>
+      <p>${'这是一段足够长的正文内容。'.repeat(80)}</p>
+      <div class="dynamic_media">
+        <div class="dynamic_media__item">
+          <picture class="media__image">
+            <img src="https://example.com/short-alt.png" alt="图1">
+          </picture>
+        </div>
+        <div class="caption"><p>这是需要保留的图注，说明图片中的关键结果。</p></div>
+      </div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/research' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /!\[图1\]\(https:\/\/example\.com\/short-alt\.png\)/,
+    'short alt text must not block rescue when a caption identifies the figure');
+  assert.match(result.text, /这是需要保留的图注/,
+    'the caption must survive with the short-alt image');
+});
+
+test('extractInPageWorld: media rescue does not skip unrelated class substrings', async () => {
+  // "update" contains "date" as a substring; it is not a date card.
+  const html = `<!doctype html><html><body>
+    <main>
+      <h1>Product update</h1>
+      <p>${'A long product update paragraph. '.repeat(60)}</p>
+      <div class="update-media">
+        <div><img src="https://example.com/update-figure.png" alt="Product update workflow diagram"></div>
+        <p class="caption">Product update figure caption.</p>
+      </div>
+    </main>
+  </body></html>`;
+  const dom = new JSDOM(html, { url: 'https://example.com/research' });
+  const result = await runExtractInPageWorldOnLiveDoc(dom.window.document, dom.window);
+  assert.ok(!result.error, `extraction should succeed, got: ${result.error}`);
+  assert.match(result.text, /!\[Product update workflow diagram\]\(https:\/\/example\.com\/update-figure\.png\)/,
+    'substring matches like "date" inside "update" must not suppress the rescue');
+  assert.match(result.text, /Product update figure caption/, 'the update figure caption must survive too');
+});
+
 test('extractInPageWorld: standalone data:/blob: image lines collapse to <image-removed>', async () => {
   const spacer = 'data:image/svg+xml,%3Cxml/%3E';
   const html = `<!doctype html><html><body>
