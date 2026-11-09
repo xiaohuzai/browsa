@@ -6,7 +6,8 @@ import { aggregateBridgePing } from './lib/provider-ping.js';
 import { ping, getCapabilities } from './lib/llm-client.js';
 import { pingOpencode } from './lib/opencode-client.js';
 import { pingSquilla } from './lib/squilla-client.js';
-import { reasoningLevelOptions } from './lib/reasoning-levels.js';
+import { reasoningLevelOptions, reasoningLevelsFor } from './lib/reasoning-levels.js';
+import { MODEL_CATALOG_URL, buildCatalog, catalogLevelsFor, catalogModelCount, isCatalog } from './lib/model-catalog.js';
 import { pingBridge, normalizeBridgeUrl } from './lib/bridge-client.js';
 import { asrAdapterFor, normalizeArkBaseUrl } from './lib/handlers/attach-asr.js';
 import { ASR_PROVIDERS, getAsrProvider } from './lib/asr-providers.js';
@@ -46,6 +47,16 @@ const BLANK_LLM = { type: 'llm', alias: '', baseUrl: '', apiKey: '', model: '', 
 let cachedCfg = null;
 const _pingState = {}; // name → 'reachable' | 'unreachable', persists across re-renders
 
+// models.dev 目录（单元 E，可选）：null = 未导入。唯一读取点是 init 与
+// lib/handlers 的 stateless 回合；本页只在用户点按钮时 fetch（首屏零网络）。
+let _modelCatalog = null;
+let _catalogBusy = false;
+let _catalogError = false;
+// 外部目录是数 MB 的第三方端点：没有超时时，「服务器接了连接却不回包」会把
+// _catalogBusy 永久钉在 true——两个按钮再也点不动，只能刷新设置页恢复。
+// 超时走 fetch 的 AbortSignal（与 lib/llm-client.js 等处的探测同一套路）。
+const CATALOG_FETCH_TIMEOUT_MS = 15000;
+
 init();
 
 async function init() {
@@ -68,6 +79,7 @@ async function init() {
     syncGuideLink();
     renderProviders({ keepDirty: true });
     syncAsrProviderUI();
+    renderCatalogStatus(); // 语言切换后状态行的按钮文案也要跟着换 key
   });
   syncGuideLink();
 
@@ -77,8 +89,13 @@ async function init() {
   // 读回，每次打开设置页都回落「唯一已配置/activeProvider/bridge」启发式。
   // storage.get('key') 已解包为裸值（lib/storage.js）——再取 .localAgentTab 会恒得 undefined。
   try { cachedCfg.localAgentTab = (await storage.get('localAgentTab')) || cachedCfg.localAgentTab; } catch (_) {}
+  // 模型目录同样是定向读键（不在 GET_ALL_KEYS）：只读本地缓存，绝不在这里 fetch。
+  try { _modelCatalog = await storage.getModelCatalog(); } catch (_) { _modelCatalog = null; }
   Object.assign(_pingState, cachedCfg.pingStates || {});
   renderProviders();
+  renderCatalogStatus();
+  document.querySelector('button[data-act="catalog-import"]')?.addEventListener('click', importModelCatalog);
+  document.querySelector('button[data-act="catalog-clear"]')?.addEventListener('click', clearModelCatalog);
   applyAsr(cachedCfg);
   applyToolbarToggle();
   applyLlmsTxt();
@@ -710,15 +727,15 @@ function wireModelChips(card) {
     const chipIds = () => [...chipsWrap.querySelectorAll('.chip')].map((c) => c.dataset.id);
     const syncChips = () => {
       hidden.value = chipIds().join(', ');
-      // 思考档位的选项跟着模型 id 自适应（填 glm-5 出 {关,开}、gpt-5.6 出力度
-      // 梯）——lib/reasoning-levels.js 的词表。改完 chips 现刷选项。
+      // 思考档位跟着模型 id 自适应（填 glm-5 出 {关,开}、gpt-5.6 出力度
+      // 梯）——lib/reasoning-levels.js 的词表，并集与首渲共用
+      // thinkingSelectHtml（单点）。行级覆盖行同步重建：删/加 chip 不得连带
+      // 清掉别的模型已选的档位。
+      renderPerModelRows(card);
       const sel = card.querySelector('[data-thinking-select]');
       if (sel) {
-        const levels = ['auto'];
-        for (const id of chipIds()) for (const l of reasoningLevelOptions(id)) if (!levels.includes(l)) levels.push(l);
-        const cur = sel.value;
-        sel.innerHTML = levels.map((l) => `<option value="${escapeAttr(l)}">${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
-        sel.value = levels.includes(cur) ? cur : 'auto';
+        const { lv } = readPerModelRows(card);
+        sel.innerHTML = thinkingSelectHtml(chipIds(), { reasoningDefault: sel.value, modelLevels: lv });
       }
     };
     const addChips = () => {
@@ -834,6 +851,174 @@ function wireProviderActivation(card, name) {
   }
 }
 
+// ─── 模型目录（models.dev 导入，单元 E）──────────────────────────────────────
+// 四态渲染：empty / busy / loaded / error。这是目录卡唯一的文案与可用性写入点
+// ——导入/清除/语言切换三条路径都调它，不信任何局部布尔。
+// 目录本身只喂选项列表（reasoningLevelOptions 的 catalogLevels），绝不写回
+// provider 行：卡片的持久化仍只由 saveCard 从 DOM 派生。
+function renderCatalogStatus() {
+  const el = $('catalogStatus');
+  const importBtn = document.querySelector('button[data-act="catalog-import"]');
+  const clearBtn = document.querySelector('button[data-act="catalog-clear"]');
+  if (!el) return;
+  const has = isCatalog(_modelCatalog);
+  if (importBtn) {
+    // 未导入 = 导入；已有目录 = 刷新（同一个按钮，两个 key）。
+    importBtn.textContent = has
+      ? _t('catalogRefreshBtn', 'Refresh model catalog')
+      : _t('catalogImportBtn', 'Import model catalog');
+    importBtn.disabled = _catalogBusy;
+  }
+  if (clearBtn) clearBtn.disabled = _catalogBusy; // busy 期间两个按钮都禁用（不并发两次导入）
+  if (_catalogBusy) {
+    el.textContent = _t('catalogStatusBusy', 'Fetching the model catalog…');
+    return;
+  }
+  if (_catalogError) {
+    // 失败时旧目录仍在：状态行报错，不清空 _modelCatalog。
+    el.textContent = _t('catalogStatusError', 'Import failed — the previous catalog was kept.');
+    return;
+  }
+  if (has) {
+    el.textContent = tSub('catalogStatusLoaded', '$1 models · updated $2',
+      String(catalogModelCount(_modelCatalog)),
+      new Date(_modelCatalog.fetchedAt).toLocaleString());
+    return;
+  }
+  el.textContent = _t('catalogStatusEmpty', 'No model catalog imported yet.');
+}
+
+// 只有用户点击才会走到这里：fetch → buildCatalog → 落库 → 重渲。
+// 任何一环失败都只改状态行，旧目录保留，绝不 throw 出页面。
+async function importModelCatalog() {
+  if (_catalogBusy) return;
+  _catalogBusy = true;
+  _catalogError = false;
+  renderCatalogStatus();
+  try {
+    const res = await fetch(MODEL_CATALOG_URL, { signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const next = buildCatalog(await res.json(), { now: Date.now() });
+    await storage.setModelCatalog(next);
+    _modelCatalog = next;
+    _catalogBusy = false;
+    renderCatalogStatus();
+    // 目录只改「选项列表」：重渲让 per-model 行/卡级 select 立刻带上新词表
+    // （keepDirty 保住未保存的输入）。
+    renderProviders({ keepDirty: true });
+  } catch (_) {
+    _catalogBusy = false;
+    _catalogError = true;
+    renderCatalogStatus();
+  }
+}
+
+async function clearModelCatalog() {
+  if (_catalogBusy) return;
+  await storage.clearModelCatalog();
+  _modelCatalog = null;
+  _catalogError = false;
+  renderCatalogStatus();
+  renderProviders({ keepDirty: true });
+}
+
+// ─── 每模型档位覆盖（per-model thinking levels）───────────────────────────────
+// 一个 model id 一行：`select` 首项 value='' = 继承卡级默认，`.per-model-levels`
+// 是逗号分隔的自定义词表（>0 个词才写 modelLevels）。两个持久化 map
+// （reasoningByModel / modelLevels）**只由 saveCard 从行 DOM 派生**
+// （readPerModelMaps）——不设隐藏 JSON 镜像：空串 JSON.parse 失败归一为 {}
+// 会把已存 map 清掉，而 pingCard 也走 saveCard。模型 id 是用户输入，行模板
+// 全程 escapeHtml / escapeAttr，行 id 经 data-per-model-row 原值往返。
+function cardModelIds(card) {
+  return [...card.querySelectorAll('[data-model-chips] .chip')].map((c) => c.dataset.id);
+}
+
+function perModelRowHtml(id, { selected = '', levels = [] } = {}) {
+  // 词表优先级在引擎里（lib/reasoning-levels.js）：行内自定义词表 > 内置规则
+  // > 目录（models.dev，用户可清除的最后一档）。已存档位不在词表里时补一项
+  // 并选中——首渲回落 auto 会让「只改别名就 Save」静默改写档位。
+  const vals = ['', ...reasoningLevelOptions(id, {
+    overrideLevels: levels,
+    catalogLevels: catalogLevelsFor(_modelCatalog, id),
+  })];
+  if (selected && !vals.includes(selected)) vals.push(selected);
+  return `
+    <div class="per-model-row" data-per-model-row="${escapeAttr(id)}">
+      <span class="per-model-id">${escapeHtml(id)}</span>
+      <select class="per-model-select" aria-label="${escapeAttr(id)}">
+        ${vals.map((l) => `<option value="${escapeAttr(l)}"${l === selected ? ' selected' : ''}>${
+          l === ''
+            ? _t('perModelInheritOption', 'inherit card default')
+            : l === 'auto'
+              ? _t('thinkingAutoOption', 'auto（不发送）')
+              : escapeHtml(l)
+        }</option>`).join('')}
+      </select>
+      <input class="per-model-levels" type="text" value="${escapeAttr(levels.join(', '))}" placeholder="${escapeAttr(_t('perModelCustomLevelsPlaceholder', 'e.g. low, max'))}" aria-label="${escapeAttr(_t('perModelCustomLevelsLabel', 'Custom levels'))}" />
+    </div>`;
+}
+
+/** 行 DOM 的现值：`{ sel: id→选值('' = 继承), lv: id→自定义词表 }`。 */
+function readPerModelRows(card) {
+  const sel = {};
+  const lv = {};
+  for (const row of card.querySelectorAll('[data-per-model-row]')) {
+    const id = row.dataset.perModelRow;
+    if (!id) continue;
+    sel[id] = row.querySelector('.per-model-select')?.value || '';
+    const words = String(row.querySelector('.per-model-levels')?.value || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    if (words.length) lv[id] = words;
+  }
+  return { sel, lv };
+}
+
+/** 两个持久化 map，从行 DOM 派生（唯一写入者是 saveCard）。 */
+function readPerModelMaps(card) {
+  const { sel, lv } = readPerModelRows(card);
+  return {
+    reasoningByModel: Object.fromEntries(Object.entries(sel).filter(([, v]) => v)),
+    modelLevels: lv,
+  };
+}
+
+// 按当前 chip 列表重建全部行，把现有选值/词表搬过去（确定性 + 幂等：首渲后
+// 的这一调用与模板输出逐字节一致；chip 增删后也只留存活模型的行）。
+function renderPerModelRows(card) {
+  const rowsWrap = card.querySelector('[data-per-model-rows]');
+  if (!rowsWrap) return;
+  const { sel, lv } = readPerModelRows(card);
+  const ids = cardModelIds(card);
+  rowsWrap.innerHTML = ids.map((id) => perModelRowHtml(id, { selected: sel[id] || '', levels: lv[id] || [] })).join('');
+  const hint = card.querySelector('.per-model-empty');
+  if (hint) hint.hidden = ids.length > 0;
+}
+
+// 行内词表改完即用新词表重建该行（change 而非 input：打字中途重建会丢光标）。
+// 调用一次即完成接线；与 buildProviderCard 的首渲共用同一渲染函数，故幂等。
+function wirePerModelThinking(card) {
+  const wrap = card.querySelector('[data-per-model]');
+  if (!wrap) return;
+  wrap.addEventListener('change', (e) => {
+    if (e.target.closest?.('.per-model-levels')) renderPerModelRows(card);
+  });
+  renderPerModelRows(card);
+}
+
+// 卡级档位下拉：卡上各模型词表的并集 + 已存档位（不在并集里补一项并选中，
+// 理由同上）。首渲与 chips 增删后的现刷共用这一个函数。目录词表逐模型查
+// （catalogLevelsFor：精确 id → 最后一段），引擎再决定它对每个模型是否生效
+// ——内置规则认识的模型不受目录影响。
+function thinkingSelectHtml(modelIds, cfg) {
+  const cur = cfg.reasoningDefault || 'auto';
+  const levels = reasoningLevelsFor(modelIds, {
+    modelLevelsById: cfg.modelLevels || {},
+    catalogLevelsByModel: Object.fromEntries(modelIds.map((id) => [id, catalogLevelsFor(_modelCatalog, id)])),
+  });
+  if (!levels.includes(cur)) levels.push(cur);
+  return levels.map((l) => `<option value="${escapeAttr(l)}"${cur === l ? ' selected' : ''}>${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
+}
+
 function buildProviderCard(name, cfg, opts = {}) {
   const reserved = !!opts.reserved; // render-only empty slot (not yet persisted)
   const card = document.createElement('div');
@@ -860,24 +1045,32 @@ function buildProviderCard(name, cfg, opts = {}) {
   // model ids — filling in `glm-5` offers {关,开}, `gpt-5.6` offers the effort
   // ladder (lib/reasoning-levels.js, ported from ZCode's model registry).
   // `auto` sends nothing (provider defaults); an option some listed model
-  // doesn't speak degrades to `auto` for that model at request time.
+  // doesn't speak snaps to the nearest rung THAT model speaks at request
+  // time (lib/reasoning-levels.js fitReasoningLevel, ties go up).
   const modelIds = (cfg.models?.length ? cfg.models : (cfg.model ? [cfg.model] : [])).filter(Boolean);
-  const thinkingLevels = (() => {
-    const out = ['auto'];
-    for (const id of modelIds) for (const l of reasoningLevelOptions(id)) if (!out.includes(l)) out.push(l);
-    return out;
-  })();
   const thinkingField = !isAgent ? `
       <div class="field">
         <label>${_t('thinkingLevelLabel', 'Thinking level')}
           <select data-k="reasoningDefault" data-thinking-select>
-            ${thinkingLevels.map((l) => `<option value="${escapeAttr(l)}"${(cfg.reasoningDefault || 'auto') === l ? ' selected' : ''}>${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('')}
+            ${thinkingSelectHtml(modelIds, cfg)}
           </select>
         </label>
       </div>
       <div class="field">
         <label>${_t('reasoningRawLabel', 'Extra reasoning fields (JSON)')}
           <input data-k="reasoningRaw" type="text" value="${escapeAttr(cfg.reasoningRaw || '')}" placeholder='{"reasoning_effort":"high"}' />
+        </label>
+      </div>
+      <div class="field" data-per-model>
+        <label>${_t('perModelThinkingLabel', 'Per-model thinking level')}
+          <span class="per-model-hint">${_t('perModelThinkingHint', 'Each model can override the level above; “inherit” keeps the card default.')}</span>
+          <div class="per-model-rows" data-per-model-rows>
+            ${modelIds.map((id) => perModelRowHtml(id, {
+              selected: cfg.reasoningByModel?.[id] || '',
+              levels: Array.isArray(cfg.modelLevels?.[id]) ? cfg.modelLevels[id] : [],
+            })).join('')}
+          </div>
+          <span class="per-model-empty"${modelIds.length ? ' hidden' : ''}>${_t('perModelNoModels', 'Add a model above to override its level.')}</span>
         </label>
       </div>` : '';
 
@@ -972,6 +1165,9 @@ function buildProviderCard(name, cfg, opts = {}) {
   wireApiKeyToggle(card);
 
   wireModelChips(card);
+  // 顺序固定：chips 先接线（syncChips 会调 renderPerModelRows），再挂行级
+  // 覆盖（首渲幂等重建）。两者都只读写本卡 DOM。
+  wirePerModelThinking(card);
   wireBridgeEndpointEditor(card);
   wireProviderActivation(card, name);
 
@@ -1082,6 +1278,13 @@ async function saveCard(name, card) {
     // 即「无 key」；卡级 apiKey 仍写首个端点的 key，给老消费方/老配置兜底。
     cachedCfg.providers[name].bridgeApiKeys = keys;
     cachedCfg.providers[name].apiKey = keys[urls[0]] || '';
+  }
+  // 每模型档位覆盖：两个 map 只从行 DOM 派生（唯一写入者 = 这里）。Agent 卡
+  // 没有该容器，永不写这两个键；键缺席 = 继承卡级默认。
+  if (card.querySelector('[data-per-model]')) {
+    const pm = readPerModelMaps(card);
+    cachedCfg.providers[name].reasoningByModel = pm.reasoningByModel;
+    cachedCfg.providers[name].modelLevels = pm.modelLevels;
   }
   // Guard: saving the reserved empty "LLM 1" slot with nothing filled in would
   // persist an unconfigured provider — exactly the state the reserved-slot
@@ -1309,6 +1512,9 @@ async function resetCard(name, card) {
   // current value, so restoring that would be a no-op.
   cachedCfg.providers[name] = isAgent ? fresh.providers[name] : { ...BLANK_LLM };
   await persistProvider(name, cachedCfg.providers[name]);
+  // 档位整体清空了，「这家拒过 reasoning 字段」的会话记忆也一并作废——用户
+  // 刚改了配置，下一回合值得重新试一次（B 导出的唯一调用点）。
+  void storage.clearReasoningRejected(name).catch(() => {});
   // Invalidate ping state too — otherwise the blanked card keeps its green
   // reachable badge from the config that no longer exists.
   forgetPingState(name);

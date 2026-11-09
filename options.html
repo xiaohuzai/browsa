@@ -54,6 +54,21 @@
         </div>
       </section>
 
+      <section class="card" id="modelCatalogCard">
+        <div class="card-header">
+          <h2 data-i18n="catalogHeading">Model catalog</h2>
+        </div>
+        <div class="card-body">
+          <p class="hint" data-i18n="catalogHint">Optional: import the models.dev directory so model IDs the built-in registry doesn't know still get a real thinking-level picker. Nothing is fetched until you click the button below.</p>
+          <p class="hint" data-i18n="catalogPrivacyHint">Import downloads https://models.dev/api.json once; the distilled list stays in local storage and is never attached to a chat request.</p>
+          <div class="card-actions">
+            <button data-act="catalog-import" data-i18n="catalogImportBtn">Import model catalog</button>
+            <button data-act="catalog-clear" data-i18n="catalogClearBtn">Clear catalog</button>
+            <span id="catalogStatus" class="hint catalog-status" role="status" aria-live="polite" data-i18n="catalogStatusEmpty">No model catalog imported yet.</span>
+          </div>
+        </div>
+      </section>
+
       <section class="card">
         <div class="card-header">
           <h2 data-i18n="systemPromptHeading">System Prompt</h2>

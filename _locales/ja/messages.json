@@ -267,6 +267,10 @@
     "message": "⚠️ 添付ファイルがモデルのコンテキスト上限を超えたため、切り詰めて自動再試行しました…",
     "description": "Background push: overflow self-rescue"
   },
+  "reasoningUnsupportedRetry": {
+    "message": "⚠️ このモデルは推論レベルのフィールドを受け付けないため、削除して再試行しています…",
+    "description": "Background push: reasoning-field rejection retry"
+  },
   "tsOutputContinuing": {
     "message": "✍️ 返答が出力上限に達したため、自動的に続きを生成しています…",
     "description": "Background push: output-cap continuation"
@@ -1286,6 +1290,70 @@
   "reasoningRawLabel": {
     "message": "追加 reasoning フィールド（JSON）",
     "description": "Options: JSON passthrough merged into the request body"
+  },
+  "perModelThinkingLabel": {
+    "message": "モデルごとの思考レベル",
+    "description": "Options: per-model level override block label (one row per model id)"
+  },
+  "perModelThinkingHint": {
+    "message": "モデルごとに上のレベルを上書きできます。「継承」ならカード既定のままです。",
+    "description": "Options: one-line hint above the per-model level rows"
+  },
+  "perModelInheritOption": {
+    "message": "カード既定を継承",
+    "description": "Options: per-model level select, the empty/'' option that clears the override"
+  },
+  "perModelCustomLevelsLabel": {
+    "message": "カスタムレベル",
+    "description": "Options: aria-label of a per-model row's comma-separated level list input"
+  },
+  "perModelCustomLevelsPlaceholder": {
+    "message": "例：low, max",
+    "description": "Options: placeholder of a per-model row's custom level list input"
+  },
+  "perModelNoModels": {
+    "message": "上でモデルを追加すると、そのモデル専用のレベルを設定できます。",
+    "description": "Options: per-model block hint when the card has no model ids yet"
+  },
+  "catalogHeading": {
+    "message": "モデルカタログ",
+    "description": "Options: heading of the optional models.dev catalog card"
+  },
+  "catalogHint": {
+    "message": "任意：models.dev のディレクトリをインポートすると、内蔵レジストリが知らないモデル ID でも実際の思考レベル選択肢が表示されます。下のボタンを押すまで通信は発生しません。",
+    "description": "Options: what importing the model catalog does"
+  },
+  "catalogPrivacyHint": {
+    "message": "インポート時に https://models.dev/api.json を一度だけダウンロードします。抽出した一覧はローカルにのみ保存され、チャットリクエストに添付されることはありません。",
+    "description": "Options: privacy note for the model catalog import"
+  },
+  "catalogImportBtn": {
+    "message": "モデルカタログをインポート",
+    "description": "Options: button that downloads and builds the model catalog"
+  },
+  "catalogRefreshBtn": {
+    "message": "モデルカタログを更新",
+    "description": "Options: same button once a catalog is already imported"
+  },
+  "catalogClearBtn": {
+    "message": "カタログを削除",
+    "description": "Options: button that deletes the imported model catalog"
+  },
+  "catalogStatusEmpty": {
+    "message": "モデルカタログはまだインポートされていません。",
+    "description": "Options: catalog status when nothing has been imported"
+  },
+  "catalogStatusBusy": {
+    "message": "モデルカタログを取得中…",
+    "description": "Options: catalog status while the download is in flight"
+  },
+  "catalogStatusLoaded": {
+    "message": "$1 件のモデル · $2 更新",
+    "description": "Options: catalog status after an import ($1 = model count, $2 = date)"
+  },
+  "catalogStatusError": {
+    "message": "インポートに失敗しました——以前のカタログは保持されています。",
+    "description": "Options: catalog status when the import failed"
   },
   "streamMovedToBackground": {
     "message": "返信はバックグラウンドで続行され、元のセッションに保存されます",

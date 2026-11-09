@@ -267,6 +267,10 @@
     "message": "⚠️ O anexo excedeu a janela de contexto do modelo — foi cortado e a tentativa repetida automaticamente…",
     "description": "Background push: overflow self-rescue"
   },
+  "reasoningUnsupportedRetry": {
+    "message": "⚠️ Este modelo não aceita os campos de nível de raciocínio — eles foram removidos e a tentativa está sendo repetida…",
+    "description": "Background push: reasoning-field rejection retry"
+  },
   "tsOutputContinuing": {
     "message": "✍️ A resposta atingiu o limite de saída — continuando automaticamente…",
     "description": "Background push: output-cap continuation"
@@ -1286,6 +1290,70 @@
   "reasoningRawLabel": {
     "message": "Campos de raciocínio extras (JSON)",
     "description": "Options: JSON passthrough merged into the request body"
+  },
+  "perModelThinkingLabel": {
+    "message": "Nível de raciocínio por modelo",
+    "description": "Options: per-model level override block label (one row per model id)"
+  },
+  "perModelThinkingHint": {
+    "message": "Cada modelo pode substituir o nível acima; «herdar» mantém o padrão do cartão.",
+    "description": "Options: one-line hint above the per-model level rows"
+  },
+  "perModelInheritOption": {
+    "message": "herdar o padrão do cartão",
+    "description": "Options: per-model level select, the empty/'' option that clears the override"
+  },
+  "perModelCustomLevelsLabel": {
+    "message": "Níveis personalizados",
+    "description": "Options: aria-label of a per-model row's comma-separated level list input"
+  },
+  "perModelCustomLevelsPlaceholder": {
+    "message": "ex.: low, max",
+    "description": "Options: placeholder of a per-model row's custom level list input"
+  },
+  "perModelNoModels": {
+    "message": "Adicione um modelo acima para definir o nível dele.",
+    "description": "Options: per-model block hint when the card has no model ids yet"
+  },
+  "catalogHeading": {
+    "message": "Catálogo de modelos",
+    "description": "Options: heading of the optional models.dev catalog card"
+  },
+  "catalogHint": {
+    "message": "Opcional: importe o diretório do models.dev para que IDs de modelo desconhecidos pelo registro integrado também tenham um seletor de nível de raciocínio. Nenhuma requisição é feita até você clicar no botão.",
+    "description": "Options: what importing the model catalog does"
+  },
+  "catalogPrivacyHint": {
+    "message": "A importação baixa https://models.dev/api.json uma única vez; a lista depurada fica só no armazenamento local e nunca é anexada a uma requisição de chat.",
+    "description": "Options: privacy note for the model catalog import"
+  },
+  "catalogImportBtn": {
+    "message": "Importar catálogo de modelos",
+    "description": "Options: button that downloads and builds the model catalog"
+  },
+  "catalogRefreshBtn": {
+    "message": "Atualizar catálogo de modelos",
+    "description": "Options: same button once a catalog is already imported"
+  },
+  "catalogClearBtn": {
+    "message": "Limpar catálogo",
+    "description": "Options: button that deletes the imported model catalog"
+  },
+  "catalogStatusEmpty": {
+    "message": "Nenhum catálogo de modelos importado ainda.",
+    "description": "Options: catalog status when nothing has been imported"
+  },
+  "catalogStatusBusy": {
+    "message": "Obtendo o catálogo de modelos…",
+    "description": "Options: catalog status while the download is in flight"
+  },
+  "catalogStatusLoaded": {
+    "message": "$1 modelos · atualizado $2",
+    "description": "Options: catalog status after an import ($1 = model count, $2 = date)"
+  },
+  "catalogStatusError": {
+    "message": "A importação falhou — o catálogo anterior foi mantido.",
+    "description": "Options: catalog status when the import failed"
   },
   "streamMovedToBackground": {
     "message": "A resposta continua em segundo plano e será salva na sessão original",

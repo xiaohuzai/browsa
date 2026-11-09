@@ -267,6 +267,10 @@
     "message": "⚠️ 첨부 파일이 모델의 컨텍스트 창을 초과하여 줄인 후 자동으로 재시도했습니다…",
     "description": "Background push: overflow self-rescue"
   },
+  "reasoningUnsupportedRetry": {
+    "message": "⚠️ 이 모델은 추론 수준 필드를 지원하지 않아 제거한 뒤 다시 시도합니다…",
+    "description": "Background push: reasoning-field rejection retry"
+  },
   "tsOutputContinuing": {
     "message": "✍️ 응답이 출력 한도에 도달하여 자동으로 이어서 생성 중…",
     "description": "Background push: output-cap continuation"
@@ -1286,6 +1290,70 @@
   "reasoningRawLabel": {
     "message": "추가 추론 필드(JSON)",
     "description": "Options: JSON passthrough merged into the request body"
+  },
+  "perModelThinkingLabel": {
+    "message": "모델별 추론 수준",
+    "description": "Options: per-model level override block label (one row per model id)"
+  },
+  "perModelThinkingHint": {
+    "message": "모델마다 위의 수준을 덮어쓸 수 있습니다. '상속'을 고르면 카드 기본값을 따릅니다.",
+    "description": "Options: one-line hint above the per-model level rows"
+  },
+  "perModelInheritOption": {
+    "message": "카드 기본값 상속",
+    "description": "Options: per-model level select, the empty/'' option that clears the override"
+  },
+  "perModelCustomLevelsLabel": {
+    "message": "사용자 지정 수준",
+    "description": "Options: aria-label of a per-model row's comma-separated level list input"
+  },
+  "perModelCustomLevelsPlaceholder": {
+    "message": "예: low, max",
+    "description": "Options: placeholder of a per-model row's custom level list input"
+  },
+  "perModelNoModels": {
+    "message": "위에서 모델을 추가하면 해당 모델만의 수준을 설정할 수 있습니다.",
+    "description": "Options: per-model block hint when the card has no model ids yet"
+  },
+  "catalogHeading": {
+    "message": "모델 카탈로그",
+    "description": "Options: heading of the optional models.dev catalog card"
+  },
+  "catalogHint": {
+    "message": "선택: models.dev 디렉터리를 가져오면 내장 레지스트리가 모르는 모델 ID도 실제 추론 수준 선택기를 갖게 됩니다. 아래 버튼을 누르기 전에는 아무 요청도 보내지 않습니다.",
+    "description": "Options: what importing the model catalog does"
+  },
+  "catalogPrivacyHint": {
+    "message": "가져오기는 https://models.dev/api.json 을 한 번만 내려받습니다. 정제된 목록은 로컬에만 저장되며 채팅 요청에 첨부되지 않습니다.",
+    "description": "Options: privacy note for the model catalog import"
+  },
+  "catalogImportBtn": {
+    "message": "모델 카탈로그 가져오기",
+    "description": "Options: button that downloads and builds the model catalog"
+  },
+  "catalogRefreshBtn": {
+    "message": "모델 카탈로그 새로 고침",
+    "description": "Options: same button once a catalog is already imported"
+  },
+  "catalogClearBtn": {
+    "message": "카탈로그 삭제",
+    "description": "Options: button that deletes the imported model catalog"
+  },
+  "catalogStatusEmpty": {
+    "message": "아직 모델 카탈로그를 가져오지 않았습니다.",
+    "description": "Options: catalog status when nothing has been imported"
+  },
+  "catalogStatusBusy": {
+    "message": "모델 카탈로그를 가져오는 중…",
+    "description": "Options: catalog status while the download is in flight"
+  },
+  "catalogStatusLoaded": {
+    "message": "모델 $1개 · $2 업데이트",
+    "description": "Options: catalog status after an import ($1 = model count, $2 = date)"
+  },
+  "catalogStatusError": {
+    "message": "가져오기 실패 — 이전 카탈로그는 유지됩니다.",
+    "description": "Options: catalog status when the import failed"
   },
   "streamMovedToBackground": {
     "message": "답변이 백그라운드에서 계속 진행되며 원래 세션에 저장됩니다",
