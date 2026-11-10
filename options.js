@@ -933,15 +933,19 @@ function cardModelIds(card) {
   return [...card.querySelectorAll('[data-model-chips] .chip')].map((c) => c.dataset.id);
 }
 
+// 「已存档位不在当前词表里时补一项」——单点规则：首渲回落 auto 会让
+// 「只改别名就 Save」静默改写档位。行级与卡级两个下拉共用。
+function withCurrent(levels, cur) {
+  return (cur && !levels.includes(cur)) ? [...levels, cur] : levels;
+}
+
 function perModelRowHtml(id, { selected = '', levels = [] } = {}) {
   // 词表优先级在引擎里（lib/reasoning-levels.js）：行内自定义词表 > 内置规则
-  // > 目录（models.dev，用户可清除的最后一档）。已存档位不在词表里时补一项
-  // 并选中——首渲回落 auto 会让「只改别名就 Save」静默改写档位。
-  const vals = ['', ...reasoningLevelOptions(id, {
+  // > 目录（models.dev，用户可清除的最后一档）。
+  const vals = withCurrent(['', ...reasoningLevelOptions(id, {
     overrideLevels: levels,
     catalogLevels: catalogLevelsFor(_modelCatalog, id),
-  })];
-  if (selected && !vals.includes(selected)) vals.push(selected);
+  })], selected);
   return `
     <div class="per-model-row" data-per-model-row="${escapeAttr(id)}">
       <span class="per-model-id">${escapeHtml(id)}</span>
@@ -1011,11 +1015,10 @@ function wirePerModelThinking(card) {
 // ——内置规则认识的模型不受目录影响。
 function thinkingSelectHtml(modelIds, cfg) {
   const cur = cfg.reasoningDefault || 'auto';
-  const levels = reasoningLevelsFor(modelIds, {
+  const levels = withCurrent(reasoningLevelsFor(modelIds, {
     modelLevelsById: cfg.modelLevels || {},
     catalogLevelsByModel: Object.fromEntries(modelIds.map((id) => [id, catalogLevelsFor(_modelCatalog, id)])),
-  });
-  if (!levels.includes(cur)) levels.push(cur);
+  }), cur);
   return levels.map((l) => `<option value="${escapeAttr(l)}"${cur === l ? ' selected' : ''}>${l === 'auto' ? _t('thinkingAutoOption', 'auto（不发送）') : escapeHtml(l)}</option>`).join('');
 }
 

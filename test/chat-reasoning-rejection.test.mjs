@@ -323,14 +323,16 @@ test('a superseded turn\'s reasoning strip pushes nothing into the newer turn\'s
 // ─── catalog read is gated (unit E) ─────────────────────────────────────────
 // The models.dev catalog is ~200KB. Only the stateless stream path can ever
 // consume it (streamCommon → reasoningFieldsFor), so the read must live AFTER
-// the turn kind is decided and be gated on STATELESS_REASONING_KINDS — an
-// ungated read would make every agent turn (hermes/opencode/bridge/squilla)
-// deserialize the blob for nothing. Source pin, not a runtime test: the cost
-// being guarded is exactly "this line runs on the agent path".
+// the turn kind is decided and be gated on the SHARED isStatelessProvider
+// predicate (provider-resolver.js) — an ungated read would make every agent
+// turn (hermes/opencode/bridge/squilla) deserialize the blob for nothing, and
+// a second hand-rolled flag test would be the same decision in two places.
+// Source pin, not a runtime test: the cost being guarded is exactly "this line
+// runs on the agent path".
 
 test('catalog read is gated to stateless turns and sits after the kind decision', async () => {
   const src = await readFile(new URL('../lib/handlers/chat-handler.js', import.meta.url), 'utf8');
-  const gated = 'const modelCatalog = STATELESS_REASONING_KINDS.has(kind) ? await storage.getModelCatalog() : null;';
+  const gated = 'const modelCatalog = isStatelessProvider(provider) ? await storage.getModelCatalog() : null;';
   const kindAt = src.indexOf('const { kind } = turn;');
   const readAt = src.indexOf(gated);
   assert.ok(kindAt >= 0, 'kind decision present');
@@ -339,8 +341,10 @@ test('catalog read is gated to stateless turns and sits after the kind decision'
     'exactly one read, and it is the gated one — no ungated catalog read anywhere');
 
   const sub = await readFile(new URL('../lib/handlers/subchat-handler.js', import.meta.url), 'utf8');
+  assert.match(sub, /const stateless = isStatelessProvider\(provider\);/,
+    'SUBCHAT gates on the SAME shared predicate, not a second flag test');
   assert.match(sub, /stateless \? await storage\.getModelCatalog\(\) : null/,
-    'SUBCHAT reads the catalog only behind the same stateless-provider gate');
+    'SUBCHAT reads the catalog only behind that gate');
   assert.equal((sub.match(/await storage\.getModelCatalog\(\)/g) || []).length, 1);
 });
 
