@@ -78,6 +78,21 @@ test('canonical 三键：raw id / canonical / canonical 最后一段都命中同
   assert.deepEqual(catalogLevelsFor(catalog, 'real-id'), ['low'], 'canonical 最后一段');
 });
 
+// 2026-11-10 invariant pass: canonical_model_id means "same model as X", so
+// every entry for that model votes in ONE ballot. The canonical key used to
+// see only the entries that declared it, and the same model answered with a
+// different vocabulary under its raw id (effort won the pooled tie; the
+// unpooled canonical key kept the toggle).
+test('canonical 身份合并：同一模型的 raw / canonical 词表必须一致', () => {
+  const catalog = buildCatalog(api(
+    { 'model-a': effort('low', 'high') },
+    { 'model-a': { ...toggle(), canonical_model_id: 'other/model-a' } },
+  ), { now: 1 });
+  assert.deepEqual(catalogLevelsFor(catalog, 'model-a'), ['low', 'high']);
+  assert.deepEqual(catalogLevelsFor(catalog, 'other/model-a'), ['low', 'high'],
+    'canonical 键必须汇总该模型的全部贡献，不是只收声明它的那一条');
+});
+
 test('family 借用：无词表但同族另有词表的模型继承族赢家', () => {
   const catalog = buildCatalog(api(
     { 'fam-src': { ...effort('low', 'high'), family: 'fam-x' } },
