@@ -157,6 +157,9 @@ main {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* 模型目录卡的状态行独占一行：文案比按钮长得多，和按钮挤同一行会把两个按钮
+   压成半行（660px 设置页里必现）。100% 基宽让它在按钮下方整行显示。 */
+.catalog-status { flex-basis: 100%; }
 
 /* ── Provider cards ──────────────────────────────────────────────────────── */
 #providers {
@@ -514,6 +517,26 @@ details.provider-group[open] > .provider-group-header::before {
   flex-shrink: 0;
 }
 .model-chips .chip-add:hover { border-color: var(--border-strong); color: var(--fg); }
+
+/* ── Per-model thinking level rows (one model id per row) ───────────────── */
+/* Same one-control-per-row geometry as the bridge editor: the model id keeps
+   a mono column so two rows line up, and the select (inherit / auto / level)
+   plus the custom-vocabulary input stay on one line when they fit. */
+.per-model-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.per-model-id {
+  font-family: var(--mono, monospace);
+  min-width: 10em;
+}
+.per-model-select,
+.per-model-levels {
+  flex: 0 1 auto;
+  min-width: 9em;
+}
 
 /* ── Bridge endpoints editor (one agent per row: URL / alias / own key) ─── */
 /* Same box geometry as .field input (border/radius/bg/focus ring/padding),

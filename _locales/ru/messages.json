@@ -267,6 +267,10 @@
     "message": "⚠️ Вложение превысило контекстное окно модели — оно усечено и попытка повторена автоматически…",
     "description": "Background push: overflow self-rescue"
   },
+  "reasoningUnsupportedRetry": {
+    "message": "⚠️ Эта модель не принимает поля уровня рассуждений — они удалены, повторяем попытку…",
+    "description": "Background push: reasoning-field rejection retry"
+  },
   "tsOutputContinuing": {
     "message": "✍️ Ответ достиг лимита вывода — продолжаю автоматически…",
     "description": "Background push: output-cap continuation"
@@ -1286,6 +1290,70 @@
   "reasoningRawLabel": {
     "message": "Дополнительные поля reasoning (JSON)",
     "description": "Options: JSON passthrough merged into the request body"
+  },
+  "perModelThinkingLabel": {
+    "message": "Уровень размышлений для модели",
+    "description": "Options: per-model level override block label (one row per model id)"
+  },
+  "perModelThinkingHint": {
+    "message": "Каждая модель может переопределить уровень выше; «наследовать» оставляет значение карточки.",
+    "description": "Options: one-line hint above the per-model level rows"
+  },
+  "perModelInheritOption": {
+    "message": "наследовать значение карточки",
+    "description": "Options: per-model level select, the empty/'' option that clears the override"
+  },
+  "perModelCustomLevelsLabel": {
+    "message": "Свои уровни",
+    "description": "Options: aria-label of a per-model row's comma-separated level list input"
+  },
+  "perModelCustomLevelsPlaceholder": {
+    "message": "напр. low, max",
+    "description": "Options: placeholder of a per-model row's custom level list input"
+  },
+  "perModelNoModels": {
+    "message": "Добавьте модель выше, чтобы задать ей свой уровень.",
+    "description": "Options: per-model block hint when the card has no model ids yet"
+  },
+  "catalogHeading": {
+    "message": "Каталог моделей",
+    "description": "Options: heading of the optional models.dev catalog card"
+  },
+  "catalogHint": {
+    "message": "Необязательно: импортируйте каталог models.dev, чтобы у моделей, которых нет во встроенном реестре, тоже появился выбор уровня размышлений. Ни одного запроса не уходит, пока вы не нажмёте кнопку.",
+    "description": "Options: what importing the model catalog does"
+  },
+  "catalogPrivacyHint": {
+    "message": "При импорте https://models.dev/api.json скачивается один раз; очищенный список хранится только локально и никогда не прикладывается к запросу чата.",
+    "description": "Options: privacy note for the model catalog import"
+  },
+  "catalogImportBtn": {
+    "message": "Импортировать каталог моделей",
+    "description": "Options: button that downloads and builds the model catalog"
+  },
+  "catalogRefreshBtn": {
+    "message": "Обновить каталог моделей",
+    "description": "Options: same button once a catalog is already imported"
+  },
+  "catalogClearBtn": {
+    "message": "Очистить каталог",
+    "description": "Options: button that deletes the imported model catalog"
+  },
+  "catalogStatusEmpty": {
+    "message": "Каталог моделей ещё не импортирован.",
+    "description": "Options: catalog status when nothing has been imported"
+  },
+  "catalogStatusBusy": {
+    "message": "Загрузка каталога моделей…",
+    "description": "Options: catalog status while the download is in flight"
+  },
+  "catalogStatusLoaded": {
+    "message": "$1 моделей · обновлено $2",
+    "description": "Options: catalog status after an import ($1 = model count, $2 = date)"
+  },
+  "catalogStatusError": {
+    "message": "Импорт не удался — прежний каталог сохранён.",
+    "description": "Options: catalog status when the import failed"
   },
   "streamMovedToBackground": {
     "message": "Ответ продолжается в фоне и будет сохранён в исходную сессию",

@@ -657,3 +657,97 @@ test('stop→resend: a late session-create resolution must not clobber the new t
     chromeMock.storage.local._reset();
   }
 });
+
+// --------------- SUBCHAT: reasoning-field pre-suppression --------------------
+
+// Unit B: the main chat records a provider+model that answered 400/422 to the
+// reasoning/thinking fields. The detail thread shares streamCommon, so it must
+// read the same memory and pass stripReasoning — otherwise the main chat and
+// the follow-up card diverge for the same selection. SUBCHAT has never had a
+// transient retry ladder (structural, ADR-0007); adding one here would be a
+// second, unreviewed 400 path — pin its absence.
+//
+// Driven through the REAL handleSubchat with a fetch stub: a source-pin regex
+// would still pass if the memory key or the provider gate were wired wrong.
+const SUPPRESSED_BODY_FIELDS = ['reasoning', 'reasoning_effort', 'enable_thinking', 'thinking'];
+
+function seedLlmProvider(extra = {}) {
+  chromeMock.storage.local._set({
+    providers: {
+      llm1: {
+        type: 'llm', alias: 'L', baseUrl: 'http://llm.test', apiKey: 'k',
+        model: 'm1', apiStyle: 'chat', stream: true, temperature: null, maxTokens: 0,
+        reasoningDefault: 'high',
+        reasoningRaw: '{"reasoning_effort":"high","enable_thinking":true}',
+        ...extra,
+      },
+    },
+    activeProvider: 'llm1',
+    activeModel: '',
+    history: [],
+  });
+}
+
+function stubChatFetch(bodies) {
+  const sse = 'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n';
+  globalThis.fetch = async (url, opts = {}) => {
+    bodies.push(JSON.parse(opts.body));
+    return {
+      ok: true, status: 200,
+      body: new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse)); c.close(); } }),
+      text: async () => '',
+    };
+  };
+}
+
+async function runSubchatTurn(subId) {
+  subChatPorts.set(subId, { postMessage: () => {} });
+  await handleSubchat({ subId, messages: [{ role: 'user', content: 'q' }] }, '');
+}
+
+test('SUBCHAT strips reasoning from the real request body when the session remembers a rejection', async () => {
+  const realFetch = globalThis.fetch;
+  const subId = 'sub-reasoning-suppress';
+  const bodies = [];
+  try {
+    seedLlmProvider();
+    chromeMock.storage.session._set({ 'browsa.reasoningRejected': { 'llm1\u0000m1': 1 } });
+    stubChatFetch(bodies);
+    await runSubchatTurn(subId);
+    await waitFor(() => bodies.length >= 1, 'subchat issued a request');
+    for (const k of SUPPRESSED_BODY_FIELDS) {
+      assert.equal(k in bodies[0], false, `remembered rejection must drop ${k} from the first attempt`);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+    chromeMock.storage.session._reset();
+  }
+});
+
+test('SUBCHAT sends reasoning when nothing was rejected (the gate is doing the work)', async () => {
+  const realFetch = globalThis.fetch;
+  const subId = 'sub-reasoning-normal';
+  const bodies = [];
+  try {
+    seedLlmProvider();
+    stubChatFetch(bodies);
+    await runSubchatTurn(subId);
+    await waitFor(() => bodies.length >= 1, 'subchat issued a request');
+    assert.equal(bodies[0].reasoning_effort, 'high', 'reasoningRaw rides the body when no rejection is remembered');
+    assert.equal(bodies[0].enable_thinking, true);
+  } finally {
+    globalThis.fetch = realFetch;
+    subChatPorts.delete(subId);
+    subChatControllers.delete(subId);
+    chromeMock.storage.local._reset();
+    chromeMock.storage.session._reset();
+  }
+});
+
+test('SUBCHAT keeps no retry loop of its own (ADR-0007)', async () => {
+  assert.doesNotMatch(await readSubchatHandlerSrc(), /MAX_RETRIES/,
+    'SUBCHAT must not grow a retry loop');
+});

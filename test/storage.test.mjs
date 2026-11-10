@@ -915,3 +915,150 @@ test('the sidepanel reading an Agent ID cannot initialize or replace the worker 
   assert.equal(await storage.getAgentSessionContextId(), workerContext);
   assert.equal(await storage.appendToHistory({ role: 'user', content: 'valid turn' }, workerContext), 1);
 });
+
+// --------------- reasoning-rejection memory (storage.session) ----------------
+// Unit B: a provider+model that rejected the reasoning/thinking body fields
+// is remembered for the rest of the BROWSER session (chrome.storage.session
+// dies with it) and is never persisted to storage.local. All three helpers
+// must degrade quietly — a session-store miss may not fail a chat turn.
+
+test('getReasoningRejected: false on a failed session read', async () => {
+  reset();
+  const original = sessionArea.get;
+  sessionArea.get = async () => { throw new Error('session read failed'); };
+  try {
+    assert.equal(await storage.getReasoningRejected('llm1', 'm1'), false);
+  } finally {
+    sessionArea.get = original;
+  }
+});
+
+test('setReasoningRejected: a failed session write is swallowed', async () => {
+  reset();
+  const original = sessionArea.set;
+  sessionArea.set = async () => { throw new Error('session write failed'); };
+  try {
+    await storage.setReasoningRejected('llm1', 'm1');
+  } finally {
+    sessionArea.set = original;
+  }
+  assert.equal(sessionArea._dump()['browsa.reasoningRejected'], undefined,
+    'nothing landed, and the caller saw no rejection');
+});
+
+test('clearReasoningRejected(provider) removes only that provider\'s keys', async () => {
+  reset();
+  const key = (p, m) => `${p}\u0000${m}`;
+  sessionArea.set({ 'browsa.reasoningRejected': {
+    [key('llm1', 'm1')]: 1,
+    [key('llm1', 'm2')]: 1,
+    [key('llm2', 'm1')]: 1,
+    [key('llm10', 'm1')]: 1,
+  } });
+  await storage.clearReasoningRejected('llm1');
+  assert.deepEqual(sessionArea._dump()['browsa.reasoningRejected'], {
+    [key('llm2', 'm1')]: 1,
+    [key('llm10', 'm1')]: 1,
+  }, 'the provider prefix is llm1\\u0000 — sibling names like llm10 stay');
+});
+
+test('reasoning-rejection helpers survive a missing chrome.storage.session', async () => {
+  reset();
+  const saved = chrome.storage.session;
+  delete chrome.storage.session;
+  try {
+    assert.equal(await storage.getReasoningRejected('llm1', 'm1'), false);
+    await storage.setReasoningRejected('llm1', 'm1');
+    await storage.clearReasoningRejected('llm1');
+  } finally {
+    chrome.storage.session = saved;
+  }
+});
+
+test('setReasoningRejected keys by provider+model and caps the map at 64 entries', async () => {
+  reset();
+  await storage.setReasoningRejected('llm1', 'm1');
+  assert.equal(await storage.getReasoningRejected('llm1', 'm1'), true);
+  assert.equal(await storage.getReasoningRejected('llm1', 'm2'), false, 'the model is part of the key');
+  assert.equal(await storage.getReasoningRejected('llm2', 'm1'), false, 'the provider is part of the key');
+  // Empty inputs are no-ops (no provider-wide fallback — one model's verdict
+  // must never poison the whole card).
+  await storage.setReasoningRejected('', 'm1');
+  await storage.setReasoningRejected('llm1', '');
+  assert.equal(Object.keys(sessionArea._dump()['browsa.reasoningRejected']).length, 1);
+  for (let i = 0; i < 70; i++) await storage.setReasoningRejected('llm1', `m${i}`);
+  const map = sessionArea._dump()['browsa.reasoningRejected'];
+  assert.equal(Object.keys(map).length, 64, 'bounded session-store footprint');
+  assert.equal(await storage.getReasoningRejected('llm1', 'm69'), true, 'newest entry kept');
+  assert.equal(await storage.getReasoningRejected('llm1', 'm2'), false, 'oldest entries evicted first');
+});
+
+// --------------- model catalog (targeted-read key) ---------------------------
+// Unit E: the imported models.dev catalog is a ~200KB blob read only by the
+// options page and by the stateless request path. It is a TARGETED-READ key —
+// it must never enter GET_ALL_KEYS, or every chat turn would deserialize it
+// just to delete it again. The three helpers degrade quietly: a miss costs a
+// request without a catalog, never a turn.
+
+const catalogFixture = () => ({
+  version: 1,
+  fetchedAt: 1760000000000,
+  models: { 'mystery-llm': ['low', 'medium', 'high'] },
+});
+
+test('getModelCatalog: null on a failed storage read', async () => {
+  reset();
+  const original = localArea.get;
+  localArea.get = async () => { throw new Error('storage read failed'); };
+  try {
+    assert.equal(await storage.getModelCatalog(), null);
+  } finally {
+    localArea.get = original;
+  }
+});
+
+test('getModelCatalog: null when the key is absent', async () => {
+  reset();
+  assert.equal(await storage.getModelCatalog(), null);
+});
+
+test('getModelCatalog: null when the stored value is not a catalog shape', async () => {
+  reset();
+  localArea._set({ modelCatalog: { nope: true } });
+  assert.equal(await storage.getModelCatalog(), null, '坏值不得流进请求路径');
+  localArea._set({ modelCatalog: [] });
+  assert.equal(await storage.getModelCatalog(), null);
+});
+
+test('setModelCatalog writes a targeted-read key: getAll() never surfaces it', async () => {
+  reset();
+  await storage.setModelCatalog(catalogFixture());
+  assert.deepEqual(localArea._dump().modelCatalog, catalogFixture(), '落在 chrome.storage.local');
+  assert.deepEqual(await storage.getModelCatalog(), catalogFixture(), '定向读回原值');
+  assert.equal((await storage.getAll()).modelCatalog, undefined,
+    '目录不参与 getAll 的固定键表（每回合反序列化 ~200KB 是明确的效率回退）');
+});
+
+test('setModelCatalog / clearModelCatalog swallow storage failures', async () => {
+  reset();
+  const originalSet = localArea.set;
+  const originalRemove = localArea.remove;
+  localArea.set = async () => { throw new Error('write failed'); };
+  localArea.remove = async () => { throw new Error('remove failed'); };
+  try {
+    await storage.setModelCatalog(catalogFixture());
+    await storage.clearModelCatalog();
+  } finally {
+    localArea.set = originalSet;
+    localArea.remove = originalRemove;
+  }
+  assert.equal(localArea._dump().modelCatalog, undefined, 'nothing landed, and the caller saw no rejection');
+});
+
+test('clearModelCatalog removes the key', async () => {
+  reset();
+  await storage.setModelCatalog(catalogFixture());
+  await storage.clearModelCatalog();
+  assert.equal(localArea._dump().modelCatalog, undefined);
+  assert.equal(await storage.getModelCatalog(), null);
+});

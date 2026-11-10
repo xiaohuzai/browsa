@@ -76,7 +76,7 @@ sidepanel.js  ←  subChatPort (browsa-subchat, opened fresh per send)  ←  bac
 - `thinking:'inline'` 只有 chat-handler 与 subchat-handler 传；其余消费者保持 omit。Tests: `llm-client-chat-reasoning`。
 - Hermes `reasoning.available` 是答案重放，echo guard 丢弃是正确的（ADR-0004 勿「修」）。
 - subchat 走 `runsApiStream` 专用 per-subId 会话（绝不用主聊天的存储会话）；不并入 turn-request 阶梯（ADR-0007）。Tests: `subchat`。
-- reasoning-levels 特定规则必须排在宽规则之后（last-match-wins）。Tests: `lib-reasoning-levels`。
+- 档位（规则 last-match-wins）：用户 modelLevels > 规则 > 目录，越界就近拟合（平局向上，off 仅显式）；400/422 reasoning 拒绝剥字段重试一次，成功后记 session。Tests: `lib-reasoning-levels`。
 - Anthropic usage 两段合并（message_start 输入/cache + message_delta 输出）。Tests: `anthropic-usage-merge`。
 - 桥 400 重试门只认图片上限文案（真 400 不重试）；`bridgeApiKeys` 映射有任一条目即为权威，绝不回落卡级 key。Tests: `bridge-client`。
 - 图片张数/字节上限单点 `lib/image-budget.js`（agent 与站点图同源 18/4.5M）；勿在任何侧自造第二套数字。Tests: `attach-site-images`、`lib-image-budget`。

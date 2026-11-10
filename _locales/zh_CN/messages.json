@@ -267,6 +267,10 @@
     "message": "⚠️ 附件超出模型上下文窗口，已临时裁剪大附件并自动重试…",
     "description": "Background push: overflow self-rescue"
   },
+  "reasoningUnsupportedRetry": {
+    "message": "⚠️ 该模型不接受思考档位字段，已去掉后重试…",
+    "description": "Background push: reasoning-field rejection retry"
+  },
   "tsOutputContinuing": {
     "message": "✍️ 回复被输出上限截断，正在自动续写…",
     "description": "Background push: output-cap continuation"
@@ -1286,6 +1290,70 @@
   "reasoningRawLabel": {
     "message": "额外 reasoning 字段(JSON)",
     "description": "Options: JSON passthrough merged into the request body"
+  },
+  "perModelThinkingLabel": {
+    "message": "每模型思考档位",
+    "description": "Options: per-model level override block label (one row per model id)"
+  },
+  "perModelThinkingHint": {
+    "message": "每个模型可以覆盖上面的档位；选「继承」则跟随卡级默认。",
+    "description": "Options: one-line hint above the per-model level rows"
+  },
+  "perModelInheritOption": {
+    "message": "继承卡级默认",
+    "description": "Options: per-model level select, the empty/'' option that clears the override"
+  },
+  "perModelCustomLevelsLabel": {
+    "message": "自定义档位",
+    "description": "Options: aria-label of a per-model row's comma-separated level list input"
+  },
+  "perModelCustomLevelsPlaceholder": {
+    "message": "例：low, max",
+    "description": "Options: placeholder of a per-model row's custom level list input"
+  },
+  "perModelNoModels": {
+    "message": "先在上面添加模型，才能单独设置它的档位。",
+    "description": "Options: per-model block hint when the card has no model ids yet"
+  },
+  "catalogHeading": {
+    "message": "模型目录",
+    "description": "Options: heading of the optional models.dev catalog card"
+  },
+  "catalogHint": {
+    "message": "可选：导入 models.dev 目录，让内置词表不认识的模型 ID 也有真实的思考档位选择器。点下面的按钮之前不会发起任何网络请求。",
+    "description": "Options: what importing the model catalog does"
+  },
+  "catalogPrivacyHint": {
+    "message": "导入会下载一次 https://models.dev/api.json；精简后的列表只保存在本地，绝不会随聊天请求发出。",
+    "description": "Options: privacy note for the model catalog import"
+  },
+  "catalogImportBtn": {
+    "message": "导入模型目录",
+    "description": "Options: button that downloads and builds the model catalog"
+  },
+  "catalogRefreshBtn": {
+    "message": "刷新模型目录",
+    "description": "Options: same button once a catalog is already imported"
+  },
+  "catalogClearBtn": {
+    "message": "清除目录",
+    "description": "Options: button that deletes the imported model catalog"
+  },
+  "catalogStatusEmpty": {
+    "message": "尚未导入模型目录。",
+    "description": "Options: catalog status when nothing has been imported"
+  },
+  "catalogStatusBusy": {
+    "message": "正在获取模型目录…",
+    "description": "Options: catalog status while the download is in flight"
+  },
+  "catalogStatusLoaded": {
+    "message": "$1 个模型 · 更新于 $2",
+    "description": "Options: catalog status after an import ($1 = model count, $2 = date)"
+  },
+  "catalogStatusError": {
+    "message": "导入失败——已保留原有目录。",
+    "description": "Options: catalog status when the import failed"
   },
   "streamMovedToBackground": {
     "message": "进行中的回复已转入后台，完成后写入原会话",
