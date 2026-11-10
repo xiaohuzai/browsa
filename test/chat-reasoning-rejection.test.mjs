@@ -87,6 +87,20 @@ function apiErr(message) {
   return e;
 }
 
+test('isStatelessProvider: only chat/responses/anthropic carry reasoning body fields', async () => {
+  // The gate both handlers read for "does this provider get a reasoning block
+  // / the catalog / the strip-retry?" — its truth table must stay the one the
+  // names say, or an agent path would start reading the 200KB catalog.
+  const { isStatelessProvider } = await import('../lib/handlers/provider-resolver.js');
+  assert.equal(isStatelessProvider({ apiStyle: 'chat' }), true);
+  assert.equal(isStatelessProvider({ apiStyle: 'responses' }), true);
+  assert.equal(isStatelessProvider({ apiStyle: 'anthropic' }), true);
+  for (const flag of ['isHermes', 'isOpencode', 'isBridge', 'isSquilla']) {
+    assert.equal(isStatelessProvider({ [flag]: true, apiStyle: 'chat' }), false, `${flag} is an agent kind`);
+  }
+  assert.equal(isStatelessProvider({}), true, 'a plain LLM card is stateless');
+});
+
 test('isReasoningRejection: anchored 400/422 status + field name + refusal word', () => {
   const cases = [
     // positive: chat / anthropic labels, both status codes, both casings
