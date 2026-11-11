@@ -143,6 +143,7 @@ test('showConfirmDialog resolves true when the confirm button is clicked', async
   const dialog = modal.closest('dialog.panel-modal');
   assert.ok(dialog, 'the card must live inside a native <dialog> (platform owns trap/inert/Esc)');
   assert.equal(dialog.getAttribute('aria-labelledby'), modal.querySelector('.confirm-title').id);
+  assert.equal(dialog.getAttribute('role'), 'alertdialog', 'destructive confirms keep alertdialog semantics');
   assert.equal(modal.querySelector('.confirm-ok').classList.contains('danger'), true);
   assert.equal(document.activeElement, modal.querySelector('.confirm-cancel'), 'danger defaults focus to Cancel');
   modal.querySelector('.confirm-ok').dispatchEvent(new dom.window.Event('click', { bubbles: true }));

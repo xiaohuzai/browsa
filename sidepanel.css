@@ -30,13 +30,15 @@ body {
 
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 /* Standard properties first (Chrome 121+; minimum_chrome_version is 116, so
-   the WebKit rules stay as a gated fallback). Both properties inherit, so
-   html covers every scroller. Thumb rides --fg-dim: ≥3:1 against both theme
-   backgrounds (WCAG 1.4.11) — the old --border thumb was near-invisible on
-   light. `thin` is the standard width tier; the fallback keeps the historical
-   4px. Selector is html, not :root: render-contract-lockstep reads the FIRST
-   :root block for the typography default (--msg-font-family). */
-html {
+   the WebKit rules stay as a gated fallback). Universal selector on purpose:
+   scrollbar-color inherits but scrollbar-width does NOT — an html-only rule
+   leaves every inner scroller (.messages, inspectors, drawers) at the default
+   width. Class rules still override (`scrollbar-width: none` on the outline
+   rail). Thumb rides --fg-dim: ≥3:1 against both theme backgrounds (WCAG
+   1.4.11) — the old --border thumb was near-invisible on light. `thin` is the
+   standard width tier; the fallback keeps the historical 4px. Not :root:
+   render-contract-lockstep reads the FIRST :root block for typography. */
+* {
   scrollbar-color: var(--fg-dim) transparent;
   scrollbar-width: thin;
 }

@@ -97,6 +97,15 @@ test('one-shot verdicts do not depend on the transient budget', () => {
   assert.equal(classify(OVERFLOW, fresh({ attempt: 3 })), 'stub-overflow');
 });
 
+test('stub-overflow with nothing to stub falls through to the transient gate', () => {
+  // The handler reclassifies with overflowRescued:true when stubOversized
+  // Attachments changes nothing — an error that is BOTH overflow-shaped and
+  // transient must still retry, exactly as the inline ladder did.
+  const both = netErr('context length exceeded');
+  assert.equal(classify(both, fresh()), 'stub-overflow', 'overflow verdict comes first');
+  assert.equal(classify(both, fresh({ overflowRescued: true })), 'retry', 'budget spent → transient gate');
+});
+
 test('sequence: strip → overflow → retry → retry → fail across one turn', () => {
   const state = fresh();
   const seen = [];
