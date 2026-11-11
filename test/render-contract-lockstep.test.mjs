@@ -309,11 +309,16 @@ test('hidden controls cannot be un-hidden by an author display rule', () => {
 });
 
 test('toasts never paint above the confirmation modal', () => {
-  const z = (sel) => {
-    const m = css.match(new RegExp(sel + '\\s*\\{[^}]*?z-index:\\s*(\\d+)'));
-    assert.ok(m, `${sel} must declare a numeric z-index`);
-    return Number(m[1]);
-  };
-  assert.ok(z('\\.toast-container') < z('\\.confirm-overlay'),
-    'a toast must not cover the dialog the user is answering');
+  // Modals are native <dialog>s (ui-utils openPanelDialog): the top layer
+  // paints above EVERY z-index, so the ordering holds by construction —
+  // but only while every panel modal actually goes through that module.
+  const m = css.match(/\.toast-container\s*\{[^}]*?z-index:\s*(\d+)/);
+  assert.ok(m, '.toast-container must declare a numeric z-index');
+  assert.match(css, /dialog\.panel-modal:not\(\[open\]\)\s*\{\s*display:\s*none/,
+    'panel modals must be native <dialog>s with the :not([open]) guard');
+  const uiUtils = readFileSync(new URL('../lib/sidepanel/ui-utils.js', import.meta.url), 'utf8');
+  assert.match(uiUtils, /export function showConfirmDialog[\s\S]*?openPanelDialog\(/,
+    'showConfirmDialog must ride openPanelDialog (top layer), not a z-index overlay');
+  assert.ok(!css.includes('.confirm-overlay'),
+    'the hand-rolled .confirm-overlay must not come back — it painted below toasts by luck of z-index');
 });

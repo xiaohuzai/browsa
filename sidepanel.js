@@ -9,7 +9,7 @@ import * as storage from './lib/storage.js';
 import { ICONS } from './lib/sidepanel/icons.js';
 import { createTurnChrome, addProviderChip } from './lib/sidepanel/turn-chrome.js';
 import { hidxAssign, hidxBump, hidxDecrement, hidxResetTo, hidxCurrent, hidxShiftAfter } from './lib/sidepanel/history-index.js';
-import { $, escM, _copyText, showToast, showConfirmDialog, sendMessage, isImeComposing, scheduleIdle, buildModeButton } from './lib/sidepanel/ui-utils.js';
+import { $, escM, _copyText, showToast, showConfirmDialog, openPanelDialog, sendMessage, isImeComposing, scheduleIdle, buildModeButton } from './lib/sidepanel/ui-utils.js';
 import {
   renderSafe, renderStreamingSafe, preloadChartVendors, chartVendorLangs, finishBubble,
   addCodeCopyButtons, linkifyTimestamps, disposeChartObservers, disposeMolstarViewers, disposeRenderInstancesIn,
@@ -504,11 +504,11 @@ function wireMessageAreaInteractions() {
 function wireGlobalShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      // 顶层浮层占用短路（2026-10-01 审计）：确认框（.confirm-overlay，含上下文/
-      // 提示词检查器）与 native <dialog>（灯箱、截图裁剪）各有自己的 Esc 处理，
-      // 与这条 document 链并行注册——此前一次 Esc 既关浮层又穿透到链上（流式中
-      // 弹「清空」确认框，按 Esc 想反悔却把回复一起 cancel）。有浮层时链不接管。
-      if (document.querySelector('.confirm-overlay, dialog[open]')) return;
+      // 顶层浮层占用短路（2026-10-01 审计）：确认框/上下文/提示词检查器与
+      // 灯箱、截图裁剪现在都是 native <dialog>（2026-11-11 收拢），Esc 由
+      // top-layer 自己消费——此前一次 Esc 既关浮层又穿透到链上（流式中弹
+      // 「清空」确认框，按 Esc 想反悔却把回复一起 cancel）。有浮层时链不接管。
+      if (document.querySelector('dialog[open]')) return;
       if (!$('msg-search-bar')?.hidden) { closeMsgSearch(); return; }
       if (isInMultiSelectMode()) { exitMultiSelect(); return; }
       if (!getSessionsDrawer()?.hidden) { closeSessionsDrawer(); return; }
@@ -3280,22 +3280,20 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
     inspectBtn.textContent = _t('inspectCtx', '检查');
     inspectBtn.title = _t('inspectCtxTitle', '查看发送给模型的完整上下文');
     inspectBtn.addEventListener('click', () => {
-      const overlay = document.createElement('div');
-      overlay.className = 'confirm-overlay';
-      overlay.innerHTML = `
-        <div class="ctx-inspector-modal">
-          <div class="ctx-inspector-header">
-            <span class="ctx-inspector-title">${escM(_t('ctxInspectorTitle', '上下文预览'))}</span>
-            <span class="ctx-inspector-len">${(ctxText || '').length.toLocaleString()} ${escM(_t('charsUnit', '字符'))}${figList.length ? ` · ${figList.length} figure${figList.length > 1 ? 's' : ''}` : ''}</span>
-            <button class="ctx-inspector-copy">${escM(_t('copy', '复制'))}</button>
-            <button class="ctx-inspector-close">✕</button>
-          </div>
-          <pre class="ctx-inspector-body"></pre>
-          ${figList.length ? '<div class="ctx-inspector-figures"></div>' : ''}
-        </div>`;
+      const box = document.createElement('div');
+      box.className = 'ctx-inspector-modal';
+      box.innerHTML = `
+        <div class="ctx-inspector-header">
+          <span class="ctx-inspector-title" id="ctx-inspector-title">${escM(_t('ctxInspectorTitle', '上下文预览'))}</span>
+          <span class="ctx-inspector-len">${(ctxText || '').length.toLocaleString()} ${escM(_t('charsUnit', '字符'))}${figList.length ? ` · ${figList.length} figure${figList.length > 1 ? 's' : ''}` : ''}</span>
+          <button class="ctx-inspector-copy">${escM(_t('copy', '复制'))}</button>
+          <button class="ctx-inspector-close" aria-label="${escM(_t('closeBtn', '关闭'))}">✕</button>
+        </div>
+        <pre class="ctx-inspector-body"></pre>
+        ${figList.length ? '<div class="ctx-inspector-figures"></div>' : ''}`;
       // Set textContent on the <pre> to avoid any XSS from raw page content.
-      overlay.querySelector('.ctx-inspector-body').textContent = ctxText || _t('noText', '(no text)');
-      const figContainer = overlay.querySelector('.ctx-inspector-figures');
+      box.querySelector('.ctx-inspector-body').textContent = ctxText || _t('noText', '(no text)');
+      const figContainer = box.querySelector('.ctx-inspector-figures');
       if (figContainer && figList.length) {
         const figTitle = document.createElement('div');
         figTitle.className = 'ctx-fig-title';
@@ -3318,23 +3316,15 @@ function appendAttachSystem(text, relatedEl, ctxText, figures, hint, attachId) {
           figContainer.appendChild(figure);
         });
       }
-      // One close path for every dismissal (✕, backdrop, Escape) so the
-      // document-level keydown listener is always removed. Previously only the
-      // Escape path removed it — closing via ✕/backdrop leaked one keydown
-      // listener per inspected attachment.
-      const closeOverlay = () => {
-        overlay.remove();
-        document.removeEventListener('keydown', onKey);
-      };
-      function onKey(e) { if (e.key === 'Escape') closeOverlay(); }
-      overlay.querySelector('.ctx-inspector-close').addEventListener('click', closeOverlay);
-      overlay.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
+      // openPanelDialog owns Esc/scrim/focus (2026-11-11): the old div overlay
+      // hand-wired Escape on document and leaked the listener when closed via
+      // ✕/backdrop; the native dialog needs none of that wiring.
+      const { dialog, close } = openPanelDialog({ body: box, labelledBy: 'ctx-inspector-title' });
+      dialog.querySelector('.ctx-inspector-close').addEventListener('click', () => close());
+      dialog.querySelector('.ctx-inspector-copy').addEventListener('click', () => {
         _copyText(ctxText || '');
         showToast(_t('copied', '已复制'), 'success');
       });
-      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
-      document.addEventListener('keydown', onKey);
-      document.body.appendChild(overlay);
     });
     el.appendChild(span);
     el.appendChild(inspectBtn);
@@ -3568,13 +3558,12 @@ async function showEffectivePrompt() {
     choiceRequestHint: CHOICE_REQUEST_HINT,
   });
 
-  const overlay = document.createElement('div');
-  overlay.className = 'confirm-overlay';
   const modal = document.createElement('div');
   modal.className = 'prompt-inspector-modal';
   // Build modal with safe DOM APIs (textContent) to avoid XSS from user-configured prompts
   const titleEl = document.createElement('div');
   titleEl.className = 'confirm-title';
+  titleEl.id = 'prompt-inspector-title';
   titleEl.textContent = _t('effectivePromptTitle', '实际生效的系统提示词');
   const urlEl = document.createElement('div');
   urlEl.className = 'prompt-inspector-url';
@@ -3611,19 +3600,22 @@ async function showEffectivePrompt() {
   actionsEl.appendChild(copyBtn);
   actionsEl.appendChild(closeBtn);
   modal.appendChild(actionsEl);
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
 
   const fullPrompt = sections.map(s => s.text).join('\n\n');
+  // openPanelDialog owns Esc/scrim/focus (2026-11-11); Enter-to-close is this
+  // inspector's own semantic, IME-gated like every other Enter path.
+  const { close } = openPanelDialog({
+    body: modal,
+    labelledBy: 'prompt-inspector-title',
+    onKey: (e, closeWith) => {
+      if (e.key === 'Enter' && !isImeComposing(e) && !e.target?.closest?.('button')) { e.preventDefault(); closeWith(); }
+    },
+  });
   copyBtn.addEventListener('click', async () => {
     await _copyText(fullPrompt).catch(() => {});
     showToast(_t('copied', 'Copied'), 'success');
   });
-  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
-  closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  function onKey(e) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } }
-  document.addEventListener('keydown', onKey);
+  closeBtn.addEventListener('click', () => close());
 }
 
 

@@ -27,7 +27,7 @@ globalThis.chrome = {
 
 const {
   $, escM, _copyText, _fallbackCopy, showToast, showConfirmDialog,
-  sendMessage, _findCard, _insertCard
+  openPanelDialog, sendMessage, _findCard, _insertCard
 } = await import('../lib/sidepanel/ui-utils.js');
 
 test('$ is document.getElementById', () => {
@@ -140,15 +140,72 @@ test('showConfirmDialog resolves true when the confirm button is clicked', async
   const modal = document.querySelector('.confirm-modal');
   assert.ok(modal, 'a .confirm-modal must be created');
   assert.match(modal.querySelector('.confirm-title').textContent, /Delete\?/);
+  const dialog = modal.closest('dialog.panel-modal');
+  assert.ok(dialog, 'the card must live inside a native <dialog> (platform owns trap/inert/Esc)');
+  assert.equal(dialog.getAttribute('aria-labelledby'), modal.querySelector('.confirm-title').id);
+  assert.equal(modal.querySelector('.confirm-ok').classList.contains('danger'), true);
+  assert.equal(document.activeElement, modal.querySelector('.confirm-cancel'), 'danger defaults focus to Cancel');
   modal.querySelector('.confirm-ok').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   assert.equal(await p, true);
-  assert.equal(document.querySelector('.confirm-overlay'), null, 'overlay must be removed after resolving');
+  assert.equal(document.querySelector('dialog.panel-modal'), null, 'dialog must be removed after resolving');
 });
 
 test('showConfirmDialog resolves false on Escape key', async () => {
   const p = showConfirmDialog({ title: 'Clear?', message: 'Sure?' });
-  document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
+  // jsdom fallback path: Esc lands on the dialog (real Chrome: cancel→close).
+  document.querySelector('dialog.panel-modal')
+    .dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal(await p, false);
+});
+
+test('showConfirmDialog: scrim click cancels, content click keeps focus semantics', async () => {
+  const p = showConfirmDialog({ title: 'T', message: 'M' });
+  const dialog = document.querySelector('dialog.panel-modal');
+  dialog.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert.equal(await p, false, 'a click on the dialog wrapper itself is the scrim');
+
+  const p2 = showConfirmDialog({ title: 'T', message: 'M', danger: true });
+  const dialog2 = document.querySelector('dialog.panel-modal');
+  dialog2.querySelector('.confirm-title').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert.equal(document.activeElement, dialog2.querySelector('.confirm-cancel'),
+    'clicking text refocuses the default button so a following Enter keeps button semantics');
+  dialog2.querySelector('.confirm-cancel').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(await p2, false);
+});
+
+test('showConfirmDialog: Enter confirms, IME-composing Enter does not, focused button keeps its own activation', async () => {
+  const p = showConfirmDialog({ title: 'T', message: 'M' });
+  const dialog = document.querySelector('dialog.panel-modal');
+  dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
+  // still open — the IME gate held
+  assert.ok(document.querySelector('dialog.panel-modal'), 'IME Enter must not resolve the dialog');
+  dialog.querySelector('.confirm-msg').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  assert.equal(await p, true, 'Enter on non-button content confirms');
+
+  const p2 = showConfirmDialog({ title: 'T', message: 'M', danger: true });
+  const cancel = document.querySelector('.confirm-cancel');
+  cancel.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  // the hook defers to the button's own activation — resolve happens on click
+  cancel.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  assert.equal(await p2, false, 'Enter on the focused Cancel must cancel, not confirm');
+});
+
+test('openPanelDialog resolves exactly once across close paths and returns focus to the invoker', async () => {
+  const invoker = document.createElement('button');
+  document.body.appendChild(invoker);
+  invoker.focus();
+  const body = document.createElement('div');
+  body.textContent = 'inspector body';
+  const { dialog, close, result } = openPanelDialog({ body });
+  assert.equal(dialog.hasAttribute('open'), true, 'jsdom fallback marks the dialog open');
+  assert.equal(dialog.querySelector('div').textContent, 'inspector body');
+  close('first');
+  close('second'); // late duplicate (e.g. close event after manual close) must not re-resolve
+  dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(await result, 'first');
+  assert.equal(document.querySelector('dialog.panel-modal'), null);
+  assert.equal(document.activeElement, invoker, 'focus returns to the invoker');
+  invoker.remove();
 });
 
 test('_findCard finds a card of the given class within the next 4 siblings', () => {

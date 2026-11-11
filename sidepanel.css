@@ -29,10 +29,23 @@ body {
 }
 
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
-::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+/* Standard properties first (Chrome 121+; minimum_chrome_version is 116, so
+   the WebKit rules stay as a gated fallback). Both properties inherit, so
+   html covers every scroller. Thumb rides --fg-dim: ≥3:1 against both theme
+   backgrounds (WCAG 1.4.11) — the old --border thumb was near-invisible on
+   light. `thin` is the standard width tier; the fallback keeps the historical
+   4px. Selector is html, not :root: render-contract-lockstep reads the FIRST
+   :root block for the typography default (--msg-font-family). */
+html {
+  scrollbar-color: var(--fg-dim) transparent;
+  scrollbar-width: thin;
+}
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--fg-dim); border-radius: var(--radius-sm); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-2); }
+}
 
 /* ─── Top bar ───────────────────────────────────────────────────────────────── */
 /* "Reading desk" surface (visual refinement pass, 2026-09-23): stronger
@@ -639,7 +652,7 @@ body {
 .undo-attach:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
 
 /* ─── Context inspector modal ─────────────────────────────────────────────── */
-.ctx-inspector-modal {
+dialog.panel-modal > .ctx-inspector-modal {
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1884,9 +1897,10 @@ html { interpolate-size: allow-keywords; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Below .confirm-overlay (9998): a toast must never cover the dialog the
-     user is answering (e.g. the prompt inspector's Copy toast). Still far
-     above every panel surface/drawer. */
+  /* Modals are native <dialog>s in the top layer, which paints above every
+     z-index — a toast can never cover the dialog the user is answering
+     (e.g. the prompt inspector's Copy toast). This tier stays far above
+     every panel surface/drawer. */
   z-index: 9997;
   pointer-events: none;
   width: calc(100% - 32px);
@@ -1929,18 +1943,31 @@ html { interpolate-size: allow-keywords; }
 .toast-warn    { background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: color-mix(in srgb, var(--warn) 30%, transparent); color: var(--warn); }
 .toast-info    { background: color-mix(in srgb, var(--fg-dim) 12%, transparent); border-color: color-mix(in srgb, var(--fg-dim) 30%, transparent); color: var(--fg-2); }
 
-/* ─── Confirm dialog ─────────────────────────────────────────────────────────── */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
+/* ─── Panel modal (native <dialog>, ui-utils openPanelDialog) ──────────────────
+   The dialog is a full-viewport flex wrapper painting its own scrim; the card
+   (.confirm-modal / .ctx-inspector-modal / .prompt-inspector-modal) is its
+   child. UA dialog rules (fit-content, max-width calc, margin:auto, border)
+   are reset here — same precedent as dialog.crop-modal. Top layer renders
+   above every z-index, so the toast-ordering contract holds by construction
+   (pinned in render-contract-lockstep). Scrollers inside must not chain. */
+dialog.panel-modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: none;
+  margin: 0;
+  padding: 20px;
   background: rgba(0,0,0,0.55);
-  z-index: 9998;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
 }
-.confirm-modal {
+dialog.panel-modal:not([open]) { display: none; }
+dialog.panel-modal:modal { overscroll-behavior: contain; }
+dialog.panel-modal::backdrop { background: transparent; }
+/* Confirm card sizing; inspector bodies override via their own classes. */
+dialog.panel-modal > .confirm-modal {
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2388,7 +2415,7 @@ code.language-patch .hljs-addition { color: #7ee787; }
 .token-usage:hover { color: var(--fg-dim); }
 
 /* ── Prompt inspector modal ──────────────────────────────────────────────── */
-.prompt-inspector-modal {
+dialog.panel-modal > .prompt-inspector-modal {
   background: var(--surface);
   border-radius: var(--radius);
   padding: 20px;
@@ -3168,6 +3195,25 @@ mark.search-highlight-active { background: color-mix(in srgb, var(--gold) 75%, t
   box-shadow: var(--edge-hi), var(--shadow-sm);
 }
 .selection-ask-btn:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+/* Anchor-positioned variant (detail-thread askAnchorSupported, Chrome 125+):
+   the zero-size marker sits at the selection's end rect; flip-block puts the
+   button ABOVE the selection when the viewport bottom is near, flip-inline
+   clamps it horizontally. 6px gap = the historical rect.bottom+6 offset. */
+.selection-ask-anchor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  anchor-name: --browsa-selection-ask;
+}
+.selection-ask-btn.anchored {
+  position: fixed;
+  inset: auto;
+  position-anchor: --browsa-selection-ask;
+  top: calc(anchor(bottom) + 6px);
+  left: anchor(left);
+  position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+}
 
 /* ─── Media download (video pages) ─────────────────────────────────────────────
    Download entry for bilibili/youtube video pages: a small ⬇ next to the page
