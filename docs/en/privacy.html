@@ -79,7 +79,7 @@
     <li><b>Models and Agents:</b> conversations, questions and relevant attachments go directly to the address configured in Settings, without passing through a browsa developer server. API keys are transmitted to authenticate with their service. Connection checks also contact the configured service. An initiated turn may continue after you switch sessions.</li>
     <li><b>Local parsing and model requests:</b> PDFs and Office documents are parsed into text and images on-device; those results can be attached and sent to your configured model or Agent. Recognized credentials in page-context URLs, such as tokens, passwords and signatures, are masked before sending. This is not a comprehensive filter for sensitive page text and does not rewrite URLs used to fetch resources.</li>
     <li><b>Site extraction:</b> besides reading already-loaded data, browsa makes on-demand requests to the current site and its APIs for text, comments, subtitles, documents or media, including raw code files and arXiv paper metadata. Requests may use the browser's existing login context. arXiv metadata queries send a paper identifier, not conversations.</li>
-    <li><b>Audiovisual analysis (optional):</b> your browser retrieves media from its platform or CDN on demand, with that platform's Cookie or Referer headers where required. After local transcoding, it sends audio or analysis inputs to your configured transcription or analysis service. This processing occurs only when you enable and use the relevant features.</li>
+    <li><b>Audiovisual analysis (optional):</b> your browser retrieves media from its platform or CDN on demand, with that platform's Cookie or Referer headers where required. After local transcoding, it sends audio or analysis inputs to your configured transcription or analysis service. Long transcription jobs continue in the extension's hidden offscreen document when the sidebar closes; progress/results stay local and job state never contains API keys, cookies, or signed media URLs. This processing occurs only when you enable and use the relevant features.</li>
     <li><b>External reply resources:</b> displaying reply images contacts their source. Protein structures requested by identifier contact structure databases such as RCSB or AlphaFold and send the corresponding identifier. These requests do not send the full conversation.</li>
     <li><b>Website:</b> web fonts come from Google Fonts, which your browser contacts directly for font resources. The website adds no analytics or tracking scripts. External links lead to sites with their own privacy policies.</li>
   </ul>
@@ -93,6 +93,7 @@
     <li><code>storage</code> / <code>unlimitedStorage</code>: save the local settings, conversations and attachments described above.</li>
     <li><code>sidePanel</code> / <code>contextMenus</code>: display the chat side panel and context-menu actions.</li>
     <li><code>alarms</code>: runtime maintenance such as clearing temporary stream state; not telemetry.</li>
+    <li><code>offscreen</code>: continue long audio transcription (download, transcode, upload, poll) in a hidden extension document so closing the sidebar does not cancel the job. It does not capture tab audio and is not used for telemetry.</li>
   </ul>
 
   <h2>Third-party services</h2>

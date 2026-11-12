@@ -32,6 +32,29 @@ test('sweep removes every browsa-owned DNR id and nothing else', async () => {
   assert.ok(!removed.includes(42), 'foreign rules must never be touched');
 });
 
+test('keepAsrRules preserves a live offscreen ASR job\'s header rules', async () => {
+  let removed = null;
+  globalThis.chrome = {
+    declarativeNetRequest: {
+      getSessionRules: async () => [
+        { id: 9000001 }, { id: 9000002 }, { id: 9000003 },
+        { id: 9000004 }, { id: 9000005 }, { id: 42 },
+      ],
+      updateSessionRules: async ({ removeRuleIds }) => { removed = removeRuleIds; },
+    },
+  };
+  const { sweepOrphanedMediaRules, MEDIA_RULE_IDS } = await import('../lib/sidepanel/media-headers.js');
+  await sweepOrphanedMediaRules({ keepAsrRules: true });
+  assert.deepEqual(
+    [...removed].sort((a, b) => a - b),
+    [9000001, MEDIA_RULE_IDS.youtube, MEDIA_RULE_IDS.bilibili].sort((a, b) => a - b),
+    'the offscreen runner rules survive a last-panel sweep'
+  );
+  assert.ok(!removed.includes(MEDIA_RULE_IDS.asrYoutube));
+  assert.ok(!removed.includes(MEDIA_RULE_IDS.asrBilibili));
+  assert.ok(!removed.includes(42));
+});
+
 test('wiring pins: sweep only at safe points; xiaoyuzhou never removes the bilibili rule', async () => {
   const bg = await readFile(new URL('../background.js', import.meta.url), 'utf8');
   assert.doesNotMatch(bg, /^sweepOrphanedMediaRules\(\)\.catch/m,

@@ -524,7 +524,7 @@
     "description": "Options: enable label"
   },
   "asrEnableTip": {
-    "message": "Attach a video/podcast page to auto-transcribe captions or run audiovisual reading (Bilibili / YouTube / Xiaoyuzhou).",
+    "message": "When you attach a video/podcast page, transcribe subtitles or do an audiovisual deep-read (Bilibili / YouTube / Xiaoyuzhou). Long jobs continue in the background after the sidebar closes.",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "Click to open full size",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "Background transcription in progress…",
+    "description": "Sidepanel: ASR job progress fallback"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "Transcription is still running or finished in the background; return to the original conversation or re-attach to use it",
+    "description": "Sidepanel: ASR job completed after the user switched conversations"
+  },
+  "asrJobPaused": {
+    "message": "Background transcription paused; re-attach to continue",
+    "description": "Sidepanel: ASR job paused on a side-effectful failure"
+  },
+  "asrJobReused": {
+    "message": ", reused previous transcript",
+    "description": "Sidepanel: attach chip suffix when a cached transcript is reused"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "Background task could not start; transcribing in the panel (closing the sidebar will interrupt it)",
+    "description": "Sidepanel: offscreen runner unavailable fallback"
   }
 }

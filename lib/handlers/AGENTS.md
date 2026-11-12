@@ -401,8 +401,10 @@ Audited and deliberately NOT adopted: ego's `scrollToBottomUntil(condition)` pre
 
 **模块布局（2026-10-07 tidy）**：三文件一 facade——`attach-asr.js`（facade：注册表、asrAdapterFor、上传缓存、转码、转写后处理、ARK 适配器、re-export）、`attach-asr-qwen.js`（百炼适配器全量）、`asr-shared.js`（供应商中立契约层：streamResponsesText + SSE 提取器、两份 prompt builder、coverage hint、时间线解析）。依赖单向：qwen → shared；ark/facade → shared + qwen。**改 prompt builder 或流解析器 = 改共享契约，必跑 `lib-attach-asr` + `lib-asr-qwen`**（ASI 截断教训即在此被抓）。
 
+- **长音频后台任务（2026-11-11）**：音频 ASR 在 `offscreen.js` + `lib/asr-runner.js` 执行；record 不存 Key/Cookie/URL（仅 session）。Qwen 认 taskId，Ark 认 fileId；上传/提交失败只 paused；DNR active 时不清扫。wiki: ASR-and-Video-Analysis。
+
 裁决（勿回退）：
-- **管线形状**：无字幕 B 站/YouTube 视频在「多模态视频理解」开启时走下载→转码→上传→转写，产 `[mm:ss] text`；`ATTACH_PAGE` 返回 `{mode:'asr-pending'}` 延迟存储 → 面板跑下载转码上传（面板有 window，SW 没有；host_permissions 免 CORS）→ `ATTACH_ASR_CONFIRM` 带 `videoSrc` 落库。**URL 直传对两平台都是死路**（B 站 URL 绑会话 IP、YouTube pot 绑会话）——下载→转码→上传是唯一可行路，不是备选。Tests: `attach-asr`、`lib-sidepanel-asr*`。
+- **管线形状**：无字幕视频在 ASR 开启时走下载→转码→上传→转写；`ATTACH_PAGE` 返回 `{mode:'asr-pending'}`，完成后 `ATTACH_ASR_CONFIRM` 带 `videoSrc` 落库。**URL 直传是死路**（B 站绑 IP、YouTube pot 绑会话）——下载→转码→上传是唯一路。Tests: `attach-asr`。
 - **检测以 `noTranscript` 结构旗标为准**（synthesizeBilibili/YouTube 都打），不是文本 marker——auto 的 Jina 回退会替换短合成文本、丢 marker（真 bug）。Tests: `attach-asr`。
 - **`buildAsrPendingCtx` 平台分派**：B 站重注入 content-script 读 `__browsaGetBilibiliStreams()`；YouTube 走 `__browsaFetchFreshYouTubeStreams`（ANDROID /player 新鲜 pot URL，闭包变量禁止——注入函数必须从 `window.location` 自解析 videoId，2026-08-25 真 bug）。选流：最低码率音频 + **时长 <90% 拒收**（截断流真 bug）+ AAC-LC 优先于 HE-AAC。无音频流 → null → 普通附加。Tests: `attach-asr-closure`、`youtube-streams`。
 - **转码是根因修复不是优化**：B 站 m4s 是 fMP4，方舟按内容判成视频→`failed`；必须转 16kHz 单声道 PCM WAV（`resampleToMono` 纯函数可测）。`audioUploadFormat:'original'`（2026-10-07「上传太慢」）只跳编码+上传、**不跳解码**——核对时长就是解码本身。Tests: `lib-attach-asr`。

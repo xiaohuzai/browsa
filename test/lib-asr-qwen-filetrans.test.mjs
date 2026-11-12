@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import {
   isQwenFiletransModel, filetransResultToLines, qwenTranscribeAudio, qwenAnalyzeVideo,
-  pingQwenAsr, parseAsrHotwords,
+  pingQwenAsr, parseAsrHotwords, resumeQwenFiletransTask,
 } from '../lib/handlers/attach-asr.js';
 
 const BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
@@ -157,6 +157,49 @@ test('qwenTranscribeAudio(filetrans): 任务 FAILED 响亮抛错（带 code/mess
     }),
     /转写任务失败 \(FAILED\).*InvalidFile.*audio decode failed/,
   );
+  delete globalThis.fetch;
+});
+
+test('qwenTranscribeAudio(filetrans): onTaskSubmitted fires before polling; onStatus sees task states', async () => {
+  mockFiletransFlow({ statusSeq: ['PENDING', 'SUCCEEDED'] });
+  const submitted = [];
+  const statuses = [];
+  await qwenTranscribeAudio({
+    baseUrl: BASE, apiKey: 'k', fileId: 'oss://x/a.wav',
+    model: 'qwen-audio-3.1-asr-flash-filetrans', pollIntervalMs: 1,
+    onTaskSubmitted: (taskId) => submitted.push(taskId),
+    onStatus: (status) => statuses.push(status),
+  });
+  assert.deepEqual(submitted, ['task-1'], 'the task id must be observable immediately after submit');
+  assert.deepEqual(statuses, ['PENDING', 'SUCCEEDED']);
+  delete globalThis.fetch;
+});
+
+test('resumeQwenFiletransTask: polls an existing task, never re-submits, and maps the result', async () => {
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    calls.push(u);
+    if (u.includes('/tasks/task-resume')) {
+      return { ok: true, json: async () => ({ output: {
+        task_id: 'task-resume', task_status: 'SUCCEEDED',
+        results: [{ transcription_url: 'https://oss.example.com/resume.json' }],
+      } }) };
+    }
+    if (u === 'https://oss.example.com/resume.json') {
+      return { ok: true, json: async () => ({ transcripts: [{ sentences: [
+        { begin_time: 1000, text: '恢复成功。' },
+      ] }] }) };
+    }
+    throw new Error('unexpected fetch: ' + u);
+  };
+  const res = await resumeQwenFiletransTask({
+    baseUrl: BASE, apiKey: 'k', taskId: 'task-resume', pollIntervalMs: 1,
+  });
+  assert.equal(res.text, '[00:01] 恢复成功。');
+  assert.equal(res.taskId, 'task-resume');
+  assert.ok(!calls.some((u) => u.endsWith('/services/audio/asr/transcription')), 'resume must not submit a second task');
+  assert.equal(calls.length, 2, 'task poll + result fetch only');
   delete globalThis.fetch;
 });
 

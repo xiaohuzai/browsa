@@ -524,7 +524,7 @@
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
-    "message": "動画ページを添付すると自動で文字起こし・解析します。対応プラットフォーム：YouTube と Bilibili。",
+    "message": "動画/ポッドキャストのページを添付すると、字幕の文字起こしや視聴覚の深読みを行います（Bilibili / YouTube / 小宇宙）。長い処理はサイドバーを閉じてもバックグラウンドで続きます。",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "クリックで拡大",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "バックグラウンドで文字起こし中…",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "文字起こしはバックグラウンドで継続中/完了しています。元の会話に戻るか、再添付して使用してください",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobPaused": {
+    "message": "バックグラウンド処理を一時停止しました。再添付で続行できます",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReused": {
+    "message": "、前回の文字起こし結果を再利用",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "バックグラウンドタスクを開始できませんでした。パネル内で文字起こしします（サイドバーを閉じると中断されます）",
+    "description": "Sidepanel: offscreen ASR job"
   }
 }

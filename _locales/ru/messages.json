@@ -524,7 +524,7 @@
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
-    "message": "Прикрепите страницу с видео — транскрибация/анализ запустятся автоматически. Поддерживаемые платформы: YouTube и Bilibili.",
+    "message": "При прикреплении страницы видео/подкаста выполняется расшифровка субтитров или аудиовизуальный анализ (Bilibili / YouTube / Xiaoyuzhou). Длительные задачи продолжаются в фоне после закрытия боковой панели.",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "Нажмите, чтобы открыть полностью",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "Расшифровка выполняется в фоне…",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "Расшифровка продолжается в фоне или уже завершена; вернитесь в исходный диалог или прикрепите видео снова",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobPaused": {
+    "message": "Фоновая расшифровка приостановлена; прикрепите видео снова, чтобы продолжить",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReused": {
+    "message": ", повторно используется предыдущая расшифровка",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "Не удалось запустить фоновую задачу; расшифровка выполняется в панели (закрытие боковой панели прервёт её)",
+    "description": "Sidepanel: offscreen ASR job"
   }
 }

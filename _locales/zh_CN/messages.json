@@ -524,7 +524,7 @@
     "description": "Options: enable label"
   },
   "asrEnableTip": {
-    "message": "附加视频/播客页时自动转写字幕或视听精读（B 站 / YouTube / 小宇宙）。",
+    "message": "附加视频/播客页时自动转写字幕或视听精读（B 站 / YouTube / 小宇宙）。长视频转写在后台继续，关闭侧栏不会中断。",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "点击查看大图",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "后台转录中…",
+    "description": "Sidepanel: ASR job progress fallback"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "转录仍在后台进行/已完成；回到原会话或重新附加即可使用",
+    "description": "Sidepanel: ASR job completed after the user switched conversations"
+  },
+  "asrJobPaused": {
+    "message": "后台转录暂停，可重新附加继续",
+    "description": "Sidepanel: ASR job paused on a side-effectful failure"
+  },
+  "asrJobReused": {
+    "message": "，复用上次转录结果",
+    "description": "Sidepanel: attach chip suffix when a cached transcript is reused"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "后台任务启动失败，改为面板内转写（关闭侧栏会中断）",
+    "description": "Sidepanel: offscreen runner unavailable fallback"
   }
 }

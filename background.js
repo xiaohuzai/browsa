@@ -28,7 +28,7 @@ import { boundUnseenImageBytes } from './lib/handlers/history-compactor.js';
 import { repairMermaid } from './lib/handlers/mermaid-repair.js';
 import { handleExplainPort } from './lib/handlers/selection-explain.js';
 import { resolveChatModel } from './lib/handlers/provider-resolver.js';
-import { ASR_SUBTITLE_SOURCE } from './lib/handlers/attach-asr.js';
+import { ASR_SUBTITLE_SOURCE, videoAssetId } from './lib/handlers/attach-asr.js';
 import { buildAsrPendingCtx } from './lib/handlers/attach-asr-pending.js';
 import { handleAttachConfirm, ATTACH_CONFIRM_TYPES } from './lib/handlers/attach-confirm-handler.js';
 import { storeAttachment } from './lib/handlers/attach-store.js';
@@ -49,6 +49,10 @@ import { inlinePageImages, collectMarkdownImages, refererGateForImageUrls } from
 import { registerPageImageReferer, removePageImageReferer, sweepOrphanedMediaRules } from './lib/sidepanel/media-headers.js';
 import { interleaveImageParts } from './lib/message-builder.js';
 import { ensureReadabilityInjected } from './lib/readability-injector.js';
+import {
+  createAsrJobIfAbsent, getAsrJob, patchAsrJob, listActiveAsrJobs, hasActiveAsrJobs,
+  saveAsrJobPayload, clearAsrJobPayload, asrJobKey,
+} from './lib/asr-job-store.js';
 
 // Capability hints: browsa rendering rules injected automatically so users
 // never need to configure them manually. Shared by both CHAT (full turn,
@@ -151,6 +155,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Panel documents are torn down by an install/update; any session DNR rule
   // they left behind is orphaned and safe to remove here.
   sweepOrphanedMediaRules().catch(() => {});
+  // An extension update also tears down the offscreen document; resume any
+  // ASR job that was mid-flight rather than silently losing it.
+  resumeActiveAsrJobs().catch(() => {});
 
   if (details.reason === 'install' || details.reason === 'update') {
     // One-shot self-heal: history blobs bloated by parked images from
@@ -251,12 +258,259 @@ const navPorts = new Map(); // tabId -> Set<Port>
 // belong to the panel, which can be mid-download while unrelated SW events
 // arrive. A last-panel disconnect is the in-session safe point; browser
 // startup/install are the cold ones.
-function sweepDnrIfNoPanels() {
-  if (navPorts.size === 0) sweepOrphanedMediaRules().catch(() => {});
+async function sweepDnrIfNoPanels() {
+  if (navPorts.size !== 0) return;
+  // The offscreen ASR runner can outlive the last panel. Its DNR rules are
+  // the download lifeline while it is active; deleting them here would turn
+  // the next CDN request into a 403. The panel-owned rules are still swept.
+  // On a storage read failure, keep the ASR rules: deleting a live download's
+  // headers is worse than leaving a stale rule for the next startup sweep.
+  const keepAsrRules = await hasActiveAsrJobs().catch(() => true);
+  await sweepOrphanedMediaRules({ keepAsrRules }).catch(() => {});
 }
 chrome.runtime.onStartup?.addListener(() => {
   sweepOrphanedMediaRules().catch(() => {});
+  resumeActiveAsrJobs().catch(() => {});
 });
+
+// ─── Offscreen audio-ASR runner ──────────────────────────────────────────────
+// The side panel owns the UI; the offscreen document owns the side-effectful
+// pipeline (download/transcode/upload/poll/transcribe). Closing the panel must
+// not cancel that work, and the runner must be recreated after SW/offscreen
+// death. The job store is the authoritative state; this block only owns the
+// lifecycle plumbing.
+const ASR_WATCHDOG_ALARM = 'browsa-asr-watchdog';
+let _asrRunnerEnsure = null;
+
+async function ensureAsrRunner() {
+  if (!chrome.offscreen?.createDocument) return false;
+  if (_asrRunnerEnsure) return _asrRunnerEnsure;
+  _asrRunnerEnsure = (async () => {
+    try {
+      if (chrome.offscreen.hasDocument && await chrome.offscreen.hasDocument()) return true;
+    } catch (_) { /* older Chrome: fall through to create */ }
+    try {
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['BLOBS'],
+        justification: 'Continue long audio transcription jobs (download, transcode, upload, poll) after the side panel closes.',
+      });
+      return true;
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (/single offscreen|already exists|Only a single/i.test(msg)) return true;
+      console.warn('browsa[bg]: offscreen ASR runner create failed:', msg);
+      return false;
+    }
+  })();
+  const ok = await _asrRunnerEnsure;
+  // Do not cache success: the offscreen document can be closed after idle or
+  // killed by Chrome, and the next job must be able to recreate it.
+  _asrRunnerEnsure = null;
+  return ok;
+}
+
+async function sendToAsrRunner(msg) {
+  try {
+    await chrome.runtime.sendMessage({ target: 'offscreen', ...msg });
+    return true;
+  } catch (e) {
+    console.warn('browsa[bg]: ASR runner message failed:', String(e?.message || e));
+    return false;
+  }
+}
+
+function ensureAsrWatchdog() {
+  try {
+    chrome.alarms.create(ASR_WATCHDOG_ALARM, { periodInMinutes: 1 });
+  } catch (_) { /* alarms unavailable — the runner still exists while alive */ }
+}
+
+async function resumeActiveAsrJobs() {
+  const jobs = await listActiveAsrJobs().catch(() => []);
+  if (!jobs.length) {
+    try { chrome.alarms.clear(ASR_WATCHDOG_ALARM); } catch (_) {}
+    return;
+  }
+  ensureAsrWatchdog();
+  if (!(await ensureAsrRunner())) return;
+  for (const job of jobs) {
+    await sendToAsrRunner({ type: 'ASR_JOB_RESUME', jobId: job.jobId });
+  }
+}
+
+function buildAsrJobRecord(job) {
+  const asr = job.asr || {};
+  const identity = {
+    assetId: job.assetId,
+    provider: asr.provider,
+    baseUrl: asr.baseUrl,
+    model: asr.model,
+    language: asr.language,
+    hotwords: asr.hotwords,
+  };
+  return {
+    jobId: job.jobId,
+    // No stable video identity → no reuse/dedupe; the unique jobId keeps two
+    // unknown-page jobs from overwriting each other in the store.
+    key: job.assetId ? asrJobKey(identity) : `job:${job.jobId}`,
+    assetId: job.assetId || '',
+    tabId: job.tabId ?? null,
+    pageUrl: job.pageUrl || job.ctx?.meta?.url || '',
+    platform: job.platform || '',
+    title: job.title || job.ctx?.meta?.title || '',
+    durationSec: Number(job.durationSec) || 0,
+    provider: asr.provider || '',
+    baseUrl: asr.baseUrl || '',
+    model: asr.model || '',
+    language: asr.language || 'auto',
+    hotwords: asr.hotwords || '',
+    timeoutMs: Number(asr.timeoutMs) || 0,
+    subtitleSource: asr.subtitleSource || 'original',
+    originContextId: job.originContextId || '',
+    originSessionId: job.originSessionId || '',
+    status: 'queued',
+    phase: 'queued',
+    progressText: '',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+// Only the media/config fields the runner needs. `text`, cookies, and other
+// panel-only context stay out of the offscreen payload.
+function pickAsrRunCtx(ctx) {
+  return {
+    mode: 'asr-pending',
+    asrPlatform: ctx.asrPlatform || ctx.mode,
+    meta: ctx.meta || {},
+    audioUrl: ctx.audioUrl || '',
+    audioLabel: ctx.audioLabel || '',
+    audioCodec: ctx.audioCodec || '',
+    audioId: ctx.audioId || 0,
+    audioCandidates: Array.isArray(ctx.audioCandidates) ? ctx.audioCandidates : [],
+    videoCandidates: Array.isArray(ctx.videoCandidates) ? ctx.videoCandidates : [],
+    muxedStream: ctx.muxedStream || null,
+    videoDurationSec: Number(ctx.videoDurationSec) || 0,
+    noTranscript: ctx.noTranscript !== false,
+    asrExpiredError: ctx.asrExpiredError || '',
+    // Cookies are read by the offscreen document itself (fresh, and never
+    // written to the job store).
+  };
+}
+
+async function startAsrJob(msg) {
+  const job = msg?.job;
+  if (!job?.jobId || !job.ctx || !job.asr) return { ok: false, error: 'bad ASR job' };
+  // Create the watchdog before the first await: if the SW dies after the job
+  // is persisted but before the offscreen document is created, the alarm is
+  // already in place to resume it.
+  ensureAsrWatchdog();
+  const record = buildAsrJobRecord(job);
+  // Idempotency: a second side panel / a re-attach race must not create a
+  // second upload or a second billable task for the same video+config. The
+  // create is atomic under the job-store lock (Web Locks in Chrome).
+  const created = await createAsrJobIfAbsent(record);
+  const saved = created.job;
+  if (!saved) return { ok: false, error: 'ASR job not saved' };
+  if (!created.created) {
+    if (saved.status !== 'done') {
+      // Refresh the ephemeral payload with this attempt's key/signed URLs;
+      // it is not a new job and cannot create a second upload/task.
+      await saveAsrJobPayload(saved.jobId, { ctx: pickAsrRunCtx(job.ctx), asr: job.asr });
+      if (saved.status === 'paused') {
+        // Make an explicit resume visible to a freshly-created offscreen
+        // document even if the best-effort message below is lost.
+        await patchAsrJob(saved.jobId, { status: 'queued', phase: 'resuming', error: '' }, { onlyIfStatus: ['paused'] });
+      }
+      if (await ensureAsrRunner()) {
+        await sendToAsrRunner({ type: 'ASR_JOB_RESUME', jobId: saved.jobId });
+      }
+    }
+    return { ok: true, jobId: saved.jobId, resumed: true };
+  }
+  await saveAsrJobPayload(saved.jobId, { ctx: pickAsrRunCtx(job.ctx), asr: job.asr });
+  if (!(await ensureAsrRunner())) {
+    await patchAsrJob(saved.jobId, { status: 'failed', phase: 'failed', error: 'offscreen-unavailable' });
+    await clearAsrJobPayload(saved.jobId);
+    return { ok: false, error: 'offscreen-unavailable' };
+  }
+  await sendToAsrRunner({ type: 'ASR_JOB_START', jobId: saved.jobId });
+  return { ok: true, jobId: saved.jobId };
+}
+
+async function resumeAsrJob(msg) {
+  const job = await getAsrJob(msg?.jobId);
+  if (!job) return { ok: false, error: 'ASR job not found' };
+  ensureAsrWatchdog();
+  if (job.status === 'paused') {
+    await patchAsrJob(job.jobId, { status: 'queued', phase: 'resuming', error: '' }, { onlyIfStatus: ['paused'] });
+  }
+  if (!(await ensureAsrRunner())) return { ok: false, error: 'offscreen-unavailable' };
+  await sendToAsrRunner({ type: 'ASR_JOB_RESUME', jobId: job.jobId });
+  return { ok: true, jobId: job.jobId };
+}
+
+async function cancelAsrJob(msg) {
+  if (!msg?.jobId) return { ok: false, error: 'no jobId' };
+  const job = await getAsrJob(msg.jobId);
+  if (!job || job.status === 'done' || job.status === 'failed' || job.status === 'canceled') {
+    return { ok: true, noop: true };
+  }
+  await sendToAsrRunner({ type: 'ASR_JOB_CANCEL', jobId: msg.jobId });
+  await patchAsrJob(msg.jobId, { status: 'canceled', phase: 'canceled', error: '' });
+  await clearAsrJobPayload(msg.jobId);
+  return { ok: true };
+}
+
+async function reconstructAsrJobContext(msg) {
+  const job = await getAsrJob(msg?.jobId);
+  if (!job) return { ok: false, error: 'ASR job not found' };
+  const all = await storage.getAll();
+  const asr = {
+    ...(all.asr || {}),
+    provider: job.provider || all.asr?.provider,
+    baseUrl: job.baseUrl || all.asr?.baseUrl,
+    model: job.model || all.asr?.model,
+    language: job.language || all.asr?.language || 'auto',
+    hotwords: job.hotwords || all.asr?.hotwords || '',
+    timeoutMs: job.timeoutMs || all.asr?.timeoutMs,
+    subtitleSource: job.subtitleSource || all.asr?.subtitleSource,
+  };
+  // A submitted Qwen task needs no media URL/page: the runner only polls the
+  // server-side task. This is the path that survives the tab being closed.
+  if (job.taskId) return { ok: true, taskOnly: true, asr };
+  // An uploaded file is also a valid checkpoint: the runner can re-run the
+  // transcription from browsaArkFileCache without the tab. If the cache entry
+  // is gone, the pipeline fails cleanly (it has no media URL to download).
+  if (job.fileId) {
+    return {
+      ok: true,
+      asr,
+      ctx: {
+        mode: 'asr-pending',
+        asrPlatform: job.platform,
+        meta: { url: job.pageUrl || '', title: job.title || '' },
+        videoDurationSec: Number(job.durationSec) || 0,
+        noTranscript: true,
+      },
+    };
+  }
+  if (job.tabId == null) return { ok: false, error: 'tab-gone' };
+  let tab;
+  try { tab = await chrome.tabs.get(job.tabId); } catch (_) { return { ok: false, error: 'tab-gone' }; }
+  const currentAsset = videoAssetId(job.platform, tab?.url || '');
+  if (job.assetId && currentAsset && currentAsset !== job.assetId) {
+    return { ok: false, error: 'tab-navigated' };
+  }
+  const asrCtx = await buildAsrPendingCtx(job.tabId, {
+    mode: job.platform,
+    meta: { url: job.pageUrl || tab?.url || '', title: job.title || tab?.title || '' },
+    noTranscript: true,
+  }, all, { skipJobLookup: true });
+  if (!asrCtx) return { ok: false, error: 'no-streams' };
+  return { ok: true, ctx: pickAsrRunCtx(asrCtx), asr };
+}
 
 // Deep-extraction progress rides the nav port the side panel already holds,
 // so the attach progress pill updates live while ATTACH_PAGE is still
@@ -547,6 +801,7 @@ function siteCacheRestorePromise() {
 }
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === GC_ALARM_NAME) gcStreamState();
+  if (alarm.name === ASR_WATCHDOG_ALARM) resumeActiveAsrJobs().catch(() => {});
   // Fires every 30s while a chat stream is in flight. Waking the service
   // worker resets its idle timer, which keeps it alive when the side panel
   // that started the stream is gone (closed panel used to mean the SW could
@@ -836,6 +1091,30 @@ async function handle(msg, sender) {
       const url = msg.url || chrome.runtime.getURL('options.html');
       await chrome.tabs.create({ url });
       return { opened: true };
+    }
+
+    case 'ASR_JOB_START':
+      return startAsrJob(msg);
+
+    case 'ASR_JOB_RESUME':
+      return resumeAsrJob(msg);
+
+    case 'ASR_JOB_CANCEL':
+      return cancelAsrJob(msg);
+
+    case 'ASR_JOB_CONTEXT':
+      return reconstructAsrJobContext(msg);
+
+    case 'ASR_RUNNER_IDLE': {
+      // The offscreen runner has no queued/active work. If a new job arrives
+      // after this closes, ensureAsrRunner() recreates it from the job store.
+      const active = await hasActiveAsrJobs().catch(() => false);
+      if (!active) {
+        try { await chrome.offscreen?.closeDocument?.(); } catch (_) {}
+        _asrRunnerEnsure = null;
+        try { chrome.alarms.clear(ASR_WATCHDOG_ALARM); } catch (_) {}
+      }
+      return { ok: true };
     }
 
     case 'STREAM_PEEK': {
