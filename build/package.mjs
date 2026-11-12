@@ -42,6 +42,7 @@ ALWAYS = [
     "manifest.json",
     "LICENSE",  # MIT requires the license text to travel with the distribution
     "background.js", "sidepanel.js", "sidepanel.html", "sidepanel.css",
+    "offscreen.js", "offscreen.html",
     "options.js", "options.html", "options.css",
     "lib", "icons", "_locales", "fonts",
 ]

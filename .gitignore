@@ -18,8 +18,10 @@ build/_deps/
 # Vendor build scratch (rebuilt via `npm run build`)
 build/_src/
 
-# Distribution artifact (rebuilt via `npm run package`)
+# Distribution artifact (rebuilt via `npm run package`); the unpacked extract
+# some local checks leave behind is covered too
 browsa-v*.zip
+browsa-v*/
 
 # Local config (do NOT commit real API keys)
 config.local.json
