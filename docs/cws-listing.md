@@ -196,6 +196,7 @@ Markdown 表格、代码高亮（40+ 语言）、KaTeX 公式、Mermaid 图、EC
 | `scripting` | Injects extraction/cleanup scripts into the active tab at user request, and seeks videos for clickable timestamps. |
 | `cookies` | Read-only, and only site session cookies of the video platform being downloaded (bilibili/googlevideo) so an audio download initiated by the user carries their own login context. |
 | `declarativeNetRequest` | Temporary session-scoped header rules (Referer) so the browser can download the audio/video stream the user explicitly requested; rules live for the service-worker lifetime only. |
+| `offscreen` | Runs the user-initiated long audio transcription pipeline (download, local transcode with Web Audio, upload, provider poll) in a hidden extension document so closing the side panel does not cancel the job. It does not capture tab audio, does not record the screen, and is not used for telemetry. |
 | `downloads` | Saves media the user explicitly chose to download (chrome.downloads.download with saveAs). |
 | `storage` | Stores settings and conversation history locally in chrome.storage.local. Nothing syncs off-device except calls to the user-configured AI endpoint. |
 

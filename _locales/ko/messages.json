@@ -524,7 +524,7 @@
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
-    "message": "동영상 페이지를 첨부하면 자동으로 전사/분석합니다. 지원 플랫폼: YouTube, Bilibili.",
+    "message": "동영상/팟캐스트 페이지를 첨부하면 자막 전사 또는 시청각 심층 분석을 수행합니다(Bilibili / YouTube / Xiaoyuzhou). 긴 작업은 사이드바를 닫아도 백그라운드에서 계속됩니다.",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "클릭하여 크게 보기",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "백그라운드에서 전사 중…",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "전사가 백그라운드에서 계속 진행 중이거나 완료되었습니다. 원래 대화로 돌아가거나 다시 첨부하여 사용하세요",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobPaused": {
+    "message": "백그라운드 전사가 일시 중지되었습니다. 다시 첨부하면 계속할 수 있습니다",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReused": {
+    "message": ", 이전 전사 결과 재사용",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "백그라운드 작업을 시작하지 못했습니다. 패널에서 전사합니다(사이드바를 닫으면 중단됩니다)",
+    "description": "Sidepanel: offscreen ASR job"
   }
 }

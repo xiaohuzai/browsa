@@ -524,7 +524,7 @@
     "description": "Options: ASR enable label"
   },
   "asrEnableTip": {
-    "message": "Adjunta una página de vídeo para transcribirla/analizarla automáticamente. Plataformas compatibles: YouTube y Bilibili.",
+    "message": "Al adjuntar una página de vídeo/pódcast, transcribe subtítulos o realiza una lectura audiovisual profunda (Bilibili / YouTube / Xiaoyuzhou). Las tareas largas continúan en segundo plano al cerrar la barra lateral.",
     "description": "Options: ASR enable tip"
   },
   "asrProviderLabel": {
@@ -1943,5 +1943,25 @@
   "screenshotOpenFull": {
     "message": "Clic para ver a tamaño completo",
     "description": "Panel: screenshot preview tooltip"
+  },
+  "asrJobWaiting": {
+    "message": "Transcripción en segundo plano…",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReadyOtherSession": {
+    "message": "La transcripción sigue en segundo plano o ya terminó; vuelve a la conversación original o vuelve a adjuntar para usarla",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobPaused": {
+    "message": "La transcripción en segundo plano se pausó; vuelve a adjuntar para continuar",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrJobReused": {
+    "message": ", reutilizando la transcripción anterior",
+    "description": "Sidepanel: offscreen ASR job"
+  },
+  "asrBackgroundUnavailable": {
+    "message": "No se pudo iniciar la tarea en segundo plano; se transcribe en el panel (cerrar la barra lateral la interrumpirá)",
+    "description": "Sidepanel: offscreen ASR job"
   }
 }
