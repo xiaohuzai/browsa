@@ -1073,3 +1073,37 @@ test('纯图片选区：折叠后引用缩略条仍可见（否则折叠成空�
 
   card.querySelector('.detail-thread-close').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
 });
+
+// ─── 追问按钮的锚定定位（2026-11-11，CSS Anchor Positioning 特性门）─────────
+// 支持 anchor-name/position-anchor 的构建（Chrome 125+）走零尺寸锚元素 +
+// .anchored 类（CSS 负责翻转/夹取）；不支持的保持内联 rect 定位。两条路径
+// 都绝不引入 popover——light-dismiss 会在 mousedown 读到选区前清掉它。
+
+test('追问按钮：锚定支持时挂零尺寸锚元素，隐藏时一并移除，且绝非 popover', async () => {
+  hideSelectionAskBtn();
+  stubRangeRect();
+  const bubble = makeFigureBubble('<p>anchor path text</p>', 'anchor path text');
+  selectInside(bubble.querySelector('p'));
+  await mouseupSelection();
+
+  const btn = document.querySelector('.selection-ask-btn');
+  assert.ok(btn, '选区应给出追问按钮');
+  assert.equal(btn.hasAttribute('popover'), false, 'light-dismiss 会清掉选区——按钮绝不能是 popover');
+  const anchorSupported = dom.window.CSS?.supports?.('anchor-name: --x')
+    && dom.window.CSS?.supports?.('position-anchor: --x');
+  const anchor = document.querySelector('.selection-ask-anchor');
+  if (anchorSupported) {
+    assert.ok(btn.classList.contains('anchored'), '支持锚定时按钮走 .anchored CSS 路径');
+    assert.ok(anchor, '锚元素必须存在');
+    assert.equal(anchor.getAttribute('aria-hidden'), 'true');
+    assert.equal(anchor.style.top, '30px', '锚在选区 rect.bottom（stub 为 30）');
+    assert.equal(anchor.style.left, '10px');
+  } else {
+    assert.equal(anchor, null);
+    assert.equal(btn.style.top, '36px', '回退路径保持 rect.bottom+6 内联定位');
+    assert.equal(btn.style.left, '10px');
+  }
+  hideSelectionAskBtn();
+  assert.equal(document.querySelector('.selection-ask-anchor'), null, '锚元素随按钮一并移除');
+  assert.equal(document.querySelector('.selection-ask-btn'), null);
+});
