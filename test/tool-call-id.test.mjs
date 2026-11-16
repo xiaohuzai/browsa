@@ -58,6 +58,31 @@ test('tool IDs: same-name parallel calls finish independently across notes and i
     { k: 'note', text: 'waiting for tools' }]);
 });
 
+test('tool IDs: terminal-only events with a reused native ID belong to separate stream invocations', () => {
+  const steps = [];
+  const first = makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'first request', status: 'done', ok: true }, 1);
+  const second = makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'second request', status: 'done', ok: false }, 2);
+  pushTurnStep(steps, first);
+  pushTurnStep(steps, second);
+  assert.deepEqual(steps.map(s => [s.toolCallId, s.toolCallScope, s.target, s.ok]), [
+    ['tc1', 1, 'first request', true], ['tc1', 2, 'second request', false],
+  ]);
+  assert.equal(pushTurnStep(steps, makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'second request', status: 'done', ok: false }, 2)), false);
+  assert.equal(steps.length, 2, 'terminal replay remains idempotent inside its own invocation');
+  assert.deepEqual(makeTurnStep({ name: 'command' }, 1), makeTurnStep({ name: 'command' }), 'legacy tools do not acquire identity metadata');
+  assert.deepEqual(makeTurnStep({ kind: 'note', text: 'checking' }, 1), { k: 'note', text: 'checking' });
+});
+
+test('tool IDs: scoped invocations never claim old unscoped records with the same native ID', () => {
+  const steps = [];
+  pushTurnStep(steps, makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'legacy start', status: 'started' }));
+  pushTurnStep(steps, makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'scoped result', status: 'done', ok: true }, 1));
+  pushTurnStep(steps, makeTurnStep({ name: 'command', toolCallId: 'tc1', target: 'legacy start (failed)', status: 'done', ok: false }));
+  assert.deepEqual(steps.map(s => [s.toolCallScope, s.target, s.ok]), [
+    [undefined, 'legacy start (failed)', false], [1, 'scoped result', true],
+  ]);
+});
+
 test('tool IDs: different IDs and mixed legacy/identified events are never guessed into one call', () => {
   const steps = [];
   pushTurnStep(steps, tool(' a ', 'same command'));
@@ -111,11 +136,11 @@ test('tool IDs: an evicted start cannot cause an unrelated call to be overwritte
 });
 
 test('tool IDs: metadata never changes model-facing text or escapes the stripped steps field', () => {
-  const steps = [tool('private-native-call-id', 'npm test', false)];
+  const steps = [{ ...tool('private-native-call-id', 'npm test', false), toolCallScope: 2 }];
   const history = [{ role: 'assistant', content: 'verbatim answer', steps }];
   const legacy = [{ role: 'assistant', content: 'verbatim answer', steps: [{ k: 'tool', name: 'command', target: 'npm test', ok: false }] }];
   assert.deepEqual(prepareHistoryForModel(history), prepareHistoryForModel(legacy));
-  assert.doesNotMatch(JSON.stringify(prepareHistoryForModel(history)), /private-native-call-id|toolCallId/);
+  assert.doesNotMatch(JSON.stringify(prepareHistoryForModel(history)), /private-native-call-id|toolCallId|toolCallScope/);
   assert.equal(formatStepsForTurn(steps), '- command: npm test ✗');
   assert.equal(history[0].steps[0].toolCallId, 'private-native-call-id', 'storage metadata survives rendering');
 });

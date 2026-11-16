@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
+import { sseHttpResponse } from './helpers/sse-fixtures.mjs';
 
 const local = makeStorageArea({}, { clone: true });
 const session = makeStorageArea({}, { clone: true });
@@ -69,4 +70,65 @@ test('bridge tool completion without a text delta updates durable and saved step
   await chat;
   const saved = (await local.get('history')).history.findLast(entry => entry.role === 'assistant');
   assert.deepEqual(saved.steps, record.steps, 'the ID and exact outcome survive final persistence');
+});
+
+test('timestamp rewrite keeps two wire requests separate when terminal-only tools reuse the same ID', async t => {
+  local._reset();
+  session._reset();
+  await local.set({
+    providers: { br: { isBridge: true, alias: 'codex', baseUrl: 'http://127.0.0.1:3948' } },
+    activeProvider: 'br',
+    history: [{ role: 'user', content: 'video transcript', videoSrc: { platform: 'youtube', url: 'https://www.youtube.com/watch?v=fixture', tabId: 95 } }],
+  });
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  let requests = 0;
+  globalThis.fetch = async url => {
+    if (!String(url).endsWith('/turns')) return new Response('{}');
+    requests++;
+    const events = [
+      // The ACP adapter can omit a native turn ID and send only completion.
+      { type: 'start', sessionId: 'same-thread', turnId: '' },
+      { type: 'tool', id: 'tc1', name: 'command', status: requests === 1 ? 'completed' : 'failed', detail: requests === 1 ? 'read original transcript' : 'read timestamp transcript (failed)' },
+      { type: 'done', full: requests === 1 ? 'These video summary notes contain enough text to trigger timestamp rewriting, without any timestamp yet.' : 'Final notes [00:00].' },
+    ];
+    return sseHttpResponse(events.map(event => `data: ${JSON.stringify(event)}\n\n`));
+  };
+  await handleChat({ tabId: 95, userText: '总结视频' }, '', '');
+  const saved = (await local.get('history')).history.findLast(entry => entry.role === 'assistant');
+  assert.equal(requests, 2, 'the real handler performed its silent timestamp rewrite');
+  assert.equal(saved.content, 'Final notes [00:00].');
+  assert.deepEqual(saved.steps.map(s => [s.toolCallId, s.toolCallScope, s.target, s.ok]), [
+    ['tc1', 1, 'read original transcript', true],
+    ['tc1', 2, 'read timestamp transcript (failed)', false],
+  ]);
+});
+
+test('separate browser turns can reuse the same native ID without sharing tool records', async t => {
+  local._reset();
+  session._reset();
+  await local.set({
+    providers: { br: { isBridge: true, alias: 'codex', baseUrl: 'http://127.0.0.1:3948' } },
+    activeProvider: 'br',
+  });
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  let requests = 0;
+  globalThis.fetch = async url => {
+    if (!String(url).endsWith('/turns')) return new Response('{}');
+    requests++;
+    const events = [
+      { type: 'start', sessionId: 'same-thread', turnId: '' },
+      { type: 'tool', id: 'tc1', name: 'command', status: requests === 1 ? 'completed' : 'failed', detail: `request ${requests}` },
+      { type: 'done', full: `reply ${requests}` },
+    ];
+    return sseHttpResponse(events.map(event => `data: ${JSON.stringify(event)}\n\n`));
+  };
+  await handleChat({ tabId: 96, userText: 'first question' }, '', '');
+  await handleChat({ tabId: 96, userText: 'second question' }, '', '');
+  const saved = (await local.get('history')).history.filter(entry => entry.role === 'assistant');
+  assert.equal(requests, 2);
+  assert.deepEqual(saved.map(entry => entry.steps.map(s => [s.toolCallId, s.target, s.ok])), [
+    [['tc1', 'request 1', true]], [['tc1', 'request 2', false]],
+  ]);
 });

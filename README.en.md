@@ -141,7 +141,7 @@ Open ⚙ Settings, select the **Agent Bridge** card, click **＋ Add agent** and
 - the sidebar dropdown lists them as "Agent Bridge · codex"; each agent has its own session thread and ping status (⟳ on the row pings just that agent)
 - approval cards for dangerous actions appear right in the panel (an optional sound plays when an approval arrives; toggle in Settings)
 - screenshots, pasted images, and PDF figures ride along with your message — ≤18 per turn, needs agent-bridge ≥0.8.0 (older bridges degrade to the first 8 with a note in the message)
-- multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply. When the bridge supplies call IDs, steps are correlated by ID so parallel calls to the same tool remain distinct; legacy events without IDs remain supported
+- multi-turn context lives in the agent itself; pre-tool-call narration (codex announcing a skill) folds into the step history, not the reply. When the bridge supplies call IDs, steps are correlated within each request so parallel calls and IDs reused by separate requests remain distinct; legacy events without IDs remain supported
 
 **ZCode** rides the official CLI's headless mode (needs agent-bridge ≥0.12.0) and reuses the login and model your ZCode desktop app / CLI already has — the bridge auto-finds the CLI bundled with the desktop app, or use the `zcode` on PATH. Three things differ from the other agents:
 
