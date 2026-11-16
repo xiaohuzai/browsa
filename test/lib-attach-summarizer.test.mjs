@@ -8,6 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { makeStorageArea } from './helpers/chrome-mock.mjs';
 import { sseChatContent } from './helpers/sse-fixtures.mjs';
 
@@ -31,6 +32,37 @@ function reset() { localArea._reset(); sessionArea._reset(); }
 const sseFor = (text) => sseChatContent(text);
 
 const PROVIDER = { baseUrl: 'http://localhost:9999', apiKey: '', model: 'test-model' };
+
+test('summarizeLongText: prompt selection preserves all six templates and context precedence byte for byte', async () => {
+  const expected = JSON.parse(await readFile(new URL('./fixtures/attachment-summary-prompts.json', import.meta.url), 'utf8'));
+  const original = globalThis.fetch;
+  const cases = [
+    ['video', { mode: 'youtube' }],
+    ['video', { mode: 'reader', ctx: { mode: 'bilibili', meta: { paper: true } } }],
+    ['paper', { mode: 'youtube', ctx: { mode: 'reader', meta: { paper: true } } }],
+    ['document', { mode: 'reader', ctx: { mode: 'reader', meta: { paper: false } } }],
+    ['document', {}],
+  ];
+  try {
+    for (const [kind, context] of cases) {
+      const prompts = [];
+      globalThis.fetch = async (_url, init) => {
+        prompts.push(JSON.parse(init.body).messages[0].content);
+        return { ok: true, status: 200, body: sseFor('summary'), text: async () => '' };
+      };
+      const text = Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\n');
+      await summarizeLongText({ ...context, text, provider: PROVIDER, chunkSizeChars: 20 });
+      assert.ok(prompts.length > 1, 'a split attachment must run chunk and merge phases');
+      assert.deepEqual(prompts.slice(0, -1), Array(prompts.length - 1).fill(expected.chunk[kind]));
+      assert.equal(prompts.at(-1), expected.merge[kind]);
+      prompts.length = 0;
+      await summarizeLongText({ ...context, text: 'short', provider: PROVIDER });
+      assert.deepEqual(prompts, [expected.chunk[kind]], 'single-chunk input must not invoke merge');
+    }
+  } finally {
+    globalThis.fetch = original;
+  }
+});
 
 // ─── shouldSummarize ─────────────────────────────────────────────────────────
 
