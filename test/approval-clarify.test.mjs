@@ -276,12 +276,14 @@ test('CHAT handler routes to runsApiStream when isHermes, chatStream otherwise',
   // /v1/runs API over plain /v1/chat/completions — no separate per-provider
   // toggle exists (a provider that doesn't support /v1/runs is simply not
   // flagged isHermes).
-  // 2026-09-20 deepening pass: the kind derivation moved into
-  // lib/handlers/turn-request.js (kind = provider.isHermes ? 'hermes' : …),
-  // still read DIRECTLY from the provider config every call.
-  const trSrc = await fs.readFile(new URL('../lib/handlers/turn-request.js', import.meta.url), 'utf8');
-  assert.match(trSrc, /provider\.isHermes \? 'hermes'/,
-    'isHermes must be read directly from the provider config');
+  // The capability descriptor must still read the current config for every
+  // request, including a provider whose ping just discovered the Runs API.
+  const { createTurnRequest } = await import('../lib/handlers/turn-request.js');
+  const provider = { apiStyle: 'chat', isHermes: false };
+  const request = () => createTurnRequest({ provider, all: {}, msg: {}, sendHistory: [] });
+  assert.equal(request().kind, 'chat');
+  provider.isHermes = true;
+  assert.equal(request().kind, 'hermes');
   assert.doesNotMatch(src, /useRunsApi/, 'the retired useRunsApi toggle must not reappear');
 
   // The doStream() closure must branch on the turn kind to pick the API client.
