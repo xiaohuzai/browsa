@@ -225,9 +225,13 @@ test('durable mirror: a salvaged turn keeps its steps (SW death mid-tool-call)',
   const st = initStreamState(32, { providerLabel: 'bridge', providerKey: { name: 'bridge' } });
   st.steps = [];
   appendToStreamState(32, 'partial reply');
-  pushTurnStep(st.steps, makeTurnStep({ name: 'bash', target: 'npm test', status: 'done', ok: false }));
+  pushTurnStep(st.steps, makeTurnStep({ name: 'bash', toolCallId: 'call-32', target: 'npm test', status: 'done', ok: false }, 1));
   scheduleDurableTurnFlush(32);
   await flushDurable();
+
+  const mirror = (await sessionArea.get('browsa.inflightTurn.32'))['browsa.inflightTurn.32'];
+  assert.equal(st.steps[0].toolCallId, 'call-32', 'live correlation keeps the native ID');
+  assert.deepEqual(mirror.steps, [{ k: 'tool', name: 'bash', target: 'npm test', ok: false }]);
 
   // Simulate SW death: the live state evaporates, only the durable record stays.
   streamState.delete(32);
@@ -243,6 +247,7 @@ test('durable mirror: a salvaged turn keeps its steps (SW death mid-tool-call)',
   assert.ok(Array.isArray(entry.steps), 'the salvage carried the ledger, not just the text');
   assert.equal(entry.steps[0].name, 'bash');
   assert.equal(entry.steps[0].ok, false, 'the failure survives the salvage');
+  assert.deepEqual(entry.steps, mirror.steps, 'salvage preserves visible fields without live-only identity');
 });
 
 

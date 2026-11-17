@@ -65,6 +65,22 @@ test('makeTurnStep: text is clipped and whitespace collapsed', () => {
   assert.equal(/\s{2,}/.test(s.target), false, 'whitespace collapsed');
 });
 
+test('makeTurnStep: clipping a legacy title preserves valid Unicode', () => {
+  const step = makeTurnStep({ name: 'read', target: 'x'.repeat(199) + '😀z', status: 'started' });
+  assert.doesNotMatch(step.target, /\p{Surrogate}/u);
+  assert.equal(step.target, `${'x'.repeat(199)}…`);
+});
+
+test('makeTurnStep: Unicode clipping respects both extremes of surrogate pairs', () => {
+  for (const point of [0x10000, 0x103ff, 0x10fc00, 0x10ffff]) {
+    const character = String.fromCodePoint(point);
+    const split = makeTurnStep({ name: 'read', target: 'x'.repeat(199) + character + 'z', status: 'started' });
+    assert.equal(split.target, `${'x'.repeat(199)}…`);
+    const between = makeTurnStep({ name: 'read', target: 'x'.repeat(198) + character + character, status: 'started' });
+    assert.equal(between.target, `${'x'.repeat(198)}${character}…`);
+  }
+});
+
 test('makeTurnStep: summary equal to target is not duplicated', () => {
   const s = makeTurnStep({ name: 'read', target: 'a.ts', summary: 'a.ts', status: 'started' });
   assert.equal(s.summary, undefined);
