@@ -21,7 +21,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
-import { makeSidepanelChromeMock, wireSendMessage } from './helpers/chrome-mock.mjs';
+import { makeSidepanelChromeMock, makeStorageArea, wireSendMessage } from './helpers/chrome-mock.mjs';
+
+// The preflight reads storage for the send-time history mirror and the
+// DONE-time reconcile; model a real CHAT/DONE writing the user/assistant
+// pair so hidx accounting matches the background's storage, not an empty {}.
+const localStore = makeStorageArea({ history: [] }, { clone: true });
+const liveHistory = [];
 
 const html = await readFile(new URL('../sidepanel.html', import.meta.url), 'utf8');
 const dom = new JSDOM(html, { url: 'http://localhost/sidepanel.html', runScripts: undefined });
@@ -45,13 +51,54 @@ globalThis.chrome = makeSidepanelChromeMock({
   sendMessage: wireSendMessage((msg) => sendMessageHandler(msg)),
   onConnect: (name, port) => { if (name === 'browsa-chat') lastChatPort = port; },
 });
+globalThis.chrome.storage.local = {
+  ...globalThis.chrome.storage.local,
+  get: async (key) => {
+    if (key === 'history') return { history: [...liveHistory] };
+    return localStore.get(key);
+  },
+  set: async (obj) => {
+    await localStore.set(obj);
+    if (obj && Object.prototype.hasOwnProperty.call(obj, 'history')) {
+      liveHistory.length = 0;
+      liveHistory.push(...obj.history);
+    }
+  },
+  remove: (keys) => localStore.remove(keys),
+};
 
 // GET_CONFIG / STREAM_PEEK / CHAT default responses — individual tests
 // override sendMessageHandler for the behavior they need.
 sendMessageHandler = async (msg) => {
   if (msg.type === 'GET_CONFIG') return { data: {} };
   if (msg.type === 'STREAM_PEEK') return { inFlight: false };
-  if (msg.type === 'CHAT') return { ok: true };
+  if (msg.type === 'PREPARE_CHAT') return { ok: true, data: {} };
+  if (msg.type === 'STREAM_ABORT') {
+    // A salvaged cancel stores the streamed partial as an interrupted
+    // assistant entry (chat-handler's AbortError catch); an explicit drop
+    // stores nothing.
+    if (msg.salvage !== false && lastChatPort?.__salvageText) {
+      liveHistory.push({ role: 'assistant', content: lastChatPort.__salvageText, interrupted: true });
+      lastChatPort.__salvageText = '';
+    }
+    return { ok: true, data: { aborted: true, durableDiscarded: msg.salvage === false } };
+  }
+  if (msg.type === 'CHAT') {
+    liveHistory.push({ role: 'user', content: msg.userText });
+    const turnPort = lastChatPort;
+    // Track the streamed text so a salvaged cancel knows the partial.
+    turnPort.__salvageText = '';
+    const baseEmit = turnPort.emit.bind(turnPort);
+    turnPort.emit = (m) => {
+      if (m.type === 'CHUNK' && typeof m.delta === 'string') turnPort.__salvageText += m.delta;
+      if (m.type === 'DONE' && typeof m.full === 'string') {
+        liveHistory.push({ role: 'assistant', content: m.full });
+        turnPort.__salvageText = '';
+      }
+      baseEmit(m);
+    };
+    return { ok: true };
+  }
   return { ok: true };
 };
 
@@ -261,11 +308,39 @@ test('Stop before any chunk leaves the empty bubble UNSTAMPED (mirrors the backg
   inputEl.value = 'stopped before anything streamed';
   sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 50));
+  const userEl = [...messagesEl.querySelectorAll('.msg.user')].pop();
+  const userH = Number(userEl.dataset.hidx);
+  lastChatPort.emit({ type: 'TOOL_PROGRESS', text: 'Reading src/app.ts' });
+  await new Promise((r) => setTimeout(r, 10));
   sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true })); // Stop, zero chunks
   await new Promise((r) => setTimeout(r, 20));
   const cancelledEl = [...messagesEl.querySelectorAll('.msg.assistant')].pop();
   assert.equal(cancelledEl.dataset.hidx, undefined,
-    'nothing streamed → background salvages nothing (its `partial` gate) → no storage twin → no stamp');
+    'tool-only user cancel retains the old no-text salvage gate → no storage twin → no stamp');
+  inputEl.value = 'next message after tool-only stop';
+  sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal([...messagesEl.querySelectorAll('.msg.user')].pop().dataset.hidx, String(userH + 1));
+  lastChatPort.emit({ type: 'DONE', full: 'next reply' });
+  await new Promise((r) => setTimeout(r, 50));
+});
+
+test('a failed durable discard warns the user that a stopped turn might reappear', async () => {
+  const previous = sendMessageHandler;
+  sendMessageHandler = async (msg) => msg.type === 'STREAM_ABORT'
+    ? { ok: true, data: { aborted: true, durableDiscarded: false } }
+    : previous(msg);
+  try {
+    inputEl.value = 'stop with storage failure';
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    lastChatPort.emit({ type: 'TOOL_PROGRESS', text: 'Reading file' });
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 30));
+    assert.match(document.querySelector('.toast-container')?.textContent || '', /may reappear/i);
+  } finally {
+    sendMessageHandler = previous;
+  }
 });
 
 test('a background-initiated abort (ERROR ABORTED, salvaged:true) stamps the finalized bubble', async () => {
@@ -315,8 +390,37 @@ test('cancel aborts the stream\'s OWN tab: STREAM_ABORT carries the same tabId a
     assert.equal(abort.tabId, chat.tabId,
       'the abort must target the tab the stream is keyed by — aborting the LIVE currentTabId no-ops after a tab switch (server keeps burning tokens)');
     assert.equal(abort.salvage, true, 'default cancel salvages the partial');
+    assert.match(chat.turnId || '', /^[0-9a-f-]{36}$/i);
+    assert.equal(abort.turnId, chat.turnId, 'the cancel must identify the exact original turn');
   } finally {
     sendMessageHandler = prev;
+  }
+});
+
+test('clear does not discard history when the worker cannot confirm the old turn drop', async () => {
+  const sent = [];
+  const prev = sendMessageHandler;
+  sendMessageHandler = async msg => {
+    sent.push(msg);
+    if (msg.type === 'STREAM_ABORT') return { ok: false, code: 'NoReceiver', error: 'worker unavailable' };
+    return prev(msg);
+  };
+  try {
+    inputEl.value = 'drop cannot be confirmed';
+    sendBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    document.getElementById('clear').click();
+    document.querySelector('.confirm-ok').click();
+    await new Promise(r => setTimeout(r, 80));
+    assert.ok(sent.some(m => m.type === 'STREAM_ABORT' && m.salvage === false));
+    assert.equal(sent.some(m => m.type === 'CLEAR_HISTORY'), false, 'unconfirmed discard cannot be presented as cleared');
+    assert.match(document.querySelector('.toast-container')?.textContent || '', /may reappear/i);
+  } finally {
+    sendMessageHandler = prev;
+    // The refused clear leaves the turn LIVE — settle it so the next test
+    // does not inherit a streaming composer (its send would cancel instead).
+    lastChatPort.emit({ type: 'DONE', full: 'settled after refused clear' });
+    await new Promise(r => setTimeout(r, 50));
   }
 });
 
@@ -379,7 +483,7 @@ test('source pin: stream-addressing sites use the stream\'s tabId, never bare cu
   const src = await readFile(new URL('../sidepanel.js', import.meta.url), 'utf8');
   assert.match(src, /const streamTabId = activeController\.tabId \?\? currentTabId;/,
     'cancelStream resolves the stream tab off the controller');
-  assert.match(src, /sendMessage\(\{ type: 'STREAM_ABORT', tabId: streamTabId, salvage \}\)/);
+  assert.match(src, /sendMessage\(\{ type: 'STREAM_ABORT', tabId: streamTabId, salvage, \.\.\.\(streamTurnId \? \{ turnId: streamTurnId \} : \{\}\) \}\)/);
   assert.match(src, /function streamTabIdOf\(\) \{ return activeController\?\.tabId \?\? currentTabId; \}/,
     'REASSIGN callers share one resolver');
   assert.match(src, /type: 'REASSIGN_STREAM_SESSION', tabId: streamTabIdOf\(\)/);

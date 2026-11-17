@@ -1359,6 +1359,18 @@
     "message": "A resposta continua em segundo plano e será salva na sessão original",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "discardRecoveryFailed": {
+    "message": "Não foi possível apagar o registro da resposta interrompida; ele pode reaparecer.",
+    "description": "Warning: a stopped turn recovery record could not be discarded"
+  },
+  "recoveredTurnInterrupted": {
+    "message": "A resposta foi interrompida antes de gerar texto.",
+    "description": "History: interrupted turn with tool steps but no reply text"
+  },
+  "toolOutcomeUnknown": {
+    "message": "resultado desconhecido",
+    "description": "History: interrupted tool step whose result was not observed"
+  },
   "streamDied": {
     "message": "⚠️ Transmissão de resposta interrompida: $1",
     "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"

@@ -46,11 +46,13 @@ globalThis.chrome = makeSidepanelChromeMock({
 // The panel reads this targeted key directly (GET_CONFIG's light-key contract
 // deliberately omits it); the old test only fed GET_CONFIG, which production
 // never sees — the false-green that hid the preference never being read.
+const baseLocalGet = chrome.storage.local.get.bind(chrome.storage.local);
 chrome.storage.local.get = async (keys) => {
   const list = keys == null ? [] : typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
   const out = {};
   if (list.includes('quickbarCollapsed')) out.quickbarCollapsed = true;
-  return out;
+  if (list.includes('quickbarCollapsed')) return out;
+  return baseLocalGet(keys);
 };
 
 await import('../sidepanel.js');
@@ -67,18 +69,20 @@ test('quickbar starts collapsed when the persisted preference is true', () => {
     'init() must apply the persisted quickbarCollapsed preference to #quickbar');
 });
 
-test('clicking quickbar-toggle un-collapses the quickbar and persists the new state', () => {
+test('clicking quickbar-toggle un-collapses the quickbar and persists the new state', async () => {
   storageSetCalls.length = 0;
   quickbarToggleBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   assert.ok(!quickbarEl.classList.contains('collapsed'), 'first click must expand the quickbar');
+  await new Promise((r) => setTimeout(r, 0)); // storage.set is fire-and-forget; let the mock's write settle
   assert.ok(storageSetCalls.some((c) => c.quickbarCollapsed === false),
     'must persist the new (expanded) state via chrome.storage.local.set');
 });
 
-test('clicking quickbar-toggle again re-collapses it and persists that too', () => {
+test('clicking quickbar-toggle again re-collapses it and persists that too', async () => {
   storageSetCalls.length = 0;
   quickbarToggleBtn.dispatchEvent(new dom.window.Event('click', { bubbles: true }));
   assert.ok(quickbarEl.classList.contains('collapsed'), 'second click must re-collapse the quickbar');
+  await new Promise((r) => setTimeout(r, 0));
   assert.ok(storageSetCalls.some((c) => c.quickbarCollapsed === true),
     'must persist the re-collapsed state');
 });

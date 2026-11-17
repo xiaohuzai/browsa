@@ -257,10 +257,12 @@ test('DONE: a throw in the finalize decoration still runs ALL terminal cleanup a
 
     // epoch 前置接线（第五批 sw-3 的 SW 门）：DONE 带 epoch 就随 RELEASE 附上，
     // 不带则不附字段（上面第一次 DONE 无 epoch 的 RELEASE 已发出）。
-    ctx.port.emit({ type: 'DONE', full: 'quoted passage lives here. Final.', epoch: 42 });
+    ctx.port.emit({ type: 'DONE', full: 'quoted passage lives here. Final.', epoch: 42, turnId: 'unique-turn-id' });
     await new Promise((r) => setTimeout(r, 80));
     assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && m.tabId === 7 && m.epoch === 42),
       'DONE 携带的 epoch 必须随 STREAM_RELEASE 附上');
+    assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && m.tabId === 7 && m.turnId === 'unique-turn-id'),
+      'DONE 携带的随机回合身份必须随 RELEASE 回传');
     assert.ok(sent.some((m) => m.type === 'STREAM_RELEASE' && !('epoch' in m)),
       '无 epoch 的 DONE 不得给 RELEASE 附字段');
   } finally {

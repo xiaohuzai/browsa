@@ -1359,6 +1359,18 @@
     "message": "返信はバックグラウンドで続行され、元のセッションに保存されます",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "discardRecoveryFailed": {
+    "message": "停止した応答の復元記録を削除できませんでした。再表示される可能性があります。",
+    "description": "Warning: a stopped turn recovery record could not be discarded"
+  },
+  "recoveredTurnInterrupted": {
+    "message": "テキストが生成される前に応答が中断されました。",
+    "description": "History: interrupted turn with tool steps but no reply text"
+  },
+  "toolOutcomeUnknown": {
+    "message": "結果不明",
+    "description": "History: interrupted tool step whose result was not observed"
+  },
   "streamDied": {
     "message": "⚠️ 返信のストリームが中断しました：$1",
     "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"

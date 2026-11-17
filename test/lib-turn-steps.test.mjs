@@ -65,6 +65,22 @@ test('makeTurnStep: text is clipped and whitespace collapsed', () => {
   assert.equal(/\s{2,}/.test(s.target), false, 'whitespace collapsed');
 });
 
+test('makeTurnStep: clipping a legacy title preserves valid Unicode', () => {
+  const step = makeTurnStep({ name: 'read', target: 'x'.repeat(199) + '😀z', status: 'started' });
+  assert.doesNotMatch(step.target, /\p{Surrogate}/u);
+  assert.equal(step.target, `${'x'.repeat(199)}…`);
+});
+
+test('makeTurnStep: Unicode clipping respects both extremes of surrogate pairs', () => {
+  for (const point of [0x10000, 0x103ff, 0x10fc00, 0x10ffff]) {
+    const character = String.fromCodePoint(point);
+    const split = makeTurnStep({ name: 'read', target: 'x'.repeat(199) + character + 'z', status: 'started' });
+    assert.equal(split.target, `${'x'.repeat(199)}…`);
+    const between = makeTurnStep({ name: 'read', target: 'x'.repeat(198) + character + character, status: 'started' });
+    assert.equal(between.target, `${'x'.repeat(198)}${character}…`);
+  }
+});
+
 test('makeTurnStep: summary equal to target is not duplicated', () => {
   const s = makeTurnStep({ name: 'read', target: 'a.ts', summary: 'a.ts', status: 'started' });
   assert.equal(s.summary, undefined);
@@ -366,6 +382,74 @@ test('buildAgentBackfill: turns without a ledger render exactly as before', () =
   const text = buildAgentBackfill([{ role: 'assistant', content: 'plain reply' }]);
   assert.match(text, /^助手：plain reply$/m);
   assert.equal(/\[该回合执行过\]/.test(text), false);
+});
+
+test('a steps-only interrupted turn reaches agent backfill with its source and unknown outcome', () => {
+  const entry = { role: 'assistant', content: '', interrupted: true, providerLabel: 'codex',
+    steps: [{ k: 'tool', name: 'read', target: 'src/app.ts' }] };
+  const transcript = buildAgentBackfill([{ role: 'user', content: 'inspect' }, entry]);
+  assert.match(transcript, /助手（codex）/);
+  assert.match(transcript, /中断/);
+  assert.match(transcript, /read: src\/app\.ts/);
+  assert.match(transcript, /outcome unknown/);
+  assert.doesNotMatch(transcript, /in progress/);
+  assert.equal(entry.content, '', 'the transcript must not invent stored assistant prose');
+});
+
+test('a steps-only recovery with internal metadata is visible to agent handoff and LLM without leaking metadata', () => {
+  const entry = { role: 'assistant', content: '', steps: [{ k: 'tool', name: 'read', target: 'src/app.ts',
+    recovery: { kind: 'browsa.interrupted-step-only', id: 'internal-id', interrupted: true,
+      providerLabel: 'codex', providerKey: { name: 'bridge', model: 'codex' } } }] };
+  const backfill = buildAgentBackfill([{ role: 'user', content: 'inspect' }, entry]);
+  assert.match(backfill, /助手（codex）.*中断/);
+  assert.match(backfill, /read: src\/app\.ts \(outcome unknown\)/);
+  assert.doesNotMatch(backfill, /internal-id|providerKey|interrupted-step-only/);
+  const assistant = buildMessages({ history: [entry], userText: 'next' }).find(m => m.role === 'assistant');
+  assert.deepEqual(Object.keys(assistant).sort(), ['content', 'role']);
+  assert.match(assistant.content, /回合已中断/);
+  assert.match(assistant.content, /outcome unknown/);
+});
+
+test('steps-only interrupted history reaches each LLM shape and remains a stable prefix', () => {
+  const entry = { role: 'assistant', content: '', interrupted: true,
+    steps: [{ k: 'tool', name: 'read', target: 'src/app.ts', recoveryId: 'private-recovery-id' }] };
+  const history = [{ role: 'user', content: 'inspect' }, entry];
+  const snapshot = structuredClone(history);
+  const messages = buildMessages({ history, userText: 'what happened?' });
+  const assistant = messages.find(m => m.role === 'assistant');
+  assert.equal(typeof assistant.content, 'string');
+  assert.match(assistant.content, /read: src\/app\.ts/);
+  assert.match(assistant.content, /outcome unknown/);
+  assert.equal('steps' in assistant, false);
+  assert.doesNotMatch(JSON.stringify(messages), /private-recovery-id|recoveryId/);
+  for (const [name, wire] of Object.entries({
+    responses: buildResponsesInput({ userText: 'what happened?' }, history),
+    anthropic: buildAnthropicMessages({ userText: 'what happened?' }, history),
+    runs: buildRunsConversationHistory(history),
+  })) {
+    const prior = wire.find(m => m.role === 'assistant');
+    assert.ok(prior, `${name} must not drop the empty-text turn`);
+    assert.match(JSON.stringify(prior.content), /read: src\/app\.ts/);
+    assert.match(JSON.stringify(prior.content), /outcome unknown/);
+    assert.equal('steps' in prior, false);
+  }
+  const later = buildMessages({ history: [...history, { role: 'user', content: 'what happened?' },
+    { role: 'assistant', content: 'I do not know yet' }], userText: 'continue' });
+  assert.deepEqual(later.slice(0, messages.length), messages, 'subsequent requests preserve the exact prefix');
+  assert.deepEqual(history, snapshot, 'request construction never rewrites stored history');
+});
+
+test('existing interrupted text entries keep their original handoff bytes', () => {
+  const entry = { role: 'assistant', content: 'partial', interrupted: true, providerLabel: 'codex',
+    steps: [{ k: 'tool', name: 'read', target: 'file' }] };
+  assert.equal(stepsNoteForEntry(entry), '\n\n[browsa: 该回合执行过]\n- read: file (in progress)');
+  assert.equal(buildAgentBackfill([entry]), '以下是切换对话对象之前的聊天记录，供接续上下文：\n\n助手（codex）：partial\n[该回合执行过]\n- read: file (in progress)');
+});
+
+test('legacy whitespace and image-only assistant entries keep their original backfill behavior', () => {
+  const steps = [{ k: 'tool', name: 'read', target: 'file' }];
+  assert.equal(buildAgentBackfill([{ role: 'assistant', content: '  ', interrupted: true, steps }]), '');
+  assert.equal(buildAgentBackfill([{ role: 'assistant', content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AA' } }], interrupted: true, steps }]), '');
 });
 
 // ─── Invariant 3: history is never rewritten to make this work ──────────────

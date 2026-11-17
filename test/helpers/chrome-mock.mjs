@@ -75,6 +75,11 @@ export function makeSidepanelChromeMock({
   portOptions,
   storageLocalSet = async () => {},
 } = {}) {
+  // A functional default local store: the send preflight mints historyGeneration
+  // via storage.ensureHistoryGeneration() (a real chrome.storage.local.set), so a
+  // no-op set would leave the generation unpersisted and abort every send. Tests
+  // that override storage.local.get/set wholesale keep their own behavior.
+  const localStore = makeStorageArea({}, { clone: true });
   return {
     tabs: {
       query: async () => [{ id: tabId, url: 'https://example.com/', title: 'Example' }],
@@ -92,7 +97,11 @@ export function makeSidepanelChromeMock({
       lastError: undefined,
     },
     storage: {
-      local: { get: async () => ({}), set: storageLocalSet, remove: async () => {} },
+      local: {
+        get: (keys) => localStore.get(keys),
+        set: async (obj) => { await localStore.set(obj); await storageLocalSet(obj); },
+        remove: (keys) => localStore.remove(keys),
+      },
       session: { get: async () => ({}), remove: async () => {} },
       onChanged: { addListener: () => {} },
     },
