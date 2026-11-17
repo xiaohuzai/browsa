@@ -58,6 +58,8 @@ import { initImageResize } from './lib/sidepanel/image-resize.js';
 import { providerDisplayName as displayProviderName, providerEntrySuffix } from './lib/provider-display.js';
 import { aggregateBridgePing } from './lib/provider-ping.js';
 import { agentSwitchNeedsPrompt } from './lib/agent-turn.js';
+import { formatStepsForTurn } from './lib/message-builder.js';
+import { recoveredStepMetadata } from './lib/tool-call-id.js';
 // smd removed: <thinking> tags from Claude confused its HTML parser, breaking markdown rendering.
 
 // i18n convenience — existing call sites keep the short alias. t() resolves
@@ -1402,7 +1404,33 @@ async function clearChatHistory() {
     danger: true
   });
   if (!ok) return;
-  cancelStream({ salvage: false }); // 确认后再停流（显式弃置，不收尸）：取消确认不应误杀进行中的回复
+  const discardController = activeController && !activeController.cancelled ? activeController : null;
+  let confirmedDiscard = null;
+  if (discardController) {
+    const dropped = discardController.turnId
+      ? await sendMessage({ type: 'STREAM_ABORT', tabId: discardController.tabId ?? currentTabId,
+        salvage: false, turnId: discardController.turnId }).catch(() => null)
+      : null;
+    if (!dropped?.data?.durableDiscarded) {
+      showToast(_t('discardRecoveryFailed', 'The stopped turn could not be cleared and may reappear.'), 'error');
+      return;
+    }
+    confirmedDiscard = discardController;
+  }
+  if (activeController && activeController === confirmedDiscard) {
+    // 弃置已在后台确认落盘：本地收尾不再重发 ABORT，避免二次未确认告警。
+    const el = activeController.el;
+    try { activeController.port?.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
+    try { activeController.port?.disconnect(); } catch (_) {}
+    activeController.renderStream?.destroy?.();
+    el?.classList.add('done');
+    turnChrome.clearToolProgress(el);
+    turnChrome.stopWait();
+    activeController = null;
+    setStreamingUI(false);
+  } else {
+    cancelStream({ salvage: false }); // 确认后再停流（显式弃置，不收尸）：取消确认不应误杀进行中的回复
+  }
   await sendMessage({ type: 'CLEAR_HISTORY' });
   void clearDetailThreads(); // 同上：对话清空，追问卡不再属于任何内容
   clearFollowups(); // 排队消息也不属于任何内容
@@ -1545,6 +1573,7 @@ function cancelStream({ salvage = true, detach = false } = {}) {
   // claimed "cancelled" (and Hermes /stop never fired). Same for the
   // REASSIGN sites (newSession / sessions-ui) — see streamTabIdOf().
   const streamTabId = activeController.tabId ?? currentTabId;
+  const streamTurnId = activeController.turnId;
   // Send STREAM_ABORT first (best-effort). The background's CHAT handler
   // is awaiting chatStream() with the matching AbortController; calling
   // .abort() throws AbortError on the next read(), which the catch
@@ -1557,7 +1586,11 @@ function cancelStream({ salvage = true, detach = false } = {}) {
   // STREAM_ABORT。salvage:false（clearChatHistory 显式弃置）随 ABORT 传递，
   // 服务端据此跳过「已中断」收尸。
   if (!detach && streamTabId != null) {
-    sendMessage({ type: 'STREAM_ABORT', tabId: streamTabId, salvage }).catch(() => {});
+    sendMessage({ type: 'STREAM_ABORT', tabId: streamTabId, salvage, ...(streamTurnId ? { turnId: streamTurnId } : {}) }).then((res) => {
+      if (res?.data?.durableDiscarded === false) {
+        showToast(_t('discardRecoveryFailed', 'The stopped turn could not be cleared and may reappear.'), 'error');
+      }
+    }).catch(() => {});
   }
   if (port) {
     try { port.postMessage({ type: 'STREAM_GOODBYE' }); } catch (_) {}
@@ -2029,7 +2062,8 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
         activeController = null;
         // epoch 前置接线（第五批 sw-3 的 SW 门）：DONE 若带回合 epoch 就随
         // RELEASE 附上；当前 SW 忽略未知字段，无行为变化。
-        sendMessage({ type: 'STREAM_RELEASE', tabId, ...(m.epoch != null ? { epoch: m.epoch } : {}) }).catch(() => {});
+        sendMessage({ type: 'STREAM_RELEASE', tabId, ...(m.epoch != null ? { epoch: m.epoch } : {}),
+          ...(m.turnId ? { turnId: m.turnId } : {}) }).catch(() => {});
         reconcileHistoryIdx(typeof m.historyLen === 'number' ? m.historyLen : undefined); // no-drift fast path skips the full-history read (批C)
         maybeDrainFollowups();
         // caller 钩子最末且单独包住：钩子抛错不得再吃掉任何清理。
@@ -2087,7 +2121,11 @@ function wireChatStreamPort({ port, tabId, target, state, hooks = {} }) {
   });
 }
 
+let preparingSend = false;
+const seenRecoveryNotices = new Map();
+
 async function onSend() {
+  if (preparingSend) return;
   if (!currentTabId) {
     appendError(_t('noActiveTab', 'No active tab.'));
     return;
@@ -2138,22 +2176,49 @@ async function onSend() {
   const slashExpanded = expandSlash(rawText);
   const text = slashExpanded || rawText;
 
-  // Re-read the active tab RIGHT before sending. This is the defense-in-depth
-  // for SPA navigation: even if a webNavigation push was missed (background
-  // service worker was sleeping, port was re-establishing, etc.), we still
-  // have the right tab here. The user perceives a small extra delay
-  // (<10ms in practice) but gains correctness.
-  if (typeof currentTabId === 'number') {
-    try {
-      const live = await chrome.tabs.get(currentTabId);
-      if (live) {
-        pagemetaEl.textContent = live.title || live.url || '';
-        pagemetaEl.href = live.url || '#';
-        pagemetaEl.title = live.url || '';
-      }
-    } catch (_) {
-      // tab gone or permission denied — keep going with what we have
+  // Resolve durable recovery before stamping a new bubble: a recovered entry
+  // inserted behind the panel's history mirror otherwise shifts every hidx.
+  const sendTabId = currentTabId;
+  const wasInputDisabled = inputEl.disabled;
+  const wasSendDisabled = sendBtn.disabled;
+  let expectedHistoryState;
+  preparingSend = true;
+  inputEl.disabled = true;
+  sendBtn.disabled = true;
+  try {
+    const before = { activeSessionId: (await storage.get('activeSessionId')) || '',
+      historyGeneration: await storage.ensureHistoryGeneration() };
+    const ready = await sendMessage({ type: 'PREPARE_CHAT', tabId: sendTabId });
+    if (!ready?.ok) { appendError(ready?.error || 'Unable to recover the previous reply. Please try again.'); return; }
+    const after = { activeSessionId: (await storage.get('activeSessionId')) || '',
+      historyGeneration: (await storage.get('historyGeneration')) || '' };
+    if (currentTabId !== sendTabId || before.activeSessionId !== after.activeSessionId || before.historyGeneration !== after.historyGeneration) return;
+    const notice = ready.data?.recoveryNotice;
+    const history = await storage.getHistory();
+    const hasStreamBubble = !!activeController && !activeController.cancelled;
+    const historyDrifted = !hasStreamBubble && hidxCurrent() !== history.length;
+    if ((notice && seenRecoveryNotices.get(sendTabId) !== notice) || historyDrifted) {
+      await renderHistory();
+      if (notice) seenRecoveryNotices.set(sendTabId, notice);
     }
+    if (typeof sendTabId === 'number') {
+      try {
+        const live = await chrome.tabs.get(sendTabId);
+        if (live) {
+          pagemetaEl.textContent = live.title || live.url || '';
+          pagemetaEl.href = live.url || '#';
+          pagemetaEl.title = live.url || '';
+        }
+      } catch (_) { /* tab gone or permission denied */ }
+    }
+    const current = { activeSessionId: (await storage.get('activeSessionId')) || '',
+      historyGeneration: (await storage.get('historyGeneration')) || '' };
+    if (currentTabId !== sendTabId || before.activeSessionId !== current.activeSessionId || before.historyGeneration !== current.historyGeneration) return;
+    expectedHistoryState = { activeSessionId: current.activeSessionId, historyGeneration: current.historyGeneration, historyLen: history.length };
+  } finally {
+    preparingSend = false;
+    inputEl.disabled = wasInputDisabled;
+    sendBtn.disabled = wasSendDisabled;
   }
 
   // User bubble — show the original slash command, not the expanded prompt
@@ -2188,8 +2253,9 @@ async function onSend() {
   // 值（onSend 的 await 链中途 currentTabId 可能随 onActivated 变掉，混用会
   // 让 cancel/REASSIGN 打错 streamState 键——2026-09-30 批A）。
   const turnTabId = currentTabId;
+  const turnId = crypto.randomUUID();
   const port = chrome.runtime.connect({ name: 'browsa-chat' });
-  activeController = { port, cancelled: false, el: assistantEl, renderStream, tabId: turnTabId, state };
+  activeController = { port, cancelled: false, el: assistantEl, renderStream, tabId: turnTabId, state, turnId };
 
   // Keep the SW alive during streaming by pinging it every 20s.
   // Chrome's MV3 SW can be killed for idleness when the SSE stream goes
@@ -2268,14 +2334,28 @@ async function onSend() {
     const res = await sendMessage({
       type: 'CHAT',
       tabId: turnTabId,
+      turnId,
       userText: text,
       stream: true,
       portName: 'browsa-chat',
       images: imageDataUrls,
       backfill,
-      sessionId: sessionForTurn
+      sessionId: sessionForTurn,
+      expectedHistoryState
     });
     if (!res.ok) {
+      if (res.code === 'HistoryChangedError') {
+        clearInterval(_swPingInterval);
+        activeController = null;
+        try { port.disconnect(); } catch (_) {}
+        setStreamingUI(false);
+        await renderHistory();
+        if (rawText) inputEl.value = inputEl.value ? `${rawText}\n\n${inputEl.value}` : rawText;
+        if (imageDataUrls?.length) { images.push(...imageDataUrls.map(dataUrl => ({ dataUrl }))); refreshImageStrip(); }
+        pendingAgentBackfill = backfill;
+        appendError(res.error || 'Conversation changed; please send again.');
+        return;
+      }
       // Real error (re-thrown by background, port receives nothing).
       // Clean up NOW: the port will never receive DONE/ERROR, so without
       // this activeController leaks and the retry button below would
@@ -2514,7 +2594,8 @@ async function resumeInFlightStream(tabId) {
   // sends STREAM_RELEASE; the background keeps streaming but no chunks
   // reach us, and PEEK stops returning in-flight. Reasonable trade-off
   // for v0.20.4; v0.20.5 will plumb an AbortController through.
-  activeController = { port, cancelled: false, tabId, resumed: true, el: target.getEl(), renderStream: target.getRenderer(), state };
+  activeController = { port, cancelled: false, tabId, resumed: true, el: target.getEl(), renderStream: target.getRenderer(), state,
+    ...(typeof peek.turnId === 'string' && peek.turnId ? { turnId: peek.turnId } : {}) };
 }
 
 /**
@@ -3019,7 +3100,7 @@ function addMsgActions(el, getRaw) {
         // （与 math-copy.js 选区复制的剥离清单同一口径）。
         const clone = el.cloneNode(true);
         clone.querySelectorAll(
-          '.think-block, .msg-actions, .code-copy-btn, .msg-time, .token-usage, .tool-history, .msg-provider, .mermaid-toolbar'
+          '.think-block, .msg-actions, .code-copy-btn, .msg-time, .token-usage, .tool-history, .msg-provider, .mermaid-toolbar, .recovered-interruption'
         ).forEach((n) => n.remove());
         text = (clone.innerText || '').trim();
       }
@@ -3623,6 +3704,23 @@ let historyUpgradeIO = null;     // IntersectionObserver driving the lazy render
 let pendingAgentBackfill = false; // one-shot: carry the conversation into the next agent turn
 let lastReplyKey = null;         // {name, model} of the provider that wrote the latest reply
 
+function isStepsOnlyInterruption(entry) {
+  return !!recoveredStepMetadata(entry);
+}
+
+function showRecoveredInterruption(el, steps) {
+  const notice = document.createElement('p');
+  notice.className = 'recovered-interruption';
+  notice.textContent = _t('recoveredTurnInterrupted', 'Reply interrupted before any text was produced.');
+  el.appendChild(notice);
+  const events = formatStepsForTurn(steps, { pendingLabel: _t('toolOutcomeUnknown', 'outcome unknown') }).split('\n');
+  const details = turnChrome.renderToolHistory(el, events);
+  if (details) {
+    details.open = true;
+    el.appendChild(details); // the steps are part of this entry and leave with it on delete
+  }
+}
+
 async function renderHistory() {
   if (historyUpgradeIO) { historyUpgradeIO.disconnect(); historyUpgradeIO = null; }
   disposeChartObservers(); // chart/markmap ResizeObservers hold strong refs to the DOM we're about to wipe
@@ -3692,9 +3790,14 @@ async function renderHistory() {
         el.dataset.hidx = i;
       } else if (m.role === 'assistant') {
         const rawContent = m.content;
+        const recoveredWithoutText = isStepsOnlyInterruption(m);
+        const providerLabel = recoveredStepMetadata(m)?.providerLabel ?? m.providerLabel;
         const el = appendAssistant('', true);
         // Sync fast-render so the bubble is visible immediately
         el.innerHTML = renderStreamingSafe(rawContent);
+        if (recoveredWithoutText) {
+          showRecoveredInterruption(el, m.steps);
+        }
         // Only resolve preceding figures when this reply actually references
         // them — figuresBeforeEntry walks backwards to the nearest image-bearing
         // user entry, which in a text-only history scans to index 0 per reply.
@@ -3704,8 +3807,8 @@ async function renderHistory() {
         el.dataset.hidx = i;
         if (m.videoSrc) el.dataset.videoSrc = JSON.stringify(m.videoSrc);
         addMsgActions(el, () => rawContent);
-        addProviderChip(el, m.providerLabel);
-        asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs, providerLabel: m.providerLabel });
+        addProviderChip(el, providerLabel);
+        asyncUpgrades.push({ el, rawContent, videoSrc: m.videoSrc, figs, providerLabel, recoveredSteps: recoveredWithoutText ? m.steps : null });
       }
     }
   } finally {
@@ -3713,7 +3816,8 @@ async function renderHistory() {
   }
   // Switch-prompt decision input: which provider/endpoint produced the most
   // recent reply (null when the conversation has no replies yet).
-  lastReplyKey = [...list].reverse().find((m) => m.role === 'assistant' && m.providerKey)?.providerKey || null;
+  lastReplyKey = [...list].reverse().filter((m) => m.role === 'assistant')
+    .map((m) => recoveredStepMetadata(m)?.providerKey ?? m.providerKey).find(Boolean) || null;
 
   // Synchronous rendering done — panel is visible. Wire shallow decorations
   // (copy buttons, timestamps) on the fast-rendered content now so they work
@@ -3758,7 +3862,7 @@ async function renderHistory() {
     // open. IntersectionObserver-driven: upgrade when the bubble nears the
     // scrollport (rootMargin pre-renders ahead of scroll). jsdom has no
     // IntersectionObserver → eager fallback keeps tests and old behavior.
-    const runUpgrade = async ({ el, rawContent, figs, providerLabel }) => {
+    const runUpgrade = async ({ el, rawContent, figs, providerLabel, recoveredSteps }) => {
       const html = await renderSafe(rawContent);
       // 气泡替换事务（单点）：嵌套卡 capture→reinsert；同步渲染缺块时暂落
       // 气泡后的卡 moveSiblings 移回真实锚点；decorate 重跑全部装饰（C3 单一
@@ -3766,6 +3870,7 @@ async function renderHistory() {
       await swapBubbleContent(el, () => { el.innerHTML = html; }, {
         moveSiblings: true,
         decorate: () => {
+          if (recoveredSteps) showRecoveredInterruption(el, recoveredSteps);
           finishBubble(el); // innerHTML 重建后全部装饰重跑（C3 单一收尾）
           decorateFigureRefs(el, figs);
           // el.innerHTML above wipes out the .msg-actions row appended during the

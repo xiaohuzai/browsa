@@ -56,8 +56,9 @@ globalThis.chrome = makeSidepanelChromeMock({
     return { ok: true };
   }),
 });
+const baseLocalGet = globalThis.chrome.storage.local.get.bind(globalThis.chrome.storage.local);
 globalThis.chrome.storage.local.get = async (key) =>
-  key === 'history' ? { history: FAKE_HISTORY } : {};
+  key === 'history' ? { history: FAKE_HISTORY } : baseLocalGet(key);
 
 await import('../sidepanel.js');
 // Deliberately short — long enough for init()'s own awaited steps

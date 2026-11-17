@@ -16,9 +16,10 @@ import {
   subChatControllers, subChatPorts,
   initStreamState, appendToStreamState, clearStreamState,
   recordTerminalTombstone, takeTerminalTombstone, peekTerminalTombstone, clearTerminalTombstone,
-  STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm, scheduleDurableTurnFlush
+  STREAM_KEEPALIVE_ALARM, GC_ALARM_NAME, syncGcAlarm, scheduleDurableTurnFlush,
+  suppressDurableTurn, discardDurableTurn
 } from './lib/state.js';
-import { handleChat, fetchLlmsTxt, ensureDurableSalvage } from './lib/handlers/chat-handler.js';
+import { handleChat, fetchLlmsTxt, ensureDurableSalvage, prepareDurableChat, discardDeadDurableTurn } from './lib/handlers/chat-handler.js';
 import { handleSubchat, handleSubchatAbort, handleSubchatApprovalRespond, handleSubchatClarifyRespond } from './lib/handlers/subchat-handler.js';
 import { handleSession } from './lib/handlers/session-handler.js';
 import { checkAndRecordAttachChange } from './lib/handlers/attach-change-tracker.js';
@@ -1162,6 +1163,7 @@ async function handle(msg, sender) {
         lastDeltaAt: st.lastDeltaAt,
         providerLabel: st.providerLabel,
         providerKey: st.providerKey,
+        turnId: st.recoveryId,
         originSessionId: st.originSessionId || null,
         bg: !!st.bg,
         pendingAgentCards: {
@@ -1213,6 +1215,8 @@ async function handle(msg, sender) {
       const t = msg.tabId;
       if (t != null) {
         const st = streamState.get(t);
+        if (st && msg.turnId != null && st.recoveryId !== msg.turnId) return { released: false };
+        if (st && (chatControllers.has(t) || activeRunIds.has(t) || st.persisting)) return { released: false };
         if (msg.epoch != null) {
           if (st && st.epoch !== msg.epoch) return { released: false };
         } else if (chatControllers.has(t) || activeRunIds.has(t)) {
@@ -1231,6 +1235,17 @@ async function handle(msg, sender) {
       // 'ABORTED'} and returns without writing to history.
       const t = msg.tabId;
       const controller = chatControllers.get(t);
+      const st = streamState.get(t);
+      if (st && ((msg.turnId && msg.turnId !== st.recoveryId) || (st.clientTokenRequired && !msg.turnId))) {
+        return { aborted: false, durableDiscarded: false };
+      }
+      if (!controller && msg.salvage === false) {
+        if (st) return { aborted: false, durableDiscarded: false };
+        return { aborted: false, durableDiscarded: await discardDeadDurableTurn(t, msg.turnId) };
+      }
+      const discardMirror = !!controller && st?.ownerController === controller
+        && (msg.salvage === false || !(String(st.acc || '').trim() || String(st.visibleBeforeSilent || '').trim()));
+      if (discardMirror) suppressDurableTurn(t, st);
       if (controller) {
         // `salvage: false` (clearChatHistory — explicit destruction) aborts
         // with reason 'drop': the CHAT handler's catch then skips the
@@ -1250,7 +1265,8 @@ async function handle(msg, sender) {
       }
       // Do NOT clearStreamState here: the CHAT handler's abort catch reads
       // streamState.acc for the interrupted-turn salvage and clears it itself.
-      return { aborted: !!controller };
+      const durableDiscarded = discardMirror ? await discardDurableTurn(t, st) : undefined;
+      return { aborted: !!controller, ...(discardMirror ? { durableDiscarded } : {}) };
     }
 
     case 'SUBCHAT_APPROVAL_RESPOND':   // subchat-keyed approval relay (detail thread card)
@@ -1317,7 +1333,11 @@ async function handle(msg, sender) {
       return ctx;
     }
 
+    case 'PREPARE_CHAT':
+      return prepareDurableChat(msg.tabId);
+
     case 'CHAT':
+      await prepareDurableChat(msg.tabId);
       return handleChat(msg, CAPABILITY_HINTS, CHOICE_REQUEST_HINT);
 
     default:

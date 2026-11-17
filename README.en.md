@@ -306,7 +306,7 @@ The full reference lives here:
 <details>
 <summary><b>Chat</b> — streaming, thinking blocks, diagrams, follow-up…</summary>
 
-Switching sessions mid-reply never kills the reply: it keeps running in the background and is saved to the session it started in (marked with a pulsing dot in the drawer until it lands). Stopping a reply yourself keeps whatever already streamed, marked as interrupted — long thinking never evaporates.
+Switching sessions mid-reply never kills the reply: it keeps running in the background and is saved to the session it started in (marked with a pulsing dot in the drawer until it lands). Stopping a reply yourself keeps whatever already streamed, marked as interrupted — long thinking never evaporates. If the extension background stops unexpectedly, reopening attempts to recover saved text or tool steps; steps with no observed result are marked as unknown.
 
 | Feature | What you get |
 |---|---|

@@ -1359,6 +1359,18 @@
     "message": "Reply continues in the background and will be saved to its original session",
     "description": "Toast: switching sessions mid-turn keeps the reply running in the background"
   },
+  "discardRecoveryFailed": {
+    "message": "The stopped turn could not be cleared and may reappear.",
+    "description": "Warning: a stopped turn recovery record could not be discarded"
+  },
+  "recoveredTurnInterrupted": {
+    "message": "Reply interrupted before any text was produced.",
+    "description": "History: interrupted turn with tool steps but no reply text"
+  },
+  "toolOutcomeUnknown": {
+    "message": "outcome unknown",
+    "description": "History: interrupted tool step whose result was not observed"
+  },
   "streamDied": {
     "message": "⚠️ Reply stream interrupted: $1",
     "description": "Resumed stream: a real provider error tombstoned while the panel was closed, replayed when the panel reattaches"
