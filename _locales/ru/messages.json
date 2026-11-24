@@ -1087,6 +1087,10 @@
     "message": "Схема: + / − масштаб, стрелки для перемещения, 0 для сброса",
     "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
   },
+  "mermaidPanHint": {
+    "message": "Чтобы перетаскивать, приблизьте: двойной щелчок или Ctrl+прокрутка",
+    "description": "Sidepanel: toast when a diagram is drag-panned before zooming in (pan is gated to >fit)"
+  },
   "mermaidExportPng": {
     "message": "Экспорт в PNG",
     "description": "Sidepanel: chart export png title"

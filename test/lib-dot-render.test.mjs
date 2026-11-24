@@ -356,3 +356,76 @@ test('renderDot keeps the original error card for DOT repair cannot fix', async 
   assert.ok(el.querySelector('.dot-error'), 'unfixable DOT still shows the error');
   assert.ok(el.querySelector('pre'), 'source block kept for copying');
 });
+
+// ─── 门禁档的拖动反馈（2026-11-24 用户报告「能缩放但鼠标拖不动」）──────────────
+// 平移门禁本身是用户拍板、勿回退的（lib/sidepanel/AGENTS.md：平移/方向键/拖拽
+// 只在 >fit(1) 时启用——整图都在视野内时平移只会把图拖偏）。这里锁的不是放开
+// 门禁，而是门禁挡掉拖动时用户看到的反馈：光标只承诺真能做的手势，鼠标拖动
+// 得到一句解释而不是沉默。真 WASM 渲染 + 真 PointerEvent，断言用户可见结果。
+async function renderGatedDiagram() {
+  // toast 3.5s 才自动消失——别让上一个测试的残留混进本次计数。
+  document.querySelector('.toast-container')?.remove();
+  const el = makeDotEl('digraph { rankdir=LR; a -> b -> c; }');
+  await renderDot(el);
+  const [plus, minus] = el.querySelectorAll('.mermaid-btn'); // 工具条顺序：+ − ⊙ 复制 导出
+  return { wrap: el.querySelector('.dot-diagram .mermaid-svg-wrap'), plus, minus };
+}
+function pointer(wrap, type, init) {
+  wrap.dispatchEvent(new dom.window.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, ...init }));
+}
+// 一次手势：按住 → 分四步拖开 →（让出一个宏任务，模拟真人拖动的时间跨度：
+// toast 的「点外面关闭」监听正是在这个间隙挂上的）→ 松开 → 浏览器随后合成的
+// click。返回手势结束后仍在的 toast 数（净增）——在拖动中途弹出的 toast 会被这次
+// 手势自己的 click 当成「点了外面」立刻关掉，真 Chrome 里等于没提示（2026-11-24
+// 真机复验抓到，jsdom 不会从 pointerup 合成 click）。
+async function drag(wrap, pointerType, end = 'pointerup') {
+  const before = document.querySelectorAll('.toast').length;
+  const at = (i) => ({ clientX: 100 + 15 * i, clientY: 100 + 8 * i });
+  pointer(wrap, 'pointerdown', { pointerType, button: 0, buttons: 1, ...at(0) });
+  for (let i = 1; i <= 4; i++) pointer(wrap, 'pointermove', { pointerType, buttons: 1, ...at(i) });
+  await new Promise((r) => setTimeout(r, 0));
+  pointer(wrap, end, { pointerType, button: 0, ...at(4) });
+  // 被取消的按住（原生链接拖拽）后面没有 click。
+  if (end === 'pointerup') wrap.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  return document.querySelectorAll('.toast').length - before;
+}
+const PAN_HINT = '放大后可拖动：双击或 Ctrl+滚轮';
+
+test('gated-off pan: the cursor advertises zoom at fit and below fit; grab only once panning works', async () => {
+  const { wrap, plus, minus } = await renderGatedDiagram();
+  assert.equal(wrap.style.cursor, 'zoom-in', 'fit: a silent arrow reads as "not interactive"');
+  plus.click();
+  assert.equal(wrap.style.cursor, 'grab', 'zoomed in: dragging pans, so say so');
+  minus.click(); minus.click(); // 1.25 → 1 → 0.8
+  assert.equal(wrap.style.cursor, 'zoom-in', 'below fit: a grab cursor promises a drag that is gated off');
+});
+
+test('gated-off pan: a mouse drag stays put and raises one info toast that outlives the gesture', async () => {
+  const { wrap, plus, minus } = await renderGatedDiagram();
+  const svg = wrap.querySelector('svg');
+  const fitVB = svg.getAttribute('viewBox');
+  assert.equal(await drag(wrap, 'mouse'), 1, 'fit: one hint, still visible after the gesture\'s own click');
+  assert.equal(svg.getAttribute('viewBox'), fitVB, 'fit: the hint replaces silence, not the pan gate');
+  const toast = document.querySelector('.toast');
+  assert.ok(toast.classList.contains('toast-info'), 'an explanation, not an error');
+  assert.equal(toast.querySelector('span').textContent, PAN_HINT);
+  assert.equal(await drag(wrap, 'mouse', 'pointercancel'), 0, 'a press that is cancelled (native link drag) explains nothing');
+  plus.click(); minus.click(); minus.click(); // below fit
+  const outVB = svg.getAttribute('viewBox');
+  assert.equal(await drag(wrap, 'mouse'), 1, 'below fit: the same explanation');
+  assert.equal(svg.getAttribute('viewBox'), outVB, 'below fit: still no pan');
+});
+
+test('gated-off pan: a touch drag raises no hint (it is a list scroll, not a failed pan)', async () => {
+  const { wrap } = await renderGatedDiagram();
+  assert.equal(await drag(wrap, 'touch'), 0, 'touch-action: pan-y hands the gesture to the page scroller');
+});
+
+test('pan enabled: a mouse drag pans and stays silent', async () => {
+  const { wrap, plus } = await renderGatedDiagram();
+  const svg = wrap.querySelector('svg');
+  const fitVB = svg.getAttribute('viewBox');
+  plus.click();
+  assert.equal(await drag(wrap, 'mouse'), 0, 'a drag that works needs no explanation');
+  assert.notEqual(svg.getAttribute('viewBox'), fitVB, 'zoomed in: the drag must actually pan');
+});

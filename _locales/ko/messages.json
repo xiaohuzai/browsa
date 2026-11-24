@@ -1087,6 +1087,10 @@
     "message": "다이어그램: + / − 확대·축소, 방향키 이동, 0 초기화",
     "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
   },
+  "mermaidPanHint": {
+    "message": "드래그하려면 먼저 확대: 더블클릭 또는 Ctrl+스크롤",
+    "description": "Sidepanel: toast when a diagram is drag-panned before zooming in (pan is gated to >fit)"
+  },
   "mermaidExportPng": {
     "message": "PNG 내보내기",
     "description": "Sidepanel: chart export png title"
