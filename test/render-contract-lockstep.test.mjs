@@ -274,6 +274,7 @@ test('lockstep: mermaid zoom has keyboard/pointer/a11y, font changes re-render, 
   assert.match(renderJs, /export function computeAnchoredZoom/);
   assert.match(renderJs, /tabIndex = 0/);
   assert.match(renderJs, /mermaidZoomHint/);
+  assert.match(renderJs, /mermaidPanHint/, 'the gated-off drag hint goes through i18n, not a hard-coded string');
   assert.match(renderJs, /addEventListener\('keydown'/);
   assert.match(renderJs, /addEventListener\('dblclick'/);
   assert.match(renderJs, /addEventListener\('pointerdown'/);

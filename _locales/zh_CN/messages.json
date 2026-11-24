@@ -1087,6 +1087,10 @@
     "message": "图表：+ / − 缩放，方向键平移，0 重置",
     "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
   },
+  "mermaidPanHint": {
+    "message": "放大后可拖动：双击或 Ctrl+滚轮",
+    "description": "Sidepanel: toast when a diagram is drag-panned before zooming in (pan is gated to >fit)"
+  },
   "mermaidExportPng": {
     "message": "导出 PNG",
     "description": "Sidepanel: chart export png title"

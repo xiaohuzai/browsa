@@ -1087,6 +1087,10 @@
     "message": "図：+ / − で拡大縮小、矢印キーで移動、0 でリセット",
     "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
   },
+  "mermaidPanHint": {
+    "message": "ドラッグで動かすには拡大：ダブルクリックまたは Ctrl+スクロール",
+    "description": "Sidepanel: toast when a diagram is drag-panned before zooming in (pan is gated to >fit)"
+  },
   "mermaidExportPng": {
     "message": "PNG をエクスポート",
     "description": "Sidepanel: chart export png title"

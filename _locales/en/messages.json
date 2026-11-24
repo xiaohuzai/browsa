@@ -1087,6 +1087,10 @@
     "message": "Diagram: + / − to zoom, arrow keys to pan, 0 to reset",
     "description": "Sidepanel: diagram keyboard zoom/pan hint (aria-label)"
   },
+  "mermaidPanHint": {
+    "message": "Zoom in to drag: double-click or Ctrl+scroll",
+    "description": "Sidepanel: toast when a diagram is drag-panned before zooming in (pan is gated to >fit)"
+  },
   "mermaidExportPng": {
     "message": "Export PNG",
     "description": "Sidepanel: chart export png title"
